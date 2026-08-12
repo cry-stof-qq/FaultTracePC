@@ -201,16 +201,37 @@ public static class RepairScriptGenerator
         return sb.ToString();
     }
 
-    /// <summary>Écrit le script à côté du rapport et retourne son chemin (null si rien à réparer).</summary>
+    /// <summary>
+    /// Écrit le script .ps1 ET son lanceur .bat à côté du rapport, renseigne les chemins
+    /// dans le rapport, et retourne le chemin du .ps1 (null si rien à réparer).
+    ///
+    /// Le .bat résout les deux blocages de Windows sur les .ps1 double-cliqués :
+    ///  - ExecutionPolicy : contournée pour CETTE exécution seulement (-ExecutionPolicy Bypass,
+    ///    aucun réglage système n'est modifié) ;
+    ///  - droits admin : auto-élévation via Start-Process -Verb RunAs (invite UAC classique).
+    /// </summary>
     public static string? WriteToDisk(DiagnosticReport r)
     {
         if (!IsRepairable(r)) return null;
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC");
         Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, $"Reparation_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.ps1");
+
+        var ps1Name = $"Reparation_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.ps1";
+        var ps1Path = Path.Combine(dir, ps1Name);
         // BOM UTF-8 indispensable pour que PowerShell 5.1 affiche correctement les accents.
-        File.WriteAllText(path, Generate(r), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
-        return path;
+        File.WriteAllText(ps1Path, Generate(r), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        r.RepairScriptPath = ps1Path;
+
+        var batPath = Path.Combine(dir, $"Reparation_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.bat");
+        var bat = "@echo off\r\n"
+                + "rem FaultTracePC - lanceur du script de reparation (double-clic)\r\n"
+                + "rem Demande l'elevation administrateur (UAC) puis execute le .ps1 associe.\r\n"
+                + "powershell -NoProfile -Command \"Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"\"%~dp0" + ps1Name + "\"\"'\"\r\n";
+        // Encodage OEM/ASCII : les .bat n'aiment pas l'UTF-8 avec BOM (d'où l'absence d'accents ci-dessus).
+        File.WriteAllText(batPath, bat, Encoding.ASCII);
+        r.RepairLauncherPath = batPath;
+
+        return ps1Path;
     }
 
     private static string CatLabel(FaultCategory c) => c switch

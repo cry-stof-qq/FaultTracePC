@@ -86,8 +86,14 @@
             <Grid>
                 <TextBlock x:Name="TxtFoot" Text="v0.1 — Phase 1 (scan post-mortem)" FontSize="11" Foreground="#6B7C91"
                            VerticalAlignment="Center"/>
-                <Button x:Name="BtnOpenReport" Content="📄  Ouvrir le dernier rapport" HorizontalAlignment="Right"
-                        Padding="12,6" FontSize="12" IsEnabled="False" Click="BtnOpenReport_Click"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="BtnRepair" Content="🛠  Lancer la réparation" Padding="12,6" FontSize="12"
+                            Margin="0,0,8,0" IsEnabled="False" Click="BtnRepair_Click"
+                            Background="#27AE60" Foreground="White" BorderThickness="0"
+                            ToolTip="Exécute le script PowerShell de réparation généré par le dernier scan (tests en lecture seule automatiques, actions avec confirmation O/N)."/>
+                    <Button x:Name="BtnOpenReport" Content="📄  Ouvrir le dernier rapport"
+                            Padding="12,6" FontSize="12" IsEnabled="False" Click="BtnOpenReport_Click"/>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

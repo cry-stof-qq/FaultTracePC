@@ -10,6 +10,7 @@ namespace FaultTracePC.App;
 public partial class MainWindow : Window
 {
     private string? _lastReportPath;
+    private string? _lastRepairScriptPath;
     private bool _scanning;
 
     public MainWindow()
@@ -40,7 +41,9 @@ public partial class MainWindow : Window
             var report = await new ScanOrchestrator().RunAsync(options, progress);
 
             _lastReportPath = HtmlReportGenerator.WriteToDisk(report);
+            _lastRepairScriptPath = report.RepairScriptPath;
             BtnOpenReport.IsEnabled = true;
+            BtnRepair.IsEnabled = _lastRepairScriptPath is not null;
             ShowResults(report);
             OpenInBrowser(_lastReportPath);
         }
@@ -88,6 +91,35 @@ public partial class MainWindow : Window
     private void BtnOpenReport_Click(object sender, RoutedEventArgs e)
     {
         if (_lastReportPath is not null) OpenInBrowser(_lastReportPath);
+    }
+
+    /// <summary>
+    /// Lance le script de réparation dans une fenêtre PowerShell.
+    /// FaultTracePC tourne déjà en administrateur : la fenêtre héritera de l'élévation,
+    /// et -ExecutionPolicy Bypass ne s'applique qu'à cette exécution (aucun réglage modifié).
+    /// </summary>
+    private void BtnRepair_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastRepairScriptPath is null || !File.Exists(_lastRepairScriptPath))
+        {
+            MessageBox.Show(this, "Aucun script de réparation disponible — relance d'abord un scan.",
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{_lastRepairScriptPath}\"",
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Impossible de lancer le script ({ex.Message}).\nChemin : {_lastRepairScriptPath}",
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OpenInBrowser(string path)

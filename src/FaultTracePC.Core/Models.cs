@@ -231,6 +231,8 @@ public sealed class DiagnosticReport
     public List<string> CollectorErrors { get; set; } = new();
     /// <summary>Chemin du script PowerShell de réparation généré (si des problèmes ont été trouvés).</summary>
     public string? RepairScriptPath { get; set; }
+    /// <summary>Lanceur .bat à double-clic (élévation UAC + ExecutionPolicy Bypass automatiques).</summary>
+    public string? RepairLauncherPath { get; set; }
 }
 
 public sealed class ScanOptions

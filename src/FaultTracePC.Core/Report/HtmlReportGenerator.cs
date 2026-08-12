@@ -44,7 +44,7 @@ public static class HtmlReportGenerator
     public static string WriteToDisk(DiagnosticReport r)
     {
         // Le script d'abord : le rapport HTML référence son chemin et embarque son contenu.
-        r.RepairScriptPath = RepairScriptGenerator.WriteToDisk(r);
+        RepairScriptGenerator.WriteToDisk(r); // renseigne RepairScriptPath + RepairLauncherPath
 
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC");
         Directory.CreateDirectory(dir);
@@ -104,8 +104,13 @@ public static class HtmlReportGenerator
         sb.Append("<p>Un script PowerShell de tests et réparations <strong>adapté aux problèmes détectés ci-dessus</strong> a été généré. ");
         sb.Append("Les tests en lecture seule s'exécutent automatiquement ; toute action qui modifie le système demande confirmation (O/N). ");
         sb.Append("Un journal complet est conservé dans <code>Documents\\FaultTracePC</code>.</p>");
-        sb.Append($"<p><strong>Script :</strong> <code>{H(r.RepairScriptPath)}</code></p>");
-        sb.Append("<p>Exécution : clic droit sur le fichier → <em>Exécuter avec PowerShell</em> (accepter l'élévation), ou depuis un terminal administrateur :</p>");
+        if (r.RepairLauncherPath is not null)
+        {
+            sb.Append($"<p><strong>Le plus simple — double-clique sur :</strong> <code>{H(r.RepairLauncherPath)}</code><br>");
+            sb.Append("<span class=\"small\">Ce lanceur demande l'élévation administrateur (UAC) et exécute le script automatiquement — aucun réglage Windows n'est modifié. ");
+            sb.Append("Tu peux aussi cliquer sur « Lancer la réparation » directement dans FaultTracePC après un scan.</span></p>");
+        }
+        sb.Append($"<p><strong>Script détaillé :</strong> <code>{H(r.RepairScriptPath)}</code> — exécutable aussi depuis un terminal administrateur :</p>");
         sb.Append($"<pre>powershell -ExecutionPolicy Bypass -File \"{H(r.RepairScriptPath)}\"</pre>");
         sb.Append("<button class=\"btn\" onclick=\"downloadRepair()\">💾 Retélécharger le script (.ps1)</button>");
         sb.Append("</div>");
