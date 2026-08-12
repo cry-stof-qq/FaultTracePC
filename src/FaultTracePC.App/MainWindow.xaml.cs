@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO; // retiré des usings implicites par le SDK WPF (conflit Path) — requis pour File.Exists
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
