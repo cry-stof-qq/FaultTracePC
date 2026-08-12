@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- Permet la compilation croisée depuis un environnement non-Windows (CI/cloud). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyTitle>FaultTracePC Core</AssemblyTitle>
+    <Description>Moteur de collecte et de diagnostic de pannes Windows (FaultTracePC)</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Accès WMI (Win32_OperatingSystem, Win32_DiskDrive, etc.) -->
+    <PackageReference Include="System.Management" Version="10.0.10" />
+    <!-- Lecture du journal d'événements Windows (EventLogQuery / EventLogReader) -->
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.10" />
+  </ItemGroup>
+
+</Project>

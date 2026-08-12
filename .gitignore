@@ -1,0 +1,8 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+publish/
+Diagnostic_PC_*.html
+Reparation_PC_*.ps1

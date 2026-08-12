@@ -1,0 +1,519 @@
+using System.Globalization;
+using FaultTracePC.Core.Collectors;
+
+namespace FaultTracePC.Core.Analysis;
+
+/// <summary>
+/// Moteur de corrélation : croise dumps, journaux d'événements, fiabilité et
+/// état matériel pour produire des conclusions hiérarchisées, avec un niveau
+/// de confiance affiché honnêtement (élevée / moyenne / faible).
+/// </summary>
+public sealed class RulesEngine
+{
+    public void Analyze(DiagnosticReport r)
+    {
+        r.Bsods = BuildIncidents(r);
+
+        AnalyzeBsodPatterns(r);
+        AnalyzeWhea(r);
+        AnalyzeMemory(r);
+        AnalyzeResourceExhaustion(r);
+        AnalyzeMemoryPressureNow(r);
+        AnalyzeStorage(r);
+        AnalyzeGpu(r);
+        AnalyzePowerLoss(r);
+        AnalyzeAppCrashes(r);
+        AnalyzeServiceFailures(r);
+        AnalyzeUpdateCorrelation(r);
+        AnalyzeDiskSpace(r);
+
+        if (r.Findings.Count == 0)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Info,
+                Confidence = Confidence.High,
+                Category = FaultCategory.None,
+                Title = "Aucune anomalie significative détectée",
+                Details = $"Aucun BSOD, aucune erreur matérielle WHEA, aucune erreur disque et aucun arrêt inattendu sur les {r.ScanPeriodDays} derniers jours.",
+                Recommendation = "Si un problème persiste malgré tout, augmenter la période d'analyse ou activer la surveillance temps réel (mode 2) pour capturer le prochain incident."
+            });
+        }
+
+        // Tri : critiques d'abord, puis avertissements, puis infos.
+        r.Findings = r.Findings
+            .OrderBy(f => f.Severity)
+            .ThenBy(f => f.Confidence)
+            .ToList();
+
+        ComputeVerdict(r);
+    }
+
+    // ------------------------------------------------------------------
+    // Construction des incidents BSOD (fusion dumps + événements 1001)
+    // ------------------------------------------------------------------
+
+    private static List<BsodIncident> BuildIncidents(DiagnosticReport r)
+    {
+        var incidents = new List<BsodIncident>();
+
+        foreach (var d in r.Dumps.Where(d =>
+                     d.Kind is DumpKind.KernelMinidump or DumpKind.FullMemoryDump && d.BugCheckCode is not null))
+        {
+            incidents.Add(new BsodIncident
+            {
+                TimeLocal = d.CrashTimeFromHeader ?? d.LastWriteTime,
+                BugCheckCode = d.BugCheckCode,
+                Parameters = d.BugCheckParameters,
+                BugCheckName = BugCheckCatalog.NameOf(d.BugCheckCode!.Value),
+                DumpPath = d.Path,
+                Sources = { d.Kind == DumpKind.FullMemoryDump ? "MEMORY.DMP" : "Minidump" },
+            });
+        }
+
+        foreach (var e in r.Events.Where(e => e.Category == EventCategory.Bsod))
+        {
+            uint? code = ParseHex(e.Extracted.GetValueOrDefault("BugCheckCode"));
+            var existing = incidents.FirstOrDefault(i =>
+                Math.Abs((i.TimeLocal - e.TimeLocal).TotalMinutes) < 10 &&
+                (code is null || i.BugCheckCode == code));
+
+            if (existing is not null)
+            {
+                if (!existing.Sources.Contains("Événement BugCheck 1001"))
+                    existing.Sources.Add("Événement BugCheck 1001");
+            }
+            else
+            {
+                incidents.Add(new BsodIncident
+                {
+                    TimeLocal = e.TimeLocal,
+                    BugCheckCode = code,
+                    BugCheckName = code is null ? "(code non extrait)" : BugCheckCatalog.NameOf(code.Value),
+                    DumpPath = e.Extracted.GetValueOrDefault("DumpPath"),
+                    Sources = { "Événement BugCheck 1001" },
+                });
+            }
+        }
+
+        // Pilote suspect via TDR proche (cas GPU) — best-effort en attendant l'analyse CDB (Phase 2).
+        foreach (var i in incidents.Where(i => i.BugCheckCode is 0x116 or 0x117 or 0x119 or 0xEA))
+        {
+            var tdr = r.Events.FirstOrDefault(e => e.Category == EventCategory.Tdr &&
+                Math.Abs((e.TimeLocal - i.TimeLocal).TotalMinutes) < 30);
+            if (tdr is not null && tdr.Extracted.TryGetValue("Driver", out var drv) && !string.IsNullOrWhiteSpace(drv))
+                i.SuspectDriver = drv;
+        }
+
+        return incidents.OrderByDescending(i => i.TimeLocal).ToList();
+    }
+
+    private static uint? ParseHex(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        s = s.Trim();
+        if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) s = s[2..];
+        return uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var v) ? v : null;
+    }
+
+    // ------------------------------------------------------------------
+    // Règles
+    // ------------------------------------------------------------------
+
+    private static void AnalyzeBsodPatterns(DiagnosticReport r)
+    {
+        if (r.Bsods.Count == 0) return;
+
+        // Un finding par code STOP distinct, avec détection de récurrence.
+        foreach (var group in r.Bsods.Where(b => b.BugCheckCode is not null).GroupBy(b => b.BugCheckCode!.Value))
+        {
+            var entry = BugCheckCatalog.Lookup(group.Key);
+            int n = group.Count();
+            var last = group.Max(b => b.TimeLocal);
+            var drivers = group.Where(b => b.SuspectDriver is not null).Select(b => b.SuspectDriver!).Distinct().ToList();
+
+            var details = $"{n} occurrence(s) de l'écran bleu {BugCheckCatalog.NameOf(group.Key)} (0x{group.Key:X8}), dernière le {last:dd/MM/yyyy HH:mm}.";
+            if (entry is not null) details += " " + entry.Description;
+            if (drivers.Count > 0) details += $" Pilote suspect : {string.Join(", ", drivers)}.";
+
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Critical,
+                Confidence = n >= 2 ? Confidence.High : Confidence.Medium,
+                Category = entry?.Category ?? FaultCategory.Driver,
+                Title = n >= 2
+                    ? $"BSOD récurrent : {BugCheckCatalog.NameOf(group.Key)} ({n}×)"
+                    : $"BSOD : {BugCheckCatalog.NameOf(group.Key)}",
+                Details = details,
+                Recommendation = entry?.Advice ?? "Analyser le dump avec WinDbg (!analyze -v) pour identifier le module fautif — automatisé en Phase 2.",
+            });
+        }
+
+        var noCode = r.Bsods.Count(b => b.BugCheckCode is null);
+        if (noCode > 0)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Warning,
+                Confidence = Confidence.Medium,
+                Category = FaultCategory.None,
+                Title = $"{noCode} crash(s) sans code STOP extrait",
+                Details = "Un redémarrage après erreur a été journalisé mais le code n'a pas pu être lu (dump absent ou purgé).",
+                Recommendation = "Vérifier que la création de dumps est activée : Système > Paramètres avancés > Démarrage et récupération > « Image mémoire du noyau »."
+            });
+        }
+    }
+
+    private static void AnalyzeWhea(DiagnosticReport r)
+    {
+        var whea = r.Events.Where(e => e.Category == EventCategory.Whea).ToList();
+        if (whea.Count == 0) return;
+
+        bool fatal = r.Bsods.Any(b => b.BugCheckCode == 0x124);
+        r.Findings.Add(new Finding
+        {
+            Severity = fatal || whea.Count >= 5 ? Severity.Critical : Severity.Warning,
+            Confidence = fatal ? Confidence.High : Confidence.Medium,
+            Category = FaultCategory.Hardware,
+            Title = $"Erreurs matérielles WHEA détectées ({whea.Count})",
+            Details = $"Le processeur a signalé {whea.Count} erreur(s) matérielle(s) (WHEA-Logger) sur la période."
+                      + (fatal ? " Un BSOD WHEA_UNCORRECTABLE_ERROR (0x124) confirme une erreur matérielle fatale." : "")
+                      + $" Dernier événement : {whea.Max(e => e.TimeLocal):dd/MM/yyyy HH:mm}."
+                      + $" Matériel concerné : CPU {r.System.Cpu.Name} · carte mère {r.System.Bios.BaseboardManufacturer} {r.System.Bios.BaseboardProduct} (BIOS {r.System.Bios.Version}).",
+            Recommendation = "Vérifier les températures et la stabilité de l'alimentation ; retirer tout overclocking/XMP ; mettre à jour le BIOS. "
+                           + "Des WHEA récurrentes pointent vers CPU, carte mère, alimentation ou RAM — à tester dans cet ordre."
+        });
+    }
+
+    private static void AnalyzeMemory(DiagnosticReport r)
+    {
+        var memBsods = r.Bsods.Where(b => b.BugCheckCode is 0x1A or 0x50 or 0x4E or 0x12B).ToList();
+        var diagErrors = r.Events.Any(e => e.Category == EventCategory.MemoryDiag &&
+                                           e.Extracted.GetValueOrDefault("HasErrors") == "True");
+        var diagOk = r.Events.Any(e => e.Category == EventCategory.MemoryDiag &&
+                                       e.Extracted.GetValueOrDefault("HasErrors") == "False");
+
+        if (diagErrors)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Critical,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Memory,
+                Title = "RAM défectueuse confirmée par le diagnostic mémoire Windows",
+                Details = "Le diagnostic mémoire Windows (mdsched) a détecté des erreurs matérielles sur la période analysée." + HardwareRamList(r),
+                Recommendation = "Tester les barrettes une par une (MemTest86, plusieurs passes) et remplacer la barrette fautive. Désactiver XMP le temps du test."
+            });
+        }
+        else if (memBsods.Count >= 2)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Critical,
+                Confidence = Confidence.Medium,
+                Category = FaultCategory.Memory,
+                Title = "Suspicion de RAM défectueuse (BSOD mémoire récurrents)",
+                Details = $"{memBsods.Count} BSOD de type mémoire (MEMORY_MANAGEMENT / PAGE_FAULT…) sur la période."
+                          + (diagOk ? " Le dernier diagnostic mémoire Windows n'avait rien détecté — MemTest86 est plus sensible." : "")
+                          + HardwareRamList(r),
+                Recommendation = "Lancer MemTest86 (4+ passes). Si XMP/DOCP est actif, le désactiver et re-tester : une instabilité XMP est une cause classique."
+            });
+        }
+    }
+
+    /// <summary>
+    /// Saturation de la mémoire virtuelle détectée par Windows lui-même
+    /// (Resource-Exhaustion-Detector 2004) : cause LOGICIELLE, avec les processus
+    /// coupables nommés — cas typique d'un logiciel de virtualisation ou d'une fuite mémoire.
+    /// </summary>
+    private static void AnalyzeResourceExhaustion(DiagnosticReport r)
+    {
+        var events = r.Events.Where(e => e.Category == EventCategory.ResourceExhaustion).ToList();
+        if (events.Count == 0) return;
+
+        var culprits = events
+            .SelectMany(e => (e.Extracted.GetValueOrDefault("Processus") ?? "").Split(", ", StringSplitOptions.RemoveEmptyEntries))
+            .GroupBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"{g.Key} ({g.Count()}×)")
+            .Take(5).ToList();
+
+        r.Findings.Add(new Finding
+        {
+            Severity = events.Count >= 2 ? Severity.Critical : Severity.Warning,
+            Confidence = Confidence.High,
+            Category = FaultCategory.Software,
+            Title = $"Mémoire saturée : Windows a détecté l'épuisement de la mémoire virtuelle ({events.Count}×)",
+            Details = "Windows a diagnostiqué une pénurie de mémoire virtuelle (événement Resource-Exhaustion-Detector 2004). "
+                      + (culprits.Count > 0
+                          ? $"Processus les plus gourmands identifiés par Windows : {string.Join(", ", culprits)}. "
+                          : "")
+                      + "Ce profil est LOGICIEL : un programme consomme toute la mémoire (virtualisation, fuite mémoire, trop d'applications), "
+                      + "ce qui provoque gels, plantages d'applications et parfois des BSOD mémoire — sans que la RAM soit défectueuse."
+                      + $" Dernière occurrence : {events.Max(e => e.TimeLocal):dd/MM/yyyy HH:mm}.",
+            Recommendation = "Limiter la mémoire du processus en cause (ex. pour la virtualisation : réduire la RAM allouée aux VM, "
+                           + "ou fichier .wslconfig pour WSL/Docker avec « memory=8GB »). Vérifier la taille du fichier d'échange "
+                           + "(recommandé : géré automatiquement). Le script de réparation inclut ces vérifications."
+        });
+    }
+
+    /// <summary>État mémoire au moment du scan (instantané) : signale une pression mémoire en cours.</summary>
+    private static void AnalyzeMemoryPressureNow(DiagnosticReport r)
+    {
+        var os = r.System.Os;
+        if (os.TotalVirtualMemoryKB == 0) return;
+        var commitUsedPct = 100.0 * (os.TotalVirtualMemoryKB - os.FreeVirtualMemoryKB) / os.TotalVirtualMemoryKB;
+        var physUsedPct = os.TotalVisibleMemoryKB == 0 ? 0
+            : 100.0 * (os.TotalVisibleMemoryKB - os.FreePhysicalMemoryKB) / os.TotalVisibleMemoryKB;
+        if (commitUsedPct < 90 && physUsedPct < 92) return;
+
+        var top = r.Processes.Take(3)
+            .Select(p => $"{p.Name} ({FormatBytes((ulong)p.PrivateBytes)})").ToList();
+
+        r.Findings.Add(new Finding
+        {
+            Severity = Severity.Warning,
+            Confidence = Confidence.High,
+            Category = FaultCategory.Software,
+            Title = $"Pression mémoire ÉLEVÉE en ce moment ({commitUsedPct:0} % de la mémoire virtuelle utilisée)",
+            Details = $"Au moment du scan : mémoire physique utilisée à {physUsedPct:0} %, mémoire virtuelle (RAM + fichier d'échange) à {commitUsedPct:0} %. "
+                      + (top.Count > 0 ? $"Plus gros consommateurs actuels : {string.Join(", ", top)}." : ""),
+            Recommendation = "Voir la section « Processus en cours » du rapport pour le détail complet, et réduire la consommation du ou des processus en tête."
+        });
+    }
+
+    private static void AnalyzeStorage(DiagnosticReport r)
+    {
+        var diskEvents = r.Events.Where(e => e.Category == EventCategory.DiskError).ToList();
+        var badDisks = r.System.Disks.Where(d =>
+            (d.HealthStatus is "Avertissement" or "Défaillant") ||
+            (!string.IsNullOrEmpty(d.WmiStatus) && !d.WmiStatus.Equals("OK", StringComparison.OrdinalIgnoreCase))).ToList();
+        var storageBsods = r.Bsods.Where(b => b.BugCheckCode is 0x24 or 0x7A or 0xF4 or 0x154 or 0xDE).ToList();
+
+        foreach (var d in badDisks)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Critical,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Storage,
+                Title = $"Disque en mauvaise santé : {d.Model}",
+                Details = $"État signalé : {(string.IsNullOrEmpty(d.HealthStatus) ? d.WmiStatus : d.HealthStatus)}."
+                          + (d.ReadErrorsTotal > 0 ? $" {d.ReadErrorsTotal} erreurs de lecture cumulées." : ""),
+                Recommendation = "Sauvegarder immédiatement les données puis remplacer le disque. Vérifier le rapport SMART complet (CrystalDiskInfo) pour confirmation."
+            });
+        }
+
+        if (diskEvents.Count >= 3 || (diskEvents.Count > 0 && storageBsods.Count > 0))
+        {
+            var byProvider = diskEvents.GroupBy(e => e.Provider)
+                .Select(g => $"{g.Key} ×{g.Count()}").ToList();
+            r.Findings.Add(new Finding
+            {
+                Severity = storageBsods.Count > 0 ? Severity.Critical : Severity.Warning,
+                Confidence = storageBsods.Count > 0 ? Confidence.High : Confidence.Medium,
+                Category = FaultCategory.Storage,
+                Title = $"Erreurs disque répétées ({diskEvents.Count})",
+                Details = $"Sources : {string.Join(", ", byProvider)}."
+                          + (storageBsods.Count > 0 ? $" Corrélées à {storageBsods.Count} BSOD de type stockage." : "")
+                          + " L'événement disk 153 / stornvme 129 signale des opérations retentées : disque, câble ou contrôleur en cause.",
+                Recommendation = "Vérifier câbles SATA/alimentation, mettre à jour le firmware du SSD, exécuter chkdsk, surveiller le SMART."
+            });
+        }
+    }
+
+    private static void AnalyzeGpu(DiagnosticReport r)
+    {
+        var tdr = r.Events.Where(e => e.Category == EventCategory.Tdr).ToList();
+        var gpuBsods = r.Bsods.Where(b => b.BugCheckCode is 0x116 or 0x117 or 0x119 or 0xEA).ToList();
+        if (tdr.Count == 0 && gpuBsods.Count == 0) return;
+
+        var drivers = tdr.Select(e => e.Extracted.GetValueOrDefault("Driver"))
+                         .Where(d => !string.IsNullOrWhiteSpace(d)).Distinct().ToList();
+
+        r.Findings.Add(new Finding
+        {
+            Severity = gpuBsods.Count > 0 ? Severity.Critical : Severity.Warning,
+            Confidence = (tdr.Count + gpuBsods.Count) >= 3 ? Confidence.High : Confidence.Medium,
+            Category = FaultCategory.GpuDriver,
+            Title = $"Instabilité du pilote graphique ({tdr.Count} réinitialisation(s), {gpuBsods.Count} BSOD)",
+            Details = $"Le pilote d'affichage a cessé de répondre puis a été récupéré (TDR){(drivers.Count > 0 ? $" — pilote : {string.Join(", ", drivers!)}" : "")}."
+                      + " Des TDR répétés indiquent pilote GPU instable, surchauffe GPU ou carte défaillante."
+                      + (r.System.Gpus.Count > 0
+                          ? $" Matériel concerné : {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (pilote {g.DriverVersion} du {g.DriverDate:dd/MM/yyyy})"))}."
+                          : ""),
+            Recommendation = "Désinstallation propre du pilote (DDU en mode sans échec) puis installation de la dernière version stable ; surveiller la température GPU en charge ; tester sans overclocking."
+        });
+    }
+
+    private static void AnalyzePowerLoss(DiagnosticReport r)
+    {
+        // Kernel-Power 41 avec BugcheckCode=0 et sans BSOD proche = coupure d'alimentation brutale.
+        var hardLosses = r.Events.Where(e =>
+            e.Category == EventCategory.PowerLoss &&
+            e.Extracted.GetValueOrDefault("BugcheckCode", "0") == "0" &&
+            !r.Bsods.Any(b => Math.Abs((b.TimeLocal - e.TimeLocal).TotalMinutes) < 5)).ToList();
+
+        if (hardLosses.Count == 0) return;
+
+        r.Findings.Add(new Finding
+        {
+            Severity = hardLosses.Count >= 2 ? Severity.Critical : Severity.Warning,
+            Confidence = Confidence.Medium,
+            Category = FaultCategory.Power,
+            Title = $"{hardLosses.Count} coupure(s) brutale(s) sans écran bleu",
+            Details = "Le système s'est éteint sans arrêt propre ni BSOD enregistré (Kernel-Power 41, code 0). "
+                      + "Causes typiques : alimentation (PSU) défaillante ou sous-dimensionnée, surchauffe déclenchant la protection thermique, "
+                      + "câble/prise, ou blocage matériel complet. Ce profil n'est PAS un bug logiciel classique."
+                      + $" Dernière occurrence : {hardLosses.Max(e => e.TimeLocal):dd/MM/yyyy HH:mm}.",
+            Recommendation = "Vérifier températures CPU/GPU en charge, dépoussiérer, contrôler les branchements. Si récurrent, tester avec une autre alimentation. "
+                           + "La surveillance temps réel (mode 2) enregistrera les températures juste avant la prochaine coupure."
+        });
+    }
+
+    private static void AnalyzeAppCrashes(DiagnosticReport r)
+    {
+        var crashes = r.Events.Where(e => e.Category == EventCategory.AppCrash).ToList();
+        if (crashes.Count == 0) return;
+
+        var topApps = crashes.GroupBy(e => e.Extracted.GetValueOrDefault("App", "(inconnue)"))
+            .OrderByDescending(g => g.Count()).Take(5).ToList();
+
+        foreach (var g in topApps.Where(g => g.Count() >= 3))
+        {
+            var modules = g.Select(e => e.Extracted.GetValueOrDefault("Module"))
+                           .Where(m => !string.IsNullOrWhiteSpace(m)).Distinct().Take(3).ToList();
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Warning,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Software,
+                Title = $"Application instable : {g.Key} ({g.Count()} crashs)",
+                Details = $"{g.Count()} plantages sur la période"
+                          + (modules.Count > 0 ? $", module(s) fautif(s) : {string.Join(", ", modules!)}" : "") + ".",
+                Recommendation = "Réinstaller/mettre à jour l'application. Si le module fautif est une DLL système ou un pilote (ex: DLL du pilote graphique), traiter ce composant en priorité."
+            });
+        }
+
+        // Module fautif commun à plusieurs applications = cause transversale.
+        var crossModule = crashes
+            .Where(e => e.Extracted.ContainsKey("Module"))
+            .GroupBy(e => e.Extracted["Module"], StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Select(e => e.Extracted.GetValueOrDefault("App", "")).Distinct().Count() >= 3)
+            .OrderByDescending(g => g.Count())
+            .FirstOrDefault();
+
+        if (crossModule is not null && !crossModule.Key.Equals("unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Warning,
+                Confidence = Confidence.Medium,
+                Category = FaultCategory.Software,
+                Title = $"Module fautif commun à plusieurs applications : {crossModule.Key}",
+                Details = $"Ce module apparaît dans les crashs de {crossModule.Select(e => e.Extracted.GetValueOrDefault("App", "")).Distinct().Count()} applications différentes — la cause est probablement ce composant, pas les applications.",
+                Recommendation = "Identifier à quoi appartient ce module (pilote, runtime, antivirus, overlay) et le mettre à jour ou le désinstaller."
+            });
+        }
+    }
+
+    private static void AnalyzeServiceFailures(DiagnosticReport r)
+    {
+        var fails = r.Events.Where(e => e.Category == EventCategory.ServiceFailure).ToList();
+        if (fails.Count < 5) return;
+        r.Findings.Add(new Finding
+        {
+            Severity = Severity.Info,
+            Confidence = Confidence.Medium,
+            Category = FaultCategory.Software,
+            Title = $"Échecs de services Windows répétés ({fails.Count})",
+            Details = "Des services n'ont pas démarré ou se sont arrêtés de façon inattendue de manière répétée.",
+            Recommendation = "Consulter le détail dans la section Événements pour identifier le(s) service(s) concerné(s)."
+        });
+    }
+
+    private static void AnalyzeUpdateCorrelation(DiagnosticReport r)
+    {
+        var updates = r.Events.Where(e => e.Category == EventCategory.WindowsUpdate && e.EventId == 19).ToList();
+        if (updates.Count == 0 || r.Bsods.Count == 0) return;
+
+        var correlated = r.Bsods.Where(b => updates.Any(u =>
+            b.TimeLocal > u.TimeLocal && b.TimeLocal < u.TimeLocal.AddHours(48))).ToList();
+
+        if (correlated.Count > 0)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Info,
+                Confidence = Confidence.Low,
+                Category = FaultCategory.WindowsUpdate,
+                Title = $"{correlated.Count} crash(s) survenus dans les 48 h après une mise à jour Windows",
+                Details = "Corrélation temporelle uniquement — ce n'est pas une preuve de causalité, mais un point à vérifier si les crashs ont commencé après une mise à jour précise.",
+                Recommendation = "Si le début des crashs coïncide avec une mise à jour, envisager sa désinstallation (Paramètres > Windows Update > Historique) ou une mise à jour des pilotes concernés."
+            });
+        }
+    }
+
+    private static void AnalyzeDiskSpace(DiagnosticReport r)
+    {
+        foreach (var v in r.System.Volumes.Where(v => v.SizeBytes > 0 && v.PercentFree < 8))
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = v.PercentFree < 4 ? Severity.Warning : Severity.Info,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Storage,
+                Title = $"Espace disque faible sur {v.Letter} ({v.PercentFree} % libre)",
+                Details = $"Volume {v.Letter} ({v.Label}) : {FormatBytes(v.FreeBytes)} libres sur {FormatBytes(v.SizeBytes)}. Un disque système saturé provoque lenteurs et échecs d'écriture du fichier d'échange ou des dumps.",
+                Recommendation = "Libérer de l'espace (nettoyage de disque, %TEMP%, anciens dumps volumineux comme MEMORY.DMP une fois analysé)."
+            });
+        }
+    }
+
+    private static void ComputeVerdict(DiagnosticReport r)
+    {
+        var critical = r.Findings.Where(f => f.Severity == Severity.Critical).ToList();
+        if (critical.Count == 0)
+        {
+            var warnings = r.Findings.Where(f => f.Severity == Severity.Warning).ToList();
+            if (warnings.Count == 0)
+            {
+                r.Verdict = "Système sain sur la période analysée : aucun crash ni signe de défaillance détecté.";
+                r.VerdictCategory = FaultCategory.None;
+                return;
+            }
+            var w = warnings.First();
+            r.VerdictCategory = w.Category;
+            r.Verdict = $"Pas de panne critique, mais des points de vigilance — le plus notable : {w.Title}.";
+            return;
+        }
+
+        var top = critical.GroupBy(f => f.Category).OrderByDescending(g => g.Count()).First().Key;
+        r.VerdictCategory = top;
+        r.Verdict = top switch
+        {
+            FaultCategory.Hardware => "Cause la plus probable : MATÉRIELLE (CPU/carte mère/alimentation ou surchauffe). Les erreurs WHEA et/ou codes STOP matériels dominent.",
+            FaultCategory.Memory => "Cause la plus probable : MÉMOIRE RAM. Les codes STOP et/ou diagnostics pointent vers la RAM.",
+            FaultCategory.Storage => "Cause la plus probable : STOCKAGE (disque/SSD, câblage ou firmware).",
+            FaultCategory.GpuDriver => "Cause la plus probable : PILOTE GRAPHIQUE ou carte graphique (TDR/BSOD vidéo).",
+            FaultCategory.Driver => "Cause la plus probable : PILOTE défectueux (voir le détail des BSOD pour le module concerné).",
+            FaultCategory.Power => "Cause la plus probable : ALIMENTATION ou surchauffe (coupures brutales sans écran bleu).",
+            FaultCategory.Software => "Cause la plus probable : LOGICIELLE (corruption système ou application).",
+            _ => "Pannes détectées — voir le détail des conclusions ci-dessous.",
+        } + $" ({critical.Count} conclusion(s) critique(s))";
+    }
+
+    /// <summary>Liste marque/modèle des barrettes RAM installées, pour les conclusions mémoire.</summary>
+    private static string HardwareRamList(DiagnosticReport r) =>
+        r.System.RamModules.Count == 0 ? ""
+        : " Barrettes installées : " + string.Join(" ; ",
+            r.System.RamModules.Select(m => $"{m.DeviceLocator} {m.Manufacturer} {m.PartNumber} ({FormatBytes(m.CapacityBytes)})")) + ".";
+
+    internal static string FormatBytes(ulong bytes)
+    {
+        string[] units = ["o", "Ko", "Mo", "Go", "To"];
+        double v = bytes; int u = 0;
+        while (v >= 1024 && u < units.Length - 1) { v /= 1024; u++; }
+        return $"{v:0.#} {units[u]}";
+    }
+}

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <!-- Permet la compilation croisée depuis un environnement non-Windows (CI/cloud). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <AssemblyName>FaultTracePC</AssemblyName>
+    <RootNamespace>FaultTracePC.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.2.0</Version>
+    <Product>FaultTracePC</Product>
+    <Company>Cry-stof</Company>
+    <Description>Diagnostic des pannes et crashs Windows 10/11</Description>
+
+    <!-- Publication : exe unique. Voir README pour framework-dependent vs self-contained. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FaultTracePC.Core\FaultTracePC.Core.csproj" />
+  </ItemGroup>
+
+</Project>
