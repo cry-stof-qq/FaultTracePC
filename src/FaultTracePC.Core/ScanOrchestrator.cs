@@ -53,6 +53,20 @@ public sealed class ScanOrchestrator
         }
         ct.ThrowIfCancellationRequested();
 
+        Step(progress, "Lecture de la boîte noire (surveillance temps réel)…", 86);
+        try
+        {
+            var crashTimes = new List<DateTime>();
+            crashTimes.AddRange(report.Dumps
+                .Where(d => d.Kind is DumpKind.KernelMinidump or DumpKind.FullMemoryDump)
+                .Select(d => d.CrashTimeFromHeader ?? d.LastWriteTime));
+            crashTimes.AddRange(report.Events
+                .Where(e => e.Category is EventCategory.PowerLoss or EventCategory.UnexpectedShutdown)
+                .Select(e => e.TimeLocal));
+            report.Flight = new FlightJournalCollector(errors).Collect(crashTimes, options.Days);
+        }
+        catch (Exception ex) { errors.Add($"Boîte noire : {ex.Message}"); }
+
         Step(progress, "Corrélation et diagnostic…", 90);
         new RulesEngine().Analyze(report);
 

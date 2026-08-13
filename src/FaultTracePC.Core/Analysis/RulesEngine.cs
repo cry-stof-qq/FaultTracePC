@@ -22,6 +22,7 @@ public sealed class RulesEngine
         AnalyzeMemoryPressureNow(r);
         AnalyzeVirtualizationMemory(r);
         AnalyzeDumpWindow(r);
+        AnalyzeFlightRecorder(r);
         AnalyzeStorage(r);
         AnalyzeGpu(r);
         AnalyzePowerLoss(r);
@@ -496,6 +497,84 @@ public sealed class RulesEngine
                       + "Le journal d'événements de ces dates n'a donc pas été examiné : le diagnostic de ces crashs est incomplet.",
             Recommendation = "Relancer le scan avec une période de 90 jours pour corréler ces crashs avec les événements de l'époque."
         });
+    }
+
+    /// <summary>
+    /// Exploite la boîte noire : que se passait-il dans les secondes AVANT chaque crash ?
+    /// Surchauffe, saturation mémoire ou rien d'anormal — chaque cas a sa conclusion.
+    /// </summary>
+    private static void AnalyzeFlightRecorder(DiagnosticReport r)
+    {
+        var f = r.Flight;
+
+        // Pas de journal : proposer la surveillance seulement s'il y a des pannes à élucider.
+        if (!f.JournalFound)
+        {
+            if (r.Bsods.Count > 0 || r.Events.Any(e => e.Category == EventCategory.PowerLoss))
+            {
+                r.Findings.Add(new Finding
+                {
+                    Severity = Severity.Info,
+                    Confidence = Confidence.High,
+                    Category = FaultCategory.None,
+                    Title = "Surveillance temps réel non installée — le contexte des crashs est perdu",
+                    Details = "Cette machine a des crashs mais aucune boîte noire : impossible de savoir quelles étaient les températures, la mémoire et les processus au moment exact des pannes.",
+                    Recommendation = "Activer la surveillance temps réel (bouton « 📡 » dans FaultTracePC) : le prochain crash sera capturé avec ses dernières secondes de contexte."
+                });
+            }
+            return;
+        }
+
+        foreach (var ctx in f.Contexts)
+        {
+            var last = ctx.Samples.LastOrDefault();
+            if (last is null) continue;
+            var maxCpuTemp = ctx.Samples.Max(s => s.CpuTemp ?? 0);
+            var maxGpuTemp = ctx.Samples.Max(s => s.GpuTemp ?? 0);
+            var maxCommit = ctx.Samples.Max(s => s.CommitPct ?? 0);
+
+            if (maxCpuTemp >= 90 || maxGpuTemp >= 92)
+            {
+                r.Findings.Add(new Finding
+                {
+                    Severity = Severity.Critical,
+                    Confidence = Confidence.High,
+                    Category = FaultCategory.Hardware,
+                    Title = $"SURCHAUFFE mesurée juste avant le crash du {ctx.CrashTime:dd/MM HH:mm} "
+                          + $"({(maxCpuTemp >= 90 ? $"CPU {maxCpuTemp:0} °C" : $"GPU {maxGpuTemp:0} °C")})",
+                    Details = $"La boîte noire montre {(maxCpuTemp >= 90 ? $"le CPU à {maxCpuTemp:0} °C" : $"le GPU à {maxGpuTemp:0} °C")} "
+                            + "dans les secondes précédant le crash — une surchauffe qui déclenche la protection matérielle. "
+                            + $"Derniers relevés : CPU {last.CpuLoad:0} % / {last.CpuTemp:0} °C, mémoire {last.MemPct:0} %.",
+                    Recommendation = "Dépoussiérer radiateurs et ventilateurs, vérifier leur rotation, renouveler la pâte thermique si la machine a plusieurs années, contrôler la ventilation du boîtier."
+                });
+            }
+            else if (maxCommit >= 95)
+            {
+                r.Findings.Add(new Finding
+                {
+                    Severity = Severity.Critical,
+                    Confidence = Confidence.High,
+                    Category = FaultCategory.Software,
+                    Title = $"Mémoire virtuelle SATURÉE juste avant le crash du {ctx.CrashTime:dd/MM HH:mm} ({maxCommit:0} %)",
+                    Details = $"La boîte noire montre la mémoire virtuelle à {maxCommit:0} % dans les secondes précédant le crash. "
+                            + $"Processus dominants alors : {ctx.Samples.LastOrDefault(s => s.TopProcesses is not null)?.TopProcesses ?? "non relevés"}.",
+                    Recommendation = "Identifier le processus dominant ci-dessus et limiter sa consommation (virtualisation → .wslconfig ; fuite mémoire → mise à jour de l'application)."
+                });
+            }
+        }
+
+        if (f.AbruptSessionEnds > 0 && f.Contexts.Count == 0)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Info,
+                Confidence = Confidence.Medium,
+                Category = FaultCategory.None,
+                Title = $"{f.AbruptSessionEnds} arrêt(s) brutal(aux) détecté(s) par la boîte noire",
+                Details = "Le journal de surveillance s'est interrompu sans arrêt propre — la machine s'est éteinte brutalement. Voir la section « Boîte noire » pour les derniers relevés.",
+                Recommendation = "Croiser avec les conclusions alimentation/température ci-dessus."
+            });
+        }
     }
 
     private static void AnalyzeStorage(DiagnosticReport r)

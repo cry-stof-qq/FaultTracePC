@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FaultTracePC.Core;
 
 // ---------------------------------------------------------------------------
@@ -250,6 +252,52 @@ public sealed class DiagnosticReport
     public string? RepairLauncherPath { get; set; }
     /// <summary>Comparaison avec le scan précédent (null au premier scan).</summary>
     public ScanComparison? Comparison { get; set; }
+    /// <summary>Données de la boîte noire (surveillance temps réel), si le journal existe.</summary>
+    public FlightInfo Flight { get; set; } = new();
+}
+
+// ---------------------------------------------------------------------------
+// Boîte noire (surveillance temps réel) — format partagé service/lecteur
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Une ligne du journal de vol (JSONL). Noms courts pour un journal compact.
+/// Kind : "s"=échantillon, "e"=événement, "b"=début de session, "x"=arrêt propre.
+/// </summary>
+public sealed class FlightSample
+{
+    [JsonPropertyName("t")] public DateTime Time { get; set; }
+    [JsonPropertyName("k")] public string Kind { get; set; } = "s";
+    [JsonPropertyName("cpu")] public double? CpuLoad { get; set; }
+    [JsonPropertyName("ct")] public double? CpuTemp { get; set; }
+    [JsonPropertyName("gt")] public double? GpuTemp { get; set; }
+    [JsonPropertyName("gl")] public double? GpuLoad { get; set; }
+    [JsonPropertyName("m")] public double? MemPct { get; set; }
+    [JsonPropertyName("c")] public double? CommitPct { get; set; }
+    [JsonPropertyName("top")] public string? TopProcesses { get; set; }
+    [JsonPropertyName("ec")] public string? EventCategory { get; set; }
+    [JsonPropertyName("em")] public string? EventMessage { get; set; }
+    [JsonPropertyName("ab")] public bool? PreviousEndedAbruptly { get; set; }
+}
+
+/// <summary>Les dernières secondes enregistrées avant un crash/arrêt brutal.</summary>
+public sealed class FlightCrashContext
+{
+    public DateTime CrashTime { get; set; }
+    public string Trigger { get; set; } = "";
+    public List<FlightSample> Samples { get; set; } = new();
+}
+
+/// <summary>État de la boîte noire au moment du scan.</summary>
+public sealed class FlightInfo
+{
+    public bool JournalFound { get; set; }
+    public DateTime? LastSampleTime { get; set; }
+    /// <summary>true si un échantillon date de moins de 2 minutes (service actif).</summary>
+    public bool Active { get; set; }
+    public int AbruptSessionEnds { get; set; }
+    public int DaysCovered { get; set; }
+    public List<FlightCrashContext> Contexts { get; set; } = new();
 }
 
 /// <summary>Résultat de la comparaison avec le scan précédent — la boucle « est-ce réparé ? ».</summary>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <AssemblyName>FaultTracePC.Monitor</AssemblyName>
+    <RootNamespace>FaultTracePC.Monitor</RootNamespace>
+    <Version>0.5.0</Version>
+    <Product>FaultTracePC Monitor</Product>
+    <Description>Service de surveillance temps réel (boîte noire) de FaultTracePC</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Hébergement en service Windows (inclut Microsoft.Extensions.Hosting) -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.10" />
+    <!-- Capteurs matériels : températures/charges CPU et GPU -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <!-- Abonnement temps réel au journal d'événements -->
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Partage du format FlightSample avec l'application -->
+    <ProjectReference Include="..\FaultTracePC.Core\FaultTracePC.Core.csproj" />
+  </ItemGroup>
+
+</Project>

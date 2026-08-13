@@ -2,5 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/FaultTracePC.App/FaultTracePC.App.csproj" />
     <Project Path="src/FaultTracePC.Core/FaultTracePC.Core.csproj" />
+    <Project Path="src/FaultTracePC.Monitor/FaultTracePC.Monitor.csproj" />
   </Folder>
 </Solution>

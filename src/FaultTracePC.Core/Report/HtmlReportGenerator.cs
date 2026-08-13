@@ -23,6 +23,7 @@ public static class HtmlReportGenerator
         ComparisonSection(sb, r);
         Findings(sb, r);
         RepairSection(sb, r);
+        FlightSection(sb, r);
         BsodSection(sb, r);
         DumpSection(sb, r);
         ProcessesSection(sb, r);
@@ -32,7 +33,7 @@ public static class HtmlReportGenerator
         ReliabilitySection(sb, r);
         ErrorsSection(sb, r);
 
-        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v0.4 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
+        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v0.5 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
         sb.Append("Les niveaux de confiance sont indiqués honnêtement : une confiance « faible » signale une piste, pas une preuve.</footer>");
         sb.Append("<script>").Append(FilterJs).Append("</script>");
         sb.Append("</body></html>");
@@ -119,7 +120,7 @@ public static class HtmlReportGenerator
             sb.Append($"<span class=\"conf\">{CategoryLabel(f.Category)} · {conf}</span></div>");
             sb.Append($"<h3>{H(f.Title)}</h3><p>{H(f.Details)}</p>");
             if (!string.IsNullOrEmpty(f.Recommendation))
-                sb.Append($"<p class=\"reco\"><strong>Recommandation :</strong> {H(f.Recommendation)}</p>");
+                sb.Append($"<p class=\"reco\"><span class=\"recolabel\">💡 Recommandation</span> {H(f.Recommendation)}</p>");
             sb.Append("</div>");
         }
         sb.Append("</section>");
@@ -190,6 +191,48 @@ public static class HtmlReportGenerator
         sb.Append($"<p class=\"empty\">{r.Processes.Count} processus au total — affichés : les 25 plus gros en RAM + les plus actifs en CPU. Lignes surlignées : &gt; 2 Go de RAM privée ou ≥ 25 % CPU.</p>");
         sb.Append("</section>");
     }
+
+    /// <summary>La boîte noire : état du service et dernières secondes avant chaque crash.</summary>
+    private static void FlightSection(StringBuilder sb, DiagnosticReport r)
+    {
+        var f = r.Flight;
+        // Section visible en mode simple uniquement quand elle a du contenu utile.
+        var techClass = f.Contexts.Count > 0 ? "" : " class=\"tech\"";
+        sb.Append($"<section{techClass}><h2>📡 Boîte noire (surveillance temps réel)</h2>");
+        sb.Append("<p class=\"explain\">Le service de surveillance enregistre en continu températures, mémoire et processus. "
+                + "En cas de crash, on retrouve ici les dernières secondes AVANT la panne — ce qu'aucune analyse après coup ne peut reconstituer.</p>");
+
+        if (!f.JournalFound)
+        {
+            sb.Append("<p class=\"empty\">Aucun journal de surveillance sur cette machine. Active la surveillance avec le bouton « 📡 Surveillance temps réel » de FaultTracePC — le service s'installe en un clic et consomme moins de 1 % de CPU.</p></section>");
+            return;
+        }
+
+        sb.Append($"<p class=\"sub2\">État : <strong>{(f.Active ? "🟢 service actif" : "🔴 service arrêté")}</strong>"
+                + (f.LastSampleTime is { } last ? $" · dernier relevé : {last:dd/MM/yyyy HH:mm:ss}" : "")
+                + $" · {f.DaysCovered} jour(s) de journal"
+                + (f.AbruptSessionEnds > 0 ? $" · <strong>{f.AbruptSessionEnds} arrêt(s) brutal(aux) détecté(s)</strong>" : "")
+                + "</p>");
+
+        foreach (var ctx in f.Contexts.Take(6))
+        {
+            sb.Append($"<h4 class=\"ctxtitle\">Dernières secondes avant l'incident du {ctx.CrashTime:dd/MM/yyyy HH:mm}</h4>");
+            sb.Append("<table><thead><tr><th>Heure</th><th>CPU %</th><th>Temp. CPU</th><th>Temp. GPU</th><th>RAM %</th><th>Mém. virtuelle %</th><th>Plus gros processus</th></tr></thead><tbody>");
+            foreach (var s in ctx.Samples)
+            {
+                sb.Append($"<tr><td>{s.Time:HH:mm:ss}</td><td>{Fmt(s.CpuLoad)}</td><td>{Fmt(s.CpuTemp, " °C")}</td>");
+                sb.Append($"<td>{Fmt(s.GpuTemp, " °C")}</td><td>{Fmt(s.MemPct)}</td><td>{Fmt(s.CommitPct)}</td>");
+                sb.Append($"<td class=\"small\">{H(s.TopProcesses ?? "")}</td></tr>");
+            }
+            sb.Append("</tbody></table>");
+        }
+        if (f.Contexts.Count == 0)
+            sb.Append("<p class=\"empty\">Aucun crash pendant la période couverte par le journal — la boîte noire veille.</p>");
+        sb.Append("</section>");
+    }
+
+    private static string Fmt(double? v, string suffix = "") =>
+        v is null ? "—" : $"{v:0.#}{suffix}";
 
     private static void BsodSection(StringBuilder sb, DiagnosticReport r)
     {
@@ -473,9 +516,12 @@ public static class HtmlReportGenerator
         .card{background:#fff;border:1px solid #dbe2ec;border-left-width:5px;border-radius:8px;padding:14px 18px;margin-bottom:12px}
         .card.crit{border-left-color:#e74c3c}.card.warn{border-left-color:#e67e22}.card.info{border-left-color:#2980b9}
         .card.okcard{border-left-color:#27ae60;background:#f4fbf7}
+        .ctxtitle{margin:14px 0 6px;font-size:13px;color:#44546a}
         .card h3{margin:8px 0 6px;font-size:16px}
         .card p{margin:4px 0;font-size:14px}
-        .card .reco{background:#f4f8fb;border-radius:6px;padding:8px 10px;margin-top:8px}
+        .card .reco{background:#eafaf1;border:1px solid #bfe8d0;border-radius:6px;padding:9px 11px;margin-top:8px}
+        .recolabel{display:inline-block;background:#27ae60;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:2px 9px;border-radius:12px;margin-right:6px;animation:recopulse 1.1s ease-in-out 3}
+        @keyframes recopulse{0%,100%{transform:scale(1);box-shadow:none}50%{transform:scale(1.12);box-shadow:0 0 0 6px rgba(39,174,96,.25)}}
         .card-head{display:flex;justify-content:space-between;align-items:center}
         .badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 9px;border-radius:20px;color:#fff}
         .badge.crit{background:#e74c3c}.badge.warn{background:#e67e22}.badge.info{background:#2980b9}

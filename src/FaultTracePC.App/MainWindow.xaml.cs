@@ -17,6 +17,79 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Loaded += (_, _) => RefreshMonitorButton();
+    }
+
+    private void RefreshMonitorButton()
+    {
+        try
+        {
+            BtnRealtime.Content = MonitorServiceManager.GetState() switch
+            {
+                MonitorState.Running => "📡  Surveillance : ACTIVE",
+                MonitorState.Stopped => "📡  Surveillance : arrêtée",
+                _ => "📡  Surveillance temps réel",
+            };
+        }
+        catch { /* affichage seulement */ }
+    }
+
+    /// <summary>
+    /// Gère le cycle de vie du service boîte noire : installer+démarrer,
+    /// redémarrer s'il est arrêté, ou (sur confirmation) arrêter+désinstaller.
+    /// </summary>
+    private void BtnRealtime_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            switch (MonitorServiceManager.GetState())
+            {
+                case MonitorState.NotInstalled:
+                {
+                    if (MessageBox.Show(this,
+                            "Installer la surveillance temps réel ?\n\n" +
+                            "Un service Windows léger (« FaultTracePC — Surveillance temps réel ») sera installé et démarré. " +
+                            "Il enregistre en continu températures, mémoire et événements critiques dans C:\\ProgramData\\FaultTracePC\\Flight, " +
+                            "pour retrouver les secondes précédant un crash. Consommation : < 1 % CPU.",
+                            "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                        return;
+                    var (ok, msg) = MonitorServiceManager.InstallAndStart();
+                    TxtStatus.Text = msg;
+                    if (!ok) MessageBox.Show(this, msg, "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    break;
+                }
+                case MonitorState.Stopped:
+                {
+                    var choice = MessageBox.Show(this,
+                        "Le service de surveillance est installé mais arrêté.\n\n" +
+                        "Oui : le redémarrer.\nNon : le désinstaller.\nAnnuler : ne rien faire.",
+                        "FaultTracePC", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                    if (choice == MessageBoxResult.Yes)
+                        TxtStatus.Text = MonitorServiceManager.Start().Message;
+                    else if (choice == MessageBoxResult.No)
+                        TxtStatus.Text = MonitorServiceManager.StopAndUninstall().Message;
+                    break;
+                }
+                case MonitorState.Running:
+                {
+                    if (MessageBox.Show(this,
+                            "La surveillance est ACTIVE.\n\nVeux-tu l'arrêter et la désinstaller ? " +
+                            "(le journal déjà enregistré est conservé pour les analyses)",
+                            "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                        TxtStatus.Text = MonitorServiceManager.StopAndUninstall().Message;
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Opération impossible : " + ex.Message, "FaultTracePC",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            RefreshMonitorButton();
+        }
     }
 
     private async void BtnScan_Click(object sender, RoutedEventArgs e)

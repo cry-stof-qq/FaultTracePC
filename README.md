@@ -76,5 +76,11 @@ L'exe se trouve ensuite dans `src/FaultTracePC.App/bin/Release/net10.0-windows/w
       récurrence de signature, pilotes mis à jour, évolution disques/mémoire, verdict
       d'efficacité) + base de signatures de ~30 pilotes connus (GPU, réseau, stockage,
       antivirus, anti-triche, RGB, virtualisation) avec correctifs ciblés
-- [ ] Phase 3 — Service de surveillance temps réel (journal circulaire + capteurs de température)
-- [ ] Phase 4 — Finitions GUI, installateur
+- [x] Phase 3 (v0.5) — Boîte noire temps réel : service Windows `FaultTracePC.Monitor`
+      (échantillon toutes les 10 s : charge/température CPU-GPU via LibreHardwareMonitor,
+      mémoire physique+virtuelle, top processus ; événements critiques en direct ;
+      chaque ligne synchronisée physiquement sur disque ; rotation 14 jours dans
+      `C:\ProgramData\FaultTracePC\Flight`). Installation/désinstallation en 1 clic
+      depuis l'app (bouton 📡). Le scan lit le journal et affiche les dernières
+      secondes avant chaque crash + règles surchauffe/saturation au moment du crash.
+- [ ] Phase 4 — Finitions GUI, installateur, mode CLI/parc
