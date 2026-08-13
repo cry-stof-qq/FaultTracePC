@@ -60,8 +60,40 @@ public static class MonitorServiceManager
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                      "FaultTracePC", "Service");
 
+    /// <summary>
+    /// true si le service a été posé par le paquet MSI (binaire sous Program Files) :
+    /// dans ce cas l'application ne redéploie rien, elle se contente de le piloter —
+    /// c'est l'installeur qui gère les mises à jour.
+    /// </summary>
+    public static bool IsManagedByInstaller()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{ServiceName}");
+            var imagePath = key?.GetValue("ImagePath")?.ToString() ?? "";
+            return imagePath.Contains(@"\Program Files", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
     public static (bool Ok, string Message) InstallAndStart()
     {
+        // Service installé par le MSI : on ne touche pas à ses fichiers, mais on le
+        // REDÉMARRE réellement — cette méthode est aussi appelée après un changement
+        // de configuration réseau, que le service ne relit qu'au démarrage.
+        if (IsManagedByInstaller())
+        {
+            if (GetState() == MonitorState.Running)
+            {
+                RunSc($"stop {ServiceName}");
+                Thread.Sleep(2000);
+            }
+            var (c, o) = RunSc($"start {ServiceName}");
+            return c == 0 || o.Contains("1056")
+                ? (true, "Surveillance (re)démarrée. Service installé par le paquet MSI : ses mises à jour passent par l'installeur.")
+                : (false, $"Service MSI présent mais démarrage en échec : {o.Trim()}");
+        }
+
         var sourceExe = FindMonitorExe();
         if (sourceExe is null)
             return (false, "FaultTracePC.Monitor.exe introuvable. Compile d'abord la solution complète (dotnet build), ou publie les deux projets dans le même dossier.");
@@ -118,6 +150,14 @@ public static class MonitorServiceManager
 
     public static (bool Ok, string Message) StopAndUninstall()
     {
+        if (IsManagedByInstaller())
+        {
+            var (c, o) = RunSc($"stop {ServiceName}");
+            return c == 0 || o.Contains("1062")
+                ? (true, "Surveillance arrêtée. Ce service a été installé par le paquet MSI : pour le retirer complètement, désinstalle FaultTracePC depuis « Applications installées ».")
+                : (false, o.Trim());
+        }
+
         RunSc($"stop {ServiceName}");
         // Petite attente pour laisser le service écrire son marqueur d'arrêt propre.
         Thread.Sleep(1500);

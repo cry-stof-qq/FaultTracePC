@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FaultTracePC — paquet d'installation MSI (déployable par GPO)
+
+    Installe dans %ProgramFiles%\FaultTracePC :
+      · FaultTracePC.exe          application (interface graphique)
+      · FaultTracePC.Cli.exe      diagnostic en ligne de commande
+      · FaultTracePC.Monitor.exe  service de surveillance « boîte noire »
+
+    Le service est enregistré et démarré par l'installeur, arrêté et supprimé à
+    la désinstallation. Installation par machine (perMachine) : déployable en
+    « Attribué à l'ordinateur » dans une stratégie de groupe.
+
+    Construction : installer\build-msi.ps1   (voir ce script pour les prérequis)
+    La version du paquet est fournie par le script (-d Version=…) : incrémente-la
+    à chaque livraison, sinon la mise à niveau automatique ne se déclenche pas.
+
+    NOTE : l'élément <Files> (récolte automatique d'un dossier) n'existe qu'à
+    partir de WiX v5 — d'où la version épinglée dans le script de construction.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Package Name="FaultTracePC"
+           Manufacturer="Cry-stof"
+           Version="$(Version).0"
+           UpgradeCode="93D2A8BD-E05A-4FB6-91C8-FC13D88871D5"
+           Scope="perMachine"
+           Compressed="yes">
+
+    <SummaryInformation Description="FaultTracePC — diagnostic des pannes Windows 10/11"
+                        Manufacturer="Cry-stof" />
+
+    <!-- Une nouvelle version remplace proprement l'ancienne. -->
+    <MajorUpgrade DowngradeErrorMessage="Une version plus récente de FaultTracePC est déjà installée." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="FaultTracePC" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppShortcutFolder" Name="FaultTracePC" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="FaultTracePC" Level="1" AllowAbsent="no"
+             Description="Application, outil en ligne de commande et service de surveillance.">
+      <ComponentGroupRef Id="ProductFiles" />
+      <ComponentRef Id="MonitorService" />
+      <ComponentRef Id="AppShortcuts" />
+    </Feature>
+
+    <!-- ===================== Fichiers publiés ===================== -->
+    <!-- Tout le dossier de publication SAUF l'exe du service, déclaré à part
+         ci-dessous car il porte l'enregistrement du service Windows. -->
+    <ComponentGroup Id="ProductFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(SourceDir)\**">
+        <!-- L'exclusion est un ÉLÉMENT enfant (attribut Files), pas un attribut
+             de <Files> : c'est la syntaxe attendue par WiX v5/v6. -->
+        <Exclude Files="$(SourceDir)\FaultTracePC.Monitor.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <!-- ===================== Service de surveillance ===================== -->
+    <Component Id="MonitorService" Directory="INSTALLFOLDER"
+               Guid="0BDCA604-E6A6-4D0F-8B3A-CE7E3075D5EE">
+      <File Id="MonitorExe" Source="$(SourceDir)\FaultTracePC.Monitor.exe" KeyPath="yes" />
+
+      <ServiceInstall Id="MonitorServiceInstall"
+                      Name="FaultTracePCMonitor"
+                      DisplayName="FaultTracePC — Surveillance temps réel"
+                      Description="Boîte noire FaultTracePC : journal continu (températures, mémoire, événements) pour retrouver les secondes précédant un crash."
+                      Type="ownProcess"
+                      Start="auto"
+                      ErrorControl="normal"
+                      Account="LocalSystem"
+                      Vital="yes" />
+
+      <ServiceControl Id="MonitorServiceControl"
+                      Name="FaultTracePCMonitor"
+                      Start="install"
+                      Stop="both"
+                      Remove="uninstall"
+                      Wait="yes" />
+    </Component>
+
+    <!-- ===================== Raccourcis ===================== -->
+    <Component Id="AppShortcuts" Directory="AppShortcutFolder"
+               Guid="EFC30DB5-AEE4-4164-A091-B40482F5D784">
+      <Shortcut Id="AppShortcut"
+                Name="FaultTracePC"
+                Description="Diagnostic des pannes Windows"
+                Target="[INSTALLFOLDER]FaultTracePC.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveAppShortcutFolder" Directory="AppShortcutFolder" On="uninstall" />
+      <RegistryValue Root="HKLM" Key="Software\Cry-stof\FaultTracePC"
+                     Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+  </Package>
+</Wix>

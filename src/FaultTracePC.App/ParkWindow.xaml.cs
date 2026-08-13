@@ -114,16 +114,29 @@ public partial class ParkWindow : Window
 
     private sealed record QueryResult(ParkMachine Machine, bool Ok, bool Active, FlightSample? Last, string Error);
 
+    /// <summary>
+    /// Construit une requête signée : le token sert de clé HMAC et ne quitte
+    /// jamais cette machine — seule la signature circule.
+    /// </summary>
+    private static HttpRequestMessage SignedRequest(ParkMachine m, HttpMethod method, string path, string query = "")
+    {
+        var host = m.Host.Trim().Trim('/');
+        var url = $"http://{host}:{m.Port}{path}" + (query.Length > 0 ? "?" + query : "");
+        var req = new HttpRequestMessage(method, url);
+        foreach (var (name, value) in RemoteConfig.BuildAuthHeaders(m.Token, method.Method, path, query))
+            req.Headers.Add(name, value);
+        return req;
+    }
+
     private static async Task<QueryResult> QueryAsync(ParkMachine m)
     {
         try
         {
-            using var req = new HttpRequestMessage(HttpMethod.Get, $"http://{m.Host}:{m.Port}/api/status");
-            req.Headers.Add("X-FaultTrace-Token", m.Token);
+            using var req = SignedRequest(m, HttpMethod.Get, "/api/status");
             using var resp = await Http.SendAsync(req);
             if (!resp.IsSuccessStatusCode)
                 return new(m, false, false, null, resp.StatusCode == System.Net.HttpStatusCode.Forbidden
-                    ? "refusé (token ?)" : $"HTTP {(int)resp.StatusCode}");
+                    ? "refusé (token ou horloge décalée ?)" : $"HTTP {(int)resp.StatusCode}");
 
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
             bool active = doc.RootElement.TryGetProperty("active", out var a) && a.GetBoolean();
@@ -208,9 +221,7 @@ public partial class ParkWindow : Window
         try
         {
             TxtStatus.Text = $"🩺 Diagnostic en cours sur {machine.Name}… (plusieurs minutes possibles, ne pas fermer cette fenêtre)";
-            using var req = new HttpRequestMessage(HttpMethod.Post,
-                $"http://{machine.Host}:{machine.Port}/api/scan?days=30");
-            req.Headers.Add("X-FaultTrace-Token", machine.Token);
+            using var req = SignedRequest(machine, HttpMethod.Post, "/api/scan", "days=30");
             using var resp = await ScanHttp.SendAsync(req);
 
             if ((int)resp.StatusCode == 429)
@@ -244,12 +255,15 @@ public partial class ParkWindow : Window
 
     private async Task DownloadAndOpenReportAsync(ParkMachine machine, string name)
     {
-        using var dlReq = new HttpRequestMessage(HttpMethod.Get,
-            $"http://{machine.Host}:{machine.Port}/api/reports/download?name={Uri.EscapeDataString(name)}");
-        dlReq.Headers.Add("X-FaultTrace-Token", machine.Token);
-        using var dlResp = await Http.SendAsync(dlReq);
+        var query = $"name={Uri.EscapeDataString(name)}";
+        using var dlReq = SignedRequest(machine, HttpMethod.Get, "/api/reports/download", query);
+        // Client à long délai : un rapport volumineux sur une liaison lente
+        // dépasserait les 4 secondes du client d'interrogation d'état.
+        using var dlResp = await ScanHttp.SendAsync(dlReq);
         dlResp.EnsureSuccessStatusCode();
-        var tmp = Path.Combine(Path.GetTempPath(), $"{machine.Name}_{name}");
+        var safeName = string.Concat($"{machine.Name}_{name}"
+            .Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        var tmp = Path.Combine(Path.GetTempPath(), safeName);
         await File.WriteAllTextAsync(tmp, await dlResp.Content.ReadAsStringAsync());
         Process.Start(new ProcessStartInfo(tmp) { UseShellExecute = true });
     }
@@ -268,8 +282,7 @@ public partial class ParkWindow : Window
         try
         {
             TxtStatus.Text = $"Récupération du dernier rapport de {machine.Name}…";
-            using var listReq = new HttpRequestMessage(HttpMethod.Get, $"http://{machine.Host}:{machine.Port}/api/reports");
-            listReq.Headers.Add("X-FaultTrace-Token", machine.Token);
+            using var listReq = SignedRequest(machine, HttpMethod.Get, "/api/reports");
             using var listResp = await Http.SendAsync(listReq);
             listResp.EnsureSuccessStatusCode();
             using var doc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());
@@ -281,15 +294,7 @@ public partial class ParkWindow : Window
             }
             var name = first.GetProperty("name").GetString()!;
 
-            using var dlReq = new HttpRequestMessage(HttpMethod.Get,
-                $"http://{machine.Host}:{machine.Port}/api/reports/download?name={Uri.EscapeDataString(name)}");
-            dlReq.Headers.Add("X-FaultTrace-Token", machine.Token);
-            using var dlResp = await Http.SendAsync(dlReq);
-            dlResp.EnsureSuccessStatusCode();
-
-            var tmp = Path.Combine(Path.GetTempPath(), $"{machine.Name}_{name}");
-            await File.WriteAllTextAsync(tmp, await dlResp.Content.ReadAsStringAsync());
-            Process.Start(new ProcessStartInfo(tmp) { UseShellExecute = true });
+            await DownloadAndOpenReportAsync(machine, name);
             TxtStatus.Text = $"Rapport {name} de {machine.Name} ouvert.";
         }
         catch (Exception ex)

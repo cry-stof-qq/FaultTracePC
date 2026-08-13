@@ -65,12 +65,88 @@ public sealed class RemoteConfig
             || (b[0] == 192 && b[1] == 168);
     }
 
-    /// <summary>Comparaison de tokens en temps constant (anti-mesure de temps).</summary>
+    /// <summary>Comparaison de chaînes secrètes en temps constant (anti-mesure de temps).</summary>
     public static bool TokenMatches(string expected, string? provided)
     {
         if (string.IsNullOrEmpty(expected) || string.IsNullOrEmpty(provided)) return false;
         var a = System.Text.Encoding.UTF8.GetBytes(expected);
         var b = System.Text.Encoding.UTF8.GetBytes(provided);
         return a.Length == b.Length && CryptographicOperations.FixedTimeEquals(a, b);
+    }
+
+    // ------------------------------------------------------------------
+    // Authentification par signature HMAC-SHA256
+    //
+    // Le token ne circule JAMAIS sur le réseau : le client signe chaque requête
+    // (méthode + chemin + paramètres + horodatage + nonce) avec le token comme
+    // clé, et le serveur recalcule la même signature. Une écoute du trafic ne
+    // révèle donc rien d'exploitable, et l'horodatage + le nonce empêchent de
+    // rejouer une requête capturée.
+    // ------------------------------------------------------------------
+
+    public const string HeaderTimestamp = "X-FaultTrace-Ts";
+    public const string HeaderNonce = "X-FaultTrace-Nonce";
+    public const string HeaderSignature = "X-FaultTrace-Sig";
+
+    /// <summary>Tolérance d'horloge entre les deux machines (secondes).</summary>
+    public const int ClockToleranceSeconds = 300;
+
+    /// <summary>
+    /// Dérive la clé HMAC du token. Un token généré par l'application est de
+    /// l'hexadécimal ; s'il a été saisi à la main (phrase quelconque), on en prend
+    /// le SHA-256 — les deux extrémités appliquent la même règle, donc pas d'échec
+    /// silencieux ni d'exception sur un token « non conforme ».
+    /// </summary>
+    private static byte[] KeyFromToken(string token)
+    {
+        var t = token.Trim();
+        return t.Length > 0 && t.Length % 2 == 0 && t.All(Uri.IsHexDigit)
+            ? Convert.FromHexString(t)
+            : SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(t));
+    }
+
+    private static string ComputeSignature(string token, string method, string path, string query, string timestamp, string nonce)
+    {
+        var payload = $"{method.ToUpperInvariant()}\n{path.ToLowerInvariant()}\n{query}\n{timestamp}\n{nonce}";
+        using var hmac = new HMACSHA256(KeyFromToken(token));
+        return Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload)));
+    }
+
+    /// <summary>En-têtes d'authentification à joindre à une requête (côté console maître).</summary>
+    public static Dictionary<string, string> BuildAuthHeaders(string token, string method, string path, string query)
+    {
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(12));
+        return new Dictionary<string, string>
+        {
+            [HeaderTimestamp] = ts,
+            [HeaderNonce] = nonce,
+            [HeaderSignature] = ComputeSignature(token, method, path, query, ts, nonce),
+        };
+    }
+
+    /// <summary>
+    /// Vérifie la signature d'une requête entrante (côté service).
+    /// <paramref name="isNonceFresh"/> permet à l'appelant de rejeter un nonce déjà vu.
+    /// </summary>
+    public static bool VerifySignature(string token, string method, string path, string query,
+                                       string? timestamp, string? nonce, string? signature,
+                                       Func<string, bool> isNonceFresh)
+    {
+        if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(timestamp) ||
+            string.IsNullOrEmpty(nonce) || string.IsNullOrEmpty(signature))
+            return false;
+
+        if (!long.TryParse(timestamp, out var unix)) return false;
+        var age = Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - unix);
+        if (age > ClockToleranceSeconds) return false;   // requête trop ancienne ou horloge décalée
+
+        // ORDRE IMPORTANT : on vérifie la signature AVANT de consommer le nonce.
+        // Sinon, n'importe qui sur le réseau pourrait remplir la mémoire du service
+        // de nonces sans jamais s'authentifier.
+        var expected = ComputeSignature(token, method, path, query, timestamp, nonce);
+        if (!TokenMatches(expected, signature)) return false;
+
+        return isNonceFresh(nonce);                      // rejeu d'une requête déjà servie
     }
 }

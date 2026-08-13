@@ -97,4 +97,29 @@ L'exe se trouve ensuite dans `src/FaultTracePC.App/bin/Release/net10.0-windows/w
       prévient AVANT la panne — notification Windows, journal `alerts.jsonl`, section
       dédiée dans le rapport, conclusions du diagnostic et endpoint `/api/alerts`.
       Anti-bruit : N échantillons consécutifs requis + délai anti-répétition.
-- [ ] Phase 4 — Finitions GUI, installateur, mode CLI
+- [x] v0.9 — **Déploiement** : projet `FaultTracePC.Cli` (scan silencieux, `--output`
+      vers un partage UNC, résumé JSON, codes de sortie 0/1/2/3 exploitables par script),
+      publication autonome mutualisant le runtime (`build\publish.ps1`, ~120 Mo pour les
+      trois exécutables, aucun prérequis sur la cible), et **paquet MSI perMachine**
+      (`installer\build-msi.ps1`) déployable par GPO, qui installe l'application, le CLI
+      et enregistre/démarre le service. **Sécurité** : l'API distante passe en
+      authentification par signature HMAC-SHA256 — le token ne circule plus sur le
+      réseau, horodatage + nonce contre le rejeu.
+- [ ] v1.0 — Tests automatisés, graphiques dans le visualiseur, rapport de parc consolidé
+
+## Déploiement
+
+```powershell
+# Exécutables autonomes (dist\FaultTracePC) + archive portable
+powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
+
+# Paquet MSI (nécessite : dotnet tool install --global wix --version 6.0.2)
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1
+```
+
+Diagnostic en ligne de commande (déployable par tâche planifiée ou GPO) :
+
+```powershell
+FaultTracePC.Cli.exe --quiet --json --days 90 --output \\serveur\Diagnostics$
+# code de sortie : 0 sain · 1 avertissements · 2 critique · 3 erreur
+```

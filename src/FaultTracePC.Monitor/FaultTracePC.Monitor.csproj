@@ -10,7 +10,7 @@
 
     <AssemblyName>FaultTracePC.Monitor</AssemblyName>
     <RootNamespace>FaultTracePC.Monitor</RootNamespace>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
     <Product>FaultTracePC Monitor</Product>
     <Description>Service de surveillance temps réel (boîte noire) de FaultTracePC</Description>
   </PropertyGroup>

@@ -51,8 +51,11 @@
             <TextBlock FontSize="12" TextWrapping="Wrap">
                 <Bold>Sécurité du mode Client :</Bold> l'API est en lecture seule et refuse toute requête
                 qui ne vient pas d'une adresse privée (127.0.0.1, 10.x, 172.16-31.x, 192.168.x) <Bold>ou</Bold>
-                qui ne présente pas le token — les deux verrous sont exigés. Une règle de pare-feu limitée à
-                ces mêmes plages est ajoutée en plus. Rien n'est accessible depuis Internet.<LineBreak/><LineBreak/>
+                dont la signature est invalide — les deux verrous sont exigés. Le token ne circule
+                <Bold>jamais</Bold> sur le réseau : il sert de clé pour signer chaque requête (HMAC-SHA256),
+                avec horodatage et nonce contre le rejeu. Une règle de pare-feu limitée à ces mêmes plages
+                est ajoutée en plus. Rien n'est accessible depuis Internet.<LineBreak/><LineBreak/>
+                <Bold>Note :</Bold> les horloges des deux machines doivent être à moins de 5 minutes d'écart.<LineBreak/><LineBreak/>
                 <Bold>Côté machine « maître » :</Bold> ouvre la console 🖥 Parc, ajoute cette machine avec
                 son nom d'hôte (ou IP), le port et ce token.
             </TextBlock>

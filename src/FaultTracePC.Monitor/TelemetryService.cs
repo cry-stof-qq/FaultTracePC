@@ -9,10 +9,14 @@ using Microsoft.Extensions.Hosting;
 namespace FaultTracePC.Monitor;
 
 /// <summary>
-/// API de télémétrie du mode Client — LECTURE SEULE, double verrou :
+/// API de télémétrie du mode Client — double verrou :
 ///  1. l'adresse source doit être privée (RFC 1918) ou boucle locale ;
-///  2. le token partagé doit être fourni (en-tête X-FaultTrace-Token ou ?token=).
+///  2. la requête doit porter une signature HMAC-SHA256 valide (en-têtes
+///     X-FaultTrace-Ts / -Nonce / -Sig). Le token sert de clé et ne circule
+///     JAMAIS ; l'horodatage et le nonce interdisent de rejouer une capture.
 /// Toute requête non conforme reçoit un 403 laconique, sans détail exploitable.
+/// Tout est en lecture seule, à l'exception de /api/scan qui déclenche un
+/// diagnostic local (action prédéfinie, sans paramètre exécutable).
 ///
 /// Endpoints :
 ///   GET /api/ping                     → identité de la machine
@@ -27,6 +31,27 @@ public sealed class TelemetryService : BackgroundService
 
     /// <summary>Un seul diagnostic à la fois : un scan est coûteux, on refuse les rafales (429).</summary>
     private static readonly SemaphoreSlim ScanLock = new(1, 1);
+
+    /// <summary>Nonces déjà servis (anti-rejeu), purgés au-delà de la tolérance d'horloge.</summary>
+    private static readonly Dictionary<string, DateTime> SeenNonces = new();
+    private static readonly object NonceLock = new();
+
+    private static bool IsNonceFresh(string nonce)
+    {
+        lock (NonceLock)
+        {
+            var now = DateTime.UtcNow;
+            if (SeenNonces.Count > 512)
+            {
+                var stale = SeenNonces.Where(kv => (now - kv.Value).TotalSeconds > RemoteConfig.ClockToleranceSeconds)
+                                      .Select(kv => kv.Key).ToList();
+                foreach (var k in stale) SeenNonces.Remove(k);
+            }
+            if (SeenNonces.ContainsKey(nonce)) return false;
+            SeenNonces[nonce] = now;
+            return true;
+        }
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -61,12 +86,19 @@ public sealed class TelemetryService : BackgroundService
             {
                 Deny(ctx); return;
             }
-            // Verrou 2 : token partagé.
-            var provided = ctx.Request.Headers["X-FaultTrace-Token"] ?? ctx.Request.QueryString["token"];
-            if (!RemoteConfig.TokenMatches(cfg.Token, provided))
-            {
-                Deny(ctx); return;
-            }
+            // Verrou 2 : signature HMAC de la requête. Le secret ne circule jamais,
+            // et l'horodatage + le nonce interdisent de rejouer une requête capturée.
+            var url = ctx.Request.Url;
+            var ok = RemoteConfig.VerifySignature(
+                cfg.Token,
+                ctx.Request.HttpMethod,
+                url?.AbsolutePath ?? "",
+                url?.Query.TrimStart('?') ?? "",
+                ctx.Request.Headers[RemoteConfig.HeaderTimestamp],
+                ctx.Request.Headers[RemoteConfig.HeaderNonce],
+                ctx.Request.Headers[RemoteConfig.HeaderSignature],
+                IsNonceFresh);
+            if (!ok) { Deny(ctx); return; }
 
             switch (ctx.Request.Url?.AbsolutePath.ToLowerInvariant())
             {
@@ -132,6 +164,8 @@ public sealed class TelemetryService : BackgroundService
                             .GetAwaiter().GetResult();
 
                         Directory.CreateDirectory(RemoteConfig.SharedReportsDir);
+                        // Script de réparation d'abord : le rapport y fait référence.
+                        try { RepairScriptGenerator.WriteToDisk(report); } catch { }
                         var name = $"Diagnostic_PC_{report.GeneratedAt:yyyy-MM-dd_HHmm}.html";
                         File.WriteAllText(Path.Combine(RemoteConfig.SharedReportsDir, name),
                             HtmlReportGenerator.Generate(report), Encoding.UTF8);

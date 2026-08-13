@@ -19,7 +19,7 @@
     <AssemblyName>FaultTracePC</AssemblyName>
     <RootNamespace>FaultTracePC.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
     <Product>FaultTracePC</Product>
     <Company>Cry-stof</Company>
     <Description>Diagnostic des pannes et crashs Windows 10/11</Description>
