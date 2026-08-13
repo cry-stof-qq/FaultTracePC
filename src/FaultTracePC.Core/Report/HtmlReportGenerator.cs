@@ -29,6 +29,7 @@ public static class HtmlReportGenerator
         ProcessesSection(sb, r);
         EventsSection(sb, r);
         SystemSection(sb, r);
+        SmartSection(sb, r);
         DriversSection(sb, r);
         ReliabilitySection(sb, r);
         ErrorsSection(sb, r);
@@ -390,6 +391,22 @@ public static class HtmlReportGenerator
                 + (d.TemperatureC is { } t ? $" · {t} °C" : "")
                 + (d.WearPercent is { } w and > 0 ? $" · usure {w} %" : ""))));
 
+        if (s.Batteries.Count > 0)
+        {
+            Card(sb, "Batterie",
+                string.Join("<br>", s.Batteries.Select(b =>
+                {
+                    var health = b.HealthPercent is { } hp
+                        ? $"<strong>{hp} % de santé</strong> (usure {b.WearPercent} %)"
+                        : "usure non mesurable";
+                    var cap = b.DesignedCapacity is { } dc && b.FullChargedCapacity is { } fc
+                        ? $"<br>{fc} mWh à pleine charge sur {dc} mWh d'origine" : "";
+                    var cyc = b.CycleCount is { } c and > 0 ? $" · {c} cycles" : "";
+                    return $"{H(b.Name)} {H(b.Chemistry)}<br>{health}{cap}{cyc}"
+                         + (b.ChargeRemainingPercent is { } ch ? $"<br>Charge actuelle : {ch} % ({H(b.Status)})" : "");
+                })));
+        }
+
         Card(sb, "Volumes",
             s.Volumes.Count == 0 ? "aucun"
             : string.Join("<br>", s.Volumes.Select(v =>
@@ -399,6 +416,38 @@ public static class HtmlReportGenerator
 
         sb.Append("</div></section>");
     }
+
+    /// <summary>Détail SMART : les chiffres qui justifient le verdict sur chaque disque.</summary>
+    private static void SmartSection(StringBuilder sb, DiagnosticReport r)
+    {
+        var disks = r.System.Disks.Where(d => d.Smart is not null).ToList();
+        if (disks.Count == 0) return;
+
+        sb.Append("<section class=\"tech\"><h2>État de santé des disques (SMART)</h2>");
+        sb.Append("<p class=\"explain\">Les disques tiennent eux-mêmes des compteurs d'incidents. Seuls ceux qui annoncent "
+                + "réellement une panne sont repris ici : les secteurs défectueux (le disque s'abîme), les erreurs de "
+                + "transmission (le câble est en cause, pas le disque) et l'usure d'un SSD.</p>");
+        sb.Append("<table><thead><tr><th>Disque</th><th>Secteurs réalloués</th><th>Secteurs en attente</th>"
+                + "<th>Illisibles</th><th>Erreurs CRC (câble)</th><th>Usure SSD</th><th>Heures</th><th>Temp.</th><th>Source</th></tr></thead><tbody>");
+
+        foreach (var d in disks)
+        {
+            var s = d.Smart!;
+            bool bad = s.BadSectors > 0 || s.PredictedFailure == true;
+            sb.Append($"<tr{(bad ? " class=\"oldrow\"" : "")}><td>{H(d.Model)}</td>");
+            sb.Append($"<td>{Cnt(s.ReallocatedSectors)}</td><td>{Cnt(s.PendingSectors)}</td><td>{Cnt(s.UncorrectableSectors)}</td>");
+            sb.Append($"<td>{Cnt(s.UdmaCrcErrors)}</td>");
+            sb.Append($"<td>{(s.SsdLifeLeftPercent is { } l ? $"{100 - l} % usé" : "—")}</td>");
+            sb.Append($"<td>{(s.PowerOnHours is { } h ? $"{h}" : "—")}</td>");
+            sb.Append($"<td>{(s.TemperatureC is { } t ? $"{t} °C" : "—")}</td>");
+            sb.Append($"<td class=\"small\">{H(s.Source)}</td></tr>");
+        }
+        sb.Append("</tbody></table>");
+        sb.Append("<p class=\"empty\">Un compteur à 0 partout est le signe d'un disque sain. Ce qui compte n'est pas tant "
+                + "la valeur absolue que son ÉVOLUTION : FaultTracePC la compare automatiquement d'un scan à l'autre.</p></section>");
+    }
+
+    private static string Cnt(ulong? v) => v is null ? "—" : v.Value == 0 ? "0" : $"<strong>{v}</strong>";
 
     private static void DriversSection(StringBuilder sb, DiagnosticReport r)
     {

@@ -23,6 +23,8 @@ public sealed class RulesEngine
         AnalyzeVirtualizationMemory(r);
         AnalyzeDumpWindow(r);
         AnalyzeFlightRecorder(r);
+        AnalyzeSmart(r);
+        AnalyzeBattery(r);
         AnalyzeStorage(r);
         AnalyzeGpu(r);
         AnalyzePowerLoss(r);
@@ -624,6 +626,140 @@ public sealed class RulesEngine
         }
     }
 
+    /// <summary>
+    /// Verdict SMART par disque. On ne parle QUE des indicateurs à valeur
+    /// prédictive démontrée : secteurs défectueux, erreurs de câble, usure SSD.
+    /// </summary>
+    private static void AnalyzeSmart(DiagnosticReport r)
+    {
+        foreach (var d in r.System.Disks)
+        {
+            if (d.Smart is not { } s) continue;
+
+            var facts = new List<string>();
+            var severity = Severity.Info;
+            var reco = "";
+
+            // Le disque annonce lui-même sa fin : c'est le signal le plus grave qui existe.
+            if (s.PredictedFailure == true)
+            {
+                severity = Severity.Critical;
+                facts.Add("le disque signale lui-même une DÉFAILLANCE IMMINENTE (SMART)");
+                reco = "Sauvegarder les données MAINTENANT et remplacer ce disque. Ne pas attendre.";
+            }
+
+            // Secteurs défectueux : le cœur de la question « mon disque est-il bon ? »
+            if (s.PendingSectors is > 0)
+            {
+                severity = Severity.Critical;
+                facts.Add($"{s.PendingSectors} secteur(s) instable(s) en attente de réallocation");
+                reco = "Secteurs en cours de dégradation : sauvegarder sans tarder, puis lancer une vérification complète du disque (chkdsk /r) qui forcera leur traitement. Si le nombre augmente d'un scan à l'autre, remplacer le disque.";
+            }
+            else if (s.ReallocatedSectors is > 0 || s.UncorrectableSectors is > 0)
+            {
+                severity = severity == Severity.Critical ? severity : Severity.Warning;
+                var bad = s.BadSectors;
+                facts.Add($"{bad} secteur(s) défectueux déjà remplacés par la réserve");
+                if (reco.Length == 0)
+                    reco = bad >= 50
+                        ? "Le nombre de secteurs défectueux est élevé : prévoir le remplacement du disque et surveiller son évolution à chaque scan."
+                        : "Quelques secteurs défectueux isolés sont tolérables sur un disque ancien ; ce qui compte est leur ÉVOLUTION — FaultTracePC la suivra d'un scan à l'autre.";
+            }
+
+            // Attribut 199 : presque toujours un problème de câble, pas de disque.
+            if (s.UdmaCrcErrors is > 0)
+            {
+                severity = severity == Severity.Critical ? severity : Severity.Warning;
+                facts.Add($"{s.UdmaCrcErrors} erreur(s) de transmission (CRC)");
+                reco += (reco.Length > 0 ? " " : "")
+                     + "Les erreurs CRC viennent presque toujours du CÂBLE SATA ou de son connecteur, pas du disque : rebrancher fermement des deux côtés, ou remplacer le câble (quelques euros) avant d'envisager autre chose.";
+            }
+
+            // Usure SSD
+            if (s.SsdLifeLeftPercent is { } life)
+            {
+                if (life <= 10)
+                {
+                    severity = Severity.Critical;
+                    facts.Add($"durée de vie restante du SSD : {life} %");
+                    reco += (reco.Length > 0 ? " " : "") + "Le SSD arrive en fin de vie : prévoir son remplacement.";
+                }
+                else if (life <= 25)
+                {
+                    severity = severity == Severity.Critical ? severity : Severity.Warning;
+                    facts.Add($"durée de vie restante du SSD : {life} %");
+                    reco += (reco.Length > 0 ? " " : "") + "Usure avancée : surveiller et prévoir le remplacement à moyen terme.";
+                }
+            }
+
+            if (facts.Count == 0) continue;
+
+            var age = s.PowerOnHours is { } h ? $" Disque en service depuis {h / 24 / 365.0:0.#} an(s) ({h} heures)." : "";
+            r.Findings.Add(new Finding
+            {
+                Severity = severity,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Storage,
+                Title = severity == Severity.Critical
+                    ? $"Disque à remplacer : {d.Model}"
+                    : $"Disque à surveiller : {d.Model}",
+                Details = $"Analyse SMART — {string.Join(" ; ", facts)}.{age} Source : {s.Source}.",
+                Recommendation = reco,
+            });
+        }
+    }
+
+    /// <summary>Usure de la batterie, exprimée simplement.</summary>
+    private static void AnalyzeBattery(DiagnosticReport r)
+    {
+        foreach (var b in r.System.Batteries)
+        {
+            if (b.WearPercent is not { } wear)
+            {
+                // Batterie détectée mais capacités non exposées par le firmware.
+                r.Findings.Add(new Finding
+                {
+                    Severity = Severity.Info,
+                    Confidence = Confidence.Low,
+                    Category = FaultCategory.Hardware,
+                    Title = "Usure de la batterie non mesurable",
+                    Details = $"La batterie « {b.Name} » est détectée, mais son firmware n'expose pas les capacités nécessaires au calcul d'usure.",
+                    Recommendation = "Utiliser le rapport de batterie Windows (bouton dédié dans la boîte à outils) pour une analyse détaillée.",
+                });
+                continue;
+            }
+
+            var health = 100 - wear;
+            var capacity = b.DesignedCapacity is { } dc && b.FullChargedCapacity is { } fc
+                ? $" Elle ne retient plus que {fc} mWh sur les {dc} mWh prévus d'origine."
+                : "";
+            var cycles = b.CycleCount is { } c and > 0 ? $" {c} cycles de charge." : "";
+
+            var (sev, title, reco) = wear switch
+            {
+                >= 70 => (Severity.Critical, $"Batterie HORS D'USAGE — {health} % de santé restante",
+                          "La batterie ne tient pratiquement plus la charge : la machine s'éteindra dès qu'elle sera débranchée. Remplacement nécessaire."),
+                >= 40 => (Severity.Warning, $"Batterie très usée — {health} % de santé restante",
+                          "L'autonomie est fortement réduite. Prévoir le remplacement de la batterie ; en attendant, éviter de compter sur elle en déplacement."),
+                >= 20 => (Severity.Info, $"Batterie usée — {health} % de santé restante",
+                          "Usure normale pour une batterie de quelques années. Rien d'urgent : surveiller l'évolution."),
+                _ => (Severity.Info, $"Batterie en bon état — {health} % de santé restante",
+                      "Aucune action nécessaire."),
+            };
+
+            r.Findings.Add(new Finding
+            {
+                Severity = sev,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Hardware,
+                Title = title,
+                Details = $"Usure mesurée : {wear} %.{capacity}{cycles}"
+                        + (b.ChargeRemainingPercent is { } ch ? $" Charge actuelle : {ch} %." : ""),
+                Recommendation = reco,
+            });
+        }
+    }
+
     private static void AnalyzeStorage(DiagnosticReport r)
     {
         var diskEvents = r.Events.Where(e => e.Category == EventCategory.DiskError).ToList();
@@ -725,15 +861,24 @@ public sealed class RulesEngine
         {
             var modules = g.Select(e => e.Extracted.GetValueOrDefault("Module"))
                            .Where(m => !string.IsNullOrWhiteSpace(m)).Distinct().Take(3).ToList();
+
+            // « Ce problème existe-t-il encore ? » — on vérifie l'état ACTUEL du
+            // logiciel au lieu de laisser l'utilisateur devant un crash périmé.
+            var lastCrash = g.Max(e => e.TimeLocal);
+            var (statusText, statusReco, stillActive) = CheckAppStatus(r, g.Key, lastCrash);
+
             r.Findings.Add(new Finding
             {
-                Severity = Severity.Warning,
+                Severity = stillActive ? Severity.Warning : Severity.Info,
                 Confidence = Confidence.High,
                 Category = FaultCategory.Software,
-                Title = $"Application instable : {g.Key} ({g.Count()} crashs)",
-                Details = $"{g.Count()} plantages sur la période"
-                          + (modules.Count > 0 ? $", module(s) fautif(s) : {string.Join(", ", modules!)}" : "") + ".",
-                Recommendation = "Réinstaller/mettre à jour l'application. Si le module fautif est une DLL système ou un pilote (ex: DLL du pilote graphique), traiter ce composant en priorité."
+                Title = stillActive
+                    ? $"Application instable : {g.Key} ({g.Count()} crashs)"
+                    : $"Application anciennement instable : {g.Key} ({g.Count()} crashs) — {statusText}",
+                Details = $"{g.Count()} plantages sur la période, dernier le {lastCrash:dd/MM/yyyy}"
+                          + (modules.Count > 0 ? $", module(s) fautif(s) : {string.Join(", ", modules!)}" : "")
+                          + $". État actuel : {statusText}",
+                Recommendation = statusReco,
             });
         }
 
@@ -757,6 +902,41 @@ public sealed class RulesEngine
                 Recommendation = "Identifier à quoi appartient ce module (pilote, runtime, antivirus, overlay) et le mettre à jour ou le désinstaller."
             });
         }
+    }
+
+    /// <summary>
+    /// Un crash daté ne dit pas si le problème est toujours là. On confronte le
+    /// nom de l'exécutable fautif aux logiciels réellement installés :
+    /// désinstallé depuis ? mis à jour depuis le crash ? toujours identique ?
+    /// </summary>
+    private static (string Status, string Recommendation, bool StillActive) CheckAppStatus(
+        DiagnosticReport r, string exeName, DateTime lastCrash)
+    {
+        if (r.System.InstalledApps.Count == 0)
+            return ("non vérifié (inventaire des logiciels indisponible)",
+                    "Réinstaller ou mettre à jour l'application.", true);
+
+        var app = Collectors.InstalledSoftwareCollector.FindByExecutable(r.System.InstalledApps, exeName);
+        if (app is null)
+        {
+            return ("ce logiciel ne figure plus parmi les programmes installés — problème probablement sans objet",
+                    "Aucune action : le logiciel semble avoir été désinstallé depuis. Si les crashs persistent, c'est qu'il subsiste sous une autre forme (application portable ou du Microsoft Store).",
+                    false);
+        }
+
+        var version = string.IsNullOrEmpty(app.Version) ? "" : $" v{app.Version}";
+        if (app.InstallDate is { } installed && installed.Date > lastCrash.Date)
+        {
+            return ($"toujours installé ({app.Name}{version}), mais RÉINSTALLÉ ou MIS À JOUR le {installed:dd/MM/yyyy}, après le dernier crash — le problème est peut-être déjà corrigé",
+                    "Surveiller : si aucun nouveau crash n'apparaît au prochain scan, l'affaire est close.",
+                    false);
+        }
+
+        return ($"toujours installé ({app.Name}{version}"
+                + (app.InstallDate is { } d ? $", installé le {d:dd/MM/yyyy}" : "") + ") — problème toujours d'actualité",
+                $"Mettre à jour {app.Name} vers sa dernière version, ou le réinstaller proprement. "
+                + "Si le module fautif est une DLL système ou de pilote (graphique, antivirus), traiter ce composant en priorité.",
+                true);
     }
 
     private static void AnalyzeServiceFailures(DiagnosticReport r)

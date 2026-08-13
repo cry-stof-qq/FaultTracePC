@@ -60,6 +60,34 @@ public static class RepairScriptGenerator
         sb.AppendLine($"Write-Host 'Diagnostic du {r.GeneratedAt:dd/MM/yyyy HH:mm} — problèmes ciblés : {string.Join(", ", cats.Select(CatLabel))}'");
         sb.AppendLine();
 
+        // ------------------------------------------- filet de sécurité : restauration
+        // Rien ne doit être modifié avant d'avoir un retour en arrière possible.
+        // Windows bride par défaut la création de points de restauration à un
+        // toutes les 24 h : on lève temporairement la bride, puis on la remet.
+        sb.AppendLine("Section 'Filet de sécurité : point de restauration'");
+        sb.AppendLine("$srKey = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SystemRestore'");
+        sb.AppendLine("$srOld = (Get-ItemProperty -Path $srKey -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue).SystemRestorePointCreationFrequency");
+        sb.AppendLine("$srDrive = $env:SystemDrive + '\\'");
+        sb.AppendLine("try { New-ItemProperty -Path $srKey -Name SystemRestorePointCreationFrequency -Value 0 -PropertyType DWord -Force | Out-Null } catch {}");
+        sb.AppendLine("Write-Host 'Création du point de restauration (peut prendre 1 à 2 minutes)…'");
+        sb.AppendLine("$srErr = $null");
+        sb.AppendLine("try { Checkpoint-Computer -Description 'FaultTracePC - avant reparation' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop }");
+        sb.AppendLine("catch { $srErr = $_.Exception.Message }");
+        sb.AppendLine("$rp = Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Select-Object -Last 1");
+        sb.AppendLine("if (-not $srErr -and $rp) {");
+        sb.AppendLine("    Write-Host ('Point de restauration disponible : #{0} — {1} ({2})' -f $rp.SequenceNumber, $rp.Description, $rp.ConvertToDateTime($rp.CreationTime)) -ForegroundColor Green");
+        sb.AppendLine("} else {");
+        sb.AppendLine("    Write-Host 'AUCUN point de restauration n''a pu être créé : les étapes suivantes ne seront PAS annulables.' -ForegroundColor Yellow");
+        sb.AppendLine("    if ($srErr) { Write-Host ('  Motif : ' + $srErr) -ForegroundColor Yellow }");
+        sb.AppendLine("    Write-Host '  Cause la plus fréquente : la protection du système est désactivée sur ce PC.' -ForegroundColor Yellow");
+        sb.AppendLine("    Write-Host ('  Pour l''activer : Enable-ComputerRestore -Drive ' + $srDrive + '   (ou Panneau de configuration > Système > Protection du système)')");
+        sb.AppendLine("    if (-not (Ask 'Continuer SANS filet de sécurité ?')) { Stop-Transcript | Out-Null; exit }");
+        sb.AppendLine("}");
+        sb.AppendLine("# Remise en place du réglage d'origine de Windows (bride des 24 h).");
+        sb.AppendLine("try { if ($null -ne $srOld) { Set-ItemProperty -Path $srKey -Name SystemRestorePointCreationFrequency -Value $srOld } else { Remove-ItemProperty -Path $srKey -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue } } catch {}");
+        sb.AppendLine("Write-Host 'Pour revenir en arrière plus tard : rstrui.exe'");
+        sb.AppendLine();
+
         // ------------------------------------------------------- état général
         sb.AppendLine("Section 'État général'");
         sb.AppendLine("Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, LastBootUpTime | Format-List");

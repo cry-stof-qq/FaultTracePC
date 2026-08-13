@@ -89,6 +89,35 @@ public partial class RepairToolboxWindow : Window
         TxtStatus.Text = $"Désinstallation de {row.Kb} lancée — suis la fenêtre PowerShell.";
     }
 
+    /// <summary>
+    /// Crée un point de restauration système. Windows limite la fréquence de
+    /// création (un point par 24 h par défaut) : on lève cette limite le temps
+    /// de l'opération, sinon l'appel échoue silencieusement.
+    /// </summary>
+    private void BtnRestorePoint_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this,
+                "Créer un point de restauration système maintenant ?\n\n" +
+                "Cela permettra de revenir à l'état actuel si une réparation se passe mal. " +
+                "Opération sans risque, qui prend quelques dizaines de secondes.",
+                "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        LaunchPs(
+            "Write-Host 'Création du point de restauration…' -ForegroundColor Cyan; " +
+            // La protection système doit être active sur C: pour que le point existe.
+            "try { Enable-ComputerRestore -Drive 'C:\\' -ErrorAction SilentlyContinue } catch {}; " +
+            "New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SystemRestore' " +
+            "-Name 'SystemRestorePointCreationFrequency' -Value 0 -PropertyType DWord -Force | Out-Null; " +
+            "Checkpoint-Computer -Description 'FaultTracePC - avant reparation' -RestorePointType 'MODIFY_SETTINGS'; " +
+            "if ($?) { Write-Host 'Point de restauration créé.' -ForegroundColor Green } " +
+            "else { Write-Host 'Échec : la protection système est peut-être désactivée (Panneau de configuration > Système > Protection du système).' -ForegroundColor Yellow }; " +
+            "Get-ComputerRestorePoint | Select-Object -Last 5 SequenceNumber, Description, CreationTime | Format-Table -AutoSize");
+    }
+
+    private void BtnWindowsUpdate_Click(object sender, RoutedEventArgs e) =>
+        new WindowsUpdateWindow { Owner = this }.Show();
+
     private void BtnInPlaceRepair_Click(object sender, RoutedEventArgs e)
     {
         MessageBox.Show(this,
@@ -115,6 +144,10 @@ public partial class RepairToolboxWindow : Window
             ["dismrestore"] = "Lancer la réparation DISM /RestoreHealth ?\n\n~15 minutes, télécharge des fichiers sains depuis Windows Update.",
             ["chkdskfix"] = "Planifier chkdsk C: /f ?\n\nLa vérification s'exécutera au prochain redémarrage du PC.",
             ["mdsched"] = "Lancer le diagnostic mémoire Windows ?\n\n⚠ Le PC REDÉMARRE immédiatement pour tester la RAM.",
+            ["componentcleanup"] = "Purger les composants Windows obsolètes ?\n\n~10 à 20 minutes. Récupère souvent plusieurs gigaoctets.\n\n⚠ Après cette opération, les mises à jour déjà installées ne pourront plus être désinstallées — à éviter si tu suspectes justement une mise à jour récente.",
+            ["temp"] = "Vider les fichiers temporaires ?\n\nLes fichiers en cours d'utilisation seront ignorés. Sans risque.",
+            ["networkreset"] = "Réinitialiser la pile réseau ?\n\nWinsock, configuration IP et cache DNS seront remis à zéro.\n\n⚠ Un REDÉMARRAGE sera nécessaire, et les paramètres réseau manuels (IP fixe, proxy) devront être reconfigurés.",
+            ["defenderfull"] = "Lancer une analyse COMPLÈTE de Microsoft Defender ?\n\nElle peut durer plus d'une heure et ralentir la machine pendant ce temps.",
         };
         if (confirmations.TryGetValue(tag, out var msg) &&
             MessageBox.Show(this, msg, "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
@@ -147,6 +180,83 @@ public partial class RepairToolboxWindow : Window
                     "net start cryptsvc; net start bits; net start wuauserv; " +
                     "Write-Host 'Terminé. Relance la recherche de mises à jour dans les Paramètres.' -ForegroundColor Green");
                 break;
+            // ---- Espace disque ----
+            case "diskusage":
+                LaunchPs(
+                    "function Taille($p) { if (Test-Path $p) { try { '{0:N1} Go' -f ((Get-ChildItem $p -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1GB) } catch { 'inaccessible' } } else { 'absent' } }; " +
+                    "Write-Host 'Espace occupé par les principaux postes :' -ForegroundColor Cyan; " +
+                    "Write-Host ('  Composants Windows (WinSxS) : ' + (Taille 'C:\\Windows\\WinSxS')); " +
+                    "Write-Host ('  Windows.old (ancienne installation) : ' + (Taille 'C:\\Windows.old')); " +
+                    "Write-Host ('  Temporaires utilisateur : ' + (Taille $env:TEMP)); " +
+                    "Write-Host ('  Temporaires Windows : ' + (Taille 'C:\\Windows\\Temp')); " +
+                    "Write-Host ('  Cache Windows Update : ' + (Taille 'C:\\Windows\\SoftwareDistribution\\Download')); " +
+                    "Write-Host ''; Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter, FileSystemLabel, " +
+                    "@{n='Libre (Go)';e={[math]::Round($_.SizeRemaining/1GB,1)}}, @{n='Total (Go)';e={[math]::Round($_.Size/1GB,1)}} | Format-Table -AutoSize");
+                break;
+
+            case "componentcleanup":
+                LaunchPs("Write-Host 'Analyse puis purge des composants obsolètes (patience)…' -ForegroundColor Cyan; " +
+                         "DISM /Online /Cleanup-Image /AnalyzeComponentStore; " +
+                         "DISM /Online /Cleanup-Image /StartComponentCleanup");
+                break;
+
+            case "temp":
+                LaunchPs(
+                    "$avant = (Get-PSDrive C).Free; " +
+                    "Write-Host 'Suppression des fichiers temporaires…' -ForegroundColor Cyan; " +
+                    "Remove-Item \"$env:TEMP\\*\" -Recurse -Force -ErrorAction SilentlyContinue; " +
+                    "Remove-Item 'C:\\Windows\\Temp\\*' -Recurse -Force -ErrorAction SilentlyContinue; " +
+                    "$apres = (Get-PSDrive C).Free; " +
+                    "Write-Host ('Espace libéré : {0:N2} Go' -f (($apres - $avant)/1GB)) -ForegroundColor Green");
+                break;
+
+            case "cleanmgr": Open("cleanmgr.exe", "/d C:"); break;
+
+            // ---- Démarrage / sécurité / réseau ----
+            case "startup":
+                LaunchPs(
+                    "Write-Host 'Programmes lancés au démarrage :' -ForegroundColor Cyan; " +
+                    "Get-CimInstance Win32_StartupCommand | Select-Object Name, Command, Location, User | Format-Table -AutoSize -Wrap; " +
+                    "Write-Host 'Dossier Démarrage :' -ForegroundColor Cyan; " +
+                    "Get-ChildItem \"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\", " +
+                    "'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup' -ErrorAction SilentlyContinue | Select-Object Name, LastWriteTime | Format-Table -AutoSize; " +
+                    "Write-Host 'Pour en désactiver : Gestionnaire des tâches > onglet Démarrage.' -ForegroundColor Yellow");
+                break;
+
+            case "defenderquick":
+                LaunchPs("Write-Host 'Analyse rapide en cours…' -ForegroundColor Cyan; Start-MpScan -ScanType QuickScan; " +
+                         "Write-Host 'Terminé.' -ForegroundColor Green; Get-MpThreatDetection | Select-Object -Last 10 InitialDetectionTime, ThreatID, Resources | Format-Table -AutoSize");
+                break;
+
+            case "defenderfull":
+                LaunchPs("Write-Host 'Analyse complète en cours (longue)…' -ForegroundColor Cyan; Start-MpScan -ScanType FullScan; " +
+                         "Write-Host 'Terminé.' -ForegroundColor Green");
+                break;
+
+            case "defenderhistory":
+                LaunchPs(
+                    "Write-Host 'État de la protection :' -ForegroundColor Cyan; " +
+                    "Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureLastUpdated, QuickScanAge, FullScanAge | Format-List; " +
+                    "Write-Host 'Menaces détectées :' -ForegroundColor Cyan; " +
+                    "$t = Get-MpThreatDetection -ErrorAction SilentlyContinue; " +
+                    "if ($t) { $t | Sort-Object InitialDetectionTime -Descending | Select-Object -First 20 InitialDetectionTime, ThreatID, Resources | Format-Table -AutoSize -Wrap } " +
+                    "else { Write-Host '  Aucune menace détectée dans l''historique.' -ForegroundColor Green }");
+                break;
+
+            case "networkreset":
+                LaunchPs("netsh winsock reset; netsh int ip reset; ipconfig /flushdns; ipconfig /registerdns; " +
+                         "Write-Host 'Réinitialisation terminée — REDÉMARRE la machine pour qu''elle prenne effet.' -ForegroundColor Yellow");
+                break;
+
+            case "battery":
+                LaunchPs("$out = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'FaultTracePC\\rapport-batterie.html'; " +
+                         "powercfg /batteryreport /output $out; " +
+                         "if (Test-Path $out) { Start-Process $out } else { Write-Host 'Aucune batterie détectée (poste fixe ?).' -ForegroundColor Yellow }");
+                break;
+
+            case "resmon": Open("perfmon.exe", "/res"); break;
+            case "rstrui": Open("rstrui.exe"); break;
+
             case "reliability": Open("perfmon.exe", "/rel"); break;
             case "eventvwr": Open("eventvwr.msc"); break;
             case "wusettings": Open("ms-settings:windowsupdate"); break;

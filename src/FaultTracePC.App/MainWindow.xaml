@@ -101,8 +101,19 @@
         <!-- Pied -->
         <Border Grid.Row="3" Background="#EDF1F6" Padding="22,10">
             <Grid>
-                <TextBlock x:Name="TxtFoot" Text="v1.0 — diagnostic, boîte noire, alertes préventives, parc et réparation" FontSize="11" Foreground="#6B7C91"
-                           VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="TxtFoot" Text="v1.1 — diagnostic, boîte noire, alertes préventives, parc et réparation" FontSize="11" Foreground="#6B7C91"
+                               VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtUpdate" FontSize="11" Margin="14,0,0,0" VerticalAlignment="Center"
+                               Visibility="Collapsed" FontWeight="SemiBold" Foreground="#C0392B"/>
+                    <Button x:Name="BtnUpdate" Content="⭯ Vérifier les mises à jour" FontSize="11" Padding="8,3"
+                            Margin="14,0,0,0" VerticalAlignment="Center" Click="BtnUpdate_Click"
+                            ToolTip="Interroge la page des versions publiées sur GitHub. FaultTracePC ne télécharge et n'installe jamais rien tout seul : il te dit ce qui existe, tu décides."/>
+                    <CheckBox x:Name="ChkUpdateStartup" Content="au démarrage" FontSize="11" Margin="8,0,0,0"
+                              VerticalAlignment="Center" Foreground="#6B7C91"
+                              Checked="ChkUpdateStartup_Changed" Unchecked="ChkUpdateStartup_Changed"
+                              ToolTip="Décoché par défaut : sans cette case, FaultTracePC ne contacte jamais Internet de lui-même. À laisser décoché sur un poste d'établissement si les sorties réseau sont contrôlées."/>
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="BtnRepair" Content="🛠  Lancer la réparation" Padding="12,6" FontSize="12"
                             Margin="0,0,8,0" IsEnabled="False" Click="BtnRepair_Click"

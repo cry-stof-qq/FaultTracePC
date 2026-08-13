@@ -24,6 +24,9 @@ public sealed class SystemInfoCollector
         Safe("GPU", () => CollectGpu(s.Gpus));
         Safe("Disques", () => CollectDisks(s.Disks));
         Safe("Volumes", () => CollectVolumes(s.Volumes));
+        Safe("SMART", () => new SmartCollector(_errors).Enrich(s.Disks));
+        Safe("Batterie", () => s.Batteries.AddRange(new BatteryCollector(_errors).Collect()));
+        Safe("Logiciels installés", () => s.InstalledApps.AddRange(InstalledSoftwareCollector.Collect(_errors)));
         if (includeDrivers)
             Safe("Pilotes", () => s.Drivers.AddRange(DriverCollector.Collect()));
 

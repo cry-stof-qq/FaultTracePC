@@ -48,22 +48,51 @@ après coup ne peut reconstituer.
 mémoire virtuelle, erreurs WHEA, santé des disques) et prévient par une
 notification Windows *avant* que la machine tombe.
 
+**État réel du matériel.** Les attributs **SMART bruts** des disques sont lus
+directement (secteurs réalloués, secteurs en attente, erreurs incorrigibles,
+erreurs CRC de câble, heures de fonctionnement, usure SSD) : le rapport dit en
+clair si des **clusters sont défectueux** et si le disque doit être remplacé —
+et distingue un disque qui meurt d'un simple **câble SATA défaillant**. Sur un
+portable, l'**état de la batterie** est donné en pourcentage d'usure, avec un
+verdict lisible (*usée*, *très usée*, *hors d'usage*).
+
 **Aide à la réparation.** Chaque diagnostic génère un script PowerShell adapté
-aux problèmes trouvés — et rien ne se lance sans confirmation. Une boîte à
-outils intégrée réunit les réparations courantes : désinstaller une mise à jour
+aux problèmes trouvés — qui commence par créer un **point de restauration** et
+ne lance rien sans confirmation. Une boîte à outils intégrée réunit les
+réparations courantes : point de restauration, désinstaller une mise à jour
 Windows fautive, réinitialiser les composants Windows Update, `sfc`, `DISM`,
-`chkdsk`, diagnostic mémoire, SMART.
+`chkdsk`, diagnostic mémoire, SMART, nettoyage de l'espace disque, analyse
+Microsoft Defender, réinitialisation réseau. Une fenêtre dédiée pilote
+**Windows Update** et affiche ce que la page Paramètres masque — mises à jour
+**optionnelles** et **pilotes** — avec sélection ligne par ligne et **jamais de
+redémarrage automatique**.
+
+**Le problème est-il encore là ?** Quand un logiciel est mis en cause, le
+rapport vérifie s'il est toujours installé, s'il a été désinstallé, ou s'il a
+été **réinstallé ou mis à jour après le dernier crash** — et le dit, au lieu
+d'afficher éternellement un problème déjà réglé.
 
 **Suivi et parc.** Chaque scan est archivé : le suivant répond à la vraie
 question — « est-ce que la réparation a marché ? ». En mode parc, une console
 affiche l'état de plusieurs machines et permet de lancer un diagnostic à
 distance sans se déplacer.
 
+**Suis-je à jour ?** Le bouton `⭯ Vérifier les mises à jour` compare la version
+réellement embarquée dans l'exécutable à la dernière publiée sur
+[la page des versions](https://github.com/cry-stof-qq/FaultTracePC/releases/latest).
+S'il y a du neuf, il affiche les nouveautés et propose d'ouvrir la page de
+téléchargement — **il ne télécharge rien et n'installe rien tout seul** : sur un
+parc déployé par GPO, un exécutable qui se met à jour sans qu'on le lui demande
+est un risque, pas un service. La vérification au démarrage est **désactivée par
+défaut** : sans cocher la case `au démarrage`, FaultTracePC ne contacte jamais
+Internet de lui-même. Sur un poste sans accès Internet, l'échec est annoncé
+clairement et ne bloque rien.
+
 ## Installation
 
 | Format | Pour qui | Comment |
 |---|---|---|
-| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.0.0.msi` (ou double-clic) |
+| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.1.0.msi` (ou double-clic) |
 | **Portable (.zip)** | Dépannage sur clé USB, rien à installer | Décompresser, lancer `FaultTracePC.exe` |
 
 Les deux sont disponibles dans les [Releases](../../releases). Aucun prérequis :
@@ -133,7 +162,7 @@ Produire les distribuables :
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.0.0
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.1.0
 ```
 
 ## Architecture

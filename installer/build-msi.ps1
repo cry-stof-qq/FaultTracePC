@@ -28,7 +28,7 @@
 [CmdletBinding()]
 param(
     [string]$WixVersion = '6.0.2',
-    [string]$Version = '0.9.0',
+    [string]$Version = '1.1.0',
     [switch]$SkipPublish
 )
 

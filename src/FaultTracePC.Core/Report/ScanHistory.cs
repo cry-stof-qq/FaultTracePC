@@ -46,6 +46,9 @@ public static class ScanHistory
         public int? TemperatureC { get; set; }
         public int? WearPercent { get; set; }
         public ulong? ReadErrorsTotal { get; set; }
+        /// <summary>Secteurs défectueux cumulés : leur ÉVOLUTION est le vrai signal d'alarme.</summary>
+        public ulong? BadSectors { get; set; }
+        public ulong? CrcErrors { get; set; }
     }
 
     // ------------------------------------------------------------------
@@ -66,6 +69,7 @@ public static class ScanHistory
             {
                 Model = d.Model, Health = d.HealthStatus,
                 TemperatureC = d.TemperatureC, WearPercent = d.WearPercent, ReadErrorsTotal = d.ReadErrorsTotal,
+                BadSectors = d.Smart?.BadSectors, CrcErrors = d.Smart?.UdmaCrcErrors,
             }).ToList(),
             DiskErrorEvents = r.Events.Count(e => e.Category == EventCategory.DiskError),
             WheaEvents = r.Events.Count(e => e.Category == EventCategory.Whea),
@@ -155,6 +159,11 @@ public static class ScanHistory
                 c.DiskChanges.Add($"{d.Model} : usure {ow} % → {nw} %");
             if (old.ReadErrorsTotal is { } oe && d.ReadErrorsTotal is { } ne && ne > oe)
                 c.DiskChanges.Add($"{d.Model} : erreurs de lecture {oe} → {ne}");
+            // L'augmentation des secteurs défectueux est LE signal d'un disque qui meurt.
+            if (old.BadSectors is { } ob && d.Smart?.BadSectors is { } nb && nb > ob)
+                c.DiskChanges.Add($"⚠ {d.Model} : secteurs défectueux {ob} → {nb} — dégradation en cours, sauvegarder");
+            if (old.CrcErrors is { } oc && d.Smart?.UdmaCrcErrors is { } nc && nc > oc)
+                c.DiskChanges.Add($"{d.Model} : erreurs de câble (CRC) {oc} → {nc}");
             if (old.TemperatureC is { } ot && d.TemperatureC is { } nt && Math.Abs(nt - ot) >= 8)
                 c.DiskChanges.Add($"{d.Model} : température {ot} °C → {nt} °C");
         }

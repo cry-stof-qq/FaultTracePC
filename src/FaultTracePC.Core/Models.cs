@@ -90,6 +90,75 @@ public sealed class DiskInfo
     public int? WearPercent { get; set; }             // usure SSD, si dispo
     public ulong? PowerOnHours { get; set; }
     public ulong? ReadErrorsTotal { get; set; }
+
+    /// <summary>Attributs SMART détaillés (ceux qui prédisent réellement une panne).</summary>
+    public SmartInfo? Smart { get; set; }
+}
+
+/// <summary>
+/// Les indicateurs SMART qui comptent vraiment. Le reste des dizaines d'attributs
+/// n'a aucune valeur prédictive démontrée : on ne retient que ceux dont la hausse
+/// annonce une défaillance.
+/// </summary>
+public sealed class SmartInfo
+{
+    /// <summary>true si le disque lui-même annonce une défaillance imminente (SMART status).</summary>
+    public bool? PredictedFailure { get; set; }
+    /// <summary>Attribut 5 : secteurs devenus défectueux et remplacés par des secteurs de réserve.</summary>
+    public ulong? ReallocatedSectors { get; set; }
+    /// <summary>Attribut 197 : secteurs instables en attente de réallocation — le signal le plus précoce.</summary>
+    public ulong? PendingSectors { get; set; }
+    /// <summary>Attribut 198 : secteurs illisibles définitivement.</summary>
+    public ulong? UncorrectableSectors { get; set; }
+    /// <summary>Attribut 199 : erreurs de transmission — signale presque toujours un CÂBLE défectueux.</summary>
+    public ulong? UdmaCrcErrors { get; set; }
+    /// <summary>Attribut 187 : erreurs non corrigeables signalées à l'hôte.</summary>
+    public ulong? ReportedUncorrectable { get; set; }
+    public ulong? PowerOnHours { get; set; }
+    public ulong? PowerCycles { get; set; }
+    public int? TemperatureC { get; set; }
+    /// <summary>Pourcentage de durée de vie restante d'un SSD (100 = neuf).</summary>
+    public int? SsdLifeLeftPercent { get; set; }
+    /// <summary>Origine des données : "SMART (SATA)", "Compteurs Windows (NVMe)"…</summary>
+    public string Source { get; set; } = "";
+
+    /// <summary>Total des secteurs défectueux (réalloués + en attente + illisibles).</summary>
+    public ulong BadSectors =>
+        (ReallocatedSectors ?? 0) + (PendingSectors ?? 0) + (UncorrectableSectors ?? 0);
+}
+
+/// <summary>État de la batterie d'un portable.</summary>
+public sealed class BatteryInfo
+{
+    public string Name { get; set; } = "";
+    public string Chemistry { get; set; } = "";
+    /// <summary>Capacité prévue par le constructeur (mWh).</summary>
+    public uint? DesignedCapacity { get; set; }
+    /// <summary>Capacité réellement atteinte à pleine charge aujourd'hui (mWh).</summary>
+    public uint? FullChargedCapacity { get; set; }
+    public uint? CycleCount { get; set; }
+    /// <summary>Charge actuelle en %.</summary>
+    public ushort? ChargeRemainingPercent { get; set; }
+    public string Status { get; set; } = "";
+
+    /// <summary>Usure en % : 0 = comme neuve, 100 = ne tient plus rien.</summary>
+    public int? WearPercent =>
+        DesignedCapacity is > 0 && FullChargedCapacity is not null
+            ? Math.Clamp((int)Math.Round(100.0 * (1.0 - (double)FullChargedCapacity.Value / DesignedCapacity.Value)), 0, 100)
+            : null;
+
+    /// <summary>Santé restante en % (100 - usure).</summary>
+    public int? HealthPercent => WearPercent is { } w ? 100 - w : null;
+}
+
+/// <summary>Un logiciel installé (registre de désinstallation).</summary>
+public sealed class InstalledApp
+{
+    public string Name { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string Publisher { get; set; } = "";
+    public DateTime? InstallDate { get; set; }
+    public string InstallLocation { get; set; } = "";
 }
 
 public sealed class VolumeInfo
@@ -125,6 +194,10 @@ public sealed class SystemSnapshot
     public List<DiskInfo> Disks { get; set; } = new();
     public List<VolumeInfo> Volumes { get; set; } = new();
     public List<DriverInfo> Drivers { get; set; } = new();
+    /// <summary>Batteries (vide sur un poste fixe).</summary>
+    public List<BatteryInfo> Batteries { get; set; } = new();
+    /// <summary>Logiciels installés — sert à vérifier si un logiciel fautif est encore présent.</summary>
+    public List<InstalledApp> InstalledApps { get; set; } = new();
     public string MachineName { get; set; } = "";
 }
 

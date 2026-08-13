@@ -20,6 +20,61 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="14,8">
             <StackPanel>
 
+                <!-- ============ Filet de sécurité ============ -->
+                <GroupBox Header=" Avant toute réparation " FontSize="13" Padding="8" Margin="0,4">
+                    <StackPanel>
+                        <TextBlock FontSize="12" Foreground="#44546A" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Un point de restauration permet de revenir en arrière si une réparation tourne mal. C'est trente secondes, et ça rend tout le reste réversible."/>
+                        <WrapPanel>
+                            <Button Content="🛟 Créer un point de restauration" Padding="10,6" Margin="0,0,8,4"
+                                    FontWeight="SemiBold" Background="#2470B3" Foreground="White" BorderThickness="0"
+                                    Click="BtnRestorePoint_Click"
+                                    ToolTip="Crée un point de restauration système nommé « FaultTracePC — avant réparation »."/>
+                            <Button Content="↩ Ouvrir la restauration du système" Padding="10,6" Margin="0,0,8,4"
+                                    Tag="rstrui" Click="BtnTool_Click"
+                                    ToolTip="Ouvre l'assistant Windows pour revenir à un point de restauration existant."/>
+                        </WrapPanel>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- ============ Nettoyage (celui qui libère vraiment de la place) ============ -->
+                <GroupBox Header=" Libérer de l'espace disque " FontSize="13" Padding="8" Margin="0,8,0,4">
+                    <StackPanel>
+                        <TextBlock FontSize="12" Foreground="#44546A" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Ces nettoyages récupèrent des gigaoctets réels — contrairement au « nettoyage de registre », qui ne libère rien et que Microsoft déconseille."/>
+                        <WrapPanel>
+                            <Button Content="📊 Où est passée la place ?" Padding="10,6" Margin="0,0,8,6" Tag="diskusage" Click="BtnTool_Click"
+                                    ToolTip="Mesure l'espace occupé par les composants Windows, les temporaires, la corbeille et Windows.old."/>
+                            <Button Content="🧹 Purger les composants Windows obsolètes" Padding="10,6" Margin="0,0,8,6" Tag="componentcleanup" Click="BtnTool_Click"
+                                    ToolTip="DISM /StartComponentCleanup : supprime les anciennes versions des composants remplacés par les mises à jour. Récupère souvent 3 à 8 Go."/>
+                            <Button Content="🗑 Vider les fichiers temporaires" Padding="10,6" Margin="0,0,8,6" Tag="temp" Click="BtnTool_Click"
+                                    ToolTip="Vide %TEMP% et le dossier Temp de Windows (les fichiers en cours d'utilisation sont ignorés)."/>
+                            <Button Content="🧰 Nettoyage de disque Windows" Padding="10,6" Margin="0,0,8,6" Tag="cleanmgr" Click="BtnTool_Click"
+                                    ToolTip="Ouvre l'outil intégré, avec les options système (Windows.old, anciennes mises à jour)."/>
+                        </WrapPanel>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- ============ Démarrage, sécurité, réseau ============ -->
+                <GroupBox Header=" Démarrage, sécurité et réseau " FontSize="13" Padding="8" Margin="0,4">
+                    <WrapPanel>
+                        <Button Content="🚀 Programmes lancés au démarrage" Padding="10,6" Margin="0,0,8,6" Tag="startup" Click="BtnTool_Click"
+                                ToolTip="Liste ce qui se lance au démarrage (registre, dossier Démarrage) — la vraie cause d'un PC lent à démarrer. Lecture seule."/>
+                        <Button Content="🛡 Analyse rapide Microsoft Defender" Padding="10,6" Margin="0,0,8,6" Tag="defenderquick" Click="BtnTool_Click"
+                                ToolTip="Start-MpScan -ScanType QuickScan : quelques minutes, sans redémarrage."/>
+                        <Button Content="🛡 Analyse complète (longue)" Padding="10,6" Margin="0,0,8,6" Tag="defenderfull" Click="BtnTool_Click"
+                                ToolTip="Analyse complète du système : peut durer plus d'une heure."/>
+                        <Button Content="📜 Menaces détectées récemment" Padding="10,6" Margin="0,0,8,6" Tag="defenderhistory" Click="BtnTool_Click"
+                                ToolTip="Historique des détections de Microsoft Defender et état de la protection."/>
+                        <Button Content="🌐 Réinitialiser la pile réseau" Padding="10,6" Margin="0,0,8,6" Tag="networkreset" Click="BtnTool_Click"
+                                ToolTip="netsh winsock reset + réinitialisation IP + vidage du cache DNS. Nécessite un redémarrage."/>
+                        <Button Content="🔋 Rapport de batterie détaillé" Padding="10,6" Margin="0,0,8,6" Tag="battery" Click="BtnTool_Click"
+                                ToolTip="powercfg /batteryreport : historique complet de capacité et d'autonomie."/>
+                        <Button Content="📈 Moniteur de ressources" Padding="10,6" Margin="0,0,8,6" Tag="resmon" Click="BtnTool_Click"
+                                ToolTip="Ouvre l'outil Windows : processeur, disque, réseau et mémoire par processus, en direct."/>
+                    </WrapPanel>
+                </GroupBox>
+
                 <!-- ============ Windows Update ============ -->
                 <GroupBox Header=" Mise à jour Windows qui s'est mal passée " FontSize="13" Padding="8" Margin="0,4">
                     <StackPanel>
@@ -45,6 +100,10 @@
                             <Button Content="🩹 Réparation sur place (réinstaller Windows sans perte)" Padding="10,6" Margin="0,0,8,4"
                                     Click="BtnInPlaceRepair_Click"
                                     ToolTip="Ouvre Paramètres → Récupération : « Résoudre les problèmes à l'aide de Windows Update » réinstalle la même version de Windows en conservant fichiers et applications."/>
+                            <Button Content="⬇ Rechercher et installer les mises à jour (optionnelles et pilotes inclus)"
+                                    Padding="10,6" Margin="0,0,8,4" FontWeight="SemiBold"
+                                    Click="BtnWindowsUpdate_Click"
+                                    ToolTip="Ouvre la fenêtre de mise à jour : liste tout ce qui est disponible, y compris les mises à jour optionnelles et de pilotes que Windows cache, avec sélection à la carte. Jamais de redémarrage automatique."/>
                         </WrapPanel>
                     </StackPanel>
                 </GroupBox>

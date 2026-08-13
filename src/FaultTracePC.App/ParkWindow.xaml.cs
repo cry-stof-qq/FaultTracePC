@@ -94,12 +94,39 @@ public partial class ParkWindow : Window
 
     private void BtnRemove_Click(object sender, RoutedEventArgs e)
     {
-        if (LvMachines.SelectedItem is Row row)
+        if (LvMachines.SelectedItem is not Row row)
         {
-            _machines.RemoveAll(m => m.Name == row.Name && m.Host == row.Host);
-            SaveMachines();
-            RenderRows(null);
+            MessageBox.Show(this,
+                "Sélectionne d'abord une machine dans la liste, puis clique sur « Retirer la sélection ».",
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
         }
+
+        if (MessageBox.Show(this,
+                $"Retirer « {row.Name} » ({row.Host}) de la console de parc ?\n\n" +
+                "Cela retire seulement la machine de TA liste de supervision :\n" +
+                "• rien n'est désinstallé sur le poste distant ;\n" +
+                "• son historique de scans local n'est pas touché ;\n" +
+                "• tu pourras la rajouter plus tard avec son nom, son adresse et son jeton.",
+                "FaultTracePC — retirer une machine",
+                MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+            return;
+
+        // Attention : la colonne « Host » affichée vaut « hôte:port ».
+        // Comparer m.Host à row.Host ne correspond JAMAIS — la machine n'était
+        // alors pas réellement retirée (bogue corrigé en 1.1).
+        int removed = _machines.RemoveAll(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
+        SaveMachines();
+
+        // On repart des derniers résultats connus : les autres machines gardent
+        // leur état affiché au lieu de repasser en « inconnu ».
+        foreach (var k in _lastResults.Keys.Where(k => k.Name == row.Name && $"{k.Host}:{k.Port}" == row.Host).ToList())
+            _lastResults.Remove(k);
+        RenderRows(_lastResults);
+
+        TxtStatus.Text = removed > 0
+            ? $"« {row.Name} » retirée de la liste. {_machines.Count} machine(s) supervisée(s)."
+            : $"« {row.Name} » n'était plus dans la liste.";
     }
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => _ = RefreshAllAsync();

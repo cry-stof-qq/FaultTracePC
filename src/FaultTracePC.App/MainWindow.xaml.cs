@@ -20,6 +20,17 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Loaded += (_, _) => RefreshMonitorButton();
+        // Version réellement embarquée dans l'assembly : le pied de page ne peut
+        // pas mentir sur ce qui tourne.
+        Loaded += (_, _) =>
+        {
+            TxtFoot.Text = $"v{UpdateChecker.CurrentVersion} — diagnostic, boîte noire, alertes préventives, parc et réparation";
+            // Vérification au démarrage : uniquement si l'utilisateur l'a demandée.
+            _startupPrefLoaded = false;
+            ChkUpdateStartup.IsChecked = UpdateChecker.CheckAtStartup;
+            _startupPrefLoaded = true;
+            if (UpdateChecker.CheckAtStartup) _ = CheckUpdateAsync(silent: true);
+        };
         // Le service peut être démarré/arrêté hors de l'application : on garde
         // l'indicateur à jour sans que l'utilisateur ait à rouvrir la fenêtre.
         Activated += (_, _) => RefreshMonitorButton();
@@ -350,6 +361,94 @@ public partial class MainWindow : Window
 
     private void BtnToolbox_Click(object sender, RoutedEventArgs e) =>
         new RepairToolboxWindow { Owner = this }.Show();
+
+    // ==================================================================
+    // Mise à jour du logiciel
+    // ==================================================================
+
+    private void BtnUpdate_Click(object sender, RoutedEventArgs e) => _ = CheckUpdateAsync(silent: false);
+
+    private bool _startupPrefLoaded;
+
+    private void ChkUpdateStartup_Changed(object sender, RoutedEventArgs e)
+    {
+        // Ignoré tant que la case n'a pas été initialisée depuis la préférence
+        // enregistrée, sinon le simple chargement de la fenêtre l'écraserait.
+        if (!_startupPrefLoaded) return;
+        UpdateChecker.CheckAtStartup = ChkUpdateStartup.IsChecked == true;
+    }
+
+    private bool _checkingUpdate;
+
+    /// <summary>
+    /// Interroge GitHub. En mode « silencieux » (démarrage), on ne dérange
+    /// l'utilisateur que si une version plus récente existe réellement.
+    /// Aucun téléchargement, aucune installation : FaultTracePC informe, l'humain décide.
+    /// </summary>
+    private async Task CheckUpdateAsync(bool silent)
+    {
+        if (_checkingUpdate) return;
+        _checkingUpdate = true;
+        if (!silent) { BtnUpdate.IsEnabled = false; BtnUpdate.Content = "⭯ Vérification…"; }
+
+        try
+        {
+            var info = await UpdateChecker.CheckAsync();
+
+            if (info.UpdateAvailable)
+            {
+                TxtUpdate.Text = $"⬆ Version {info.Latest} disponible";
+                TxtUpdate.Visibility = Visibility.Visible;
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("Une nouvelle version de FaultTracePC est disponible.");
+                sb.AppendLine();
+                sb.AppendLine($"  Installée : {info.Current}");
+                sb.AppendLine($"  Publiée   : {info.Latest}" +
+                    (info.PublishedAt is { } d ? $" (le {d.LocalDateTime:dd/MM/yyyy})" : ""));
+                if (info.Assets.Count > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("Fichiers publiés :");
+                    foreach (var (name, bytes) in info.Assets)
+                        sb.AppendLine($"  • {name}" + (bytes > 0 ? $" ({bytes / 1024.0 / 1024:0.#} Mo)" : ""));
+                }
+                if (!string.IsNullOrWhiteSpace(info.ReleaseNotes))
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("Nouveautés :");
+                    var notes = info.ReleaseNotes.Length > 1200 ? info.ReleaseNotes[..1200] + "…" : info.ReleaseNotes;
+                    sb.AppendLine(notes);
+                }
+                sb.AppendLine();
+                sb.AppendLine("FaultTracePC ne télécharge et n'installe rien tout seul.");
+                sb.AppendLine("Ouvrir la page de téléchargement dans le navigateur ?");
+
+                if (MessageBox.Show(this, sb.ToString(), "FaultTracePC — mise à jour disponible",
+                        MessageBoxButton.YesNo, MessageBoxImage.Information, MessageBoxResult.Yes) == MessageBoxResult.Yes)
+                    UpdateChecker.OpenDownloadPage(info.DownloadPage);
+            }
+            else
+            {
+                TxtUpdate.Visibility = Visibility.Collapsed;
+                if (!silent)
+                {
+                    var extra = info.Succeeded
+                        ? "\n\nRien à faire."
+                        : "\n\nCe n'est pas une anomalie sur un poste sans accès Internet : le mode parc de FaultTracePC fonctionne justement en réseau local fermé.";
+                    MessageBox.Show(this, info.Summary + extra, "FaultTracePC — mise à jour",
+                        MessageBoxButton.OK,
+                        info.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                }
+            }
+        }
+        finally
+        {
+            _checkingUpdate = false;
+            BtnUpdate.IsEnabled = true;
+            BtnUpdate.Content = "⭯ Vérifier les mises à jour";
+        }
+    }
 
     private void BtnOpenReport_Click(object sender, RoutedEventArgs e)
     {
