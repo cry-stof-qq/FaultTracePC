@@ -36,11 +36,18 @@ public sealed class ScanOrchestrator
         report.ReliabilityRecords = new ReliabilityCollector(errors).Collect(options.Days);
         ct.ThrowIfCancellationRequested();
 
-        Step(progress, "Analyse des fichiers dump (Minidump, MEMORY.DMP)…", 75);
+        Step(progress, "Analyse des fichiers dump (Minidump, MEMORY.DMP)…", 70);
         report.Dumps = new DumpCollector(errors).Collect();
         ct.ThrowIfCancellationRequested();
 
-        Step(progress, "Corrélation et diagnostic…", 90);
+        if (options.DeepDumpAnalysis && report.Dumps.Count > 0)
+        {
+            Step(progress, "Analyse profonde des dumps (WinDbg/CDB, symboles Microsoft)…", 78);
+            new CdbAnalyzer(errors).AnalyzeAll(report.Dumps, options.MaxDeepDumps, ct);
+        }
+        ct.ThrowIfCancellationRequested();
+
+        Step(progress, "Corrélation et diagnostic…", 92);
         new RulesEngine().Analyze(report);
 
         Step(progress, "Terminé.", 100);

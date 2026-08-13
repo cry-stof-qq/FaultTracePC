@@ -37,6 +37,9 @@
                 </ComboBox>
                 <CheckBox x:Name="ChkDrivers" Content="Inventaire des pilotes" IsChecked="True"
                           VerticalAlignment="Center" Margin="18,0,0,0"/>
+                <CheckBox x:Name="ChkDeep" Content="Analyse profonde (WinDbg)" IsChecked="True"
+                          VerticalAlignment="Center" Margin="12,0,0,0"
+                          ToolTip="Exécute !analyze -v sur les 5 derniers dumps via CDB pour nommer le pilote fautif. Nécessite WinDbg (winget install Microsoft.WinDbg) ; ignoré proprement s'il est absent."/>
                 <Button x:Name="BtnRealtime" Content="📡  Surveillance temps réel" Padding="14,9" Margin="18,0,0,0"
                         FontSize="13" IsEnabled="False" Cursor="Arrow"
                         ToolTip="Disponible en Phase 3 : service de surveillance avec journal continu et capteurs de température."/>
@@ -84,7 +87,7 @@
         <!-- Pied -->
         <Border Grid.Row="3" Background="#EDF1F6" Padding="22,10">
             <Grid>
-                <TextBlock x:Name="TxtFoot" Text="v0.1 — Phase 1 (scan post-mortem)" FontSize="11" Foreground="#6B7C91"
+                <TextBlock x:Name="TxtFoot" Text="v0.3 — scan post-mortem + analyse symbolique WinDbg" FontSize="11" Foreground="#6B7C91"
                            VerticalAlignment="Center"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="BtnRepair" Content="🛠  Lancer la réparation" Padding="12,6" FontSize="12"

@@ -15,6 +15,7 @@ public sealed class RulesEngine
         r.Bsods = BuildIncidents(r);
 
         AnalyzeBsodPatterns(r);
+        AnalyzeFaultingDrivers(r);
         AnalyzeWhea(r);
         AnalyzeMemory(r);
         AnalyzeResourceExhaustion(r);
@@ -67,6 +68,8 @@ public sealed class RulesEngine
                 Parameters = d.BugCheckParameters,
                 BugCheckName = BugCheckCatalog.NameOf(d.BugCheckCode!.Value),
                 DumpPath = d.Path,
+                // Analyse symbolique (Phase 2) : le module fautif nommé par CDB fait foi.
+                SuspectDriver = d.FaultingModule,
                 Sources = { d.Kind == DumpKind.FullMemoryDump ? "MEMORY.DMP" : "Minidump" },
             });
         }
@@ -96,8 +99,9 @@ public sealed class RulesEngine
             }
         }
 
-        // Pilote suspect via TDR proche (cas GPU) — best-effort en attendant l'analyse CDB (Phase 2).
-        foreach (var i in incidents.Where(i => i.BugCheckCode is 0x116 or 0x117 or 0x119 or 0xEA))
+        // Pilote suspect via TDR proche (cas GPU) — utilisé seulement si CDB n'a rien nommé.
+        foreach (var i in incidents.Where(i => i.SuspectDriver is null &&
+                                               i.BugCheckCode is 0x116 or 0x117 or 0x119 or 0xEA))
         {
             var tdr = r.Events.FirstOrDefault(e => e.Category == EventCategory.Tdr &&
                 Math.Abs((e.TimeLocal - i.TimeLocal).TotalMinutes) < 30);
@@ -217,6 +221,87 @@ public sealed class RulesEngine
                           + (diagOk ? " Le dernier diagnostic mémoire Windows n'avait rien détecté — MemTest86 est plus sensible." : "")
                           + HardwareRamList(r),
                 Recommendation = "Lancer MemTest86 (4+ passes). Si XMP/DOCP est actif, le désactiver et re-tester : une instabilité XMP est une cause classique."
+            });
+        }
+    }
+
+    /// <summary>Modules « fautifs » de CDB qui ne désignent pas un vrai pilote tiers.</summary>
+    private static readonly HashSet<string> KernelPseudoModules = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ntoskrnl.exe", "ntkrnlmp.exe", "ntkrnlpa.exe", "ntkrpamp.exe",
+        "memory_corruption", "hardware", "Unknown_Image", "Pool_Corruption", "win32k.sys", "win32kfull.sys",
+    };
+
+    /// <summary>
+    /// Exploite les verdicts de l'analyse symbolique CDB (Phase 2) :
+    /// pilote fautif nommé, récurrence par pilote, et interprétation honnête des
+    /// pseudo-modules (memory_corruption → RAM, ntoskrnl → souvent RAM/matériel).
+    /// </summary>
+    private static void AnalyzeFaultingDrivers(DiagnosticReport r)
+    {
+        var analyzed = r.Dumps.Where(d => d.DeepAnalyzed && !string.IsNullOrEmpty(d.FaultingModule)).ToList();
+        if (analyzed.Count == 0) return;
+
+        // 1) Vrais pilotes désignés par l'analyse symbolique
+        foreach (var g in analyzed
+                     .Where(d => !KernelPseudoModules.Contains(d.FaultingModule!))
+                     .GroupBy(d => d.FaultingModule!, StringComparer.OrdinalIgnoreCase))
+        {
+            var inv = Collectors.DriverCollector.FindBySysName(r.System.Drivers, g.Key);
+            var invInfo = inv is null ? ""
+                : $" Pilote installé : {inv.DisplayName} — {inv.CompanyName} v{inv.FileVersion}"
+                  + (inv.FileDate is { } fd ? $" du {fd:dd/MM/yyyy}" : "") + ".";
+
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Critical,
+                Confidence = g.Count() >= 2 ? Confidence.High : Confidence.Medium,
+                Category = FaultCategory.Driver,
+                Title = g.Count() >= 2
+                    ? $"Pilote fautif identifié (récurrent) : {g.Key} — {g.Count()} crashs"
+                    : $"Pilote fautif identifié : {g.Key}",
+                Details = $"L'analyse symbolique WinDbg (!analyze) désigne {g.Key} dans {g.Count()} dump(s)."
+                          + (g.First().FailureBucket is { } b ? $" Signature : {b}." : "")
+                          + invInfo,
+                Recommendation = $"Mettre à jour {g.Key} depuis le site de l'éditeur"
+                               + (inv is not null && !string.IsNullOrEmpty(inv.CompanyName) ? $" ({inv.CompanyName})" : "")
+                               + ", ou désinstaller le logiciel associé s'il ne sert plus. "
+                               + "Si le crash persiste avec la dernière version, revenir à une version antérieure stable."
+            });
+        }
+
+        // 2) Pseudo-modules : CDB n'a pas pu incriminer un pilote → lecture honnête
+        var pseudo = analyzed.Where(d => KernelPseudoModules.Contains(d.FaultingModule!)).ToList();
+        var memCorruption = pseudo.Count(d =>
+            d.FaultingModule!.Equals("memory_corruption", StringComparison.OrdinalIgnoreCase));
+        if (memCorruption > 0)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Critical,
+                Confidence = memCorruption >= 2 ? Confidence.High : Confidence.Medium,
+                Category = FaultCategory.Memory,
+                Title = $"Corruption mémoire détectée par l'analyse symbolique ({memCorruption} dump(s))",
+                Details = "WinDbg conclut à « memory_corruption » : la mémoire a été altérée sans qu'un pilote précis "
+                          + "puisse être incriminé. Ce verdict pointe le plus souvent vers la RAM physique (ou un "
+                          + "overclocking/XMP instable), parfois vers un pilote qui écrit hors de sa zone."
+                          + HardwareRamList(r),
+                Recommendation = "MemTest86 en priorité (4+ passes, XMP désactivé). Si la RAM est saine, activer le "
+                               + "vérificateur de pilotes avec précaution (voir le script de réparation)."
+            });
+        }
+        else if (pseudo.Count > 0 && analyzed.Count == pseudo.Count)
+        {
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Warning,
+                Confidence = Confidence.Low,
+                Category = FaultCategory.None,
+                Title = "Analyse symbolique sans coupable direct",
+                Details = $"CDB désigne le noyau Windows ({string.Join(", ", pseudo.Select(d => d.FaultingModule).Distinct())}) — "
+                          + "cela signifie généralement que le vrai fautif (RAM, matériel ou pilote masqué) a corrompu "
+                          + "l'état du système avant le crash, pas que Windows lui-même est en cause.",
+                Recommendation = "Croiser avec les autres conclusions (WHEA, mémoire, disque) ; tester la RAM."
             });
         }
     }

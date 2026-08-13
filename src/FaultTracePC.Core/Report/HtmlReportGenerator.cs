@@ -30,7 +30,7 @@ public static class HtmlReportGenerator
         ReliabilitySection(sb, r);
         ErrorsSection(sb, r);
 
-        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v0.2 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
+        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v0.3 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
         sb.Append("Les niveaux de confiance sont indiqués honnêtement : une confiance « faible » signale une piste, pas une preuve.</footer>");
         sb.Append("<script>").Append(FilterJs).Append("</script>");
         sb.Append("</body></html>");
@@ -58,7 +58,9 @@ public static class HtmlReportGenerator
     private static void Header(StringBuilder sb, DiagnosticReport r)
     {
         sb.Append("<header><h1>🩺 FaultTracePC — Rapport de diagnostic</h1>");
-        sb.Append($"<p class=\"sub\">Machine <strong>{H(r.System.MachineName)}</strong> · {H(r.System.Os.Caption)} {H(r.System.Os.DisplayVersion)} (build {H(r.System.Os.BuildNumber)}) · généré le {r.GeneratedAt:dd/MM/yyyy à HH:mm} · période : {r.ScanPeriodDays} jours</p></header>");
+        sb.Append($"<p class=\"sub\">Machine <strong>{H(r.System.MachineName)}</strong> · {H(r.System.Os.Caption)} {H(r.System.Os.DisplayVersion)} (build {H(r.System.Os.BuildNumber)}) · généré le {r.GeneratedAt:dd/MM/yyyy à HH:mm} · période : {r.ScanPeriodDays} jours</p>");
+        sb.Append("<button id=\"mode-toggle\" class=\"btn2\" type=\"button\">🙈 Masquer les détails techniques (mode simple)</button>");
+        sb.Append("</header>");
     }
 
     private static void VerdictBanner(StringBuilder sb, DiagnosticReport r)
@@ -71,6 +73,8 @@ public static class HtmlReportGenerator
     private static void Findings(StringBuilder sb, DiagnosticReport r)
     {
         sb.Append("<section><h2>Conclusions du diagnostic</h2>");
+        sb.Append("<p class=\"explain\">Ce que FaultTracePC a trouvé, classé du plus grave au moins grave. Chaque carte explique le problème en clair et dit quoi faire. "
+                + "Le niveau de confiance est honnête : « faible » signale une piste à vérifier, pas une certitude.</p>");
         foreach (var f in r.Findings)
         {
             var (cls, label) = f.Severity switch
@@ -101,19 +105,21 @@ public static class HtmlReportGenerator
         if (r.RepairScriptPath is null) return;
 
         sb.Append("<section><h2>🛠️ Aide à la réparation</h2><div class=\"repair\">");
-        sb.Append("<p>Un script PowerShell de tests et réparations <strong>adapté aux problèmes détectés ci-dessus</strong> a été généré. ");
-        sb.Append("Les tests en lecture seule s'exécutent automatiquement ; toute action qui modifie le système demande confirmation (O/N). ");
-        sb.Append("Un journal complet est conservé dans <code>Documents\\FaultTracePC</code>.</p>");
+        sb.Append("<p class=\"explain\">Une série de tests et de réparations <strong>adaptée aux problèmes trouvés ci-dessus</strong> a été préparée pour cette machine. "
+                + "Rien n'est modifié sans te demander : à chaque proposition, tu réponds O (oui) ou N (non).</p>");
         if (r.RepairLauncherPath is not null)
         {
-            sb.Append($"<p><strong>Le plus simple — double-clique sur :</strong> <code>{H(r.RepairLauncherPath)}</code><br>");
-            sb.Append("<span class=\"small\">Ce lanceur demande l'élévation administrateur (UAC) et exécute le script automatiquement — aucun réglage Windows n'est modifié. ");
-            sb.Append("Tu peux aussi cliquer sur « Lancer la réparation » directement dans FaultTracePC après un scan.</span></p>");
+            sb.Append("<p class=\"bigstep\"><strong>Pour la lancer :</strong> double-clique sur le fichier "
+                    + $"<code>{H(Path.GetFileName(r.RepairLauncherPath))}</code> dans ton dossier <code>Documents\\FaultTracePC</code>, "
+                    + "et accepte la demande d'autorisation de Windows. C'est tout.</p>");
+            sb.Append("<p class=\"small\">Ou clique sur le bouton « 🛠 Lancer la réparation » dans FaultTracePC après un scan — même résultat.</p>");
         }
-        sb.Append($"<p><strong>Script détaillé :</strong> <code>{H(r.RepairScriptPath)}</code> — exécutable aussi depuis un terminal administrateur :</p>");
+        sb.Append("<details><summary>Options avancées (technicien)</summary>");
+        sb.Append($"<p class=\"small\">Script PowerShell : <code>{H(r.RepairScriptPath)}</code> — exécutable depuis un terminal administrateur :</p>");
         sb.Append($"<pre>powershell -ExecutionPolicy Bypass -File \"{H(r.RepairScriptPath)}\"</pre>");
         sb.Append("<button class=\"btn\" onclick=\"downloadRepair()\">💾 Retélécharger le script (.ps1)</button>");
-        sb.Append("</div>");
+        sb.Append("<p class=\"small\">Le journal complet de chaque exécution est conservé dans <code>Documents\\FaultTracePC</code>.</p>");
+        sb.Append("</details></div>");
         // Contenu du script embarqué pour le bouton de téléchargement (échappé en JSON).
         sb.Append("<script>const REPAIR_PS1 = ")
           .Append(System.Text.Json.JsonSerializer.Serialize(RepairScriptGenerator.Generate(r)))
@@ -126,7 +132,9 @@ public static class HtmlReportGenerator
     /// <summary>Processus en cours au moment du scan : RAM, CPU, débit disque.</summary>
     private static void ProcessesSection(StringBuilder sb, DiagnosticReport r)
     {
-        sb.Append("<section><h2>Processus en cours au moment du scan</h2>");
+        sb.Append("<section class=\"tech\"><h2>Processus en cours au moment du scan</h2>");
+        sb.Append("<p class=\"explain\">La liste des programmes qui tournaient pendant le scan, et ce qu'ils consommaient. "
+                + "Utile pour repérer un programme qui monopolise la mémoire ou le processeur.</p>");
         if (r.Processes.Count == 0) { sb.Append("<p class=\"empty\">Relevé des processus indisponible.</p></section>"); return; }
 
         var os = r.System.Os;
@@ -159,7 +167,9 @@ public static class HtmlReportGenerator
 
     private static void BsodSection(StringBuilder sb, DiagnosticReport r)
     {
-        sb.Append("<section><h2>Écrans bleus (BSOD)</h2>");
+        sb.Append("<section class=\"tech\"><h2>Écrans bleus (BSOD)</h2>");
+        sb.Append("<p class=\"explain\">Un « écran bleu » signifie que Windows s'est arrêté d'urgence pour éviter d'endommager le système. "
+                + "Chaque ligne est un arrêt de ce type ; la colonne « Pilote suspect » désigne le composant le plus probablement responsable.</p>");
         if (r.Bsods.Count == 0) { sb.Append("<p class=\"empty\">Aucun BSOD détecté sur la période.</p></section>"); return; }
 
         sb.Append("<table><thead><tr><th>Date</th><th>Bug Check</th><th>Nom</th><th>Paramètres</th><th>Pilote suspect</th><th>Dump</th><th>Sources</th></tr></thead><tbody>");
@@ -168,7 +178,10 @@ public static class HtmlReportGenerator
             var code = b.BugCheckCode is null ? "—" : $"0x{b.BugCheckCode:X8}";
             var pars = b.Parameters is null ? "—" : string.Join("<br>", b.Parameters.Select(p => $"0x{p:X16}"));
             sb.Append($"<tr><td>{b.TimeLocal:dd/MM/yyyy HH:mm}</td><td class=\"mono\">{code}</td><td>{H(b.BugCheckName)}</td>");
-            sb.Append($"<td class=\"mono small\">{pars}</td><td>{H(b.SuspectDriver ?? "à déterminer (Phase 2 : WinDbg)")}</td>");
+            var driverCell = b.SuspectDriver is null
+                ? "<span class=\"small\">non identifié (installer WinDbg pour l'analyse symbolique)</span>"
+                : $"<strong>{H(b.SuspectDriver)}</strong>";
+            sb.Append($"<td class=\"mono small\">{pars}</td><td>{driverCell}</td>");
             sb.Append($"<td class=\"small\">{H(b.DumpPath is null ? "—" : Path.GetFileName(b.DumpPath))}</td><td class=\"small\">{H(string.Join(", ", b.Sources))}</td></tr>");
         }
         sb.Append("</tbody></table></section>");
@@ -176,10 +189,12 @@ public static class HtmlReportGenerator
 
     private static void DumpSection(StringBuilder sb, DiagnosticReport r)
     {
-        sb.Append("<section><h2>Fichiers dump présents</h2>");
+        sb.Append("<section class=\"tech\"><h2>Fichiers dump présents</h2>");
+        sb.Append("<p class=\"explain\">Un « dump » est la boîte noire que Windows enregistre au moment d'un crash. "
+                + "FaultTracePC les a lus (et analysés avec WinDbg si disponible) pour identifier le coupable.</p>");
         if (r.Dumps.Count == 0) { sb.Append("<p class=\"empty\">Aucun fichier dump trouvé (Minidump, MEMORY.DMP, LiveKernelReports).</p></section>"); return; }
 
-        sb.Append("<table><thead><tr><th>Fichier</th><th>Type</th><th>Date</th><th>Taille</th><th>Code STOP (en-tête)</th></tr></thead><tbody>");
+        sb.Append("<table><thead><tr><th>Fichier</th><th>Type</th><th>Date</th><th>Taille</th><th>Code STOP (en-tête)</th><th>Analyse symbolique (WinDbg)</th></tr></thead><tbody>");
         foreach (var d in r.Dumps)
         {
             var kind = d.Kind switch
@@ -193,15 +208,34 @@ public static class HtmlReportGenerator
             var code = d.BugCheckCode is null
                 ? (d.ParseError is null ? "—" : $"illisible ({H(d.ParseError)})")
                 : $"0x{d.BugCheckCode:X8} {H(BugCheckCatalog.NameOf(d.BugCheckCode.Value))}";
+
+            string analysis;
+            if (d.DeepAnalyzed && d.FaultingModule is not null)
+            {
+                analysis = $"<strong>{H(d.FaultingModule)}</strong>";
+                if (d.CrashProcessName is not null) analysis += $"<br><span class=\"small\">processus : {H(d.CrashProcessName)}</span>";
+                if (d.FailureBucket is not null) analysis += $"<br><span class=\"small\">{H(d.FailureBucket)}</span>";
+                if (d.StackExcerpt is not null)
+                    analysis += $"<details><summary class=\"small\">pile d'appels</summary><pre class=\"stack\">{H(d.StackExcerpt)}</pre></details>";
+            }
+            else if (d.DeepAnalysisError is not null)
+                analysis = $"<span class=\"small\">échec : {H(d.DeepAnalysisError)}</span>";
+            else if (d.Kind is DumpKind.KernelMinidump or DumpKind.FullMemoryDump)
+                analysis = "<span class=\"small\">non analysé</span>";
+            else
+                analysis = "—";
+
             sb.Append($"<tr><td class=\"small\">{H(d.Path)}</td><td>{kind}</td><td>{(d.CrashTimeFromHeader ?? d.LastWriteTime):dd/MM/yyyy HH:mm}</td>");
-            sb.Append($"<td>{RulesEngine.FormatBytes((ulong)d.SizeBytes)}</td><td class=\"mono small\">{code}</td></tr>");
+            sb.Append($"<td>{RulesEngine.FormatBytes((ulong)d.SizeBytes)}</td><td class=\"mono small\">{code}</td><td>{analysis}</td></tr>");
         }
         sb.Append("</tbody></table></section>");
     }
 
     private static void EventsSection(StringBuilder sb, DiagnosticReport r)
     {
-        sb.Append("<section><h2>Historique des événements significatifs</h2>");
+        sb.Append("<section class=\"tech\"><h2>Historique des événements significatifs</h2>");
+        sb.Append("<p class=\"explain\">Le journal de bord de Windows : chaque ligne est un incident que le système a enregistré "
+                + "(erreur, crash, redémarrage…). C'est la matière première du diagnostic.</p>");
         if (r.Events.Count == 0) { sb.Append("<p class=\"empty\">Aucun événement significatif sur la période.</p></section>"); return; }
 
         // Résumé par catégorie : chaque puce est un BOUTON de filtre.
@@ -232,7 +266,9 @@ public static class HtmlReportGenerator
     private static void SystemSection(StringBuilder sb, DiagnosticReport r)
     {
         var s = r.System;
-        sb.Append("<section><h2>Configuration système</h2><div class=\"grid\">");
+        sb.Append("<section class=\"tech\"><h2>Configuration système</h2>");
+        sb.Append("<p class=\"explain\">La fiche d'identité de la machine — utile à communiquer si tu demandes de l'aide à un technicien.</p>");
+        sb.Append("<div class=\"grid\">");
 
         Card(sb, "Windows", $"{H(s.Os.Caption)} {H(s.Os.DisplayVersion)}<br>Build {H(s.Os.BuildNumber)} · {H(s.Os.Architecture)}"
             + $"<br>Installé le {(s.Os.InstallDate?.ToString("dd/MM/yyyy") ?? "?")}"
@@ -278,7 +314,9 @@ public static class HtmlReportGenerator
             .Where(d => d.State.Equals("Running", StringComparison.OrdinalIgnoreCase) && !d.IsMicrosoft && !string.IsNullOrEmpty(d.CompanyName))
             .OrderBy(d => d.CompanyName).ThenBy(d => d.Name).ToList();
 
-        sb.Append("<section><h2>Pilotes tiers actifs</h2>");
+        sb.Append("<section class=\"tech\"><h2>Pilotes tiers actifs</h2>");
+        sb.Append("<p class=\"explain\">Un pilote est le petit programme qui fait le lien entre Windows et un matériel ou un outil. "
+                + "Ceux listés ici ne viennent pas de Microsoft — ce sont les premiers à vérifier en cas d'écran bleu.</p>");
         if (r.System.Drivers.Count == 0) { sb.Append("<p class=\"empty\">Inventaire des pilotes non collecté.</p></section>"); return; }
         if (thirdParty.Count == 0) { sb.Append("<p class=\"empty\">Aucun pilote tiers en cours d'exécution (tous Microsoft).</p></section>"); return; }
 
@@ -302,7 +340,8 @@ public static class HtmlReportGenerator
 
     private static void ReliabilitySection(StringBuilder sb, DiagnosticReport r)
     {
-        sb.Append("<section><h2>Moniteur de fiabilité</h2>");
+        sb.Append("<section class=\"tech\"><h2>Moniteur de fiabilité</h2>");
+        sb.Append("<p class=\"explain\">L'historique de stabilité que Windows tient en continu — installations, plantages, mises à jour.</p>");
         if (r.ReliabilityRecords.Count == 0) { sb.Append("<p class=\"empty\">Aucune donnée de fiabilité disponible sur la période.</p></section>"); return; }
         sb.Append("<table><thead><tr><th>Date</th><th>Source</th><th>Produit</th><th>Message</th></tr></thead><tbody>");
         foreach (var rec in r.ReliabilityRecords.Take(60))
@@ -357,6 +396,13 @@ public static class HtmlReportGenerator
     /// <summary>JS du filtrage des événements par catégorie (puces cliquables).</summary>
     private const string FilterJs = """
         (function(){
+          const t = document.getElementById('mode-toggle');
+          if (t) t.addEventListener('click', () => {
+            const simple = document.body.classList.toggle('simple');
+            t.textContent = simple
+              ? '🔎 Afficher les détails techniques (mode complet)'
+              : '🙈 Masquer les détails techniques (mode simple)';
+          });
           const chips = document.querySelectorAll('#evt-chips .chip');
           const rows = document.querySelectorAll('#evt-table tbody tr');
           const none = document.getElementById('evt-none');
@@ -422,9 +468,16 @@ public static class HtmlReportGenerator
         .chip:hover{border-color:#2470b3;background:#f0f6fc}
         .chip.active{background:#2470b3;border-color:#2470b3;color:#fff}
         .legend{background:#fffbe9;border:1px solid #e8d9a0;border-radius:8px;padding:10px 14px;font-size:13px;margin:0 0 12px}
+        .explain{color:#5a6b7f;font-size:13px;font-style:italic;margin:0 0 12px}
+        .bigstep{font-size:15px;background:#eafaf1;border-radius:6px;padding:10px 12px}
+        .btn2{margin-top:12px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:inherit}
+        .btn2:hover{background:rgba(255,255,255,.22)}
+        body.simple section.tech{display:none}
         .agebadge{background:#e6a817;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap}
         .repair{background:#fff;border:1px solid #dbe2ec;border-left:5px solid #27ae60;border-radius:8px;padding:14px 18px;font-size:14px}
         .repair pre{background:#182848;color:#d8e4f5;padding:10px 12px;border-radius:6px;overflow-x:auto;font-size:12px}
+        .stack{background:#182848;color:#d8e4f5;padding:8px 10px;border-radius:6px;overflow-x:auto;font-size:11px;line-height:1.4;margin:4px 0 0}
+        details summary{cursor:pointer;color:#2470b3}
         .repair code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:12px}
         .btn{background:#27ae60;color:#fff;border:0;border-radius:6px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
         .btn:hover{background:#219652}

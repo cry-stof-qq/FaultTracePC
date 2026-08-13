@@ -30,7 +30,12 @@ public partial class MainWindow : Window
         PbProgress.Value = 0;
 
         var days = int.Parse((string)((ComboBoxItem)CmbDays.SelectedItem).Tag);
-        var options = new ScanOptions { Days = days, IncludeDrivers = ChkDrivers.IsChecked == true };
+        var options = new ScanOptions
+        {
+            Days = days,
+            IncludeDrivers = ChkDrivers.IsChecked == true,
+            DeepDumpAnalysis = ChkDeep.IsChecked == true,
+        };
         var progress = new Progress<ScanProgress>(p =>
         {
             TxtStatus.Text = p.Step;

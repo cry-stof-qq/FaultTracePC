@@ -173,6 +173,21 @@ public sealed class DumpFileInfo
     public DateTime? CrashTimeFromHeader { get; set; }
     public bool Is64Bit { get; set; }
     public string? ParseError { get; set; }
+
+    // --- Résultats de l'analyse profonde (CDB/WinDbg, Phase 2) ---
+    /// <summary>true si !analyze -v a été exécuté sur ce dump.</summary>
+    public bool DeepAnalyzed { get; set; }
+    /// <summary>IMAGE_NAME : le module désigné fautif (ex: nvlddmkm.sys).</summary>
+    public string? FaultingModule { get; set; }
+    /// <summary>Ligne « Probably caused by » de CDB.</summary>
+    public string? ProbablyCausedBy { get; set; }
+    /// <summary>FAILURE_BUCKET_ID : signature de classement Microsoft du crash.</summary>
+    public string? FailureBucket { get; set; }
+    /// <summary>Processus actif au moment du crash (PROCESS_NAME).</summary>
+    public string? CrashProcessName { get; set; }
+    /// <summary>Premières lignes de la pile d'appels (STACK_TEXT).</summary>
+    public string? StackExcerpt { get; set; }
+    public string? DeepAnalysisError { get; set; }
 }
 
 /// <summary>Un incident BSOD consolidé (fusion dump + événement 1001).</summary>
@@ -241,6 +256,10 @@ public sealed class ScanOptions
     public int Days { get; set; } = 30;
     /// <summary>Inclure l'inventaire des pilotes (peut prendre quelques secondes).</summary>
     public bool IncludeDrivers { get; set; } = true;
+    /// <summary>Analyse profonde des dumps via CDB/WinDbg si présent (identifie le pilote exact).</summary>
+    public bool DeepDumpAnalysis { get; set; } = true;
+    /// <summary>Nombre maximum de dumps analysés en profondeur (les plus récents d'abord).</summary>
+    public int MaxDeepDumps { get; set; } = 5;
 }
 
 public sealed record ScanProgress(string Step, int Percent);

@@ -66,6 +66,10 @@ L'exe se trouve ensuite dans `src/FaultTracePC.App/bin/Release/net10.0-windows/w
       (Resource-Exhaustion-Detector), filtres cliquables dans le rapport, matériel
       nommé (marque/modèle) dans les conclusions, script PowerShell de réparation
       adapté aux problèmes trouvés (sûr par défaut, confirmations O/N)
-- [ ] Phase 2 — Analyse profonde des dumps (WinDbg/CDB optionnel), pilote exact, récurrences affinées
+- [x] Phase 2 (v0.3) — Analyse symbolique des dumps via CDB/WinDbg si présent
+      (`winget install Microsoft.WinDbg`) : pilote fautif nommé (IMAGE_NAME),
+      signature de crash (FAILURE_BUCKET_ID), pile d'appels dépliable dans le
+      rapport, récurrence par pilote, interprétation des verdicts
+      « memory_corruption »/« ntoskrnl » ; cache de symboles local
 - [ ] Phase 3 — Service de surveillance temps réel (journal circulaire + capteurs de température)
 - [ ] Phase 4 — Finitions GUI, installateur
