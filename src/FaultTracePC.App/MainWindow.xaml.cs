@@ -167,6 +167,23 @@ public partial class MainWindow : Window
         TxtFoot.Text = $"Rapport : {_lastReportPath}";
     }
 
+    /// <summary>Ouvre le visualiseur du journal de la boîte noire.</summary>
+    private void BtnViewer_Click(object sender, RoutedEventArgs e)
+    {
+        var flightDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "FaultTracePC", "Flight");
+        if (!Directory.Exists(flightDir) || !Directory.EnumerateFiles(flightDir, "flight_*.jsonl").Any())
+        {
+            MessageBox.Show(this,
+                "Aucun journal de surveillance sur cette machine.\n\n" +
+                "Installe d'abord la surveillance temps réel (bouton « 📡 »), attends quelques relevés (10 s chacun), puis rouvre ce visualiseur.",
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        new MonitorWindow { Owner = this }.Show();
+    }
+
     private void BtnOpenReport_Click(object sender, RoutedEventArgs e)
     {
         if (_lastReportPath is not null) OpenInBrowser(_lastReportPath);

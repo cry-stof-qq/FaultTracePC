@@ -33,6 +33,9 @@
                 <Button x:Name="BtnRealtime" Content="📡  Surveillance temps réel" Padding="14,9" Margin="12,0,0,6"
                         FontSize="13" Cursor="Hand" Click="BtnRealtime_Click"
                         ToolTip="Installe/désinstalle le service boîte noire : journal continu (températures, mémoire, événements) écrit sur disque pour retrouver les secondes précédant un crash. Moins de 1 % de CPU."/>
+                <Button x:Name="BtnViewer" Content="📈  Voir en direct" Padding="14,9" Margin="12,0,0,6"
+                        FontSize="13" Cursor="Hand" Click="BtnViewer_Click"
+                        ToolTip="Ouvre le visualiseur du journal : relevés en direct (CPU, températures), historique sur plusieurs jours, données brutes, bascule °C/°F."/>
                 <TextBlock Text="Période :" VerticalAlignment="Center" Margin="18,0,6,6"/>
                 <ComboBox x:Name="CmbDays" Width="110" VerticalAlignment="Center" SelectedIndex="1" Margin="0,0,0,6">
                     <ComboBoxItem Content="7 jours" Tag="7"/>
