@@ -5,7 +5,8 @@
         Icon="Assets/FaultTracePC.ico"
         Width="880" Height="580" MinWidth="700" MinHeight="480"
         WindowStartupLocation="CenterScreen"
-        Background="#F4F6F9">
+        Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol">
     <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -106,7 +107,7 @@
                                VerticalAlignment="Center"/>
                     <TextBlock x:Name="TxtUpdate" FontSize="11" Margin="14,0,0,0" VerticalAlignment="Center"
                                Visibility="Collapsed" FontWeight="SemiBold" Foreground="#C0392B"/>
-                    <Button x:Name="BtnUpdate" Content="⭯ Vérifier les mises à jour" FontSize="11" Padding="8,3"
+                    <Button x:Name="BtnUpdate" Content="🔄 Vérifier les mises à jour" FontSize="11" Padding="8,3"
                             Margin="14,0,0,0" VerticalAlignment="Center" Click="BtnUpdate_Click"
                             ToolTip="Interroge la page des versions publiées sur GitHub. FaultTracePC ne télécharge et n'installe jamais rien tout seul : il te dit ce qui existe, tu décides."/>
                     <CheckBox x:Name="ChkUpdateStartup" Content="au démarrage" FontSize="11" Margin="8,0,0,0"

@@ -4,7 +4,8 @@
         Title="FaultTracePC — Mode réseau"
         Icon="Assets/FaultTracePC.ico"
         Width="640" Height="480" MinWidth="560" MinHeight="420"
-        WindowStartupLocation="CenterOwner" Background="#F4F6F9">
+        WindowStartupLocation="CenterOwner" Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol">
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

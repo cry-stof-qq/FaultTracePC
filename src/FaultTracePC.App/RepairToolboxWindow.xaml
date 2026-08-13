@@ -4,7 +4,8 @@
         Title="FaultTracePC — Boîte à outils de réparation"
         Icon="Assets/FaultTracePC.ico"
         Width="820" Height="640" MinWidth="700" MinHeight="540"
-        WindowStartupLocation="CenterOwner" Background="#F4F6F9">
+        WindowStartupLocation="CenterOwner" Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -26,7 +27,7 @@
                         <TextBlock FontSize="12" Foreground="#44546A" TextWrapping="Wrap" Margin="0,0,0,8"
                                    Text="Un point de restauration permet de revenir en arrière si une réparation tourne mal. C'est trente secondes, et ça rend tout le reste réversible."/>
                         <WrapPanel>
-                            <Button Content="🛟 Créer un point de restauration" Padding="10,6" Margin="0,0,8,4"
+                            <Button Content="💾 Créer un point de restauration" Padding="10,6" Margin="0,0,8,4"
                                     FontWeight="SemiBold" Background="#2470B3" Foreground="White" BorderThickness="0"
                                     Click="BtnRestorePoint_Click"
                                     ToolTip="Crée un point de restauration système nommé « FaultTracePC — avant réparation »."/>

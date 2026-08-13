@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.IO;
 using System.Text;
 using System.Windows;
 
@@ -121,7 +122,8 @@ public partial class WindowsUpdateWindow : Window
 
         SetBusy(true, "Interrogation de Windows Update… (cela peut prendre 1 à 3 minutes)");
         ClearRows();
-        Log("=== Recherche démarrée ===");
+        Log($"=== Recherche démarrée (pilotes : {(includeDrivers ? "inclus" : "exclus")}, "
+          + $"masquées : {(includeHidden ? "incluses" : "exclues")}) ===");
 
         try
         {
@@ -390,6 +392,9 @@ public partial class WindowsUpdateWindow : Window
             var report = await Task.Run(() => InstallCore(selected));
 
             foreach (var line in report.Log) Log(line);
+            Log("RÉSULTAT : " + report.Summary
+              + (report.RebootRequired ? " — REDÉMARRAGE REQUIS (non déclenché par FaultTracePC)." : ""));
+            Log($"=== Fin de l'opération — journal : {JournalPath} ===");
             TxtStatus.Text = report.Summary;
 
             MessageBox.Show(this, report.Summary +
@@ -547,10 +552,39 @@ public partial class WindowsUpdateWindow : Window
         if (status is not null) TxtStatus.Text = status;
     }
 
+    /// <summary>
+    /// Fichier de journal, un par jour, dans Documents\FaultTracePC.
+    /// Installer des mises à jour est une action qui modifie durablement le poste :
+    /// elle doit laisser une trace sur le disque, pas seulement à l'écran. Sur un
+    /// parc, c'est ce qui permet de savoir plus tard ce qui a été posé et quand.
+    /// </summary>
+    private static string JournalPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC",
+        $"MajWindows_{DateTime.Now:yyyy-MM-dd}.txt");
+
     private void Log(string line)
     {
-        TxtLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {line}{Environment.NewLine}");
+        var stamped = $"[{DateTime.Now:HH:mm:ss}] {line}";
+        TxtLog.AppendText(stamped + Environment.NewLine);
         TxtLog.ScrollToEnd();
+        WriteJournal(stamped);
+    }
+
+    private static void WriteJournal(string line)
+    {
+        try
+        {
+            var path = JournalPath;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var header = File.Exists(path)
+                ? ""
+                : $"# FaultTracePC — journal des mises à jour Windows — {DateTime.Now:dd/MM/yyyy}"
+                  + Environment.NewLine
+                  + $"# Machine : {Environment.MachineName} — utilisateur : {Environment.UserName}"
+                  + Environment.NewLine + Environment.NewLine;
+            File.AppendAllText(path, header + line + Environment.NewLine, Encoding.UTF8);
+        }
+        catch { /* journal non critique : jamais bloquer une réparation pour ça */ }
     }
 
     private static string FormatSize(long bytes) => bytes switch

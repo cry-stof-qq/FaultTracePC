@@ -5,7 +5,8 @@
         Icon="Assets/FaultTracePC.ico"
         Width="960" Height="640" MinWidth="760" MinHeight="480"
         WindowStartupLocation="CenterOwner"
-        Background="#F4F6F9">
+        Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -79,7 +80,7 @@
         </ListView>
 
         <!-- ============ Journal ============ -->
-        <Expander Grid.Row="3" Header="  Détail technique (journal de l'opération)" Margin="10,0,10,6"
+        <Expander Grid.Row="3" Header="  Détail technique — aussi enregistré dans Documents\FaultTracePC\MajWindows_AAAA-MM-JJ.txt" Margin="10,0,10,6"
                   IsExpanded="False" Foreground="#44546A">
             <TextBox x:Name="TxtLog" Height="120" Margin="0,6,0,0" IsReadOnly="True"
                      FontFamily="Consolas" FontSize="11" TextWrapping="NoWrap"

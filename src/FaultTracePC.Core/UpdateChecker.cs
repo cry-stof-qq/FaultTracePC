@@ -128,7 +128,15 @@ public static class UpdateChecker
             using var resp = await http.GetAsync(ApiUrl, ct).ConfigureAwait(false);
 
             if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
-                return new UpdateInfo { Current = current, Error = "aucune version n'a encore été publiée sur le dépôt." };
+                // GitHub renvoie 404 dans DEUX cas indiscernables de l'extérieur :
+                // aucune version publiée, ou dépôt privé (une requête anonyme ne le
+                // voit pas). On ne tranche pas ce qu'on ne peut pas savoir.
+                return new UpdateInfo
+                {
+                    Current = current,
+                    Error = "aucune version publiée n'est visible sur le dépôt (soit aucune n'existe encore, "
+                          + "soit le dépôt est privé — une requête anonyme ne peut pas le distinguer).",
+                };
             if ((int)resp.StatusCode == 403)
                 return new UpdateInfo { Current = current, Error = "GitHub a refusé la requête (quota d'appels anonymes atteint). Réessaie dans une heure." };
             if (!resp.IsSuccessStatusCode)

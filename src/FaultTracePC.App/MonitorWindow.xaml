@@ -5,7 +5,8 @@
         Icon="Assets/FaultTracePC.ico"
         Width="820" Height="560" MinWidth="680" MinHeight="420"
         WindowStartupLocation="CenterOwner"
-        Background="#F4F6F9">
+        Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

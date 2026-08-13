@@ -389,7 +389,7 @@ public partial class MainWindow : Window
     {
         if (_checkingUpdate) return;
         _checkingUpdate = true;
-        if (!silent) { BtnUpdate.IsEnabled = false; BtnUpdate.Content = "⭯ Vérification…"; }
+        if (!silent) { BtnUpdate.IsEnabled = false; BtnUpdate.Content = "🔄 Vérification…"; }
 
         try
         {
@@ -446,7 +446,7 @@ public partial class MainWindow : Window
         {
             _checkingUpdate = false;
             BtnUpdate.IsEnabled = true;
-            BtnUpdate.Content = "⭯ Vérifier les mises à jour";
+            BtnUpdate.Content = "🔄 Vérifier les mises à jour";
         }
     }
 
