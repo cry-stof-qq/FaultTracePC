@@ -1,137 +1,159 @@
+<div align="center">
+
+<img src="assets/FaultTracePC.png" alt="FaultTracePC" width="120">
+
 # FaultTracePC
 
-Logiciel de diagnostic de pannes Windows 10/11 — léger et efficace.
+**Trouver la cause d'une panne Windows 10/11 — et savoir quoi faire ensuite.**
 
-Deux modes prévus :
+Analyse des écrans bleus, boîte noire temps réel, alertes avant la panne,
+rapport lisible et aide à la réparation. Gratuit, en français, sans télémétrie.
 
-1. **Scan post-mortem** (disponible — Phase 1) : après une panne, analyse croisée des
-   dumps (`Minidump`, `MEMORY.DMP`, `LiveKernelReports`), du journal d'événements
-   (BugCheck 1001, Kernel-Power 41, WHEA, erreurs disque, TDR, crashs applicatifs…),
-   du Moniteur de fiabilité et de l'état matériel (WMI). Produit un rapport HTML en
-   français ouvert automatiquement dans le navigateur par défaut.
-2. **Surveillance temps réel** (Phase 3) : service Windows léger qui journalise en
-   continu événements + températures dans un journal circulaire écrit sur disque,
-   pour retrouver les secondes précédant un crash.
+</div>
+
+---
+
+## Pourquoi ce logiciel
+
+Quand un PC plante, Windows enregistre tout ce qu'il faut pour comprendre — et
+le rend illisible. Les informations sont éclatées entre l'Observateur
+d'événements, le Moniteur de fiabilité, les fichiers `.dmp`, les compteurs SMART
+des disques et les capteurs matériels. Les outils existants savent lire *une* de
+ces sources : l'un décode les dumps, l'autre affiche les températures, un
+troisième liste les crashs. Aucun ne les croise, et aucun ne dit clairement quoi
+faire.
+
+FaultTracePC fait exactement cela : il rassemble toutes ces sources, les
+recoupe, et produit **un verdict en français avec un niveau de confiance
+honnête** — puis propose les réparations correspondantes.
+
+## Ce qu'il fait
+
+**Analyse après une panne.** Il lit les fichiers dump (`Minidump`, `MEMORY.DMP`,
+`LiveKernelReports`), en extrait nativement le code STOP et ses paramètres, et —
+si WinDbg est installé — lance l'analyse symbolique pour **nommer le pilote
+fautif** avec sa pile d'appels. Il croise ensuite avec le journal d'événements
+(BugCheck, Kernel-Power, WHEA, erreurs disque, réinitialisations du pilote
+graphique, crashs d'applications, saturation mémoire), le Moniteur de fiabilité,
+l'inventaire des pilotes, la santé SMART des disques et les processus en cours.
+
+**Surveillance temps réel — la boîte noire.** Un service Windows léger
+(< 1 % de CPU) enregistre en continu températures, mémoire et événements
+critiques. Chaque ligne est écrite *physiquement* sur le disque : les dernières
+secondes avant un crash survivent au crash. C'est ce qui permet de dire
+« le processeur était à 97 °C juste avant l'arrêt » — ce qu'aucune analyse
+après coup ne peut reconstituer.
+
+**Alertes avant la panne.** Le service surveille des seuils (températures,
+mémoire virtuelle, erreurs WHEA, santé des disques) et prévient par une
+notification Windows *avant* que la machine tombe.
+
+**Aide à la réparation.** Chaque diagnostic génère un script PowerShell adapté
+aux problèmes trouvés — et rien ne se lance sans confirmation. Une boîte à
+outils intégrée réunit les réparations courantes : désinstaller une mise à jour
+Windows fautive, réinitialiser les composants Windows Update, `sfc`, `DISM`,
+`chkdsk`, diagnostic mémoire, SMART.
+
+**Suivi et parc.** Chaque scan est archivé : le suivant répond à la vraie
+question — « est-ce que la réparation a marché ? ». En mode parc, une console
+affiche l'état de plusieurs machines et permet de lancer un diagnostic à
+distance sans se déplacer.
+
+## Installation
+
+| Format | Pour qui | Comment |
+|---|---|---|
+| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.0.0.msi` (ou double-clic) |
+| **Portable (.zip)** | Dépannage sur clé USB, rien à installer | Décompresser, lancer `FaultTracePC.exe` |
+
+Les deux sont disponibles dans les [Releases](../../releases). Aucun prérequis :
+le runtime .NET est inclus. **Windows 10 ou 11, 64 bits, droits administrateur**
+(nécessaires pour lire les dumps et les journaux système).
+
+Optionnel mais recommandé — l'analyse symbolique des dumps, qui nomme le pilote
+fautif, nécessite WinDbg :
+
+```powershell
+winget install Microsoft.WinDbg
+```
+
+## Utilisation
+
+1. Lancer FaultTracePC (il demande l'élévation administrateur).
+2. **🔍 Analyser cette machine** — le rapport HTML s'ouvre dans le navigateur.
+   Il démarre en mode simple ; un bouton révèle le détail technique.
+3. **📡 Surveillance temps réel** — installe la boîte noire en un clic. Elle
+   continue même application fermée, et redémarre avec le PC.
+4. **🧰 Outils** — les réparations à un clic, dans une fenêtre PowerShell visible.
+
+En ligne de commande, pour un parc ou une tâche planifiée :
+
+```powershell
+FaultTracePC.Cli.exe --quiet --json --days 90 --output \\serveur\Diagnostics$
+# codes de sortie : 0 sain · 1 avertissements · 2 critique · 3 erreur
+```
+
+## Limites — dites honnêtement
+
+- **Sans WinDbg**, le code STOP est lu mais le pilote fautif reste souvent non
+  identifié : le diagnostic est alors moins précis (confiance abaissée en
+  conséquence dans le rapport, jamais masquée).
+- **Les températures CPU dépendent de la machine.** Le pilote historique
+  utilisé par les bibliothèques de capteurs est bloqué par Windows 11 récent ;
+  installer [PawnIO](https://pawnio.eu) rétablit la lecture. Les températures
+  GPU fonctionnent sans lui.
+- **Un diagnostic n'est pas une certitude.** Chaque conclusion affiche son
+  niveau de confiance — « faible » signale une piste à vérifier, pas une preuve.
+- **Rien n'est envoyé nulle part.** Aucune télémétrie, aucun compte. Les
+  rapports restent dans `Documents\FaultTracePC`. Le mode réseau, facultatif,
+  n'accepte que les adresses privées et des requêtes signées.
+
+## Mode réseau (facultatif)
+
+Une machine peut publier son état en **lecture seule** pour une console
+d'administration. Double verrou : seules les adresses privées (RFC 1918) sont
+acceptées, **et** chaque requête doit porter une signature HMAC-SHA256 — le
+secret ne circule jamais sur le réseau, et le rejeu d'une requête capturée est
+refusé. Une règle de pare-feu restreinte aux mêmes plages est posée en plus.
+Rien n'est accessible depuis Internet.
+
+## Compiler depuis les sources
+
+Prérequis : [SDK .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0).
+
+```powershell
+git clone https://github.com/cry-stof-qq/FaultTracePC.git
+cd FaultTracePC
+dotnet build
+dotnet test                                    # 59 tests
+dotnet run --project src\FaultTracePC.App
+```
+
+Produire les distribuables :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.0.0
+```
 
 ## Architecture
 
 ```
-FaultTracePC.sln
-└── src
-    ├── FaultTracePC.Core     Bibliothèque : collecteurs, moteur de règles, rapport HTML
-    │   ├── Collectors        WMI, journal d'événements, fiabilité, dumps (parsing natif)
-    │   ├── Analysis          Catalogue BugCheck + moteur de corrélation
-    │   └── Report            Générateur de rapport HTML autonome
-    └── FaultTracePC.App      Application WPF (GUI légère), exige l'élévation admin
+src/
+  FaultTracePC.Core      Collecte (WMI, événements, dumps, capteurs), moteur de
+                         règles, catalogue des codes STOP, base de signatures de
+                         pilotes, génération des rapports HTML
+  FaultTracePC.App       Interface WPF : scan, visualiseur, console de parc,
+                         boîte à outils, configuration réseau
+  FaultTracePC.Monitor   Service Windows : boîte noire, alertes préventives,
+                         API de télémétrie signée
+  FaultTracePC.Cli       Diagnostic en ligne de commande (parc, GPO)
+tests/                   Tests xUnit : sécurité, parsing des dumps, règles
 ```
 
-Points techniques notables :
+## Licence
 
-- **Parsing natif des dumps noyau** : lecture du code STOP et des 4 paramètres
-  directement dans l'en-tête `PAGE`/`DU64` (offsets 0x38 / 0x40), sans dépendance.
-  L'analyse symbolique profonde (pilote exact via `!analyze -v`) arrive en Phase 2
-  avec l'intégration optionnelle de WinDbg/CDB.
-- **Requêtes d'événements ciblées** (XPath par fournisseur/ID) : rapide même sur
-  un journal volumineux, plafonné à 500 événements par requête.
-- Chaque collecteur est isolé : une source illisible n'empêche pas le diagnostic,
-  elle est listée dans la section « Limitations » du rapport.
+[MIT](LICENSE) — utilisation, modification et redistribution libres.
 
-## Compiler et lancer (sur Windows, SDK .NET 10 requis)
-
-```powershell
-cd $env:USERPROFILE\Documents\FaultTracePC
-dotnet build
-dotnet run --project src/FaultTracePC.App
-```
-
-L'application demande l'élévation administrateur (nécessaire pour lire les dumps
-et les journaux complets). Les rapports sont écrits dans `Documents\FaultTracePC\`.
-
-## Publier un exécutable
-
-```powershell
-# Léger (~qq Mo), nécessite le runtime .NET 10 Desktop sur la machine cible :
-dotnet publish src/FaultTracePC.App -c Release -r win-x64 --self-contained false
-
-# 100 % autonome (~80 Mo), aucun prérequis sur la machine cible :
-dotnet publish src/FaultTracePC.App -c Release -r win-x64 --self-contained true
-```
-
-L'exe se trouve ensuite dans `src/FaultTracePC.App/bin/Release/net10.0-windows/win-x64/publish/`.
-
-## Feuille de route
-
-- [x] Phase 1 — Scan post-mortem + rapport HTML
-- [x] v0.2 — Processus en cours (RAM/CPU/disque), détection de saturation mémoire
-      (Resource-Exhaustion-Detector), filtres cliquables dans le rapport, matériel
-      nommé (marque/modèle) dans les conclusions, script PowerShell de réparation
-      adapté aux problèmes trouvés (sûr par défaut, confirmations O/N)
-- [x] Phase 2 (v0.3) — Analyse symbolique des dumps via CDB/WinDbg si présent
-      (`winget install Microsoft.WinDbg`) : pilote fautif nommé (IMAGE_NAME),
-      signature de crash (FAILURE_BUCKET_ID), pile d'appels dépliable dans le
-      rapport, récurrence par pilote, interprétation des verdicts
-      « memory_corruption »/« ntoskrnl » ; cache de symboles local
-- [x] v0.4 — Suivi avant/après réparation (historique JSON des scans dans
-      `Documents\FaultTracePC\Historique`, comparaison automatique : nouveaux crashs,
-      récurrence de signature, pilotes mis à jour, évolution disques/mémoire, verdict
-      d'efficacité) + base de signatures de ~30 pilotes connus (GPU, réseau, stockage,
-      antivirus, anti-triche, RGB, virtualisation) avec correctifs ciblés
-- [x] Phase 3 (v0.5) — Boîte noire temps réel : service Windows `FaultTracePC.Monitor`
-      (échantillon toutes les 10 s : charge/température CPU-GPU via LibreHardwareMonitor,
-      mémoire physique+virtuelle, top processus ; événements critiques en direct ;
-      chaque ligne synchronisée physiquement sur disque ; rotation 14 jours dans
-      `C:\ProgramData\FaultTracePC\Flight`). Installation/désinstallation en 1 clic
-      depuis l'app (bouton 📡). Le scan lit le journal et affiche les dernières
-      secondes avant chaque crash + règles surchauffe/saturation au moment du crash.
-- [x] v0.6 — Mode réseau : « Client » (API HTTP en lecture seule dans le service —
-      statut temps réel, journal boîte noire, rapports partagés — double verrou :
-      adresses privées RFC 1918 uniquement ET token 256 bits, plus règle de pare-feu
-      restreinte aux mêmes plages) et console « 🖥 Parc » (mode maître : état de
-      toutes les machines clientes, ouverture des rapports distants). Rien n'est
-      accessible depuis Internet ; aucune écriture ni exécution à distance.
-- [x] v0.7 — Boîte à outils intégrée (🧰) : désinstallation d'une mise à jour Windows,
-      réinitialisation des composants Windows Update, réparation sur place,
-      sfc/DISM/chkdsk/mdsched/SMART à un clic dans une fenêtre PowerShell visible.
-- [x] v0.8 — Alertes préventives : le service surveille des seuils (températures CPU/GPU,
-      saturation de la mémoire virtuelle, erreurs WHEA, erreurs disque, santé SMART) et
-      prévient AVANT la panne — notification Windows, journal `alerts.jsonl`, section
-      dédiée dans le rapport, conclusions du diagnostic et endpoint `/api/alerts`.
-      Anti-bruit : N échantillons consécutifs requis + délai anti-répétition.
-- [x] v0.9 — **Déploiement** : projet `FaultTracePC.Cli` (scan silencieux, `--output`
-      vers un partage UNC, résumé JSON, codes de sortie 0/1/2/3 exploitables par script),
-      publication autonome mutualisant le runtime (`build\publish.ps1`, ~120 Mo pour les
-      trois exécutables, aucun prérequis sur la cible), et **paquet MSI perMachine**
-      (`installer\build-msi.ps1`) déployable par GPO, qui installe l'application, le CLI
-      et enregistre/démarre le service. **Sécurité** : l'API distante passe en
-      authentification par signature HMAC-SHA256 — le token ne circule plus sur le
-      réseau, horodatage + nonce contre le rejeu.
-- [x] v1.0 — **Tests automatisés** (xUnit v3 : sécurité HMAC et filtrage RFC 1918,
-      parsing natif des dumps sur fichiers fabriqués, moteur de règles — dédoublonnage,
-      priorité au pilote identifié, piste virtualisation, surchauffe —, génération du
-      rapport et échappement) ; **courbes** dans le visualiseur (températures CPU/GPU
-      et mémoire, palette validée pour la vision des couleurs, repères d'incidents,
-      lecture au survol) ; **rapport de parc consolidé** (page HTML imprimable :
-      synthèse, état par machine, alertes, processus dominants).
-
-## Tests
-
-```powershell
-dotnet test          # depuis la racine de la solution
-```
-
-## Déploiement
-
-```powershell
-# Exécutables autonomes (dist\FaultTracePC) + archive portable
-powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-
-# Paquet MSI (nécessite : dotnet tool install --global wix --version 6.0.2)
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1
-```
-
-Diagnostic en ligne de commande (déployable par tâche planifiée ou GPO) :
-
-```powershell
-FaultTracePC.Cli.exe --quiet --json --days 90 --output \\serveur\Diagnostics$
-# code de sortie : 0 sain · 1 avertissements · 2 critique · 3 erreur
-```
+Ce logiciel est fourni sans garantie. Il lit l'état du système et ne modifie
+rien sans confirmation explicite de l'utilisateur.

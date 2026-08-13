@@ -36,8 +36,11 @@
 
     <Property Id="ARPNOREPAIR" Value="1" />
 
-    <!-- Icône du produit (Applications installées, raccourci). -->
-    <Icon Id="AppIcon.ico" SourceFile="..\assets\FaultTracePC.ico" />
+    <!-- Icône du produit (Applications installées, raccourci).
+         Le chemin passe par une variable : WiX résout SourceFile par rapport au
+         répertoire courant, pas au fichier .wxs — un chemin relatif casserait
+         selon l'endroit d'où le script est lancé. -->
+    <Icon Id="AppIcon.ico" SourceFile="$(AssetsDir)\FaultTracePC.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
 
     <StandardDirectory Id="ProgramFiles64Folder">

@@ -7,17 +7,37 @@ publish/
 
 # Artefacts de publication : exécutables, archive portable, MSI.
 # Ils se reconstruisent avec build\publish.ps1 et installer\build-msi.ps1 —
-# les versionner alourdirait le dépôt de plusieurs centaines de Mo (GitHub
-# refuse d'ailleurs les fichiers > 100 Mo et alerte au-delà de 50 Mo).
+# les versionner alourdirait le dépôt de centaines de Mo (GitHub refuse les
+# fichiers > 100 Mo et alerte au-delà de 50 Mo). Pour les distribuer :
+# passer par une Release GitHub.
 dist/
 *.msi
+*.wixpdb
 *.zip
 
-# Sorties de diagnostic : elles contiennent des informations personnelles
-# sur la machine analysée (matériel, processus, historique de pannes).
-Diagnostic_PC_*.html
+# ---------------------------------------------------------------------------
+# SORTIES DU LOGICIEL — À NE JAMAIS VERSIONNER
+#
+# FaultTracePC écrit ses rapports dans Documents\FaultTracePC, qui est aussi
+# le dossier de développement : sans ces règles, des données personnelles de
+# la machine analysée (matériel, processus, historique de pannes, journaux
+# PowerShell) et surtout des SECRETS (tokens d'accès dans parc.json) se
+# retrouvent dans le dépôt.
+# ---------------------------------------------------------------------------
 Diagnostic_*.html
 Parc_*.html
 Reparation_PC_*.ps1
 Reparation_PC_*.bat
 Reparation_log_*.txt
+rapport-energie.html
+inventaire_pilotes.txt
+
+# Historique des scans (résumés machine) et configuration locale
+Historique/
+parc.json
+remote.json
+alerts.json
+*.jsonl
+
+# Dumps éventuellement copiés pour analyse
+*.dmp

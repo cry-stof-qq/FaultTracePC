@@ -66,6 +66,7 @@ New-Item -ItemType Directory -Force -Path (Split-Path $msiPath) | Out-Null
 
 wix build (Join-Path $PSScriptRoot 'FaultTracePC.wxs') `
     -d "SourceDir=$publishDir" `
+    -d "AssetsDir=$(Join-Path $root 'assets')" `
     -d "Version=$Version" `
     -arch x64 `
     -out $msiPath
