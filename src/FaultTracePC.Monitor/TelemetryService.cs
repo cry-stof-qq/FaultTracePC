@@ -71,7 +71,13 @@ public sealed class TelemetryService : BackgroundService
             switch (ctx.Request.Url?.AbsolutePath.ToLowerInvariant())
             {
                 case "/api/ping":
-                    Json(ctx, new { machine = Environment.MachineName, product = "FaultTracePC.Monitor", version = "0.6", time = DateTime.Now });
+                    Json(ctx, new
+                    {
+                        machine = Environment.MachineName,
+                        product = "FaultTracePC.Monitor",
+                        version = typeof(TelemetryService).Assembly.GetName().Version?.ToString(3) ?? "?",
+                        time = DateTime.Now,
+                    });
                     break;
 
                 case "/api/status":
@@ -86,6 +92,13 @@ public sealed class TelemetryService : BackgroundService
                         .Where(l => l.Time >= cutoff)
                         .Select(l => l.Raw);
                     Raw(ctx, "application/json", "[" + string.Join(",", lines) + "]");
+                    break;
+                }
+
+                case "/api/alerts":
+                {
+                    int days = int.TryParse(ctx.Request.QueryString["days"], out var ad) ? Math.Clamp(ad, 1, 30) : 7;
+                    Json(ctx, Core.Collectors.AlertLogReader.Read(days));
                     break;
                 }
 

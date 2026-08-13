@@ -31,6 +31,17 @@ public sealed class FlightRecorderService : BackgroundService
     private FileStream? _stream;
     private string _currentFile = "";
     private readonly List<EventLogWatcher> _watchers = new();
+    private AlertEngine? _alerts;
+
+    /// <summary>Trace l'alerte dans le journal de vol (pour la retrouver dans le contexte d'un crash).</summary>
+    private void WriteAlertMarker(PreventiveAlert alert) =>
+        WriteLine(new FlightSample
+        {
+            Time = alert.Time,
+            Kind = "e",
+            EventCategory = $"ALERTE#{alert.Level}",
+            EventMessage = alert.Title,
+        });
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -41,6 +52,10 @@ public sealed class FlightRecorderService : BackgroundService
         WriteLine(new FlightSample { Time = DateTime.Now, Kind = "b", PreviousEndedAbruptly = abrupt });
 
         using var sensors = new SensorReader();
+        var alertSettings = AlertSettings.Load();
+        // Écrit alerts.json au premier démarrage : les seuils deviennent visibles et modifiables.
+        try { if (!File.Exists(AlertSettings.SettingsPath)) alertSettings.Save(); } catch { }
+        _alerts = new AlertEngine(alertSettings);
         StartEventWatchers();
 
         int counter = 0;
@@ -66,6 +81,12 @@ public sealed class FlightRecorderService : BackgroundService
                         TopProcesses = (++counter % TopProcessEverySamples == 0) ? TopProcesses() : null,
                     };
                     WriteLine(sample);
+
+                    // Alertes préventives : seuils sur l'échantillon + contrôle périodique des disques.
+                    foreach (var alert in _alerts!.Evaluate(sample))
+                        WriteAlertMarker(alert);
+                    foreach (var alert in _alerts.CheckDisksIfDue())
+                        WriteAlertMarker(alert);
                 }
                 catch { /* un échantillon raté ne doit jamais arrêter la boîte noire */ }
 
@@ -227,13 +248,18 @@ public sealed class FlightRecorderService : BackgroundService
                 {
                     string msg;
                     try { msg = rec.FormatDescription() ?? ""; } catch { msg = ""; }
+                    var category = $"{rec.ProviderName}#{rec.Id}";
                     WriteLine(new FlightSample
                     {
                         Time = rec.TimeCreated?.ToLocalTime() ?? DateTime.Now,
                         Kind = "e",
-                        EventCategory = $"{rec.ProviderName}#{rec.Id}",
+                        EventCategory = category,
                         EventMessage = msg.Length > 220 ? msg[..220] : msg,
                     });
+
+                    // Certains événements méritent une alerte préventive immédiate.
+                    if (_alerts?.EvaluateEvent(category, msg) is { } alert)
+                        WriteAlertMarker(alert);
                 }
                 catch { }
                 finally { rec.Dispose(); }

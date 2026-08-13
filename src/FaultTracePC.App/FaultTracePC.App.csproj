@@ -9,13 +9,17 @@
     <UseWPF>true</UseWPF>
     <!-- WinForms uniquement pour NotifyIcon (icône de zone de notification). -->
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- WFO0003 : l'analyseur WinForms réclame de gérer le DPI via ApplicationHighDpiMode.
+         Ici l'application est WPF (WinForms n'est présent que pour NotifyIcon) et c'est
+         bien le manifeste qui doit porter les réglages DPI. Avertissement non pertinent. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
     <!-- Permet la compilation croisée depuis un environnement non-Windows (CI/cloud). -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
 
     <AssemblyName>FaultTracePC</AssemblyName>
     <RootNamespace>FaultTracePC.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.7.0</Version>
+    <Version>0.8.0</Version>
     <Product>FaultTracePC</Product>
     <Company>Cry-stof</Company>
     <Description>Diagnostic des pannes et crashs Windows 10/11</Description>

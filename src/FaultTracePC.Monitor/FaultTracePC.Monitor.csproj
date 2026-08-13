@@ -10,7 +10,7 @@
 
     <AssemblyName>FaultTracePC.Monitor</AssemblyName>
     <RootNamespace>FaultTracePC.Monitor</RootNamespace>
-    <Version>0.5.0</Version>
+    <Version>0.8.0</Version>
     <Product>FaultTracePC Monitor</Product>
     <Description>Service de surveillance temps réel (boîte noire) de FaultTracePC</Description>
   </PropertyGroup>
@@ -22,6 +22,9 @@
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <!-- Abonnement temps réel au journal d'événements -->
     <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.10" />
+    <!-- WMI : santé des disques pour les alertes préventives (référence explicite,
+         plutôt que de dépendre du flux transitif via FaultTracePC.Core). -->
+    <PackageReference Include="System.Management" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>

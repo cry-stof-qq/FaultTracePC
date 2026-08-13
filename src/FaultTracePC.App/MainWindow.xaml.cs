@@ -14,11 +14,52 @@ public partial class MainWindow : Window
     private string? _lastRepairScriptPath;
     private bool _scanning;
     private System.Windows.Forms.NotifyIcon? _tray;
+    private bool _forceClose;
 
     public MainWindow()
     {
         InitializeComponent();
         Loaded += (_, _) => RefreshMonitorButton();
+        // Le service peut être démarré/arrêté hors de l'application : on garde
+        // l'indicateur à jour sans que l'utilisateur ait à rouvrir la fenêtre.
+        Activated += (_, _) => RefreshMonitorButton();
+        var stateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        stateTimer.Tick += (_, _) => RefreshMonitorButton();
+        stateTimer.Start();
+
+        // Surveillance des alertes préventives émises par le service : notification
+        // dès qu'un signe avant-coureur apparaît, sans attendre le prochain scan.
+        _alertWatchStart = DateTime.Now;
+        var alertTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        alertTimer.Tick += (_, _) => CheckNewAlerts();
+        alertTimer.Start();
+    }
+
+    private DateTime _alertWatchStart;
+
+    /// <summary>Affiche une bulle de notification pour chaque nouvelle alerte préventive.</summary>
+    private void CheckNewAlerts()
+    {
+        try
+        {
+            var fresh = FaultTracePC.Core.Collectors.AlertLogReader.ReadSince(_alertWatchStart);
+            if (fresh.Count == 0) return;
+            _alertWatchStart = fresh[^1].Time;
+
+            foreach (var a in fresh)
+            {
+                var prefix = a.Level == "crit" ? "⛔ " : "⚠ ";
+                TxtStatus.Text = prefix + a.Title + " — " + a.Recommendation;
+
+                EnsureTrayIcon();
+                _tray?.ShowBalloonTip(10000, "FaultTracePC — alerte préventive",
+                    a.Title + "\n" + a.Recommendation,
+                    a.Level == "crit"
+                        ? System.Windows.Forms.ToolTipIcon.Error
+                        : System.Windows.Forms.ToolTipIcon.Warning);
+            }
+        }
+        catch { /* notification best effort */ }
     }
 
     /// <summary>
@@ -27,7 +68,8 @@ public partial class MainWindow : Window
     /// </summary>
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        if (_tray is null && MonitorServiceManager.GetState() == MonitorState.Running)
+        // _forceClose : fermeture demandée depuis le menu de l'icône — ne pas re-demander.
+        if (!_forceClose && MonitorServiceManager.GetState() == MonitorState.Running)
         {
             var choice = MessageBox.Show(this,
                 "La surveillance temps réel tourne en SERVICE Windows : elle continuera même si tu fermes " +
@@ -46,62 +88,106 @@ public partial class MainWindow : Window
                 return;
             }
         }
-        _tray?.Dispose();
+        if (_tray is not null)
+        {
+            _tray.ContextMenuStrip?.Dispose();
+            _tray.Dispose();
+            _tray = null;
+        }
         base.OnClosing(e);
     }
 
+    /// <summary>Réduit la fenêtre dans la zone de notification (l'app continue de tourner).</summary>
     private void MinimizeToTray()
     {
-        if (_tray is null)
-        {
-            System.Drawing.Icon icon;
-            try { icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application; }
-            catch { icon = System.Drawing.SystemIcons.Application; }
-
-            _tray = new System.Windows.Forms.NotifyIcon
-            {
-                Icon = icon,
-                Text = "FaultTracePC — surveillance active",
-                Visible = true,
-            };
-            _tray.DoubleClick += (_, _) => RestoreFromTray();
-
-            var menu = new System.Windows.Forms.ContextMenuStrip();
-            menu.Items.Add("Ouvrir FaultTracePC", null, (_, _) => RestoreFromTray());
-            menu.Items.Add("Quitter (la surveillance continue)", null, (_, _) => { _tray?.Dispose(); _tray = null; Close(); });
-            menu.Items.Add("Tout arrêter (surveillance comprise) et quitter", null, (_, _) =>
-            {
-                var (_, msg) = MonitorServiceManager.StopOnly();
-                System.Windows.Forms.MessageBox.Show(msg, "FaultTracePC");
-                _tray?.Dispose(); _tray = null; Close();
-            });
-            _tray.ContextMenuStrip = menu;
-        }
+        EnsureTrayIcon();
         Hide();
-        _tray.ShowBalloonTip(3000, "FaultTracePC",
+        _tray!.ShowBalloonTip(3000, "FaultTracePC",
             "Réduit à côté de l'horloge — la surveillance continue. Double-clic pour rouvrir.",
             System.Windows.Forms.ToolTipIcon.Info);
     }
 
+    /// <summary>
+    /// Crée l'icône de zone de notification si nécessaire — utilisée aussi bien pour la
+    /// réduction que pour l'affichage des alertes préventives fenêtre ouverte.
+    /// </summary>
+    private void EnsureTrayIcon()
+    {
+        if (_tray is not null) return;
+
+        System.Drawing.Icon icon;
+        try { icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application; }
+        catch { icon = System.Drawing.SystemIcons.Application; }
+
+        _tray = new System.Windows.Forms.NotifyIcon
+        {
+            Icon = icon,
+            Text = "FaultTracePC",
+            Visible = true,
+        };
+        _tray.DoubleClick += (_, _) => RestoreFromTray();
+        _tray.BalloonTipClicked += (_, _) => RestoreFromTray();
+
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add("Ouvrir FaultTracePC", null, (_, _) => RestoreFromTray());
+        menu.Items.Add("Quitter (la surveillance continue)", null, (_, _) => CloseFromTray(stopService: false));
+        menu.Items.Add("Tout arrêter (surveillance comprise) et quitter", null, (_, _) => CloseFromTray(stopService: true));
+        _tray.ContextMenuStrip = menu;
+    }
+
+    private void CloseFromTray(bool stopService)
+    {
+        if (stopService)
+        {
+            var (_, msg) = MonitorServiceManager.StopOnly();
+            System.Windows.Forms.MessageBox.Show(msg, "FaultTracePC");
+        }
+        _forceClose = true;
+        Close();
+    }
+
+    /// <summary>Ramène la fenêtre au premier plan (l'icône reste pour les alertes).</summary>
     private void RestoreFromTray()
     {
-        _tray?.Dispose();
-        _tray = null;
         Show();
         WindowState = WindowState.Normal;
         Activate();
     }
 
+    /// <summary>
+    /// Le bouton surveillance reflète l'état du service par sa couleur :
+    /// vert = surveillance active, orange = installée mais arrêtée, gris = non installée.
+    /// </summary>
     private void RefreshMonitorButton()
     {
         try
         {
-            BtnRealtime.Content = MonitorServiceManager.GetState() switch
+            switch (MonitorServiceManager.GetState())
             {
-                MonitorState.Running => "📡  Surveillance : ACTIVE",
-                MonitorState.Stopped => "📡  Surveillance : arrêtée",
-                _ => "📡  Surveillance temps réel",
-            };
+                case MonitorState.Running:
+                    BtnRealtime.Content = "📡  Surveillance : ACTIVE";
+                    BtnRealtime.Background = new SolidColorBrush(Color.FromRgb(0x27, 0xAE, 0x60));
+                    BtnRealtime.Foreground = System.Windows.Media.Brushes.White;
+                    BtnRealtime.BorderThickness = new Thickness(0);
+                    BtnRealtime.FontWeight = FontWeights.SemiBold;
+                    break;
+
+                case MonitorState.Stopped:
+                    BtnRealtime.Content = "📡  Surveillance : ARRÊTÉE";
+                    BtnRealtime.Background = new SolidColorBrush(Color.FromRgb(0xE6, 0x7E, 0x22));
+                    BtnRealtime.Foreground = System.Windows.Media.Brushes.White;
+                    BtnRealtime.BorderThickness = new Thickness(0);
+                    BtnRealtime.FontWeight = FontWeights.SemiBold;
+                    break;
+
+                default: // non installée : apparence neutre d'origine
+                    BtnRealtime.Content = "📡  Surveillance temps réel";
+                    BtnRealtime.ClearValue(BackgroundProperty);
+                    BtnRealtime.ClearValue(ForegroundProperty);
+                    BtnRealtime.ClearValue(BorderThicknessProperty);
+                    BtnRealtime.FontWeight = FontWeights.Normal;
+                    break;
+            }
         }
         catch { /* affichage seulement */ }
     }

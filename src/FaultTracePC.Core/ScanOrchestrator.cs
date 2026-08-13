@@ -64,6 +64,7 @@ public sealed class ScanOrchestrator
                 .Where(e => e.Category is EventCategory.PowerLoss or EventCategory.UnexpectedShutdown)
                 .Select(e => e.TimeLocal));
             report.Flight = new FlightJournalCollector(errors).Collect(crashTimes, options.Days);
+            report.Flight.Alerts = AlertLogReader.Read(options.Days, errors);
         }
         catch (Exception ex) { errors.Add($"Boîte noire : {ex.Message}"); }
 

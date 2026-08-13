@@ -206,7 +206,7 @@ public static class HtmlReportGenerator
     {
         var f = r.Flight;
         // Section visible en mode simple uniquement quand elle a du contenu utile.
-        var techClass = f.Contexts.Count > 0 ? "" : " class=\"tech\"";
+        var techClass = f.Contexts.Count > 0 || f.Alerts.Count > 0 ? "" : " class=\"tech\"";
         sb.Append($"<section{techClass}><h2>📡 Boîte noire (surveillance temps réel)</h2>");
         sb.Append("<p class=\"explain\">Le service de surveillance enregistre en continu températures, mémoire et processus. "
                 + "En cas de crash, on retrouve ici les dernières secondes AVANT la panne — ce qu'aucune analyse après coup ne peut reconstituer.</p>");
@@ -215,6 +215,18 @@ public static class HtmlReportGenerator
         {
             sb.Append("<p class=\"empty\">Aucun journal de surveillance sur cette machine. Active la surveillance avec le bouton « 📡 Surveillance temps réel » de FaultTracePC — le service s'installe en un clic et consomme moins de 1 % de CPU.</p></section>");
             return;
+        }
+
+        if (f.Alerts.Count > 0)
+        {
+            sb.Append("<h4 class=\"ctxtitle\">Alertes préventives émises en temps réel</h4>");
+            sb.Append("<table><thead><tr><th>Date</th><th>Niveau</th><th>Alerte</th><th>Que faire</th></tr></thead><tbody>");
+            foreach (var a in f.Alerts.Take(40))
+            {
+                var badge = a.Level == "crit" ? "<span class=\"badge crit\">Critique</span>" : "<span class=\"badge warn\">Alerte</span>";
+                sb.Append($"<tr><td>{a.Time:dd/MM HH:mm}</td><td>{badge}</td><td>{H(a.Title)}</td><td class=\"small\">{H(a.Recommendation)}</td></tr>");
+            }
+            sb.Append("</tbody></table>");
         }
 
         sb.Append($"<p class=\"sub2\">État : <strong>{(f.Active ? "🟢 service actif" : "🔴 service arrêté")}</strong>"

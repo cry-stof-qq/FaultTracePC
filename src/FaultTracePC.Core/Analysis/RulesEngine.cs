@@ -500,12 +500,59 @@ public sealed class RulesEngine
     }
 
     /// <summary>
+    /// Transforme les alertes préventives (émises en temps réel par le service) en
+    /// conclusions du diagnostic. Une alerte déjà couverte par une analyse de contexte
+    /// de crash n'est pas répétée : on évite les doublons dans le rapport.
+    /// </summary>
+    private static void AnalyzePreventiveAlerts(DiagnosticReport r, FlightInfo f)
+    {
+        if (f.Alerts.Count == 0) return;
+
+        // Catégories déjà expliquées par un contexte de crash (surchauffe/saturation mesurées).
+        var covered = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var ctx in f.Contexts)
+        {
+            if (ctx.Samples.Any(s => s.CpuTemp >= 90)) covered.Add("cpu_temp");
+            if (ctx.Samples.Any(s => s.GpuTemp >= 92)) covered.Add("gpu_temp");
+            if (ctx.Samples.Any(s => s.CommitPct >= 95)) covered.Add("commit");
+        }
+
+        foreach (var g in f.Alerts.GroupBy(a => a.RuleId))
+        {
+            if (covered.Contains(g.Key)) continue;
+
+            var latest = g.OrderByDescending(a => a.Time).First();
+            r.Findings.Add(new Finding
+            {
+                Severity = g.Any(a => a.Level == "crit") ? Severity.Critical : Severity.Warning,
+                Confidence = Confidence.High,
+                Category = latest.RuleId switch
+                {
+                    "cpu_temp" or "gpu_temp" or "whea" or "power41" => FaultCategory.Hardware,
+                    "commit" or "exhaustion" => FaultCategory.Software,
+                    _ when latest.RuleId.StartsWith("disk", StringComparison.Ordinal) => FaultCategory.Storage,
+                    _ => FaultCategory.None,
+                },
+                Title = g.Count() > 1
+                    ? $"⚠ Alerte préventive répétée ({g.Count()}×) : {latest.Title}"
+                    : $"⚠ Alerte préventive : {latest.Title}",
+                Details = latest.Details + $" Détecté en temps réel par la surveillance, dernière fois le {latest.Time:dd/MM/yyyy à HH:mm}.",
+                Recommendation = latest.Recommendation,
+            });
+        }
+    }
+
+    /// <summary>
     /// Exploite la boîte noire : que se passait-il dans les secondes AVANT chaque crash ?
     /// Surchauffe, saturation mémoire ou rien d'anormal — chaque cas a sa conclusion.
     /// </summary>
     private static void AnalyzeFlightRecorder(DiagnosticReport r)
     {
         var f = r.Flight;
+
+        // Les alertes préventives sont exploitées même si le journal de vol a été purgé
+        // (rotation 14 jours) : elles se suffisent à elles-mêmes.
+        AnalyzePreventiveAlerts(r, f);
 
         // Pas de journal : proposer la surveillance seulement s'il y a des pannes à élucider.
         if (!f.JournalFound)

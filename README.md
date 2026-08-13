@@ -89,4 +89,12 @@ L'exe se trouve ensuite dans `src/FaultTracePC.App/bin/Release/net10.0-windows/w
       restreinte aux mêmes plages) et console « 🖥 Parc » (mode maître : état de
       toutes les machines clientes, ouverture des rapports distants). Rien n'est
       accessible depuis Internet ; aucune écriture ni exécution à distance.
+- [x] v0.7 — Boîte à outils intégrée (🧰) : désinstallation d'une mise à jour Windows,
+      réinitialisation des composants Windows Update, réparation sur place,
+      sfc/DISM/chkdsk/mdsched/SMART à un clic dans une fenêtre PowerShell visible.
+- [x] v0.8 — Alertes préventives : le service surveille des seuils (températures CPU/GPU,
+      saturation de la mémoire virtuelle, erreurs WHEA, erreurs disque, santé SMART) et
+      prévient AVANT la panne — notification Windows, journal `alerts.jsonl`, section
+      dédiée dans le rapport, conclusions du diagnostic et endpoint `/api/alerts`.
+      Anti-bruit : N échantillons consécutifs requis + délai anti-répétition.
 - [ ] Phase 4 — Finitions GUI, installateur, mode CLI

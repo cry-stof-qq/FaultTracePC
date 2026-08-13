@@ -288,6 +288,65 @@ public sealed class FlightCrashContext
     public List<FlightSample> Samples { get; set; } = new();
 }
 
+/// <summary>
+/// Une alerte préventive émise par le service de surveillance : un signe avant-coureur
+/// détecté AVANT la panne (surchauffe, disque qui se dégrade, mémoire qui sature…).
+/// </summary>
+public sealed class PreventiveAlert
+{
+    [JsonPropertyName("t")] public DateTime Time { get; set; }
+    /// <summary>Identifiant stable de la règle (sert à l'anti-répétition) : cpu_temp, gpu_temp, commit, whea…</summary>
+    [JsonPropertyName("id")] public string RuleId { get; set; } = "";
+    /// <summary>"warn" (à surveiller) ou "crit" (agir maintenant).</summary>
+    [JsonPropertyName("lv")] public string Level { get; set; } = "warn";
+    [JsonPropertyName("ti")] public string Title { get; set; } = "";
+    [JsonPropertyName("de")] public string Details { get; set; } = "";
+    [JsonPropertyName("re")] public string Recommendation { get; set; } = "";
+    /// <summary>Valeur mesurée ayant déclenché l'alerte (température, %, compteur…).</summary>
+    [JsonPropertyName("va")] public double? Value { get; set; }
+}
+
+/// <summary>Seuils de déclenchement des alertes préventives (ProgramData\FaultTracePC\alerts.json).</summary>
+public sealed class AlertSettings
+{
+    public bool Enabled { get; set; } = true;
+    public double CpuTempWarn { get; set; } = 85;
+    public double CpuTempCrit { get; set; } = 95;
+    public double GpuTempWarn { get; set; } = 85;
+    public double GpuTempCrit { get; set; } = 95;
+    /// <summary>Mémoire virtuelle engagée (%) — au-delà, gels et plantages guettent.</summary>
+    public double CommitWarn { get; set; } = 90;
+    public double CommitCrit { get; set; } = 97;
+    /// <summary>Nombre d'échantillons consécutifs au-dessus du seuil avant d'alerter (anti-faux positif).</summary>
+    public int ConsecutiveSamples { get; set; } = 3;
+    /// <summary>Délai minimal avant de ré-alerter sur la même règle (minutes).</summary>
+    public int RepeatMinutes { get; set; } = 60;
+    /// <summary>Contrôle de la santé des disques (SMART) toutes les N minutes.</summary>
+    public int DiskCheckMinutes { get; set; } = 60;
+
+    public static string SettingsPath => Path.Combine(RemoteConfig.BaseDir, "alerts.json");
+    public static string AlertsLogPath => Path.Combine(RemoteConfig.BaseDir, "Flight", "alerts.jsonl");
+
+    public static AlertSettings Load()
+    {
+        try
+        {
+            if (File.Exists(SettingsPath) &&
+                System.Text.Json.JsonSerializer.Deserialize<AlertSettings>(File.ReadAllText(SettingsPath)) is { } s)
+                return s;
+        }
+        catch { }
+        return new AlertSettings();
+    }
+
+    public void Save()
+    {
+        Directory.CreateDirectory(RemoteConfig.BaseDir);
+        File.WriteAllText(SettingsPath,
+            System.Text.Json.JsonSerializer.Serialize(this, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+    }
+}
+
 /// <summary>État de la boîte noire au moment du scan.</summary>
 public sealed class FlightInfo
 {
@@ -298,6 +357,8 @@ public sealed class FlightInfo
     public int AbruptSessionEnds { get; set; }
     public int DaysCovered { get; set; }
     public List<FlightCrashContext> Contexts { get; set; } = new();
+    /// <summary>Alertes préventives émises par le service sur la période analysée.</summary>
+    public List<PreventiveAlert> Alerts { get; set; } = new();
 }
 
 /// <summary>Résultat de la comparaison avec le scan précédent — la boucle « est-ce réparé ? ».</summary>
