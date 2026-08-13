@@ -4,5 +4,20 @@ obj/
 .vs/
 .idea/
 publish/
+
+# Artefacts de publication : exécutables, archive portable, MSI.
+# Ils se reconstruisent avec build\publish.ps1 et installer\build-msi.ps1 —
+# les versionner alourdirait le dépôt de plusieurs centaines de Mo (GitHub
+# refuse d'ailleurs les fichiers > 100 Mo et alerte au-delà de 50 Mo).
+dist/
+*.msi
+*.zip
+
+# Sorties de diagnostic : elles contiennent des informations personnelles
+# sur la machine analysée (matériel, processus, historique de pannes).
 Diagnostic_PC_*.html
+Diagnostic_*.html
+Parc_*.html
 Reparation_PC_*.ps1
+Reparation_PC_*.bat
+Reparation_log_*.txt

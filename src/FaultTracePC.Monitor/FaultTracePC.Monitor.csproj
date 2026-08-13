@@ -13,6 +13,7 @@
     <Version>0.9.0</Version>
     <Product>FaultTracePC Monitor</Product>
     <Description>Service de surveillance temps réel (boîte noire) de FaultTracePC</Description>
+    <ApplicationIcon>..\..\assets\FaultTracePC.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

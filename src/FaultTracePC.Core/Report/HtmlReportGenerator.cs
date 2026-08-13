@@ -69,7 +69,9 @@ public static class HtmlReportGenerator
 
     private static void Header(StringBuilder sb, DiagnosticReport r)
     {
-        sb.Append("<header><h1>🩺 FaultTracePC — Rapport de diagnostic</h1>");
+        sb.Append("<header><div class=\"brand\">");
+        sb.Append($"<img src=\"{Branding.LogoDataUri}\" alt=\"FaultTracePC\" width=\"48\" height=\"48\">");
+        sb.Append("<h1>FaultTracePC — Rapport de diagnostic</h1></div>");
         sb.Append($"<p class=\"sub\">Machine <strong>{H(r.System.MachineName)}</strong> · {H(r.System.Os.Caption)} {H(r.System.Os.DisplayVersion)} (build {H(r.System.Os.BuildNumber)}) · généré le {r.GeneratedAt:dd/MM/yyyy à HH:mm} · période : {r.ScanPeriodDays} jours</p>");
         sb.Append("<button id=\"mode-toggle\" class=\"btn2\" type=\"button\">🔎 Afficher les détails techniques (mode complet)</button>");
         sb.Append("</header>");
@@ -525,6 +527,8 @@ public static class HtmlReportGenerator
         body{font-family:'Segoe UI',system-ui,sans-serif;margin:0;background:#f4f6f9;color:#1d2733;line-height:1.5}
         header{background:#182848;color:#fff;padding:26px 34px}
         header h1{margin:0;font-size:24px;font-weight:600}
+        .brand{display:flex;align-items:center;gap:14px}
+        .brand img{border-radius:8px;flex:0 0 auto}
         header .sub{margin:6px 0 0;opacity:.85;font-size:14px}
         section{max-width:1160px;margin:26px auto;padding:0 24px}
         h2{font-size:19px;border-bottom:2px solid #dbe2ec;padding-bottom:6px;margin:0 0 14px}

@@ -36,6 +36,10 @@
 
     <Property Id="ARPNOREPAIR" Value="1" />
 
+    <!-- Icône du produit (Applications installées, raccourci). -->
+    <Icon Id="AppIcon.ico" SourceFile="..\assets\FaultTracePC.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="FaultTracePC" />
     </StandardDirectory>
@@ -91,7 +95,8 @@
                 Name="FaultTracePC"
                 Description="Diagnostic des pannes Windows"
                 Target="[INSTALLFOLDER]FaultTracePC.exe"
-                WorkingDirectory="INSTALLFOLDER" />
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon.ico" />
       <RemoveFolder Id="RemoveAppShortcutFolder" Directory="AppShortcutFolder" On="uninstall" />
       <RegistryValue Root="HKLM" Key="Software\Cry-stof\FaultTracePC"
                      Name="Installed" Type="integer" Value="1" KeyPath="yes" />

@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="FaultTracePC — Diagnostic de pannes Windows"
+        Icon="Assets/FaultTracePC.ico"
         Width="880" Height="580" MinWidth="700" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         Background="#F4F6F9">

@@ -19,6 +19,7 @@
     <AssemblyName>FaultTracePC</AssemblyName>
     <RootNamespace>FaultTracePC.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\FaultTracePC.ico</ApplicationIcon>
     <Version>1.0.0</Version>
     <Product>FaultTracePC</Product>
     <Company>Cry-stof</Company>
@@ -36,6 +37,11 @@
          est écrit en noms complets (System.Windows.Forms.NotifyIcon, etc.). -->
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Icône embarquée comme ressource : sert d'icône de fenêtre (XAML). -->
+    <Resource Include="..\..\assets\FaultTracePC.ico" Link="Assets\FaultTracePC.ico" />
   </ItemGroup>
 
   <ItemGroup>

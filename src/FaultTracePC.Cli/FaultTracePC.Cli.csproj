@@ -16,6 +16,7 @@
 
     <!-- Élévation requise : lecture des dumps et des journaux complets. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\FaultTracePC.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

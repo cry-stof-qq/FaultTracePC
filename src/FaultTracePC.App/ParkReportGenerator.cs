@@ -42,7 +42,9 @@ public static class ParkReportGenerator
         var inactive = machines.Count(m => m.Reachable && !m.MonitoringActive);
         var healthy = machines.Count - unreachable - critical;
 
-        sb.Append("<header><h1>🖥 État du parc — FaultTracePC</h1>");
+        sb.Append("<header><div class=\"brand\">");
+        sb.Append($"<img src=\"{FaultTracePC.Core.Report.Branding.LogoDataUri}\" alt=\"FaultTracePC\" width=\"44\" height=\"44\">");
+        sb.Append("<h1>État du parc — FaultTracePC</h1></div>");
         sb.Append($"<p class=\"sub\">{machines.Count} machine(s) · relevé du {now:dd/MM/yyyy à HH:mm}</p></header>");
 
         // Bandeau de synthèse : quatre nombres, pas de graphique inutile.
@@ -112,6 +114,8 @@ public static class ParkReportGenerator
         body{font-family:'Segoe UI',system-ui,sans-serif;margin:0;background:#f4f6f9;color:#1d2733;line-height:1.5}
         header{background:#182848;color:#fff;padding:22px 30px}
         header h1{margin:0;font-size:22px;font-weight:600}
+        .brand{display:flex;align-items:center;gap:14px}
+        .brand img{border-radius:8px;flex:0 0 auto}
         header .sub{margin:6px 0 0;opacity:.85;font-size:13px}
         section{max-width:1200px;margin:22px auto;padding:0 24px}
         h2{font-size:18px;border-bottom:2px solid #dbe2ec;padding-bottom:6px;margin:0 0 14px}
