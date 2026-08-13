@@ -133,6 +133,15 @@ public static class MonitorServiceManager
         return code == 0 ? (true, "Surveillance démarrée.") : (false, output.Trim());
     }
 
+    /// <summary>Arrête le service SANS le désinstaller (il redémarrera au prochain boot).</summary>
+    public static (bool Ok, string Message) StopOnly()
+    {
+        var (code, output) = RunSc($"stop {ServiceName}");
+        return code == 0
+            ? (true, "Surveillance arrêtée. Le service reste installé et redémarrera au prochain démarrage du PC — pour l'arrêter définitivement : bouton 📡 → désinstaller.")
+            : (false, output.Trim());
+    }
+
     /// <summary>Redémarre le service (nécessaire après un changement de configuration réseau).</summary>
     public static void Restart()
     {

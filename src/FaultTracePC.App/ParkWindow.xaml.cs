@@ -19,6 +19,9 @@ public partial class ParkWindow : Window
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(4) };
 
+    /// <summary>Client dédié aux diagnostics distants : un scan complet peut durer plusieurs minutes.</summary>
+    private static readonly HttpClient ScanHttp = new() { Timeout = TimeSpan.FromMinutes(15) };
+
     private List<ParkMachine> _machines = new();
 
     public ParkWindow()
@@ -178,6 +181,78 @@ public partial class ParkWindow : Window
     // ------------------------------------------------------------------
     // Rapport distant
     // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Déclenche un scan complet sur la machine sélectionnée puis rapatrie et ouvre
+    /// son rapport HTML — le « diagnostic sans se déplacer ».
+    /// </summary>
+    private async void BtnRemoteScan_Click(object sender, RoutedEventArgs e)
+    {
+        if (LvMachines.SelectedItem is not Row row)
+        {
+            MessageBox.Show(this, "Sélectionne d'abord une machine dans la liste.", "FaultTracePC",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var machine = _machines.FirstOrDefault(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
+        if (machine is null) return;
+
+        if (MessageBox.Show(this,
+                $"Lancer un diagnostic complet sur {machine.Name} ?\n\n" +
+                "Le scan s'exécute sur la machine distante (période 30 jours, analyse des dumps comprise) " +
+                "et peut prendre plusieurs minutes ; son rapport s'ouvrira automatiquement ici.",
+                "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+        BtnRemoteScan.IsEnabled = false;
+        try
+        {
+            TxtStatus.Text = $"🩺 Diagnostic en cours sur {machine.Name}… (plusieurs minutes possibles, ne pas fermer cette fenêtre)";
+            using var req = new HttpRequestMessage(HttpMethod.Post,
+                $"http://{machine.Host}:{machine.Port}/api/scan?days=30");
+            req.Headers.Add("X-FaultTrace-Token", machine.Token);
+            using var resp = await ScanHttp.SendAsync(req);
+
+            if ((int)resp.StatusCode == 429)
+            {
+                TxtStatus.Text = $"{machine.Name} : un diagnostic est déjà en cours — réessaie dans quelques minutes.";
+                return;
+            }
+            resp.EnsureSuccessStatusCode();
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            if (!doc.RootElement.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
+            {
+                TxtStatus.Text = $"{machine.Name} : échec du scan distant — " +
+                    (doc.RootElement.TryGetProperty("error", out var err) ? err.GetString() : "erreur inconnue");
+                return;
+            }
+
+            var name = doc.RootElement.GetProperty("report").GetString()!;
+            await DownloadAndOpenReportAsync(machine, name);
+            TxtStatus.Text = $"✅ Diagnostic de {machine.Name} terminé — verdict : " +
+                (doc.RootElement.TryGetProperty("verdict", out var v) ? v.GetString() : "voir le rapport");
+        }
+        catch (Exception ex)
+        {
+            TxtStatus.Text = $"Échec du diagnostic distant : {(ex is TaskCanceledException ? "délai dépassé" : ex.Message)}";
+        }
+        finally
+        {
+            BtnRemoteScan.IsEnabled = true;
+        }
+    }
+
+    private async Task DownloadAndOpenReportAsync(ParkMachine machine, string name)
+    {
+        using var dlReq = new HttpRequestMessage(HttpMethod.Get,
+            $"http://{machine.Host}:{machine.Port}/api/reports/download?name={Uri.EscapeDataString(name)}");
+        dlReq.Headers.Add("X-FaultTrace-Token", machine.Token);
+        using var dlResp = await Http.SendAsync(dlReq);
+        dlResp.EnsureSuccessStatusCode();
+        var tmp = Path.Combine(Path.GetTempPath(), $"{machine.Name}_{name}");
+        await File.WriteAllTextAsync(tmp, await dlResp.Content.ReadAsStringAsync());
+        Process.Start(new ProcessStartInfo(tmp) { UseShellExecute = true });
+    }
 
     private async void BtnOpenReport_Click(object sender, RoutedEventArgs e)
     {

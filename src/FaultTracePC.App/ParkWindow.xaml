@@ -54,8 +54,14 @@
             <Grid>
                 <TextBlock x:Name="TxtStatus" VerticalAlignment="Center" FontSize="12" Foreground="#44546A"
                            Text="Ajoute tes machines clientes (mode Client activé sur chacune via 🌐), puis Actualiser."/>
-                <Button Content="📄 Ouvrir le dernier rapport de la machine sélectionnée" HorizontalAlignment="Right"
-                        Padding="12,6" FontSize="12" Click="BtnOpenReport_Click"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="BtnRemoteScan" Content="🩺 Lancer un diagnostic à distance" Padding="12,6"
+                            FontSize="12" Margin="0,0,8,0" FontWeight="SemiBold"
+                            Background="#2470B3" Foreground="White" BorderThickness="0"
+                            Click="BtnRemoteScan_Click"
+                            ToolTip="Déclenche un scan complet sur la machine sélectionnée puis ouvre son rapport HTML. Peut prendre plusieurs minutes (analyse des dumps comprise)."/>
+                    <Button Content="📄 Ouvrir le dernier rapport" Padding="12,6" FontSize="12" Click="BtnOpenReport_Click"/>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

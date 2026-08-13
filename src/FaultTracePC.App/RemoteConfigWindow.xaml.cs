@@ -61,11 +61,13 @@ public partial class RemoteConfigWindow : Window
                 TxtStatus.Text = "Mode Local appliqué — plus rien n'est exposé.";
             }
 
-            // Le service lit la configuration au démarrage : redémarrage si installé.
+            // Le service lit la configuration au démarrage. On REDÉPLOIE la dernière
+            // compilation (pas un simple redémarrage) : sinon une ancienne version du
+            // service, sans l'API, resterait en place et la machine serait injoignable.
             if (MonitorServiceManager.GetState() != MonitorState.NotInstalled)
             {
-                MonitorServiceManager.Restart();
-                TxtStatus.Text += " Service redémarré.";
+                var (ok, msg) = MonitorServiceManager.InstallAndStart();
+                TxtStatus.Text += ok ? " Service mis à jour et redémarré." : $" ⚠ {msg}";
             }
             else if (RbClient.IsChecked == true)
             {

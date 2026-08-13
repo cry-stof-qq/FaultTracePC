@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FaultTracePC.Core;
+using FaultTracePC.Core.Report;
 using Microsoft.Extensions.Hosting;
 
 namespace FaultTracePC.Monitor;
@@ -23,6 +24,9 @@ namespace FaultTracePC.Monitor;
 public sealed class TelemetryService : BackgroundService
 {
     private static readonly Regex ReportNameRx = new(@"^Diagnostic_PC_[\w\-]+\.html$", RegexOptions.Compiled);
+
+    /// <summary>Un seul diagnostic à la fois : un scan est coûteux, on refuse les rafales (429).</summary>
+    private static readonly SemaphoreSlim ScanLock = new(1, 1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -96,6 +100,42 @@ public sealed class TelemetryService : BackgroundService
                             .Select(f => (object)new { name = Path.GetFileName(f), sizeKb = new FileInfo(f).Length / 1024, date = File.GetLastWriteTime(f) })
                             .ToList();
                     Json(ctx, list);
+                    break;
+                }
+
+                case "/api/scan":
+                {
+                    // Lance un diagnostic COMPLET sur cette machine et publie le rapport
+                    // dans le dossier partagé. Ce n'est pas de l'exécution arbitraire :
+                    // une seule action prédéfinie, en lecture seule sur le système.
+                    if (!ScanLock.Wait(0)) { ctx.Response.StatusCode = 429; ctx.Response.Close(); break; }
+                    try
+                    {
+                        int days = int.TryParse(ctx.Request.QueryString["days"], out var d) ? Math.Clamp(d, 1, 90) : 30;
+                        bool deep = ctx.Request.QueryString["deep"] != "0";
+
+                        var report = new ScanOrchestrator()
+                            .RunAsync(new ScanOptions { Days = days, IncludeDrivers = true, DeepDumpAnalysis = deep })
+                            .GetAwaiter().GetResult();
+
+                        Directory.CreateDirectory(RemoteConfig.SharedReportsDir);
+                        var name = $"Diagnostic_PC_{report.GeneratedAt:yyyy-MM-dd_HHmm}.html";
+                        File.WriteAllText(Path.Combine(RemoteConfig.SharedReportsDir, name),
+                            HtmlReportGenerator.Generate(report), Encoding.UTF8);
+
+                        Json(ctx, new
+                        {
+                            ok = true,
+                            report = name,
+                            verdict = report.Verdict,
+                            findings = report.Findings.Count(f => f.Severity != Severity.Info),
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Json(ctx, new { ok = false, error = ex.Message });
+                    }
+                    finally { ScanLock.Release(); }
                     break;
                 }
 

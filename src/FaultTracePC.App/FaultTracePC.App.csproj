@@ -7,6 +7,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <UseWPF>true</UseWPF>
+    <!-- WinForms uniquement pour NotifyIcon (icône de zone de notification). -->
+    <UseWindowsForms>true</UseWindowsForms>
     <!-- Permet la compilation croisée depuis un environnement non-Windows (CI/cloud). -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
 

@@ -13,11 +13,83 @@ public partial class MainWindow : Window
     private string? _lastReportPath;
     private string? _lastRepairScriptPath;
     private bool _scanning;
+    private System.Windows.Forms.NotifyIcon? _tray;
 
     public MainWindow()
     {
         InitializeComponent();
         Loaded += (_, _) => RefreshMonitorButton();
+    }
+
+    /// <summary>
+    /// À la fermeture : si la surveillance tourne, expliquer qu'elle CONTINUE en service,
+    /// et proposer de réduire l'application à côté de l'horloge plutôt que de la fermer.
+    /// </summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (_tray is null && MonitorServiceManager.GetState() == MonitorState.Running)
+        {
+            var choice = MessageBox.Show(this,
+                "La surveillance temps réel tourne en SERVICE Windows : elle continuera même si tu fermes " +
+                "FaultTracePC, et redémarrera automatiquement avec le PC.\n\n" +
+                "Oui : réduire FaultTracePC à côté de l'horloge (zone de notification).\n" +
+                "Non : fermer FaultTracePC — la surveillance continue en arrière-plan.\n" +
+                "Annuler : rester ouvert.\n\n" +
+                "(Pour arrêter aussi la surveillance : bouton 📡, ou clic droit sur l'icône de notification.)",
+                "FaultTracePC", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+
+            if (choice == MessageBoxResult.Cancel) { e.Cancel = true; return; }
+            if (choice == MessageBoxResult.Yes)
+            {
+                e.Cancel = true;
+                MinimizeToTray();
+                return;
+            }
+        }
+        _tray?.Dispose();
+        base.OnClosing(e);
+    }
+
+    private void MinimizeToTray()
+    {
+        if (_tray is null)
+        {
+            System.Drawing.Icon icon;
+            try { icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? System.Drawing.SystemIcons.Application; }
+            catch { icon = System.Drawing.SystemIcons.Application; }
+
+            _tray = new System.Windows.Forms.NotifyIcon
+            {
+                Icon = icon,
+                Text = "FaultTracePC — surveillance active",
+                Visible = true,
+            };
+            _tray.DoubleClick += (_, _) => RestoreFromTray();
+
+            var menu = new System.Windows.Forms.ContextMenuStrip();
+            menu.Items.Add("Ouvrir FaultTracePC", null, (_, _) => RestoreFromTray());
+            menu.Items.Add("Quitter (la surveillance continue)", null, (_, _) => { _tray?.Dispose(); _tray = null; Close(); });
+            menu.Items.Add("Tout arrêter (surveillance comprise) et quitter", null, (_, _) =>
+            {
+                var (_, msg) = MonitorServiceManager.StopOnly();
+                System.Windows.Forms.MessageBox.Show(msg, "FaultTracePC");
+                _tray?.Dispose(); _tray = null; Close();
+            });
+            _tray.ContextMenuStrip = menu;
+        }
+        Hide();
+        _tray.ShowBalloonTip(3000, "FaultTracePC",
+            "Réduit à côté de l'horloge — la surveillance continue. Double-clic pour rouvrir.",
+            System.Windows.Forms.ToolTipIcon.Info);
+    }
+
+    private void RestoreFromTray()
+    {
+        _tray?.Dispose();
+        _tray = null;
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
     }
 
     private void RefreshMonitorButton()
