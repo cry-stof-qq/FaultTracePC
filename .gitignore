@@ -29,6 +29,10 @@ Parc_*.html
 Reparation_PC_*.ps1
 Reparation_PC_*.bat
 Reparation_log_*.txt
+# Journaux de compilation (build.log / test.log via Tee-Object).
+# Note : .gitignore n'accepte PAS de commentaire en fin de ligne — le texte
+# ferait partie du motif. Toujours sur une ligne dédiée.
+*.log
 rapport-energie.html
 inventaire_pilotes.txt
 

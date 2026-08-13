@@ -23,8 +23,45 @@ public sealed class SmartCollector
     public void Enrich(List<DiskInfo> disks)
     {
         if (disks.Count == 0) return;
-        TryReadAtaSmart(disks);
-        FillFromReliabilityCounters(disks);
+        TryReadAtaSmart(disks);   // SATA/ATA : attributs bruts par WMI
+        TryReadNvmeSmart(disks);  // NVMe : journal de santé lu auprès du disque
+        FillFromReliabilityCounters(disks); // complément Windows, en dernier recours
+    }
+
+    // ------------------------------------------------------------------
+    // NVMe : journal de santé (page 0x02) via DeviceIoControl
+    // ------------------------------------------------------------------
+
+    private void TryReadNvmeSmart(List<DiskInfo> disks)
+    {
+        foreach (var d in disks)
+        {
+            // Sans numéro physique on ne sait pas quel \\.\PhysicalDriveN ouvrir.
+            // Un SMART ATA déjà lu prime : c'est la source la plus détaillée.
+            if (d.Index is not { } index) continue;
+            if (d.Smart is { Source.Length: > 0 } existing && existing.Source.StartsWith("SMART (SATA)")) continue;
+
+            var h = NvmeSmartReader.TryRead(index, _errors);
+            if (h is null) continue;
+
+            var s = d.Smart ??= new SmartInfo();
+            s.Source = "SMART NVMe (journal de santé)";
+            s.CriticalWarning = h.CriticalWarning;
+            s.TemperatureC ??= h.TemperatureC;
+            s.AvailableSparePercent = h.AvailableSparePercent;
+            s.AvailableSpareThresholdPercent = h.AvailableSpareThresholdPercent;
+            // « Percentage Used » peut dépasser 100 quand l'endurance annoncée est
+            // dépassée : on borne à 0 pour ne pas afficher une durée de vie négative.
+            s.SsdLifeLeftPercent = Math.Max(0, 100 - h.PercentageUsed);
+            // Media and Data Integrity Errors : l'équivalent NVMe des secteurs
+            // illisibles — des données que le contrôleur n'a pas su restituer.
+            s.UncorrectableSectors = h.MediaErrors;
+            s.ReportedUncorrectable = h.ErrorLogEntries;
+            s.PowerOnHours = h.PowerOnHours;
+            s.PowerCycles = h.PowerCycles;
+            s.UnsafeShutdowns = h.UnsafeShutdowns;
+            s.PredictedFailure = h.CriticalWarning != 0;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -139,9 +176,12 @@ public sealed class SmartCollector
     {
         foreach (var d in disks)
         {
-            var s = d.Smart;
-            bool needsSource = s is null || string.IsNullOrEmpty(s.Source);
-            s ??= d.Smart = new SmartInfo();
+            // On travaille sur un objet provisoire : il ne sera rattaché au disque
+            // QUE s'il contient au moins une mesure réelle. Auparavant l'objet était
+            // créé systématiquement, et un disque dont rien n'avait pu être lu
+            // s'affichait comme une ligne de tirets — indiscernable d'un disque sain.
+            var s = d.Smart ?? new SmartInfo();
+            bool needsSource = string.IsNullOrEmpty(s.Source);
 
             // Les valeurs déjà collectées par SystemInfoCollector complètent le tableau.
             s.PowerOnHours ??= d.PowerOnHours;
@@ -149,8 +189,11 @@ public sealed class SmartCollector
             if (s.SsdLifeLeftPercent is null && d.WearPercent is { } wear && wear is >= 0 and <= 100)
                 s.SsdLifeLeftPercent = 100 - wear;
 
-            if (needsSource && (s.PowerOnHours is not null || s.TemperatureC is not null || s.SsdLifeLeftPercent is not null))
-                s.Source = "Compteurs Windows (NVMe)";
+            if (!s.HasData) { d.Smart = null; continue; }
+
+            if (needsSource)
+                s.Source = "Compteurs de fiabilité Windows";
+            d.Smart = s;
         }
     }
 }

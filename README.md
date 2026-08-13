@@ -48,13 +48,25 @@ après coup ne peut reconstituer.
 mémoire virtuelle, erreurs WHEA, santé des disques) et prévient par une
 notification Windows *avant* que la machine tombe.
 
-**État réel du matériel.** Les attributs **SMART bruts** des disques sont lus
-directement (secteurs réalloués, secteurs en attente, erreurs incorrigibles,
-erreurs CRC de câble, heures de fonctionnement, usure SSD) : le rapport dit en
-clair si des **clusters sont défectueux** et si le disque doit être remplacé —
-et distingue un disque qui meurt d'un simple **câble SATA défaillant**. Sur un
-portable, l'**état de la batterie** est donné en pourcentage d'usure, avec un
-verdict lisible (*usée*, *très usée*, *hors d'usage*).
+**État réel du matériel.** Les compteurs de santé des disques sont lus
+directement auprès du matériel, par le chemin adapté à chaque technologie :
+
+- **SATA/ATA** — attributs SMART bruts via WMI : secteurs réalloués, secteurs en
+  attente, secteurs illisibles, erreurs CRC, heures, usure SSD. Le rapport dit en
+  clair si des **clusters sont défectueux**, et distingue un disque qui meurt
+  d'un simple **câble SATA défaillant**.
+- **NVMe** — journal de santé (log page 0x02) lu par `DeviceIoControl`, comme le
+  font les outils spécialisés. Windows n'expose pas ces compteurs par WMI : sans
+  ce chemin, un SSD NVMe ne peut tout simplement pas être diagnostiqué. On y
+  obtient la **réserve de blocs de remplacement** comparée au seuil du
+  constructeur (le vrai signal de fin de vie d'un NVMe), les **erreurs
+  d'intégrité des données**, et les alertes que le contrôleur lève lui-même.
+
+Quand aucun compteur n'est lisible, le rapport **le dit** au lieu d'afficher un
+tableau vide qui ferait passer une absence de mesure pour un bilan de santé.
+
+Sur un portable, l'**état de la batterie** est donné en pourcentage d'usure, avec
+un verdict lisible (*usée*, *très usée*, *hors d'usage*).
 
 **Aide à la réparation.** Chaque diagnostic génère un script PowerShell adapté
 aux problèmes trouvés — qui commence par créer un **point de restauration** et

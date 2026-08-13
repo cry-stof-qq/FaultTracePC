@@ -131,4 +131,215 @@ public class ReportAndHistoryTests
         // La virgule décimale dépend de la culture : on compare sur le nombre + l'unité.
         Assert.Equal(expectedFragment.Replace(',', '.'), text.Replace(',', '.'));
     }
+
+    // ==================================================================
+    // Régression 1.1 : « je n'ai rien mesuré » ne doit JAMAIS s'afficher
+    // comme « tout va bien ». Un objet SMART vide produisait une ligne de
+    // tirets indiscernable d'un disque sain, et l'historique enregistrait
+    // BadSectors = 0 comme s'il s'agissait d'une mesure.
+    // ==================================================================
+
+    [Fact]
+    public void SmartInfo_Vide_NAPasDeDonnees()
+    {
+        Assert.False(new SmartInfo().HasData);
+    }
+
+    [Theory]
+    [InlineData("temperature")]
+    [InlineData("usure")]
+    [InlineData("secteurs")]
+    [InlineData("crc")]
+    public void SmartInfo_UnSeulCompteurSuffitAValoirMesure(string champ)
+    {
+        var s = new SmartInfo();
+        switch (champ)
+        {
+            case "temperature": s.TemperatureC = 29; break;
+            case "usure": s.SsdLifeLeftPercent = 100; break;
+            case "secteurs": s.ReallocatedSectors = 0; break;
+            case "crc": s.UdmaCrcErrors = 0; break;
+        }
+        Assert.True(s.HasData);
+    }
+
+    [Fact]
+    public void SmartInfo_ZeroMesureEstUneDonnee_PasUneAbsence()
+    {
+        // Un compteur qui vaut 0 est une VRAIE mesure (disque sain) ; il doit
+        // être distingué d'un compteur absent, qui ne dit rien du tout.
+        var mesure = new SmartInfo { ReallocatedSectors = 0, PendingSectors = 0, UncorrectableSectors = 0 };
+        Assert.True(mesure.HasData);
+        Assert.Equal(0UL, mesure.BadSectors);
+
+        var absence = new SmartInfo();
+        Assert.False(absence.HasData);
+        // BadSectors vaut aussi 0 par construction : c'est précisément pourquoi
+        // il ne faut jamais se fier à lui seul pour décider d'afficher une ligne.
+        Assert.Equal(0UL, absence.BadSectors);
+    }
+
+    [Fact]
+    public void RapportHtml_SansMesureSmart_DitQueRienNaEteLu()
+    {
+        var r = SampleReport();
+        r.System.Disks.Clear();
+        r.System.Disks.Add(new DiskInfo { Model = "RPEYJ1T24MML1AWX", MediaType = "SSD", HealthStatus = "Sain", Smart = null });
+        new RulesEngine().Analyze(r);
+
+        var html = HtmlReportGenerator.Generate(r);
+        Assert.Contains("Aucun compteur n'a pu être lu", html);
+        // Et surtout : pas de tableau de tirets qui ferait croire à un contrôle.
+        Assert.DoesNotContain("<th>Erreurs CRC (câble)</th>", html);
+    }
+
+    [Fact]
+    public void RapportHtml_AvecMesureSmart_AfficheLeTableau()
+    {
+        var r = SampleReport();
+        r.System.Disks.Clear();
+        r.System.Disks.Add(new DiskInfo
+        {
+            Model = "RPEYJ1T24MML1AWX",
+            Smart = new SmartInfo { TemperatureC = 29, SsdLifeLeftPercent = 100, Source = "Compteurs de fiabilité Windows" },
+        });
+        new RulesEngine().Analyze(r);
+
+        var html = HtmlReportGenerator.Generate(r);
+        Assert.Contains("<th>Erreurs CRC (câble)</th>", html);
+        Assert.DoesNotContain("Aucun compteur n'a pu être lu", html);
+    }
+
+    // ==================================================================
+    // NVMe : décodage du journal de santé (page 0x02) et règles associées.
+    // Ce code parle au matériel : impossible de le tester sur la machine de
+    // développement, donc on le teste sur une page synthétique conforme à la
+    // norme NVMe. C'est le seul filet possible sur du P/Invoke.
+    // ==================================================================
+
+    /// <summary>Construit une page de log NVMe 0x02 valide (512 octets).</summary>
+    private static byte[] NvmeLog(
+        byte warning = 0, int kelvin = 305, byte spare = 100, byte spareThreshold = 10,
+        byte used = 3, ulong powerCycles = 500, ulong hours = 1200, ulong unsafeShutdowns = 12,
+        ulong mediaErrors = 0, ulong errorEntries = 0)
+    {
+        var b = new byte[512];
+        b[0] = warning;
+        b[1] = (byte)(kelvin & 0xFF);
+        b[2] = (byte)((kelvin >> 8) & 0xFF);
+        b[3] = spare;
+        b[4] = spareThreshold;
+        b[5] = used;
+        void W(int off, ulong v) { for (int i = 0; i < 8; i++) b[off + i] = (byte)(v >> (8 * i)); }
+        W(112, powerCycles);
+        W(128, hours);
+        W(144, unsafeShutdowns);
+        W(160, mediaErrors);
+        W(176, errorEntries);
+        return b;
+    }
+
+    [Fact]
+    public void NvmeLog_DecodeLesChampsDeLaNorme()
+    {
+        var h = FaultTracePC.Core.Collectors.NvmeSmartReader.Parse(NvmeLog(), 0);
+
+        Assert.NotNull(h);
+        Assert.Equal(0, h!.CriticalWarning);
+        Assert.Equal(32, h.TemperatureC);            // 305 K - 273
+        Assert.Equal(100, h.AvailableSparePercent);
+        Assert.Equal(10, h.AvailableSpareThresholdPercent);
+        Assert.Equal(3, h.PercentageUsed);
+        Assert.Equal(500UL, h.PowerCycles);
+        Assert.Equal(1200UL, h.PowerOnHours);
+        Assert.Equal(12UL, h.UnsafeShutdowns);
+    }
+
+    [Fact]
+    public void NvmeLog_EntierementNul_EstRefuse()
+    {
+        // Un pilote peut répondre « OK » sans rien remplir : ce n'est pas une mesure.
+        Assert.Null(FaultTracePC.Core.Collectors.NvmeSmartReader.Parse(new byte[512], 0));
+    }
+
+    [Fact]
+    public void NvmeLog_LuAvecUnDecalage()
+    {
+        // Dans la vraie vie la page est précédée de l'en-tête du descripteur.
+        var buffer = new byte[48 + 512];
+        NvmeLog(kelvin: 310).CopyTo(buffer, 48);
+        var h = FaultTracePC.Core.Collectors.NvmeSmartReader.Parse(buffer, 48);
+        Assert.Equal(37, h!.TemperatureC);
+    }
+
+    [Theory]
+    [InlineData(0x01, "réserve")]
+    [InlineData(0x02, "température")]
+    [InlineData(0x04, "fiabilité")]
+    [InlineData(0x08, "LECTURE SEULE")]
+    public void NvmeAlerte_EstTraduiteEnClair(byte flags, string fragment)
+    {
+        var texte = FaultTracePC.Core.Collectors.NvmeSmartReader.DescribeWarning(flags);
+        Assert.Contains(fragment, texte, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void NvmeAlerte_ZeroNeDitRien() =>
+        Assert.Equal("", FaultTracePC.Core.Collectors.NvmeSmartReader.DescribeWarning(0));
+
+    [Fact]
+    public void ReserveNvme_EpuiseeSeulementSousLeSeuil()
+    {
+        Assert.True(new SmartInfo { AvailableSparePercent = 5, AvailableSpareThresholdPercent = 10 }.SpareExhausted);
+        Assert.False(new SmartInfo { AvailableSparePercent = 100, AvailableSpareThresholdPercent = 10 }.SpareExhausted);
+        // Sans seuil connu, on ne conclut pas : un disque n'est pas condamné faute d'information.
+        Assert.False(new SmartInfo { AvailableSparePercent = 5 }.SpareExhausted);
+    }
+
+    [Fact]
+    public void RegleNvme_ReserveEpuisee_EstCritique()
+    {
+        var r = SampleReport();
+        r.System.Disks.Clear();
+        r.System.Disks.Add(new DiskInfo
+        {
+            Model = "SSD-NVME",
+            Smart = new SmartInfo
+            {
+                Source = "SMART NVMe (journal de santé)",
+                AvailableSparePercent = 4, AvailableSpareThresholdPercent = 10, SsdLifeLeftPercent = 40,
+            },
+        });
+        new RulesEngine().Analyze(r);
+
+        var f = r.Findings.FirstOrDefault(x => x.Title.Contains("SSD-NVME", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(f);
+        Assert.Equal(Severity.Critical, f!.Severity);
+        Assert.Contains("réserve", f.Details, StringComparison.OrdinalIgnoreCase);
+        // Un NVMe ne compte pas en secteurs : le mot ne doit pas apparaître.
+        Assert.DoesNotContain("secteur(s) instable", f.Details);
+    }
+
+    [Fact]
+    public void RegleNvme_ErreursIntegrite_SontSignalees()
+    {
+        var r = SampleReport();
+        r.System.Disks.Clear();
+        r.System.Disks.Add(new DiskInfo
+        {
+            Model = "SSD-NVME",
+            Smart = new SmartInfo
+            {
+                Source = "SMART NVMe (journal de santé)",
+                AvailableSparePercent = 100, AvailableSpareThresholdPercent = 10,
+                UncorrectableSectors = 12, SsdLifeLeftPercent = 90,
+            },
+        });
+        new RulesEngine().Analyze(r);
+
+        var f = r.Findings.FirstOrDefault(x => x.Title.Contains("SSD-NVME", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(f);
+        Assert.Equal(Severity.Critical, f!.Severity);   // >= 10 erreurs
+        Assert.Contains("intégrité", f.Details, StringComparison.OrdinalIgnoreCase);
+    }
 }

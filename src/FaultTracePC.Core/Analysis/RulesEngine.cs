@@ -640,16 +640,64 @@ public sealed class RulesEngine
             var severity = Severity.Info;
             var reco = "";
 
+            // Un NVMe ne compte pas en « secteurs » : ses indicateurs de dégradation
+            // sont la réserve de blocs et les erreurs d'intégrité. On adapte donc le
+            // vocabulaire, sous peine de dire des choses fausses à l'utilisateur.
+            bool isNvme = s.AvailableSparePercent is not null
+                       || s.Source.StartsWith("SMART NVMe", StringComparison.OrdinalIgnoreCase);
+
             // Le disque annonce lui-même sa fin : c'est le signal le plus grave qui existe.
             if (s.PredictedFailure == true)
             {
                 severity = Severity.Critical;
-                facts.Add("le disque signale lui-même une DÉFAILLANCE IMMINENTE (SMART)");
+                var detail = s.CriticalWarning is { } w && w != 0
+                    ? Collectors.NvmeSmartReader.DescribeWarning(w)
+                    : "";
+                facts.Add(detail.Length > 0
+                    ? $"le disque lève lui-même une ALERTE CRITIQUE : {detail}"
+                    : "le disque signale lui-même une DÉFAILLANCE IMMINENTE (SMART)");
                 reco = "Sauvegarder les données MAINTENANT et remplacer ce disque. Ne pas attendre.";
             }
 
+            if (isNvme)
+            {
+                // La réserve de blocs de remplacement est LE signal de fin de vie d'un NVMe.
+                if (s.SpareExhausted)
+                {
+                    severity = Severity.Critical;
+                    facts.Add($"réserve de blocs de remplacement épuisée : {s.AvailableSparePercent} % restants "
+                            + $"pour un seuil constructeur de {s.AvailableSpareThresholdPercent} %");
+                    if (reco.Length == 0)
+                        reco = "Le disque n'a plus de blocs de rechange pour compenser l'usure : sauvegarder et remplacer.";
+                }
+                else if (s.AvailableSparePercent is { } sp && s.AvailableSpareThresholdPercent is { } th && th > 0 && sp <= th + 10)
+                {
+                    severity = severity == Severity.Critical ? severity : Severity.Warning;
+                    facts.Add($"réserve de blocs proche du seuil : {sp} % pour un seuil de {th} %");
+                    if (reco.Length == 0)
+                        reco = "La réserve approche du seuil constructeur : surveiller son évolution à chaque scan et prévoir le remplacement.";
+                }
+
+                // Media and Data Integrity Errors : des données que le contrôleur
+                // n'a pas su restituer. C'est l'équivalent NVMe d'un secteur illisible.
+                if (s.UncorrectableSectors is { } media && media > 0)
+                {
+                    severity = media >= 10 ? Severity.Critical
+                             : severity == Severity.Critical ? severity : Severity.Warning;
+                    facts.Add($"{media} erreur(s) d'intégrité des données non corrigée(s)");
+                    reco += (reco.Length > 0 ? " " : "")
+                         + "Ces erreurs signifient que le disque n'a pas pu restituer des données qu'il avait écrites. "
+                         + "Sauvegarder, vérifier l'intégrité des fichiers importants, et surveiller si le compteur augmente : "
+                         + "une progression d'un scan à l'autre condamne le disque.";
+                }
+
+                if (s.UnsafeShutdowns is { } us && s.PowerCycles is { } pc && pc > 10 && us > pc / 2)
+                    facts.Add($"{us} arrêt(s) brutal(s) sur {pc} démarrages — coupures d'alimentation fréquentes");
+            }
+
             // Secteurs défectueux : le cœur de la question « mon disque est-il bon ? »
-            if (s.PendingSectors is > 0)
+            if (isNvme) { /* le vocabulaire « secteurs » ne s'applique pas au NVMe */ }
+            else if (s.PendingSectors is > 0)
             {
                 severity = Severity.Critical;
                 facts.Add($"{s.PendingSectors} secteur(s) instable(s) en attente de réallocation");

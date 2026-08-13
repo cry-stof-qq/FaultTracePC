@@ -81,6 +81,8 @@ public sealed class GpuInfo
 public sealed class DiskInfo
 {
     public string Model { get; set; } = "";
+    /// <summary>Numéro physique (Win32_DiskDrive.Index = MSFT_PhysicalDisk.DeviceId).</summary>
+    public int? Index { get; set; }
     public ulong SizeBytes { get; set; }
     public string InterfaceType { get; set; } = "";
     public string MediaType { get; set; } = "";       // SSD / HDD / inconnu
@@ -122,9 +124,40 @@ public sealed class SmartInfo
     /// <summary>Origine des données : "SMART (SATA)", "Compteurs Windows (NVMe)"…</summary>
     public string Source { get; set; } = "";
 
+    // --- Spécifique NVMe (journal de santé lu directement auprès du disque) ---
+
+    /// <summary>Réserve de blocs de remplacement restante, en % (NVMe).</summary>
+    public int? AvailableSparePercent { get; set; }
+
+    /// <summary>Seuil sous lequel le fabricant déclare le disque en fin de vie (NVMe).</summary>
+    public int? AvailableSpareThresholdPercent { get; set; }
+
+    /// <summary>Drapeaux d'alerte levés par le contrôleur NVMe (0 = aucun).</summary>
+    public byte? CriticalWarning { get; set; }
+
+    /// <summary>Arrêts brutaux comptés par le disque (NVMe).</summary>
+    public ulong? UnsafeShutdowns { get; set; }
+
+    /// <summary>La réserve de blocs est-elle passée sous le seuil du fabricant ?</summary>
+    public bool SpareExhausted =>
+        AvailableSparePercent is { } s && AvailableSpareThresholdPercent is { } t && t > 0 && s < t;
+
     /// <summary>Total des secteurs défectueux (réalloués + en attente + illisibles).</summary>
     public ulong BadSectors =>
         (ReallocatedSectors ?? 0) + (PendingSectors ?? 0) + (UncorrectableSectors ?? 0);
+
+    /// <summary>
+    /// Vrai si au moins UN compteur a réellement été lu. Sans ce garde-fou, un objet
+    /// vide s'affichait sous forme d'une ligne de tirets — ce qui faisait passer
+    /// « je n'ai rien mesuré » pour « tout va bien ». Un outil de diagnostic ne doit
+    /// jamais présenter une absence de mesure comme un résultat.
+    /// </summary>
+    public bool HasData =>
+        PredictedFailure is not null || ReallocatedSectors is not null || PendingSectors is not null ||
+        UncorrectableSectors is not null || UdmaCrcErrors is not null || ReportedUncorrectable is not null ||
+        PowerOnHours is not null || PowerCycles is not null || TemperatureC is not null ||
+        SsdLifeLeftPercent is not null || AvailableSparePercent is not null ||
+        CriticalWarning is not null || UnsafeShutdowns is not null;
 }
 
 /// <summary>État de la batterie d'un portable.</summary>

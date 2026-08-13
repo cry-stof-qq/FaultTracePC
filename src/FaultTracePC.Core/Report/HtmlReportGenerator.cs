@@ -34,7 +34,7 @@ public static class HtmlReportGenerator
         ReliabilitySection(sb, r);
         ErrorsSection(sb, r);
 
-        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v1.0 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
+        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v{UpdateChecker.CurrentVersion} le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
         sb.Append("Les niveaux de confiance sont indiqués honnêtement : une confiance « faible » signale une piste, pas une preuve.</footer>");
         sb.Append("<script>").Append(FilterJs).Append("</script>");
         sb.Append("</body></html>");
@@ -420,31 +420,77 @@ public static class HtmlReportGenerator
     /// <summary>Détail SMART : les chiffres qui justifient le verdict sur chaque disque.</summary>
     private static void SmartSection(StringBuilder sb, DiagnosticReport r)
     {
-        var disks = r.System.Disks.Where(d => d.Smart is not null).ToList();
-        if (disks.Count == 0) return;
+        var disks = r.System.Disks.Where(d => d.Smart is { HasData: true }).ToList();
+        if (r.System.Disks.Count == 0) return;
 
         sb.Append("<section class=\"tech\"><h2>État de santé des disques (SMART)</h2>");
         sb.Append("<p class=\"explain\">Les disques tiennent eux-mêmes des compteurs d'incidents. Seuls ceux qui annoncent "
                 + "réellement une panne sont repris ici : les secteurs défectueux (le disque s'abîme), les erreurs de "
                 + "transmission (le câble est en cause, pas le disque) et l'usure d'un SSD.</p>");
+
+        // Aucune mesure : on le DIT, plutôt que d'afficher un tableau de tirets qui
+        // laisserait croire que les disques ont été contrôlés et déclarés sains.
+        if (disks.Count == 0)
+        {
+            sb.Append("<p class=\"empty\"><strong>Aucun compteur n'a pu être lu sur ");
+            sb.Append(r.System.Disks.Count > 1 ? "ces disques" : "ce disque");
+            sb.Append(" — ce n'est ni un bon ni un mauvais signe : l'état interne n'est tout simplement pas connu.</strong><br>");
+            sb.Append("Les attributs SMART bruts ne sont exposés à Windows que par les disques SATA/ATA. Beaucoup de "
+                    + "contrôleurs NVMe, et la plupart des contrôleurs RAID, ne les transmettent pas — Windows ne peut "
+                    + "alors rien en dire, et FaultTracePC non plus.<br>");
+            sb.Append("Pour connaître malgré tout l'état de ");
+            sb.Append(r.System.Disks.Count > 1 ? "ces disques" : "ce disque");
+            sb.Append(" : l'outil du fabricant (Samsung Magician, Crucial Storage Executive, WD Dashboard…) parle "
+                    + "directement au disque, ou un utilitaire spécialisé comme CrystalDiskInfo.</p>");
+            foreach (var d in r.System.Disks)
+                sb.Append($"<p class=\"small\">{H(d.Model)}{(string.IsNullOrEmpty(d.MediaType) ? "" : $" · {H(d.MediaType)}")}"
+                        + $"{(string.IsNullOrEmpty(d.InterfaceType) ? "" : $" · {H(d.InterfaceType)}")}"
+                        + $"{(string.IsNullOrEmpty(d.HealthStatus) ? "" : $" · état déclaré par Windows : {H(d.HealthStatus)}")}</p>");
+            sb.Append("</section>");
+            return;
+        }
         sb.Append("<table><thead><tr><th>Disque</th><th>Secteurs réalloués</th><th>Secteurs en attente</th>"
-                + "<th>Illisibles</th><th>Erreurs CRC (câble)</th><th>Usure SSD</th><th>Heures</th><th>Temp.</th><th>Source</th></tr></thead><tbody>");
+                + "<th>Illisibles / erreurs d'intégrité</th><th>Erreurs CRC (câble)</th><th>Réserve (NVMe)</th>"
+                + "<th>Usure SSD</th><th>Heures</th><th>Temp.</th><th>Source</th></tr></thead><tbody>");
 
         foreach (var d in disks)
         {
             var s = d.Smart!;
-            bool bad = s.BadSectors > 0 || s.PredictedFailure == true;
+            bool bad = s.BadSectors > 0 || s.PredictedFailure == true || s.SpareExhausted;
             sb.Append($"<tr{(bad ? " class=\"oldrow\"" : "")}><td>{H(d.Model)}</td>");
             sb.Append($"<td>{Cnt(s.ReallocatedSectors)}</td><td>{Cnt(s.PendingSectors)}</td><td>{Cnt(s.UncorrectableSectors)}</td>");
             sb.Append($"<td>{Cnt(s.UdmaCrcErrors)}</td>");
+            // Réserve de blocs : la valeur seule ne dit rien, c'est sa position par
+            // rapport au seuil du constructeur qui compte.
+            sb.Append("<td>");
+            if (s.AvailableSparePercent is { } sp)
+            {
+                var th = s.AvailableSpareThresholdPercent;
+                sb.Append(s.SpareExhausted ? $"<strong>{sp} %</strong>" : $"{sp} %");
+                if (th is > 0) sb.Append($" <span class=\"small\">(seuil {th} %)</span>");
+            }
+            else sb.Append('—');
+            sb.Append("</td>");
             sb.Append($"<td>{(s.SsdLifeLeftPercent is { } l ? $"{100 - l} % usé" : "—")}</td>");
             sb.Append($"<td>{(s.PowerOnHours is { } h ? $"{h}" : "—")}</td>");
             sb.Append($"<td>{(s.TemperatureC is { } t ? $"{t} °C" : "—")}</td>");
             sb.Append($"<td class=\"small\">{H(s.Source)}</td></tr>");
+
+            // Alerte levée par le contrôleur lui-même : elle mérite sa propre ligne,
+            // pas une case dans un tableau.
+            if (s.CriticalWarning is { } w && w != 0)
+                sb.Append($"<tr class=\"oldrow\"><td colspan=\"10\">⚠ <strong>{H(d.Model)} — alerte du contrôleur :</strong> "
+                        + $"{H(Collectors.NvmeSmartReader.DescribeWarning(w))}</td></tr>");
         }
         sb.Append("</tbody></table>");
-        sb.Append("<p class=\"empty\">Un compteur à 0 partout est le signe d'un disque sain. Ce qui compte n'est pas tant "
-                + "la valeur absolue que son ÉVOLUTION : FaultTracePC la compare automatiquement d'un scan à l'autre.</p></section>");
+        sb.Append("<p class=\"empty\">Sur un SSD <strong>NVMe</strong>, le disque ne compte pas en secteurs : "
+                + "ce qui annonce sa fin est l'épuisement de sa <strong>réserve de blocs</strong> (comparée au seuil du "
+                + "constructeur) et les <strong>erreurs d'intégrité</strong> — des données qu'il n'a pas su relire.</p>");
+        sb.Append("<p class=\"empty\"><strong>« 0 » et « — » ne veulent pas dire la même chose :</strong> 0 est une mesure "
+                + "(le compteur existe et vaut zéro, c'est le signe d'un disque sain), « — » signifie que ce compteur "
+                + "n'est pas exposé par le disque et n'a donc pas été mesuré.<br>"
+                + "Ce qui compte n'est pas tant la valeur absolue que son ÉVOLUTION : FaultTracePC la compare "
+                + "automatiquement d'un scan à l'autre.</p></section>");
     }
 
     private static string Cnt(ulong? v) => v is null ? "—" : v.Value == 0 ? "0" : $"<strong>{v}</strong>";

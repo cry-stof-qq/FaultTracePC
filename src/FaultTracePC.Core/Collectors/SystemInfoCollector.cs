@@ -171,6 +171,9 @@ public sealed class SystemInfoCollector
                 SizeBytes = V<ulong>(mo, "Size") ?? 0,
                 InterfaceType = S(mo, "InterfaceType"),
                 WmiStatus = S(mo, "Status"),
+                // Numéro physique du disque : c'est la MÊME numérotation que
+                // MSFT_PhysicalDisk.DeviceId, donc la seule association fiable.
+                Index = V<int>(mo, "Index"),
             });
         }
 
@@ -181,9 +184,19 @@ public sealed class SystemInfoCollector
             {
                 var model = S(mo, "Model");
                 if (string.IsNullOrEmpty(model)) model = S(mo, "FriendlyName");
-                var match = list.FirstOrDefault(d =>
-                    d.Model.Contains(model, StringComparison.OrdinalIgnoreCase) ||
-                    model.Contains(d.Model, StringComparison.OrdinalIgnoreCase));
+
+                // Association par numéro physique d'abord : MSFT_PhysicalDisk.DeviceId
+                // et Win32_DiskDrive.Index désignent le même disque. Le rapprochement
+                // par modèle ne sert que de repli — il est ambigu dès que deux disques
+                // identiques sont montés sur la même machine.
+                DiskInfo? match = null;
+                if (int.TryParse(S(mo, "DeviceId"), out var devId))
+                    match = list.FirstOrDefault(d => d.Index == devId);
+                if (match is null && model.Length > 0)
+                    match = list.FirstOrDefault(d =>
+                        d.Model.Length > 0 &&
+                        (d.Model.Contains(model, StringComparison.OrdinalIgnoreCase) ||
+                         model.Contains(d.Model, StringComparison.OrdinalIgnoreCase)));
                 if (match is null) continue;
 
                 var health = V<ushort>(mo, "HealthStatus");
@@ -196,30 +209,67 @@ public sealed class SystemInfoCollector
                 };
                 var media = V<ushort>(mo, "MediaType");
                 match.MediaType = media switch { 3 => "HDD", 4 => "SSD", 5 => "SCM", _ => match.MediaType };
-            }
-        }
-        catch { /* espace de noms Storage indisponible : non bloquant */ }
 
-        // Compteurs de fiabilité (température, usure) — pas toujours exposés selon le contrôleur.
-        try
-        {
-            foreach (var mo in Query("SELECT * FROM MSFT_StorageReliabilityCounter", @"root\Microsoft\Windows\Storage"))
-            {
-                var deviceId = S(mo, "DeviceId");
-                // Association best-effort par index : on rattache au disque de même position si possible.
-                if (int.TryParse(deviceId, out var idx) && idx >= 0 && idx < list.Count)
+                // Compteurs de fiabilité (température, usure, heures, erreurs).
+                //
+                // ATTENTION : MSFT_StorageReliabilityCounter n'est PAS énumérable.
+                // Le fournisseur de stockage ne matérialise l'instance qu'à travers
+                // l'association depuis le disque — c'est exactement pour cette raison
+                // que Get-StorageReliabilityCounter exige un disque en entrée et n'a
+                // pas de forme sans paramètre. Un « SELECT * FROM
+                // MSFT_StorageReliabilityCounter » renvoie zéro instance, sans erreur :
+                // les valeurs disparaissaient donc en silence (corrigé en 1.1).
+                foreach (var rc in RelatedReliabilityCounters(mo))
                 {
-                    var d = list[idx];
-                    var temp = V<byte>(mo, "Temperature");
-                    if (temp is > 0 and < 120) d.TemperatureC = temp;
-                    var wear = V<byte>(mo, "Wear");
-                    if (wear is not null) d.WearPercent = wear;
-                    d.PowerOnHours = V<uint>(mo, "PowerOnHours");
-                    d.ReadErrorsTotal = V<ulong>(mo, "ReadErrorsTotal");
+                    // Ces propriétés sont déclarées UInt16/UInt32/UInt64 selon les
+                    // versions de Windows : on convertit largement plutôt que de
+                    // parier sur un type exact.
+                    var temp = V<int>(rc, "Temperature");
+                    if (temp is > 0 and < 120) match.TemperatureC = temp;
+                    var wear = V<int>(rc, "Wear");
+                    if (wear is >= 0 and <= 100) match.WearPercent = wear;
+                    match.PowerOnHours ??= V<ulong>(rc, "PowerOnHours");
+                    match.ReadErrorsTotal ??= V<ulong>(rc, "ReadErrorsTotal");
+                    break; // une seule instance de compteur par disque
                 }
             }
         }
         catch { /* non bloquant */ }
+    }
+
+    /// <summary>
+    /// Compteurs de fiabilité associés à un disque physique.
+    ///
+    /// On passe par une requête ASSOCIATORS plutôt que par une énumération directe :
+    /// le fournisseur de stockage ne matérialise l'instance qu'au travers de
+    /// l'association depuis le disque. Deux façons d'obtenir le chemin de l'objet,
+    /// la seconde reconstruisant le chemin à la main si la propriété système
+    /// __RELPATH n'est pas accessible.
+    /// </summary>
+    private static IEnumerable<ManagementObject> RelatedReliabilityCounters(ManagementObject disk)
+    {
+        const string ns = @"root\Microsoft\Windows\Storage";
+        const string result = " WHERE ResultClass = MSFT_StorageReliabilityCounter";
+
+        string? relPath = null;
+        try { relPath = disk["__RELPATH"]?.ToString(); } catch { /* propriété système indisponible */ }
+
+        if (string.IsNullOrWhiteSpace(relPath))
+        {
+            var objectId = S(disk, "ObjectId");
+            if (objectId.Length == 0) yield break;
+            // Échappement WMI : antislash puis guillemet, dans cet ordre.
+            var escaped = objectId.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            relPath = $"MSFT_PhysicalDisk.ObjectId=\"{escaped}\"";
+        }
+
+        // Query() peut lever si le chemin est refusé : on isole l'échec ici pour ne
+        // pas interrompre la collecte des autres disques.
+        List<ManagementObject> found;
+        try { found = Query("ASSOCIATORS OF {" + relPath + "}" + result, ns).ToList(); }
+        catch { yield break; }
+
+        foreach (var mo in found) yield return mo;
     }
 
     private void CollectVolumes(List<VolumeInfo> list)
