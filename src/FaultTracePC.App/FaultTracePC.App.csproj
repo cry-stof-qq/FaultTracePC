@@ -26,6 +26,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- WinForms n'est activé que pour NotifyIcon : on retire ses usings implicites,
+         sinon System.Windows.Forms.Application / System.Drawing.Brush entrent en
+         collision avec leurs homonymes WPF (CS0104). Le code WinForms de ce projet
+         est écrit en noms complets (System.Windows.Forms.NotifyIcon, etc.). -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FaultTracePC.Core\FaultTracePC.Core.csproj" />
   </ItemGroup>
 
