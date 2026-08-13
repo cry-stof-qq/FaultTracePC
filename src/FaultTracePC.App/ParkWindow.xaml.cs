@@ -104,15 +104,72 @@ public partial class ParkWindow : Window
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => _ = RefreshAllAsync();
 
+    /// <summary>Dernier état connu, réutilisé pour le rapport de parc.</summary>
+    private Dictionary<ParkMachine, QueryResult> _lastResults = new();
+
     private async Task RefreshAllAsync()
     {
         TxtStatus.Text = $"Interrogation de {_machines.Count} machine(s)…";
         var results = await Task.WhenAll(_machines.Select(QueryAsync));
-        RenderRows(results.ToDictionary(r => r.Machine, r => r));
+        _lastResults = results.ToDictionary(r => r.Machine, r => r);
+        RenderRows(_lastResults);
         TxtStatus.Text = $"Actualisé à {DateTime.Now:HH:mm:ss} — {results.Count(r => r.Ok)}/{_machines.Count} machine(s) joignable(s).";
     }
 
-    private sealed record QueryResult(ParkMachine Machine, bool Ok, bool Active, FlightSample? Last, string Error);
+    /// <summary>Génère et ouvre le rapport HTML consolidé du parc.</summary>
+    private async void BtnParkReport_Click(object sender, RoutedEventArgs e)
+    {
+        if (_machines.Count == 0)
+        {
+            MessageBox.Show(this, "Aucune machine enregistrée. Ajoute d'abord tes postes clients.",
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try
+        {
+            // On repart d'un état frais : un rapport doit refléter l'instant présent.
+            TxtStatus.Text = "Interrogation des machines pour le rapport…";
+            await RefreshAllAsync();
+
+            var lines = _machines.Select(m =>
+            {
+                _lastResults.TryGetValue(m, out var r);
+                var alerts = r?.Alerts ?? new List<PreventiveAlert>();
+                var latest = alerts.OrderByDescending(a => a.Time).FirstOrDefault();
+                return new ParkReportGenerator.MachineLine
+                {
+                    Name = m.Name,
+                    Host = $"{m.Host}:{m.Port}",
+                    Reachable = r?.Ok ?? false,
+                    MonitoringActive = r?.Active ?? false,
+                    Error = r?.Error ?? "non interrogée",
+                    LastSample = r?.Last?.Time,
+                    CpuLoad = r?.Last?.CpuLoad,
+                    CpuTemp = r?.Last?.CpuTemp,
+                    GpuTemp = r?.Last?.GpuTemp,
+                    MemPct = r?.Last?.MemPct,
+                    TopProcesses = r?.Last?.TopProcesses ?? "",
+                    CriticalAlerts = alerts.Count(a => a.Level == "crit"),
+                    WarningAlerts = alerts.Count(a => a.Level != "crit"),
+                    LastAlert = latest is null ? "" : $"{latest.Time:dd/MM HH:mm} — {latest.Title}",
+                };
+            }).ToList();
+
+            var path = ParkReportGenerator.WriteToDisk(lines);
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            TxtStatus.Text = $"Rapport du parc généré : {path}";
+        }
+        catch (Exception ex)
+        {
+            TxtStatus.Text = "Échec de la génération du rapport : " + ex.Message;
+        }
+    }
+
+    private sealed record QueryResult(ParkMachine Machine, bool Ok, bool Active, FlightSample? Last, string Error)
+    {
+        /// <summary>Alertes préventives récupérées lors de la même interrogation.</summary>
+        public List<PreventiveAlert> Alerts { get; init; } = new();
+    }
 
     /// <summary>
     /// Construit une requête signée : le token sert de clé HMAC et ne quitte
@@ -143,7 +200,21 @@ public partial class ParkWindow : Window
             FlightSample? last = null;
             if (doc.RootElement.TryGetProperty("lastSample", out var ls) && ls.ValueKind == JsonValueKind.Object)
                 last = ls.Deserialize<FlightSample>();
-            return new(m, true, active, last, "");
+
+            // Alertes préventives des 7 derniers jours (best effort : une machine
+            // avec un service ancien n'expose pas encore cet endpoint).
+            var alerts = new List<PreventiveAlert>();
+            try
+            {
+                using var alertReq = SignedRequest(m, HttpMethod.Get, "/api/alerts", "days=7");
+                using var alertResp = await Http.SendAsync(alertReq);
+                if (alertResp.IsSuccessStatusCode)
+                    alerts = JsonSerializer.Deserialize<List<PreventiveAlert>>(
+                        await alertResp.Content.ReadAsStringAsync()) ?? new();
+            }
+            catch { }
+
+            return new(m, true, active, last, "") { Alerts = alerts };
         }
         catch (Exception ex)
         {

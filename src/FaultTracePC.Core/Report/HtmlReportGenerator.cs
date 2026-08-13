@@ -33,7 +33,7 @@ public static class HtmlReportGenerator
         ReliabilitySection(sb, r);
         ErrorsSection(sb, r);
 
-        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v0.5 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
+        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v1.0 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
         sb.Append("Les niveaux de confiance sont indiqués honnêtement : une confiance « faible » signale une piste, pas une preuve.</footer>");
         sb.Append("<script>").Append(FilterJs).Append("</script>");
         sb.Append("</body></html>");

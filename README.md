@@ -105,7 +105,19 @@ L'exe se trouve ensuite dans `src/FaultTracePC.App/bin/Release/net10.0-windows/w
       et enregistre/démarre le service. **Sécurité** : l'API distante passe en
       authentification par signature HMAC-SHA256 — le token ne circule plus sur le
       réseau, horodatage + nonce contre le rejeu.
-- [ ] v1.0 — Tests automatisés, graphiques dans le visualiseur, rapport de parc consolidé
+- [x] v1.0 — **Tests automatisés** (xUnit v3 : sécurité HMAC et filtrage RFC 1918,
+      parsing natif des dumps sur fichiers fabriqués, moteur de règles — dédoublonnage,
+      priorité au pilote identifié, piste virtualisation, surchauffe —, génération du
+      rapport et échappement) ; **courbes** dans le visualiseur (températures CPU/GPU
+      et mémoire, palette validée pour la vision des couleurs, repères d'incidents,
+      lecture au survol) ; **rapport de parc consolidé** (page HTML imprimable :
+      synthèse, état par machine, alertes, processus dominants).
+
+## Tests
+
+```powershell
+dotnet test          # depuis la racine de la solution
+```
 
 ## Déploiement
 

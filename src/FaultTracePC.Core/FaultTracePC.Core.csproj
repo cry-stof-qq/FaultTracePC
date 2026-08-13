@@ -12,6 +12,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Le projet de tests accède aux helpers internes (parsing de dumps, formatage). -->
+    <InternalsVisibleTo Include="FaultTracePC.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Accès WMI (Win32_OperatingSystem, Win32_DiskDrive, etc.) -->
     <PackageReference Include="System.Management" Version="10.0.10" />
     <!-- Lecture du journal d'événements Windows (EventLogQuery / EventLogReader) -->

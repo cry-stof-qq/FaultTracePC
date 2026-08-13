@@ -55,6 +55,9 @@
                 <TextBlock x:Name="TxtStatus" VerticalAlignment="Center" FontSize="12" Foreground="#44546A"
                            Text="Ajoute tes machines clientes (mode Client activé sur chacune via 🌐), puis Actualiser."/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="BtnParkReport" Content="📊 Rapport du parc" Padding="12,6"
+                            FontSize="12" Margin="0,0,8,0" Click="BtnParkReport_Click"
+                            ToolTip="Génère une page HTML récapitulant l'état de toutes les machines (imprimable, transmissible)."/>
                     <Button x:Name="BtnRemoteScan" Content="🩺 Lancer un diagnostic à distance" Padding="12,6"
                             FontSize="12" Margin="0,0,8,0" FontWeight="SemiBold"
                             Background="#2470B3" Foreground="White" BorderThickness="0"

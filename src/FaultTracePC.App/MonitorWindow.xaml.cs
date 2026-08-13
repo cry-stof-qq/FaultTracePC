@@ -1,14 +1,16 @@
 using System.IO;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 using FaultTracePC.Core;
 
 namespace FaultTracePC.App;
 
 /// <summary>
-/// Visualiseur du journal de la boîte noire, en trois vues :
+/// Visualiseur du journal de la boîte noire, en quatre vues :
 ///  - « En direct » : les derniers relevés, rafraîchis toutes les 5 s (mode simple) ;
+///  - « Courbes » : températures et mémoire tracées, avec repères d'incidents ;
 ///  - « Historique » : agrégation par heure sur 1 à 14 jours ;
 ///  - « Données brutes » : les lignes JSONL telles qu'écrites par le service (mode avancé).
 /// Bascule °C/°F pour toutes les vues.
@@ -26,6 +28,7 @@ public partial class MonitorWindow : Window
     {
         InitializeComponent();
         RefreshLive();
+        Loaded += (_, _) => DrawChart();
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _timer.Tick += (_, _) => RefreshLive();
         _timer.Start();
@@ -125,7 +128,166 @@ public partial class MonitorWindow : Window
     {
         RefreshLive();
         if (LvHist.ItemsSource is not null) BtnLoadHistory_Click(sender, e);
+        DrawChart();
     }
+
+    // ------------------------------------------------------------------
+    // Onglet « Courbes »
+    //
+    // Trois séries seulement (températures CPU/GPU et mémoire) : c'est le nombre
+    // maximal qui reste distinguable pour un daltonien sur toutes les paires.
+    // Couleurs issues d'une palette validée ; la légende nomme chaque série, donc
+    // l'identité ne repose jamais sur la couleur seule.
+    // ------------------------------------------------------------------
+
+    private static readonly System.Windows.Media.Color SeriesCpu = System.Windows.Media.Color.FromRgb(0x2A, 0x78, 0xD6);
+    private static readonly System.Windows.Media.Color SeriesGpu = System.Windows.Media.Color.FromRgb(0xEB, 0x68, 0x34);
+    private static readonly System.Windows.Media.Color SeriesMem = System.Windows.Media.Color.FromRgb(0x1B, 0xAF, 0x7A);
+
+    private List<FlightSample> _chartSamples = new();
+    private List<FlightSample> _chartEvents = new();
+    private double _chartMin, _chartMax;
+    private DateTime _chartStart, _chartEnd;
+
+    private void ChartRange_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => DrawChart();
+
+    private void ChartCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => DrawChart();
+
+    private int ChartHours =>
+        CmbChartHours?.SelectedItem is System.Windows.Controls.ComboBoxItem it &&
+        int.TryParse((string)it.Tag, out var h) ? h : 6;
+
+    private void DrawChart()
+    {
+        if (ChartCanvas is null || ChartCanvas.ActualWidth < 50) return;
+        ChartCanvas.Children.Clear();
+
+        var hours = ChartHours;
+        var since = DateTime.Now.AddHours(-hours);
+        var all = ReadEntries(hours / 24 + 2);
+        _chartSamples = all.Where(e => e.Kind == "s" && e.Time >= since).OrderBy(e => e.Time).ToList();
+        _chartEvents = all.Where(e => e.Kind == "e" && e.Time >= since).ToList();
+
+        if (_chartSamples.Count < 2)
+        {
+            AddText("Pas encore assez de relevés sur cette période — laisse la surveillance tourner quelques minutes.",
+                12, 12, System.Windows.Media.Brushes.Gray);
+            return;
+        }
+
+        double w = ChartCanvas.ActualWidth, h = ChartCanvas.ActualHeight;
+        const double padL = 46, padR = 12, padT = 12, padB = 24;
+        double plotW = Math.Max(10, w - padL - padR), plotH = Math.Max(10, h - padT - padB);
+
+        _chartStart = _chartSamples[0].Time;
+        _chartEnd = _chartSamples[^1].Time;
+        var span = Math.Max(1, (_chartEnd - _chartStart).TotalSeconds);
+
+        // Les valeurs affichées (converties si Fahrenheit) DOIVENT servir à calculer
+        // l'échelle, sinon les courbes sortent du cadre en °F.
+        double? CpuVal(FlightSample s) => UseFahrenheit && s.CpuTemp is { } c ? c * 9 / 5 + 32 : s.CpuTemp;
+        double? GpuVal(FlightSample s) => UseFahrenheit && s.GpuTemp is { } g ? g * 9 / 5 + 32 : s.GpuTemp;
+
+        // Échelle unique (un seul axe des ordonnées — jamais deux échelles).
+        var values = _chartSamples.SelectMany(s => new[] { CpuVal(s), GpuVal(s), s.MemPct })
+                                  .Where(v => v is not null).Select(v => v!.Value).ToList();
+        _chartMin = 0;
+        _chartMax = values.Count == 0 ? 100 : Math.Max(100, Math.Ceiling(values.Max() / 10) * 10);
+
+        double X(DateTime t) => padL + (t - _chartStart).TotalSeconds / span * plotW;
+        double Y(double v) => padT + plotH - (v - _chartMin) / (_chartMax - _chartMin) * plotH;
+
+        // Grille discrète + graduations
+        for (int i = 0; i <= 4; i++)
+        {
+            double v = _chartMin + (_chartMax - _chartMin) * i / 4.0;
+            double y = Y(v);
+            ChartCanvas.Children.Add(new System.Windows.Shapes.Line
+            {
+                X1 = padL, X2 = padL + plotW, Y1 = y, Y2 = y,
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE8, 0xED, 0xF3)),
+                StrokeThickness = 1,
+            });
+            AddText($"{v:0}", 6, y - 9, System.Windows.Media.Brushes.Gray, 11);
+        }
+        AddText(_chartStart.ToString("dd/MM HH:mm"), padL, padT + plotH + 4, System.Windows.Media.Brushes.Gray, 11);
+        var endLabel = _chartEnd.ToString("dd/MM HH:mm");
+        AddText(endLabel, padL + plotW - endLabel.Length * 6.5, padT + plotH + 4, System.Windows.Media.Brushes.Gray, 11);
+
+        // Repères verticaux des incidents (événements et alertes)
+        foreach (var ev in _chartEvents)
+        {
+            bool isAlert = ev.EventCategory?.StartsWith("ALERTE#", StringComparison.Ordinal) == true;
+            ChartCanvas.Children.Add(new System.Windows.Shapes.Line
+            {
+                X1 = X(ev.Time), X2 = X(ev.Time), Y1 = padT, Y2 = padT + plotH,
+                Stroke = new SolidColorBrush(isAlert
+                    ? System.Windows.Media.Color.FromRgb(0xE3, 0x49, 0x48)
+                    : System.Windows.Media.Color.FromRgb(0xED, 0xA1, 0x00)),
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 3, 3 },
+                Opacity = 0.8,
+            });
+        }
+
+        DrawSeries(CpuVal, SeriesCpu, X, Y);
+        DrawSeries(GpuVal, SeriesGpu, X, Y);
+        DrawSeries(s => s.MemPct, SeriesMem, X, Y);
+
+        TxtChartInfo.Text = $"{_chartSamples.Count} relevés du {_chartStart:dd/MM HH:mm} au {_chartEnd:dd/MM HH:mm}" +
+                            (_chartEvents.Count > 0 ? $" · {_chartEvents.Count} incident(s) en repères pointillés" : "") +
+                            " · survole pour lire les valeurs.";
+    }
+
+    private void DrawSeries(Func<FlightSample, double?> selector,
+                            System.Windows.Media.Color color,
+                            Func<DateTime, double> x, Func<double, double> y)
+    {
+        var points = new PointCollection();
+        foreach (var s in _chartSamples)
+        {
+            if (selector(s) is not { } v) continue;   // trou de mesure : on ne relie pas
+            points.Add(new System.Windows.Point(x(s.Time), y(v)));
+        }
+        if (points.Count < 2) return;
+
+        ChartCanvas.Children.Add(new System.Windows.Shapes.Polyline
+        {
+            Points = points,
+            Stroke = new SolidColorBrush(color),
+            StrokeThickness = 2,
+            StrokeLineJoin = PenLineJoin.Round,
+        });
+    }
+
+    private void AddText(string text, double left, double top,
+                         System.Windows.Media.Brush brush, double size = 12)
+    {
+        var tb = new System.Windows.Controls.TextBlock { Text = text, Foreground = brush, FontSize = size };
+        System.Windows.Controls.Canvas.SetLeft(tb, left);
+        System.Windows.Controls.Canvas.SetTop(tb, top);
+        ChartCanvas.Children.Add(tb);
+    }
+
+    // ---- Survol : valeurs sous le curseur ----
+
+    private void ChartCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_chartSamples.Count < 2 || ChartCanvas.ActualWidth < 50) return;
+
+        const double padL = 46, padR = 12;
+        double plotW = Math.Max(10, ChartCanvas.ActualWidth - padL - padR);
+        double ratio = Math.Clamp((e.GetPosition(ChartCanvas).X - padL) / plotW, 0, 1);
+        var target = _chartStart.AddSeconds(ratio * (_chartEnd - _chartStart).TotalSeconds);
+
+        var s = _chartSamples.OrderBy(x => Math.Abs((x.Time - target).TotalSeconds)).First();
+        TxtChartInfo.Text = $"{s.Time:dd/MM HH:mm:ss}  ·  CPU {Pct(s.CpuLoad)} % / {Temp(s.CpuTemp)}  ·  " +
+                            $"GPU {Temp(s.GpuTemp)}  ·  Mémoire {Pct(s.MemPct)} %  ·  Mém. virtuelle {Pct(s.CommitPct)} %" +
+                            (s.TopProcesses is not null ? $"  ·  {s.TopProcesses}" : "");
+    }
+
+    private void ChartCanvas_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) =>
+        TxtChartInfo.Text = $"{_chartSamples.Count} relevés · survole la courbe pour lire les valeurs.";
 
     // ------------------------------------------------------------------
     // Onglet « Historique » (agrégation par heure)

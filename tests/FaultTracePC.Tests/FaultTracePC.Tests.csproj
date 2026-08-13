@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- xUnit v3 : le projet de tests est un exécutable auto-lançable. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FaultTracePC.Core\FaultTracePC.Core.csproj" />
+  </ItemGroup>
+
+</Project>

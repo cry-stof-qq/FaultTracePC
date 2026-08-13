@@ -5,4 +5,7 @@
     <Project Path="src/FaultTracePC.Core/FaultTracePC.Core.csproj" />
     <Project Path="src/FaultTracePC.Monitor/FaultTracePC.Monitor.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FaultTracePC.Tests/FaultTracePC.Tests.csproj" />
+  </Folder>
 </Solution>

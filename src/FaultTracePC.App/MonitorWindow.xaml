@@ -49,7 +49,46 @@
                 </Grid>
             </TabItem>
 
-            <!-- Onglet 2 : historique agrégé par heure -->
+            <!-- Onglet 2 : courbes -->
+            <TabItem Header="  Courbes  ">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <WrapPanel Grid.Row="0" Margin="4,6">
+                        <TextBlock Text="Période :" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox x:Name="CmbChartHours" Width="130" SelectedIndex="1" VerticalAlignment="Center"
+                                  SelectionChanged="ChartRange_Changed">
+                            <ComboBoxItem Content="1 heure" Tag="1"/>
+                            <ComboBoxItem Content="6 heures" Tag="6"/>
+                            <ComboBoxItem Content="24 heures" Tag="24"/>
+                            <ComboBoxItem Content="7 jours" Tag="168"/>
+                        </ComboBox>
+                        <!-- Légende : identité jamais portée par la couleur seule -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
+                            <Rectangle Width="14" Height="3" Fill="#2A78D6" VerticalAlignment="Center"/>
+                            <TextBlock Text="Température CPU" Margin="5,0,16,0" FontSize="12" VerticalAlignment="Center"/>
+                            <Rectangle Width="14" Height="3" Fill="#EB6834" VerticalAlignment="Center"/>
+                            <TextBlock Text="Température GPU" Margin="5,0,16,0" FontSize="12" VerticalAlignment="Center"/>
+                            <Rectangle Width="14" Height="3" Fill="#1BAF7A" VerticalAlignment="Center"/>
+                            <TextBlock Text="Mémoire utilisée (%)" Margin="5,0,0,0" FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </WrapPanel>
+
+                    <Border Grid.Row="1" Background="White" BorderBrush="#DBE2EC" BorderThickness="1" Margin="4">
+                        <Canvas x:Name="ChartCanvas" ClipToBounds="True" SizeChanged="ChartCanvas_SizeChanged"
+                                Background="Transparent" MouseMove="ChartCanvas_MouseMove" MouseLeave="ChartCanvas_MouseLeave"/>
+                    </Border>
+
+                    <TextBlock x:Name="TxtChartInfo" Grid.Row="2" Margin="6,2,6,6" FontSize="12" Foreground="#44546A"
+                               Text="Survole la courbe pour lire les valeurs. Les incidents (alertes, événements) apparaissent en repères verticaux."/>
+                </Grid>
+            </TabItem>
+
+            <!-- Onglet 3 : historique agrégé par heure (tableau = vue alternative des courbes) -->
             <TabItem Header="  Historique  ">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -85,7 +124,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- Onglet 3 : données brutes (mode avancé) -->
+            <!-- Onglet 4 : données brutes (mode avancé) -->
             <TabItem Header="  Données brutes (avancé)  ">
                 <Grid>
                     <Grid.RowDefinitions>

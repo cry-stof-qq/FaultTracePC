@@ -56,7 +56,14 @@ public sealed class DumpCollector
         }
     }
 
-    private void AddDump(List<DumpFileInfo> dumps, string path, DumpKind kind)
+    private void AddDump(List<DumpFileInfo> dumps, string path, DumpKind kind) =>
+        dumps.Add(InspectFile(path, kind));
+
+    /// <summary>
+    /// Analyse un fichier dump isolé (taille, date, en-tête). Exposé en interne
+    /// pour permettre aux tests de travailler sur des dumps fabriqués.
+    /// </summary>
+    internal static DumpFileInfo InspectFile(string path, DumpKind kind)
     {
         var info = new DumpFileInfo { Path = path, Kind = kind };
         try
@@ -70,7 +77,7 @@ public sealed class DumpCollector
         {
             info.ParseError = ex.Message;
         }
-        dumps.Add(info);
+        return info;
     }
 
     private static void ParseHeader(DumpFileInfo info)
