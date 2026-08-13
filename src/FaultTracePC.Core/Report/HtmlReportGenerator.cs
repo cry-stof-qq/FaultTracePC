@@ -20,6 +20,7 @@ public static class HtmlReportGenerator
 
         Header(sb, r);
         VerdictBanner(sb, r);
+        ComparisonSection(sb, r);
         Findings(sb, r);
         RepairSection(sb, r);
         BsodSection(sb, r);
@@ -31,7 +32,7 @@ public static class HtmlReportGenerator
         ReliabilitySection(sb, r);
         ErrorsSection(sb, r);
 
-        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v0.3 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
+        sb.Append($"<footer>Généré par <strong>FaultTracePC</strong> v0.4 le {r.GeneratedAt:dd/MM/yyyy à HH:mm} — période analysée : {r.ScanPeriodDays} jours. ");
         sb.Append("Les niveaux de confiance sont indiqués honnêtement : une confiance « faible » signale une piste, pas une preuve.</footer>");
         sb.Append("<script>").Append(FilterJs).Append("</script>");
         sb.Append("</body></html>");
@@ -69,6 +70,30 @@ public static class HtmlReportGenerator
         var cls = r.Findings.Any(f => f.Severity == Severity.Critical) ? "crit"
                 : r.Findings.Any(f => f.Severity == Severity.Warning) ? "warn" : "ok";
         sb.Append($"<div class=\"verdict {cls}\"><div class=\"verdict-label\">Verdict</div><div class=\"verdict-text\">{H(r.Verdict)}</div></div>");
+    }
+
+    /// <summary>Évolution depuis le scan précédent — la réponse à « est-ce que c'est réparé ? ».</summary>
+    private static void ComparisonSection(StringBuilder sb, DiagnosticReport r)
+    {
+        var c = r.Comparison;
+        if (c is null) return;
+
+        sb.Append("<section><h2>Évolution depuis le dernier scan</h2>");
+        sb.Append($"<div class=\"card {(c.Tone == "ok" ? "okcard" : c.Tone)}\">");
+        sb.Append($"<h3>{H(c.Assessment)}</h3>");
+
+        var items = new List<string>();
+        items.Add(c.NewBsodCount == 0
+            ? "✅ Aucun nouveau crash système"
+            : $"❌ {c.NewBsodCount} nouveau(x) crash(s) : {H(string.Join(" · ", c.NewBsods))}");
+        if (c.NewWheaEvents > 0) items.Add($"⚠️ {c.NewWheaEvents} nouvelle(s) erreur(s) matérielle(s) WHEA");
+        if (c.NewDiskErrorEvents > 0) items.Add($"⚠️ {c.NewDiskErrorEvents} nouvelle(s) erreur(s) disque");
+        if (c.DriverUpdates.Count > 0) items.Add($"🔄 Pilotes mis à jour : {H(string.Join(" · ", c.DriverUpdates))}");
+        if (c.DiskChanges.Count > 0) items.Add($"💽 Disques : {H(string.Join(" · ", c.DiskChanges))}");
+        if (!string.IsNullOrEmpty(c.MemoryTrend)) items.Add($"🧠 {H(c.MemoryTrend)}");
+
+        sb.Append("<p>").Append(string.Join("<br>", items)).Append("</p>");
+        sb.Append("</div></section>");
     }
 
     private static void Findings(StringBuilder sb, DiagnosticReport r)
@@ -447,6 +472,7 @@ public static class HtmlReportGenerator
         .verdict-text{font-size:16px;font-weight:600}
         .card{background:#fff;border:1px solid #dbe2ec;border-left-width:5px;border-radius:8px;padding:14px 18px;margin-bottom:12px}
         .card.crit{border-left-color:#e74c3c}.card.warn{border-left-color:#e67e22}.card.info{border-left-color:#2980b9}
+        .card.okcard{border-left-color:#27ae60;background:#f4fbf7}
         .card h3{margin:8px 0 6px;font-size:16px}
         .card p{margin:4px 0;font-size:14px}
         .card .reco{background:#f4f8fb;border-radius:6px;padding:8px 10px;margin-top:8px}

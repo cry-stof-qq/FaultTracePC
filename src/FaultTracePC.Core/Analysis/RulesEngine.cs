@@ -293,13 +293,21 @@ public sealed class RulesEngine
                              .Where(p => !string.IsNullOrEmpty(p)).Distinct().ToList();
 
             string reco;
-            if (isMicrosoft)
+            var kb = DriverKnowledgeBase.Lookup(g.Key);
+            if (kb is not null)
             {
-                reco = $"{g.Key} est un composant de Windows : la correction passe par Windows Update "
-                     + "(et « wsl --update » s'il est lié à la virtualisation WSL/conteneurs), pas par un site d'éditeur. "
+                // Signature connue : contexte et correctif précis, éprouvés.
+                invInfo += $" [{kb.Owner}] {kb.Context}";
+                reco = kb.Fix
+                     + (updatedSince ? " Note : le pilote a déjà été mis à jour depuis le dernier crash — le correctif est peut-être déjà en place ; surveiller." : "");
+            }
+            else if (isMicrosoft)
+            {
+                reco = $"{g.Key} est un composant de Windows : la correction passe par Windows Update, pas par un site d'éditeur. "
+                     + "Le script de réparation vérifie et applique lui-même ces mises à jour (WSL, Windows Update) et t'affiche le résultat. "
                      + (updatedSince
                          ? "Bonne nouvelle : le pilote a été mis à jour depuis le dernier crash — le correctif est peut-être déjà en place ; surveiller si le crash se reproduit."
-                         : "Vérifier que Windows est à jour ; si le crash persiste système à jour, limiter la charge du composant déclencheur en attendant un correctif Microsoft.");
+                         : "Si le crash persiste système à jour, limiter la charge du composant déclencheur en attendant un correctif Microsoft.");
             }
             else
             {

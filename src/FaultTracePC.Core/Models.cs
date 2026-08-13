@@ -248,6 +248,27 @@ public sealed class DiagnosticReport
     public string? RepairScriptPath { get; set; }
     /// <summary>Lanceur .bat à double-clic (élévation UAC + ExecutionPolicy Bypass automatiques).</summary>
     public string? RepairLauncherPath { get; set; }
+    /// <summary>Comparaison avec le scan précédent (null au premier scan).</summary>
+    public ScanComparison? Comparison { get; set; }
+}
+
+/// <summary>Résultat de la comparaison avec le scan précédent — la boucle « est-ce réparé ? ».</summary>
+public sealed class ScanComparison
+{
+    public DateTime PreviousScanAt { get; set; }
+    /// <summary>Phrase de synthèse : réparation efficace / problème persistant / stable…</summary>
+    public string Assessment { get; set; } = "";
+    /// <summary>Tonalité pour l'affichage : ok / warn / crit.</summary>
+    public string Tone { get; set; } = "ok";
+    public int NewBsodCount { get; set; }
+    public List<string> NewBsods { get; set; } = new();
+    /// <summary>true si un nouveau crash a la même signature (code/pilote) qu'avant.</summary>
+    public bool SameSignatureRecurred { get; set; }
+    public List<string> DriverUpdates { get; set; } = new();
+    public List<string> DiskChanges { get; set; } = new();
+    public int NewDiskErrorEvents { get; set; }
+    public int NewWheaEvents { get; set; }
+    public string MemoryTrend { get; set; } = "";
 }
 
 public sealed class ScanOptions

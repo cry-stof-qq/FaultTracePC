@@ -53,8 +53,16 @@ public sealed class ScanOrchestrator
         }
         ct.ThrowIfCancellationRequested();
 
-        Step(progress, "Corrélation et diagnostic…", 92);
+        Step(progress, "Corrélation et diagnostic…", 90);
         new RulesEngine().Analyze(report);
+
+        Step(progress, "Comparaison avec le scan précédent…", 96);
+        try
+        {
+            report.Comparison = Report.ScanHistory.CompareWithPrevious(report, errors);
+            Report.ScanHistory.Save(report, errors);
+        }
+        catch (Exception ex) { errors.Add($"Historique des scans : {ex.Message}"); }
 
         Step(progress, "Terminé.", 100);
         return report;

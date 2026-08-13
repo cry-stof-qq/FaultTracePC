@@ -70,6 +70,19 @@ public static class RepairScriptGenerator
         if (cats.Contains(FaultCategory.Software) || cats.Contains(FaultCategory.WindowsUpdate) ||
             cats.Contains(FaultCategory.Driver) || hasBsod)
         {
+            // Vérifications EXÉCUTÉES (pas seulement conseillées) : l'utilisateur voit
+            // directement « déjà à jour » ou « mise à jour appliquée » — pas de conseil inutile.
+            sb.AppendLine("Section 'Mises à jour des composants (vérification automatique)'");
+            sb.AppendLine("if (Get-Command wsl -ErrorAction SilentlyContinue) {");
+            sb.AppendLine("    Write-Host 'Vérification/mise à jour de WSL (virtualisation) :'");
+            sb.AppendLine("    wsl --update");
+            sb.AppendLine("}");
+            sb.AppendLine("Write-Host 'Dernières mises à jour Windows installées :'");
+            sb.AppendLine("Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 5 HotFixID, Description, InstalledOn | Format-Table -AutoSize");
+            sb.AppendLine("if (Ask 'Ouvrir Windows Update pour rechercher les mises à jour en attente') {");
+            sb.AppendLine("    Start-Process 'ms-settings:windowsupdate-action'");
+            sb.AppendLine("}");
+            sb.AppendLine();
             sb.AppendLine("Section 'Intégrité des fichiers système'");
             sb.AppendLine("if (Ask 'Lancer sfc /scannow (vérifie et répare les fichiers système, ~10 min)') {");
             sb.AppendLine("    sfc /scannow");

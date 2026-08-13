@@ -71,5 +71,10 @@ L'exe se trouve ensuite dans `src/FaultTracePC.App/bin/Release/net10.0-windows/w
       signature de crash (FAILURE_BUCKET_ID), pile d'appels dépliable dans le
       rapport, récurrence par pilote, interprétation des verdicts
       « memory_corruption »/« ntoskrnl » ; cache de symboles local
+- [x] v0.4 — Suivi avant/après réparation (historique JSON des scans dans
+      `Documents\FaultTracePC\Historique`, comparaison automatique : nouveaux crashs,
+      récurrence de signature, pilotes mis à jour, évolution disques/mémoire, verdict
+      d'efficacité) + base de signatures de ~30 pilotes connus (GPU, réseau, stockage,
+      antivirus, anti-triche, RGB, virtualisation) avec correctifs ciblés
 - [ ] Phase 3 — Service de surveillance temps réel (journal circulaire + capteurs de température)
 - [ ] Phase 4 — Finitions GUI, installateur
