@@ -83,4 +83,10 @@ L'exe se trouve ensuite dans `src/FaultTracePC.App/bin/Release/net10.0-windows/w
       `C:\ProgramData\FaultTracePC\Flight`). Installation/désinstallation en 1 clic
       depuis l'app (bouton 📡). Le scan lit le journal et affiche les dernières
       secondes avant chaque crash + règles surchauffe/saturation au moment du crash.
-- [ ] Phase 4 — Finitions GUI, installateur, mode CLI/parc
+- [x] v0.6 — Mode réseau : « Client » (API HTTP en lecture seule dans le service —
+      statut temps réel, journal boîte noire, rapports partagés — double verrou :
+      adresses privées RFC 1918 uniquement ET token 256 bits, plus règle de pare-feu
+      restreinte aux mêmes plages) et console « 🖥 Parc » (mode maître : état de
+      toutes les machines clientes, ouverture des rapports distants). Rien n'est
+      accessible depuis Internet ; aucune écriture ni exécution à distance.
+- [ ] Phase 4 — Finitions GUI, installateur, mode CLI

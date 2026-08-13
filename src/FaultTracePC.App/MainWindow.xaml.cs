@@ -184,6 +184,12 @@ public partial class MainWindow : Window
         new MonitorWindow { Owner = this }.Show();
     }
 
+    private void BtnNetwork_Click(object sender, RoutedEventArgs e) =>
+        new RemoteConfigWindow { Owner = this }.ShowDialog();
+
+    private void BtnPark_Click(object sender, RoutedEventArgs e) =>
+        new ParkWindow { Owner = this }.Show();
+
     private void BtnOpenReport_Click(object sender, RoutedEventArgs e)
     {
         if (_lastReportPath is not null) OpenInBrowser(_lastReportPath);

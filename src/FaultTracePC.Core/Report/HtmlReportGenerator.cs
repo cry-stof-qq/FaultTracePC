@@ -53,6 +53,15 @@ public static class HtmlReportGenerator
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, $"Diagnostic_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.html");
         File.WriteAllText(path, Generate(r), Encoding.UTF8);
+
+        // Copie vers le dossier partagé (servi par l'API du mode Client) — best effort.
+        try
+        {
+            Directory.CreateDirectory(RemoteConfig.SharedReportsDir);
+            File.Copy(path, Path.Combine(RemoteConfig.SharedReportsDir, Path.GetFileName(path)), overwrite: true);
+        }
+        catch { /* partage indisponible : le rapport local reste la référence */ }
+
         return path;
     }
 

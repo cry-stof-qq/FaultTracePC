@@ -12,4 +12,6 @@ using Microsoft.Extensions.Hosting;
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddWindowsService(options => options.ServiceName = "FaultTracePCMonitor");
 builder.Services.AddHostedService<FlightRecorderService>();
+// API de télémétrie (mode Client uniquement — s'endort en mode Local).
+builder.Services.AddHostedService<TelemetryService>();
 builder.Build().Run();

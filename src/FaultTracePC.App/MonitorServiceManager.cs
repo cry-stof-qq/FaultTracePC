@@ -54,23 +54,66 @@ public static class MonitorServiceManager
         return candidates.FirstOrDefault(File.Exists);
     }
 
+    /// <summary>Dossier de déploiement stable du service — JAMAIS le dossier de build,
+    /// sinon le service en cours d'exécution verrouille les DLL et bloque toute recompilation.</summary>
+    private static string DeployDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                     "FaultTracePC", "Service");
+
     public static (bool Ok, string Message) InstallAndStart()
     {
-        var exe = FindMonitorExe();
-        if (exe is null)
+        var sourceExe = FindMonitorExe();
+        if (sourceExe is null)
             return (false, "FaultTracePC.Monitor.exe introuvable. Compile d'abord la solution complète (dotnet build), ou publie les deux projets dans le même dossier.");
 
-        var (code, output) = RunSc($"create {ServiceName} binPath= \"{exe}\" start= auto DisplayName= \"FaultTracePC — Surveillance temps réel\"");
-        if (code != 0 && !output.Contains("1073")) // 1073 = existe déjà
-            return (false, $"Échec de l'installation du service : {output.Trim()}");
+        bool alreadyInstalled = GetState() != MonitorState.NotInstalled;
 
-        RunSc($"description {ServiceName} \"Boîte noire FaultTracePC : journal continu (températures, mémoire, événements) pour retrouver les secondes précédant un crash.\"");
-        RunSc($"failure {ServiceName} reset= 86400 actions= restart/60000/restart/60000/restart/60000");
+        // Mise à jour : arrêter l'instance en cours pour libérer les fichiers déployés.
+        if (GetState() == MonitorState.Running)
+        {
+            RunSc($"stop {ServiceName}");
+            Thread.Sleep(2000);
+        }
+
+        // Copie du build vers le dossier stable (réessai une fois si un fichier est encore tenu).
+        try { CopyDirectory(Path.GetDirectoryName(sourceExe)!, DeployDir); }
+        catch (IOException)
+        {
+            Thread.Sleep(2000);
+            try { CopyDirectory(Path.GetDirectoryName(sourceExe)!, DeployDir); }
+            catch (Exception ex) { return (false, $"Impossible de déployer le service vers {DeployDir} : {ex.Message}"); }
+        }
+        catch (Exception ex) { return (false, $"Impossible de déployer le service vers {DeployDir} : {ex.Message}"); }
+
+        var deployedExe = Path.Combine(DeployDir, "FaultTracePC.Monitor.exe");
+
+        if (!alreadyInstalled)
+        {
+            var (code, output) = RunSc($"create {ServiceName} binPath= \"{deployedExe}\" start= auto DisplayName= \"FaultTracePC — Surveillance temps réel\"");
+            if (code != 0 && !output.Contains("1073")) // 1073 = existe déjà
+                return (false, $"Échec de l'installation du service : {output.Trim()}");
+            RunSc($"description {ServiceName} \"Boîte noire FaultTracePC : journal continu (températures, mémoire, événements) pour retrouver les secondes précédant un crash.\"");
+            RunSc($"failure {ServiceName} reset= 86400 actions= restart/60000/restart/60000/restart/60000");
+        }
+        else
+        {
+            // Service existant (peut-être enregistré sur un ancien chemin) : on repointe vers le déploiement stable.
+            RunSc($"config {ServiceName} binPath= \"{deployedExe}\" start= auto");
+        }
 
         var (startCode, startOut) = RunSc($"start {ServiceName}");
         return startCode == 0 || startOut.Contains("1056") // 1056 = déjà démarré
-            ? (true, "Surveillance temps réel installée et démarrée. Le journal s'écrit dans C:\\ProgramData\\FaultTracePC\\Flight.")
+            ? (true, $"Surveillance {(alreadyInstalled ? "mise à jour" : "installée")} et démarrée depuis {DeployDir}. Journal : C:\\ProgramData\\FaultTracePC\\Flight.")
             : (false, $"Service installé mais démarrage en échec : {startOut.Trim()}");
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var file in Directory.EnumerateFiles(source))
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), overwrite: true);
+        foreach (var dir in Directory.EnumerateDirectories(source))
+            CopyDirectory(dir, Path.Combine(destination, Path.GetFileName(dir)));
     }
 
     public static (bool Ok, string Message) StopAndUninstall()
@@ -88,6 +131,44 @@ public static class MonitorServiceManager
     {
         var (code, output) = RunSc($"start {ServiceName}");
         return code == 0 ? (true, "Surveillance démarrée.") : (false, output.Trim());
+    }
+
+    /// <summary>Redémarre le service (nécessaire après un changement de configuration réseau).</summary>
+    public static void Restart()
+    {
+        RunSc($"stop {ServiceName}");
+        Thread.Sleep(2000);
+        RunSc($"start {ServiceName}");
+    }
+
+    // ------------------------------------------------------------------
+    // Pare-feu : règle entrante limitée aux plages privées (défense en profondeur,
+    // en plus du double contrôle IP+token effectué par le service lui-même).
+    // ------------------------------------------------------------------
+
+    private const string FirewallRuleName = "FaultTracePC Telemetry";
+
+    public static void EnsureFirewallRule(int port)
+    {
+        RunNetsh($"advfirewall firewall delete rule name=\"{FirewallRuleName}\"");
+        RunNetsh($"advfirewall firewall add rule name=\"{FirewallRuleName}\" dir=in action=allow protocol=TCP localport={port} " +
+                 "remoteip=127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16");
+    }
+
+    public static void RemoveFirewallRule() =>
+        RunNetsh($"advfirewall firewall delete rule name=\"{FirewallRuleName}\"");
+
+    private static void RunNetsh(string args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("netsh.exe", args)
+            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            using var p = Process.Start(psi)!;
+            p.StandardOutput.ReadToEnd();
+            p.WaitForExit(10000);
+        }
+        catch { /* best effort — le service refuse de toute façon les IP non privées */ }
     }
 
     private static (int ExitCode, string Output) RunSc(string args)

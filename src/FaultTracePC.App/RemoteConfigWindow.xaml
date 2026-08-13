@@ -1,0 +1,68 @@
+<Window x:Class="FaultTracePC.App.RemoteConfigWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FaultTracePC — Mode réseau"
+        Width="640" Height="480" MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F9">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="🌐 Mode réseau de cette machine" FontSize="17" FontWeight="SemiBold"/>
+
+        <StackPanel Grid.Row="1" Margin="0,14,0,0">
+            <RadioButton x:Name="RbLocal" Content="Local — rien n'est exposé sur le réseau (défaut, recommandé pour un poste isolé)"
+                         GroupName="Mode" FontSize="13" Margin="0,4"/>
+            <RadioButton x:Name="RbClient" Content="Client — cette machine publie sa télémétrie et ses rapports en LECTURE SEULE"
+                         GroupName="Mode" FontSize="13" Margin="0,4"/>
+        </StackPanel>
+
+        <Grid Grid.Row="2" Margin="24,10,0,0" x:Name="PnlClient">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Port TCP :" VerticalAlignment="Center" Margin="0,0,8,8"/>
+            <TextBox x:Name="TxtPort" Grid.Row="0" Grid.Column="1" Width="90" HorizontalAlignment="Left"
+                     VerticalAlignment="Center" Margin="0,0,0,8"/>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Token :" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox x:Name="TxtToken" Grid.Row="1" Grid.Column="1" IsReadOnly="True" FontFamily="Consolas"
+                     FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                <Button Content="Générer" Padding="10,4" Click="BtnGenerate_Click"/>
+                <Button Content="Copier" Padding="10,4" Margin="6,0,0,0" Click="BtnCopyToken_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="3" Background="#FFFBE9" BorderBrush="#E8D9A0" BorderThickness="1" CornerRadius="8"
+                Padding="12" Margin="0,14,0,0" VerticalAlignment="Top">
+            <TextBlock FontSize="12" TextWrapping="Wrap">
+                <Bold>Sécurité du mode Client :</Bold> l'API est en lecture seule et refuse toute requête
+                qui ne vient pas d'une adresse privée (127.0.0.1, 10.x, 172.16-31.x, 192.168.x) <Bold>ou</Bold>
+                qui ne présente pas le token — les deux verrous sont exigés. Une règle de pare-feu limitée à
+                ces mêmes plages est ajoutée en plus. Rien n'est accessible depuis Internet.<LineBreak/><LineBreak/>
+                <Bold>Côté machine « maître » :</Bold> ouvre la console 🖥 Parc, ajoute cette machine avec
+                son nom d'hôte (ou IP), le port et ce token.
+            </TextBlock>
+        </Border>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <TextBlock x:Name="TxtStatus" VerticalAlignment="Center" Margin="0,0,14,0" FontSize="12" Foreground="#44546A"/>
+            <Button Content="Appliquer" Padding="16,7" FontWeight="SemiBold" Background="#2470B3" Foreground="White"
+                    BorderThickness="0" Click="BtnApply_Click"/>
+            <Button Content="Fermer" Padding="16,7" Margin="8,0,0,0" Click="BtnClose_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

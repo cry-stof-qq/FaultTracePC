@@ -36,6 +36,12 @@
                 <Button x:Name="BtnViewer" Content="📈  Voir en direct" Padding="14,9" Margin="12,0,0,6"
                         FontSize="13" Cursor="Hand" Click="BtnViewer_Click"
                         ToolTip="Ouvre le visualiseur du journal : relevés en direct (CPU, températures), historique sur plusieurs jours, données brutes, bascule °C/°F."/>
+                <Button x:Name="BtnNetwork" Content="🌐  Réseau" Padding="14,9" Margin="12,0,0,6"
+                        FontSize="13" Cursor="Hand" Click="BtnNetwork_Click"
+                        ToolTip="Mode réseau de cette machine : Local (rien d'exposé) ou Client (télémétrie et rapports en lecture seule, réservés aux adresses privées munies du token)."/>
+                <Button x:Name="BtnPark" Content="🖥  Parc" Padding="14,9" Margin="12,0,0,6"
+                        FontSize="13" Cursor="Hand" Click="BtnPark_Click"
+                        ToolTip="Console maître : état temps réel et rapports de toutes tes machines clientes."/>
                 <TextBlock Text="Période :" VerticalAlignment="Center" Margin="18,0,6,6"/>
                 <ComboBox x:Name="CmbDays" Width="110" VerticalAlignment="Center" SelectedIndex="1" Margin="0,0,0,6">
                     <ComboBoxItem Content="7 jours" Tag="7"/>
