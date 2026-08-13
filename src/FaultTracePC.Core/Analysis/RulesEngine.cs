@@ -155,11 +155,15 @@ public sealed class RulesEngine
             if (entry is not null) details += " " + entry.Description;
             if (drivers.Count > 0) details += $" Pilote suspect : {string.Join(", ", drivers)}.";
 
+            // Si l'analyse symbolique a nommé un pilote pour TOUS les incidents du groupe,
+            // la catégorie de la cause est « Pilote », pas celle générique du code STOP.
+            bool allDriverIdentified = group.All(b => b.SuspectDriver is not null &&
+                                                     !KernelPseudoModules.Contains(b.SuspectDriver));
             r.Findings.Add(new Finding
             {
                 Severity = Severity.Critical,
                 Confidence = n >= 2 ? Confidence.High : Confidence.Medium,
-                Category = entry?.Category ?? FaultCategory.Driver,
+                Category = allDriverIdentified ? FaultCategory.Driver : entry?.Category ?? FaultCategory.Driver,
                 Title = n >= 2
                     ? $"BSOD récurrent : {BugCheckCatalog.NameOf(group.Key)} ({n}×)"
                     : $"BSOD : {BugCheckCatalog.NameOf(group.Key)}",
@@ -206,7 +210,11 @@ public sealed class RulesEngine
 
     private static void AnalyzeMemory(DiagnosticReport r)
     {
-        var memBsods = r.Bsods.Where(b => b.BugCheckCode is 0x1A or 0x50 or 0x4E or 0x12B).ToList();
+        // Les incidents dont l'analyse symbolique a nommé un vrai pilote ne comptent PAS
+        // comme suspicion RAM : leur cause est connue, inutile d'inquiéter sur le matériel.
+        var memBsods = r.Bsods.Where(b => b.BugCheckCode is 0x1A or 0x50 or 0x4E or 0x12B &&
+                                          (b.SuspectDriver is null || KernelPseudoModules.Contains(b.SuspectDriver)))
+                              .ToList();
         var diagErrors = r.Events.Any(e => e.Category == EventCategory.MemoryDiag &&
                                            e.Extracted.GetValueOrDefault("HasErrors") == "True");
         var diagOk = r.Events.Any(e => e.Category == EventCategory.MemoryDiag &&
@@ -274,6 +282,33 @@ public sealed class RulesEngine
             var invInfo = inv is null ? ""
                 : $" Pilote installé : {inv.DisplayName} — {inv.CompanyName} v{inv.FileVersion}"
                   + (inv.FileDate is { } fd ? $" du {fd:dd/MM/yyyy}" : "") + ".";
+            bool isMicrosoft = inv?.IsMicrosoft ?? false;
+
+            // Le pilote a-t-il été mis à jour APRÈS le dernier crash ? Si oui, le correctif
+            // est peut-être déjà en place — information précieuse, on la donne.
+            var lastCrash = g.Max(d => d.CrashTimeFromHeader ?? d.LastWriteTime);
+            bool updatedSince = inv?.FileDate is { } fdate && fdate > lastCrash;
+
+            var processes = g.Select(d => d.CrashProcessName)
+                             .Where(p => !string.IsNullOrEmpty(p)).Distinct().ToList();
+
+            string reco;
+            if (isMicrosoft)
+            {
+                reco = $"{g.Key} est un composant de Windows : la correction passe par Windows Update "
+                     + "(et « wsl --update » s'il est lié à la virtualisation WSL/conteneurs), pas par un site d'éditeur. "
+                     + (updatedSince
+                         ? "Bonne nouvelle : le pilote a été mis à jour depuis le dernier crash — le correctif est peut-être déjà en place ; surveiller si le crash se reproduit."
+                         : "Vérifier que Windows est à jour ; si le crash persiste système à jour, limiter la charge du composant déclencheur en attendant un correctif Microsoft.");
+            }
+            else
+            {
+                reco = $"Mettre à jour {g.Key} depuis le site de l'éditeur"
+                     + (inv is not null && !string.IsNullOrEmpty(inv.CompanyName) ? $" ({inv.CompanyName})" : "")
+                     + ", ou désinstaller le logiciel associé s'il ne sert plus. "
+                     + "Si le crash persiste avec la dernière version, revenir à une version antérieure stable."
+                     + (updatedSince ? " Note : le pilote a déjà été mis à jour depuis le dernier crash — le problème est peut-être déjà résolu." : "");
+            }
 
             r.Findings.Add(new Finding
             {
@@ -285,11 +320,10 @@ public sealed class RulesEngine
                     : $"Pilote fautif identifié : {g.Key}",
                 Details = $"L'analyse symbolique WinDbg (!analyze) désigne {g.Key} dans {g.Count()} dump(s)."
                           + (g.First().FailureBucket is { } b ? $" Signature : {b}." : "")
-                          + invInfo,
-                Recommendation = $"Mettre à jour {g.Key} depuis le site de l'éditeur"
-                               + (inv is not null && !string.IsNullOrEmpty(inv.CompanyName) ? $" ({inv.CompanyName})" : "")
-                               + ", ou désinstaller le logiciel associé s'il ne sert plus. "
-                               + "Si le crash persiste avec la dernière version, revenir à une version antérieure stable."
+                          + (processes.Count > 0 ? $" Processus déclencheur : {string.Join(", ", processes)}." : "")
+                          + invInfo
+                          + (updatedSince ? $" ⚠ Le pilote a été mis à jour APRÈS le dernier crash ({lastCrash:dd/MM/yyyy})." : ""),
+                Recommendation = reco
             });
         }
 
@@ -659,6 +693,17 @@ public sealed class RulesEngine
             var w = warnings.First();
             r.VerdictCategory = w.Category;
             r.Verdict = $"Pas de panne critique, mais des points de vigilance — le plus notable : {w.Title}.";
+            return;
+        }
+
+        // Priorité à la preuve la plus forte : un pilote nommé par l'analyse symbolique
+        // l'emporte sur les catégories déduites des seuls codes STOP.
+        var identified = critical.FirstOrDefault(f => f.Title.StartsWith("Pilote fautif identifié", StringComparison.Ordinal));
+        if (identified is not null)
+        {
+            r.VerdictCategory = FaultCategory.Driver;
+            var name = identified.Title.Split(':').Length > 1 ? identified.Title.Split(':')[1].Split('—')[0].Trim() : "";
+            r.Verdict = $"Cause identifiée : PILOTE {name} (analyse symbolique des dumps — voir la conclusion dédiée pour la marche à suivre). ({critical.Count} conclusion(s) critique(s))";
             return;
         }
 
