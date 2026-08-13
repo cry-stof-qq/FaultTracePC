@@ -42,6 +42,9 @@
                 <Button x:Name="BtnPark" Content="🖥  Parc" Padding="14,9" Margin="12,0,0,6"
                         FontSize="13" Cursor="Hand" Click="BtnPark_Click"
                         ToolTip="Console maître : état temps réel et rapports de toutes tes machines clientes."/>
+                <Button x:Name="BtnToolbox" Content="🧰  Outils" Padding="14,9" Margin="12,0,0,6"
+                        FontSize="13" Cursor="Hand" Click="BtnToolbox_Click"
+                        ToolTip="Boîte à outils de réparation : désinstaller une mise à jour Windows, réinitialiser Windows Update, sfc/DISM/chkdsk, diagnostic mémoire… à un clic, dans une fenêtre PowerShell visible."/>
                 <TextBlock Text="Période :" VerticalAlignment="Center" Margin="18,0,6,6"/>
                 <ComboBox x:Name="CmbDays" Width="110" VerticalAlignment="Center" SelectedIndex="1" Margin="0,0,0,6">
                     <ComboBoxItem Content="7 jours" Tag="7"/>

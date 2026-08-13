@@ -262,6 +262,9 @@ public partial class MainWindow : Window
     private void BtnPark_Click(object sender, RoutedEventArgs e) =>
         new ParkWindow { Owner = this }.Show();
 
+    private void BtnToolbox_Click(object sender, RoutedEventArgs e) =>
+        new RepairToolboxWindow { Owner = this }.Show();
+
     private void BtnOpenReport_Click(object sender, RoutedEventArgs e)
     {
         if (_lastReportPath is not null) OpenInBrowser(_lastReportPath);
