@@ -20,6 +20,8 @@ public sealed class RulesEngine
         AnalyzeMemory(r);
         AnalyzeResourceExhaustion(r);
         AnalyzeMemoryPressureNow(r);
+        AnalyzeVirtualizationMemory(r);
+        AnalyzeDumpWindow(r);
         AnalyzeStorage(r);
         AnalyzeGpu(r);
         AnalyzePowerLoss(r);
@@ -109,7 +111,20 @@ public sealed class RulesEngine
                 i.SuspectDriver = drv;
         }
 
-        return incidents.OrderByDescending(i => i.TimeLocal).ToList();
+        // Dédoublonnage : un même crash apparaît souvent deux fois (Minidump + MEMORY.DMP,
+        // et parfois l'événement 1001). Même code + horodatages à moins de 5 min = un seul incident.
+        var deduped = new List<BsodIncident>();
+        foreach (var i in incidents.OrderByDescending(x => x.TimeLocal))
+        {
+            var dup = deduped.FirstOrDefault(x =>
+                x.BugCheckCode == i.BugCheckCode &&
+                Math.Abs((x.TimeLocal - i.TimeLocal).TotalMinutes) < 5);
+            if (dup is null) { deduped.Add(i); continue; }
+            foreach (var s in i.Sources.Where(s => !dup.Sources.Contains(s))) dup.Sources.Add(s);
+            dup.SuspectDriver ??= i.SuspectDriver;
+            dup.DumpPath ??= i.DumpPath;
+        }
+        return deduped;
     }
 
     private static uint? ParseHex(string? s)
@@ -211,16 +226,24 @@ public sealed class RulesEngine
         }
         else if (memBsods.Count >= 2)
         {
+            // Nuance importante : si la virtualisation monopolise la RAM, la piste
+            // logicielle est au moins aussi crédible que la RAM physique — on le dit.
+            bool vmHeavy = VirtualizationBytes(r) > (long)r.System.Os.TotalVisibleMemoryKB * 1024 / 5;
             r.Findings.Add(new Finding
             {
                 Severity = Severity.Critical,
-                Confidence = Confidence.Medium,
+                Confidence = vmHeavy ? Confidence.Low : Confidence.Medium,
                 Category = FaultCategory.Memory,
-                Title = "Suspicion de RAM défectueuse (BSOD mémoire récurrents)",
+                Title = vmHeavy
+                    ? "BSOD mémoire récurrents — RAM défectueuse OU pénurie causée par la virtualisation"
+                    : "Suspicion de RAM défectueuse (BSOD mémoire récurrents)",
                 Details = $"{memBsods.Count} BSOD de type mémoire (MEMORY_MANAGEMENT / PAGE_FAULT…) sur la période."
                           + (diagOk ? " Le dernier diagnostic mémoire Windows n'avait rien détecté — MemTest86 est plus sensible." : "")
+                          + (vmHeavy ? " ATTENTION : la virtualisation (vmmem) réserve une grosse part de la RAM — voir la conclusion dédiée ; un manque de mémoire peut produire ces mêmes écrans bleus sans que la RAM soit défectueuse." : "")
                           + HardwareRamList(r),
-                Recommendation = "Lancer MemTest86 (4+ passes). Si XMP/DOCP est actif, le désactiver et re-tester : une instabilité XMP est une cause classique."
+                Recommendation = (vmHeavy ? "1) Limiter la mémoire de la virtualisation (voir conclusion dédiée). 2) " : "")
+                               + "Lancer MemTest86 (4+ passes) pour exclure la RAM physique. Si XMP/DOCP est actif, le désactiver et re-tester. "
+                               + "L'analyse symbolique WinDbg (case « Analyse profonde » cochée) nommera le module fautif et permettra de trancher."
             });
         }
     }
@@ -364,6 +387,72 @@ public sealed class RulesEngine
             Details = $"Au moment du scan : mémoire physique utilisée à {physUsedPct:0} %, mémoire virtuelle (RAM + fichier d'échange) à {commitUsedPct:0} %. "
                       + (top.Count > 0 ? $"Plus gros consommateurs actuels : {string.Join(", ", top)}." : ""),
             Recommendation = "Voir la section « Processus en cours » du rapport pour le détail complet, et réduire la consommation du ou des processus en tête."
+        });
+    }
+
+    /// <summary>Mémoire privée cumulée des conteneurs de virtualisation (WSL2/Docker/Hyper-V).</summary>
+    internal static long VirtualizationBytes(DiagnosticReport r) =>
+        r.Processes.Where(p => p.Name.StartsWith("vmmem", StringComparison.OrdinalIgnoreCase) ||
+                               p.Name.Equals("vmwp", StringComparison.OrdinalIgnoreCase))
+                   .Sum(p => p.PrivateBytes);
+
+    /// <summary>
+    /// Nomme explicitement la virtualisation (vmmem…) quand elle réserve une part
+    /// importante de la RAM — même sans saturation au moment du scan. C'est la cause
+    /// la plus fréquente des « plus de mémoire » incompris sur les postes de dev/admin.
+    /// </summary>
+    private static void AnalyzeVirtualizationMemory(DiagnosticReport r)
+    {
+        var vmBytes = VirtualizationBytes(r);
+        var totalBytes = (long)r.System.Os.TotalVisibleMemoryKB * 1024;
+        if (totalBytes == 0 || vmBytes < totalBytes * 0.20) return;
+
+        var pct = 100.0 * vmBytes / totalBytes;
+        var vmNames = string.Join(", ", r.Processes
+            .Where(p => p.Name.StartsWith("vmmem", StringComparison.OrdinalIgnoreCase))
+            .Select(p => $"{p.Name} ({FormatBytes((ulong)p.PrivateBytes)})"));
+        bool memCrashes = r.Bsods.Any(b => b.BugCheckCode is 0x1A or 0x50 or 0x4E or 0x12B) ||
+                          r.Events.Any(e => e.Category == EventCategory.ResourceExhaustion);
+
+        r.Findings.Add(new Finding
+        {
+            Severity = memCrashes ? Severity.Warning : Severity.Info,
+            Confidence = Confidence.High,
+            Category = FaultCategory.Software,
+            Title = $"La virtualisation réserve {FormatBytes((ulong)vmBytes)} de RAM ({pct:0} %) — {vmNames.Split(' ')[0]}",
+            Details = $"Les processus de virtualisation ({vmNames}) occupent {pct:0} % de la mémoire de la machine. "
+                      + "« vmmem » héberge WSL2, Docker Desktop ou les machines virtuelles Hyper-V : par défaut il peut "
+                      + "grossir jusqu'à consommer presque toute la RAM, ce qui provoque gels et plantages d'applications"
+                      + (memCrashes
+                          ? " — et des BSOD de type mémoire peuvent en découler quand un pilote gère mal la pénurie. "
+                            + "Vu les crashs mémoire relevés sur cette machine, cette piste LOGICIELLE doit être vérifiée "
+                            + "AVANT de conclure à une RAM défectueuse."
+                          : "."),
+            Recommendation = "Limiter la mémoire de la virtualisation : pour WSL2/Docker, créer le fichier "
+                           + @"%USERPROFILE%\.wslconfig contenant deux lignes « [wsl2] » puis « memory=8GB » (à adapter), "
+                           + "puis exécuter « wsl --shutdown ». Pour une VM Hyper-V : réduire sa RAM ou activer la mémoire dynamique."
+        });
+    }
+
+    /// <summary>
+    /// Signale les crashs plus anciens que la fenêtre d'analyse : leurs événements
+    /// (BugCheck 1001, saturation mémoire…) n'ont pas pu être corrélés.
+    /// </summary>
+    private static void AnalyzeDumpWindow(DiagnosticReport r)
+    {
+        var cutoff = DateTime.Now.AddDays(-r.ScanPeriodDays);
+        var older = r.Bsods.Where(b => b.TimeLocal < cutoff).ToList();
+        if (older.Count == 0) return;
+
+        r.Findings.Add(new Finding
+        {
+            Severity = Severity.Info,
+            Confidence = Confidence.High,
+            Category = FaultCategory.None,
+            Title = $"{older.Count} crash(s) antérieurs à la période analysée ({r.ScanPeriodDays} jours)",
+            Details = $"Des dumps de crash datent d'avant la fenêtre d'analyse (le plus récent : {older.Max(b => b.TimeLocal):dd/MM/yyyy}). "
+                      + "Le journal d'événements de ces dates n'a donc pas été examiné : le diagnostic de ces crashs est incomplet.",
+            Recommendation = "Relancer le scan avec une période de 90 jours pour corréler ces crashs avec les événements de l'époque."
         });
     }
 

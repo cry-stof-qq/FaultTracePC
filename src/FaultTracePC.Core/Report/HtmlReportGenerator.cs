@@ -15,7 +15,8 @@ public static class HtmlReportGenerator
         sb.Append("<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"utf-8\">");
         sb.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
         sb.Append($"<title>Diagnostic {H(r.System.MachineName)} — {r.GeneratedAt:dd/MM/yyyy}</title>");
-        sb.Append("<style>").Append(Css).Append("</style></head><body>");
+        // Mode simple par défaut : l'essentiel d'abord, les détails techniques sur demande.
+        sb.Append("<style>").Append(Css).Append("</style></head><body class=\"simple\">");
 
         Header(sb, r);
         VerdictBanner(sb, r);
@@ -59,7 +60,7 @@ public static class HtmlReportGenerator
     {
         sb.Append("<header><h1>🩺 FaultTracePC — Rapport de diagnostic</h1>");
         sb.Append($"<p class=\"sub\">Machine <strong>{H(r.System.MachineName)}</strong> · {H(r.System.Os.Caption)} {H(r.System.Os.DisplayVersion)} (build {H(r.System.Os.BuildNumber)}) · généré le {r.GeneratedAt:dd/MM/yyyy à HH:mm} · période : {r.ScanPeriodDays} jours</p>");
-        sb.Append("<button id=\"mode-toggle\" class=\"btn2\" type=\"button\">🙈 Masquer les détails techniques (mode simple)</button>");
+        sb.Append("<button id=\"mode-toggle\" class=\"btn2\" type=\"button\">🔎 Afficher les détails techniques (mode complet)</button>");
         sb.Append("</header>");
     }
 

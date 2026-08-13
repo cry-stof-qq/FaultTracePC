@@ -53,6 +53,17 @@ public sealed class CdbAnalyzer
             catch { /* entrée PATH invalide */ }
         }
 
+        // Alias d'exécution du paquet WinDbg (winget install Microsoft.WinDbg) :
+        // les versions récentes publient cdb.exe dans le dossier des alias utilisateur.
+        try
+        {
+            var alias = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                @"Microsoft\WindowsApps\cdb.exe");
+            if (File.Exists(alias)) return alias;
+        }
+        catch { }
+
         // Paquet WinDbg (winget install Microsoft.WinDbg) — l'accès à WindowsApps peut être refusé.
         try
         {

@@ -40,10 +40,16 @@ public sealed class ScanOrchestrator
         report.Dumps = new DumpCollector(errors).Collect();
         ct.ThrowIfCancellationRequested();
 
+        bool hasKernelDumps = report.Dumps.Any(d => d.Kind is DumpKind.KernelMinidump or DumpKind.FullMemoryDump);
         if (options.DeepDumpAnalysis && report.Dumps.Count > 0)
         {
             Step(progress, "Analyse profonde des dumps (WinDbg/CDB, symboles Microsoft)…", 78);
             new CdbAnalyzer(errors).AnalyzeAll(report.Dumps, options.MaxDeepDumps, ct);
+        }
+        else if (!options.DeepDumpAnalysis && hasKernelDumps)
+        {
+            errors.Add("Analyse profonde des dumps DÉSACTIVÉE (case décochée) : le pilote fautif des BSOD "
+                     + "ne sera pas identifié. Recocher « Analyse profonde (WinDbg) » pour un diagnostic complet.");
         }
         ct.ThrowIfCancellationRequested();
 
