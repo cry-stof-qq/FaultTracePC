@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="FaultTracePC — Diagnostic de pannes Windows"
-        Width="760" Height="560" MinWidth="640" MinHeight="480"
+        Width="880" Height="580" MinWidth="700" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         Background="#F4F6F9">
     <Grid Margin="0">
@@ -22,28 +22,29 @@
             </StackPanel>
         </Border>
 
-        <!-- Commandes -->
+        <!-- Commandes : WrapPanel = retour à la ligne automatique, plus jamais de bouton
+             poussé hors de la fenêtre quand on ajoute une option. -->
         <Border Grid.Row="1" Padding="22,16,22,8">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <WrapPanel VerticalAlignment="Center">
                 <Button x:Name="BtnScan" Content="🔍  Analyser cette machine" Padding="16,9"
-                        FontSize="14" FontWeight="SemiBold"
+                        FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"
                         Background="#2470B3" Foreground="White" BorderThickness="0"
                         Cursor="Hand" Click="BtnScan_Click"/>
-                <TextBlock Text="Période :" VerticalAlignment="Center" Margin="18,0,6,0"/>
-                <ComboBox x:Name="CmbDays" Width="110" VerticalAlignment="Center" SelectedIndex="1">
+                <Button x:Name="BtnRealtime" Content="📡  Surveillance temps réel" Padding="14,9" Margin="12,0,0,6"
+                        FontSize="13" Cursor="Hand" Click="BtnRealtime_Click"
+                        ToolTip="Installe/désinstalle le service boîte noire : journal continu (températures, mémoire, événements) écrit sur disque pour retrouver les secondes précédant un crash. Moins de 1 % de CPU."/>
+                <TextBlock Text="Période :" VerticalAlignment="Center" Margin="18,0,6,6"/>
+                <ComboBox x:Name="CmbDays" Width="110" VerticalAlignment="Center" SelectedIndex="1" Margin="0,0,0,6">
                     <ComboBoxItem Content="7 jours" Tag="7"/>
                     <ComboBoxItem Content="30 jours" Tag="30"/>
                     <ComboBoxItem Content="90 jours" Tag="90"/>
                 </ComboBox>
                 <CheckBox x:Name="ChkDrivers" Content="Inventaire des pilotes" IsChecked="True"
-                          VerticalAlignment="Center" Margin="18,0,0,0"/>
+                          VerticalAlignment="Center" Margin="18,0,0,6"/>
                 <CheckBox x:Name="ChkDeep" Content="Analyse profonde (WinDbg)" IsChecked="True"
-                          VerticalAlignment="Center" Margin="12,0,0,0"
+                          VerticalAlignment="Center" Margin="12,0,0,6"
                           ToolTip="Exécute !analyze -v sur les 5 derniers dumps via CDB pour nommer le pilote fautif. Nécessite WinDbg (winget install Microsoft.WinDbg) ; ignoré proprement s'il est absent."/>
-                <Button x:Name="BtnRealtime" Content="📡  Surveillance temps réel" Padding="14,9" Margin="18,0,0,0"
-                        FontSize="13" Cursor="Hand" Click="BtnRealtime_Click"
-                        ToolTip="Installe/désinstalle le service boîte noire : journal continu (températures, mémoire, événements) écrit sur disque pour retrouver les secondes précédant un crash. Moins de 1 % de CPU."/>
-            </StackPanel>
+            </WrapPanel>
         </Border>
 
         <!-- Résultats -->
