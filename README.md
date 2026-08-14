@@ -4,207 +4,234 @@
 
 # FaultTracePC
 
-**Trouver la cause d'une panne Windows 10/11 — et savoir quoi faire ensuite.**
+**Find out why a Windows 10/11 machine crashed — and what to do about it.**
 
-Analyse des écrans bleus, boîte noire temps réel, alertes avant la panne,
-rapport lisible et aide à la réparation. Gratuit, en français, sans télémétrie.
+Crash dump analysis, a real-time flight recorder, alerts before the failure,
+a readable report and guided repair. Free, no telemetry, no account.
+
+🇬🇧 English · [🇫🇷 Français](README.fr.md)
 
 </div>
 
 ---
 
-## Pourquoi ce logiciel
+> **Language notice.** The application interface and the generated reports are
+> currently **in French only**. This README is in English so you can judge
+> whether the tool is worth your time. An English version is planned —
+> if you want it, [open an issue](../../issues/new) saying so. That is how the
+> decision gets made.
 
-Quand un PC plante, Windows enregistre tout ce qu'il faut pour comprendre — et
-le rend illisible. Les informations sont éclatées entre l'Observateur
-d'événements, le Moniteur de fiabilité, les fichiers `.dmp`, les compteurs SMART
-des disques et les capteurs matériels. Les outils existants savent lire *une* de
-ces sources : l'un décode les dumps, l'autre affiche les températures, un
-troisième liste les crashs. Aucun ne les croise, et aucun ne dit clairement quoi
-faire.
+---
 
-FaultTracePC fait exactement cela : il rassemble toutes ces sources, les
-recoupe, et produit **un verdict en français avec un niveau de confiance
-honnête** — puis propose les réparations correspondantes.
+## Why this exists
 
-## Ce qu'il fait
+When a PC crashes, Windows already records everything you need to understand
+it — and makes it unreadable. The evidence is scattered across Event Viewer,
+Reliability Monitor, `.dmp` files, disk SMART counters and hardware sensors.
+Existing tools each read *one* of those sources: one decodes dumps, another
+shows temperatures, a third lists crashes. None of them cross-reference, and
+none of them tell you what to actually do.
 
-**Analyse après une panne.** Il lit les fichiers dump (`Minidump`, `MEMORY.DMP`,
-`LiveKernelReports`), en extrait nativement le code STOP et ses paramètres, et —
-si WinDbg est installé — lance l'analyse symbolique pour **nommer le pilote
-fautif** avec sa pile d'appels. Il croise ensuite avec le journal d'événements
-(BugCheck, Kernel-Power, WHEA, erreurs disque, réinitialisations du pilote
-graphique, crashs d'applications, saturation mémoire), le Moniteur de fiabilité,
-l'inventaire des pilotes, la santé SMART des disques et les processus en cours.
+And when you finally get an answer, it usually looks like this: **the faulting
+driver is `nvlddmkm.sys`**. Accurate, and useless to anyone who doesn't know
+what a driver is.
 
-**Surveillance temps réel — la boîte noire.** Un service Windows léger
-(< 1 % de CPU) enregistre en continu températures, mémoire et événements
-critiques. Chaque ligne est écrite *physiquement* sur le disque : les dernières
-secondes avant un crash survivent au crash. C'est ce qui permet de dire
-« le processeur était à 97 °C juste avant l'arrêt » — ce qu'aucune analyse
-après coup ne peut reconstituer.
+FaultTracePC collects all of those sources, cross-references them, and produces
+**a verdict with an honest confidence level** — then names the software to
+install, uninstall or update, and in what order.
 
-**Alertes avant la panne.** Le service surveille des seuils (températures,
-mémoire virtuelle, erreurs WHEA, santé des disques) et prévient par une
-notification Windows *avant* que la machine tombe.
+## What it does
 
-**État réel du matériel.** Les compteurs de santé des disques sont lus
-directement auprès du matériel, par le chemin adapté à chaque technologie :
+**Post-mortem analysis.** It reads dump files (`Minidump`, `MEMORY.DMP`,
+`LiveKernelReports`), natively extracts the STOP code and its parameters, and —
+if WinDbg is installed — runs symbolic analysis to **name the faulting driver**
+with its call stack. It then cross-references the event log (BugCheck,
+Kernel-Power, WHEA, disk errors, display driver resets, application crashes,
+memory exhaustion), Reliability Monitor, the driver inventory, disk SMART health
+and running processes. Repeated crashes sharing a signature are flagged as such,
+which separates a one-off accident from a systemic fault.
 
-- **SATA/ATA** — attributs SMART bruts via WMI : secteurs réalloués, secteurs en
-  attente, secteurs illisibles, erreurs CRC, heures, usure SSD. Le rapport dit en
-  clair si des **clusters sont défectueux**, et distingue un disque qui meurt
-  d'un simple **câble SATA défaillant**.
-- **NVMe** — journal de santé (log page 0x02) lu par `DeviceIoControl`, comme le
-  font les outils spécialisés. Windows n'expose pas ces compteurs par WMI : sans
-  ce chemin, un SSD NVMe ne peut tout simplement pas être diagnostiqué. On y
-  obtient la **réserve de blocs de remplacement** comparée au seuil du
-  constructeur (le vrai signal de fin de vie d'un NVMe), les **erreurs
-  d'intégrité des données**, et les alertes que le contrôleur lève lui-même.
+**Every driver gets a name, an owner and an action.** A database of **59
+documented drivers** maps a `.sys` file to the hardware or software that
+installs it, and to the proven fix — `nvlddmkm.sys` becomes "NVIDIA display
+driver, clean reinstall with DDU in safe mode". Drivers absent from the database
+are matched to their **platform family** (AMD, Intel, Realtek, Qualcomm,
+VirtualBox, Fortinet, OEM vendors…) only when the filename **and** the vendor
+recorded in the file agree. The report always states which of the two levels it
+reached: a by-name match gives the precise fix, a family match gives generic but
+correct advice.
 
-Quand aucun compteur n'est lisible, le rapport **le dit** au lieu d'afficher un
-tableau vide qui ferait passer une absence de mesure pour un bilan de santé.
+One category matters more than the rest: **files blamed by mistake**.
+`ntoskrnl.exe`, `fltmgr.sys` and `dxgkrnl.sys` top most crash analyses because
+they *observe* the error rather than cause it — and a beginner following a forum
+thread ends up trying to delete a vital Windows component. The report says so
+explicitly, and points to where the cause actually lives.
 
-Sur un portable, l'**état de la batterie** est donné en pourcentage d'usure, avec
-un verdict lisible (*usée*, *très usée*, *hors d'usage*).
+**Real-time monitoring — the flight recorder.** A lightweight Windows service
+(< 1 % CPU) continuously records temperatures, memory and critical events. Each
+line is *physically flushed* to disk: the last seconds before a crash survive
+the crash. That is what makes it possible to say "the CPU was at 97 °C right
+before shutdown" — something no post-mortem analysis can reconstruct.
 
-**Aide à la réparation.** Chaque diagnostic génère un script PowerShell adapté
-aux problèmes trouvés — qui commence par créer un **point de restauration** et
-ne lance rien sans confirmation. Une boîte à outils intégrée réunit les
-réparations courantes : point de restauration, désinstaller une mise à jour
-Windows fautive, réinitialiser les composants Windows Update, `sfc`, `DISM`,
-`chkdsk`, diagnostic mémoire, SMART, nettoyage de l'espace disque, analyse
-Microsoft Defender, réinitialisation réseau. Une fenêtre dédiée pilote
-**Windows Update** et affiche ce que la page Paramètres masque — mises à jour
-**optionnelles** et **pilotes** — avec sélection ligne par ligne et **jamais de
-redémarrage automatique**.
+**Alerts before the failure.** The service watches thresholds (temperatures,
+virtual memory, WHEA errors, disk health) and raises a Windows notification
+*before* the machine goes down.
 
-**Le problème est-il encore là ?** Quand un logiciel est mis en cause, le
-rapport vérifie s'il est toujours installé, s'il a été désinstallé, ou s'il a
-été **réinstallé ou mis à jour après le dernier crash** — et le dit, au lieu
-d'afficher éternellement un problème déjà réglé.
+**Real hardware state.** Disk health counters are read directly from the
+hardware, by the path each technology requires:
 
-**Chaque pilote a un nom, un propriétaire et une action.** Une base de 59 pilotes
-documentés relie un fichier `.sys` au logiciel ou au matériel qui l'installe, et
-au correctif éprouvé — « nvlddmkm.sys » devient « pilote NVIDIA, réinstallation
-propre avec DDU en mode sans échec ». Les pilotes absents de la base sont
-rattachés à leur **famille de plateforme** (AMD, Intel, Realtek, VirtualBox,
-Fortinet, OEM…) quand le nom **et** l'éditeur concordent. Le rapport distingue
-les deux niveaux : une correspondance nominative donne le correctif précis, une
-identification par famille un conseil générique mais juste.
+- **SATA/ATA** — raw SMART attributes via WMI: reallocated sectors, pending
+  sectors, uncorrectable sectors, CRC errors, power-on hours, SSD wear. The
+  report states plainly whether there are **bad sectors**, and distinguishes a
+  dying disk from a **failing SATA cable** — a few-euro fault regularly mistaken
+  for a dead drive.
+- **NVMe** — health log (log page 0x02) read through `DeviceIoControl`, the way
+  dedicated tools do it. Windows does not expose these counters over WMI:
+  without this path an NVMe SSD simply cannot be diagnosed. It yields the
+  **available spare** compared against the manufacturer's threshold (the real
+  end-of-life signal for NVMe), **data integrity errors**, and the critical
+  warnings the controller raises itself.
 
-**« Je ne sais pas ce que j'ai ».** Un bouton unique, pensé pour qui ne sait pas
-ce qu'est un pilote : point de restauration, examen, réparations **sans risque**
-appliquées seules, puis nouvelle analyse et une conclusion en une phrase. Tout ce
-qui redémarre, installe ou désinstalle est **proposé à la fin, une action à la
-fois, avec sa raison**. Sans point de restauration possible, l'assistant propose
-d'activer la protection du système — et à défaut continue en **mode réduit**, en
-s'interdisant alors de toucher aux fichiers système.
+When no counter can be read, the report **says so**, rather than printing an
+empty table that would pass a missing measurement off as a clean bill of health.
 
-**Températures dans la durée.** Ce n'est pas la température d'un instant qui
-annonce un plantage, mais le temps cumulé passé trop haut : *« 40 minutes
-au-dessus de 90 °C cette semaine »*, avec les épisodes continus les plus longs.
-Les périodes machine éteinte ne sont jamais comptées.
+On laptops, **battery wear** is reported as a percentage with a plain verdict.
 
-**Export PDF, à la demande.** Un bouton crée un PDF du rapport **complet**,
-détails techniques inclus, pour le joindre à un ticket. Aucun PDF n'est généré
-automatiquement.
+**"I don't know what's wrong with it."** A single button, designed for someone
+who has no way to arbitrate a technical question. It creates a restore point,
+examines the machine, applies the repairs that cannot break anything **on its
+own**, re-checks, and concludes **in one sentence**. Anything that reboots,
+installs or uninstalls is offered **at the end, one action at a time, with the
+reason the assistant did not take it for you**. Where no restore point can be
+created — System Protection disabled, common in managed environments — it offers
+to enable it, and failing that continues in **reduced mode**, refusing to touch
+system files at all rather than performing a quiet irreversible change.
 
-**Suivi et parc.** Chaque scan est archivé : le suivant répond à la vraie
-question — « est-ce que la réparation a marché ? ». En mode parc, une console
-affiche l'état de plusieurs machines et permet de lancer un diagnostic à
-distance sans se déplacer.
+**Guided repair.** Each diagnosis generates a PowerShell script tailored to the
+problems found — which starts by creating a restore point and runs nothing
+without confirmation. A built-in toolbox gathers the common repairs: restore
+point, uninstall a faulty Windows update, reset Windows Update components,
+`sfc`, `DISM`, `chkdsk`, memory diagnostic, SMART, disk cleanup, Microsoft
+Defender scan, network reset. A dedicated window drives **Windows Update** and
+surfaces what the Settings page hides — **optional** and **driver** updates —
+with per-row selection and **never an automatic reboot**. Repairs that modify
+the system can no longer run concurrently: `sfc` and `DISM` contend for the
+component store, so one modifying action runs at a time.
 
-**Comparateur de parc.** Ce qu'aucun diagnostic individuel ne peut voir : un
-pilote ancien identique sur six postes n'est plus un suspect, c'est une image de
-déploiement à corriger — une fois, pour tout le parc. Le comparateur relève ce
-qui est **commun** (pilote, code d'arrêt, modèle de disque qui se dégrade), ce
-qui **diverge** (même pilote en plusieurs versions : les retardataires sont
-nommés) et ce qui est **isolé** (un poste qui accumule seul, et relève d'un
-traitement individuel).
+**Is the problem still there?** When software is implicated, the report checks
+whether it is still installed, has been removed, or has been **reinstalled or
+updated since the last crash** — instead of displaying a solved problem forever.
 
-**Suis-je à jour ?** Le bouton `🔄 Vérifier les mises à jour` compare la version
-réellement embarquée dans l'exécutable à la dernière publiée sur
-[la page des versions](https://github.com/cry-stof-qq/FaultTracePC/releases/latest).
-S'il y a du neuf, il affiche les nouveautés et propose d'ouvrir la page de
-téléchargement — **il ne télécharge rien et n'installe rien tout seul** : sur un
-parc déployé par GPO, un exécutable qui se met à jour sans qu'on le lui demande
-est un risque, pas un service. La vérification au démarrage est **désactivée par
-défaut** : sans cocher la case `au démarrage`, FaultTracePC ne contacte jamais
-Internet de lui-même. Sur un poste sans accès Internet, l'échec est annoncé
-clairement et ne bloque rien.
+**Temperature over time.** It isn't the temperature at one instant that predicts
+a crash, it's the accumulated time spent too high: *"40 minutes above 90 °C this
+week"*, with the longest continuous episodes. Time while the machine was off is
+never counted, and the calculation deliberately under-reports rather than
+inflating a figure meant to raise an alarm.
 
-## Installation
+**PDF export, on demand.** One button produces a PDF of the **complete** report,
+technical details included, to attach to a ticket. No PDF is ever generated
+automatically.
 
-| Format | Pour qui | Comment |
+**History and fleet.** Every scan is archived, so the next one answers the real
+question — *did the repair work?* In fleet mode, a console shows the state of
+several machines and can trigger a remote diagnosis without walking to the desk.
+
+**Fleet comparator.** What no individual diagnosis can see: an identical old
+driver on six machines is not a suspect, it's a deployment image to fix — once,
+for the whole fleet. The comparator reports what is **shared** (driver, stop
+code, degrading disk model), what **diverges** (same driver at several versions:
+the laggards are named) and what is **isolated** (one machine accumulating
+problems alone, needing individual treatment). Below two machines it produces
+nothing, and says so.
+
+**Am I up to date?** The `🔄` button compares the version actually embedded in
+the executable against the latest published on
+[the releases page](https://github.com/cry-stof-qq/FaultTracePC/releases/latest).
+If there is something new it shows the changes and offers to open the download
+page — **it downloads nothing and installs nothing by itself**: on a
+GPO-deployed fleet, an executable that updates itself unasked is a risk, not a
+service. The startup check is **off by default**: unless you tick `au démarrage`,
+FaultTracePC never contacts the Internet on its own.
+
+## Install
+
+| Format | For whom | How |
 |---|---|---|
-| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.2.0.msi` (ou double-clic) |
-| **Portable (.zip)** | Dépannage sur clé USB, rien à installer | Décompresser, lancer `FaultTracePC.exe` |
+| **MSI** | Permanent install, GPO deployment | `msiexec /i FaultTracePC-1.2.0.msi` (or double-click) |
+| **Portable (.zip)** | USB-stick troubleshooting, nothing to install | Unzip, run `FaultTracePC.exe` |
 
-Les deux sont disponibles dans les [Releases](../../releases). Aucun prérequis :
-le runtime .NET est inclus. **Windows 10 ou 11, 64 bits, droits administrateur**
-(nécessaires pour lire les dumps et les journaux système).
+Both are on the [Releases page](../../releases). No prerequisites: the .NET
+runtime is bundled. **Windows 10 or 11, 64-bit, administrator rights** (required
+to read dumps and full system logs).
 
-Optionnel mais recommandé — l'analyse symbolique des dumps, qui nomme le pilote
-fautif, nécessite WinDbg :
+Optional but recommended — symbolic dump analysis, which names the faulting
+driver, needs WinDbg:
 
 ```powershell
 winget install Microsoft.WinDbg
 ```
 
-## Utilisation
+**These files are not code-signed.** On first run Windows SmartScreen will show
+"Unknown publisher" — expected for free software without a code-signing
+certificate. Click "More info", then "Run anyway". The full source is here and
+you can rebuild it yourself with `dotnet build`.
 
-1. Lancer FaultTracePC (il demande l'élévation administrateur).
-2. **🔍 Analyser cette machine** — le rapport HTML s'ouvre dans le navigateur.
-   Il démarre en mode simple ; un bouton révèle le détail technique.
-3. **📡 Surveillance temps réel** — installe la boîte noire en un clic. Elle
-   continue même application fermée, et redémarre avec le PC.
-4. **🧰 Outils** — les réparations à un clic, dans une fenêtre PowerShell visible.
+## Usage
 
-En ligne de commande, pour un parc ou une tâche planifiée :
+1. Launch FaultTracePC (it requests administrator elevation).
+2. **Analyse this machine** — the HTML report opens in your browser. It starts
+   in simple mode; a button reveals the technical detail.
+3. **Real-time monitoring** — installs the flight recorder in one click. It
+   keeps running with the application closed, and restarts with the PC.
+4. **Toolbox** — one-click repairs, in a visible PowerShell window.
+
+From the command line, for a fleet or a scheduled task:
 
 ```powershell
-FaultTracePC.Cli.exe --quiet --json --days 90 --output \\serveur\Diagnostics$
-# codes de sortie : 0 sain · 1 avertissements · 2 critique · 3 erreur
+FaultTracePC.Cli.exe --quiet --json --days 90 --output \\server\Diagnostics$
+# exit codes: 0 healthy · 1 warnings · 2 critical · 3 error
 ```
 
-## Limites — dites honnêtement
+## Limits — stated honestly
 
-- **Sans WinDbg**, le code STOP est lu mais le pilote fautif reste souvent non
-  identifié : le diagnostic est alors moins précis (confiance abaissée en
-  conséquence dans le rapport, jamais masquée).
-- **Les températures CPU dépendent de la machine.** Le pilote historique
-  utilisé par les bibliothèques de capteurs est bloqué par Windows 11 récent ;
-  installer [PawnIO](https://pawnio.eu) rétablit la lecture. Les températures
-  GPU fonctionnent sans lui.
-- **Un diagnostic n'est pas une certitude.** Chaque conclusion affiche son
-  niveau de confiance — « faible » signale une piste à vérifier, pas une preuve.
-- **Rien n'est envoyé nulle part.** Aucune télémétrie, aucun compte. Les
-  rapports restent dans `Documents\FaultTracePC`. Le mode réseau, facultatif,
-  n'accepte que les adresses privées et des requêtes signées.
+- **Interface and reports are in French only.** See the notice at the top.
+- **Without WinDbg**, the STOP code is read but the faulting driver often stays
+  unidentified: the diagnosis is less precise, and the report lowers its stated
+  confidence accordingly rather than hiding the gap.
+- **CPU temperatures depend on the machine.** The legacy driver used by sensor
+  libraries is blocked on recent Windows 11; installing [PawnIO](https://pawnio.eu)
+  restores the reading. GPU temperatures work without it.
+- **A diagnosis is not a certainty.** Every conclusion carries a confidence
+  level — "low" marks a lead to check, not a proof.
+- **Nothing is sent anywhere.** No telemetry, no account. Reports stay in
+  `Documents\FaultTracePC`. The optional network mode accepts private addresses
+  only, and signed requests only.
+- Some antivirus products react to it, because FaultTracePC does exactly what a
+  diagnostic tool does: read memory dumps, query hardware at a low level, and —
+  if you enable fleet mode — listen on a local network port. **Do not disable
+  your antivirus for it.** Read the source instead.
 
-## Mode réseau (facultatif)
+## Network mode (optional)
 
-Une machine peut publier son état en **lecture seule** pour une console
-d'administration. Double verrou : seules les adresses privées (RFC 1918) sont
-acceptées, **et** chaque requête doit porter une signature HMAC-SHA256 — le
-secret ne circule jamais sur le réseau, et le rejeu d'une requête capturée est
-refusé. Une règle de pare-feu restreinte aux mêmes plages est posée en plus.
-Rien n'est accessible depuis Internet.
+A machine can publish its state **read-only** for an administration console.
+Two locks: only private addresses (RFC 1918) are accepted, **and** every request
+must carry an HMAC-SHA256 signature — the secret never travels over the network,
+and replaying a captured request is refused. A firewall rule restricted to the
+same ranges is added on top. Nothing is reachable from the Internet.
 
-## Compiler depuis les sources
+## Build from source
 
-Prérequis : [SDK .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0).
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```powershell
 git clone https://github.com/cry-stof-qq/FaultTracePC.git
 cd FaultTracePC
 dotnet build
-dotnet test                                    # 59 tests
+dotnet test                                    # 120 tests
 dotnet run --project src\FaultTracePC.App
 ```
 
-Produire les distribuables :
+Produce the distributables:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
@@ -215,20 +242,29 @@ powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.2.0
 
 ```
 src/
-  FaultTracePC.Core      Collecte (WMI, événements, dumps, capteurs), moteur de
-                         règles, catalogue des codes STOP, base de signatures de
-                         pilotes, génération des rapports HTML
-  FaultTracePC.App       Interface WPF : scan, visualiseur, console de parc,
-                         boîte à outils, configuration réseau
-  FaultTracePC.Monitor   Service Windows : boîte noire, alertes préventives,
-                         API de télémétrie signée
-  FaultTracePC.Cli       Diagnostic en ligne de commande (parc, GPO)
-tests/                   Tests xUnit : sécurité, parsing des dumps, règles
+  FaultTracePC.Core      Collection (WMI, events, dumps, sensors), rules engine,
+                         STOP code catalogue, driver knowledge base, HTML report
+                         generation
+  FaultTracePC.App       WPF interface: scan, viewer, fleet console, toolbox,
+                         network configuration
+  FaultTracePC.Monitor   Windows service: flight recorder, preventive alerts,
+                         signed telemetry API
+  FaultTracePC.Cli       Command-line diagnosis (fleet, GPO)
+tests/                   xUnit tests: security, dump parsing, rules
 ```
+
+## Contributing
+
+Issues and pull requests are welcome, in English or French.
+
+The most useful thing you can report right now: **whether you want an English
+interface**. The translation is a real piece of work and it will only be done if
+there is demand — an issue saying so is what makes that decision.
 
 ## Licence
 
-[MIT](LICENSE) — utilisation, modification et redistribution libres.
+[MIT](LICENSE) — free to use, modify and redistribute, including commercially
+and in schools and businesses.
 
-Ce logiciel est fourni sans garantie. Il lit l'état du système et ne modifie
-rien sans confirmation explicite de l'utilisateur.
+This software comes with no warranty. It reads system state and changes nothing
+without explicit user confirmation.
