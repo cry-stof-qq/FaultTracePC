@@ -16,6 +16,9 @@ param(
     [string]$Configuration = 'Release',
     [string]$Runtime = 'win-x64',
     [switch]$Zip,
+    # Le nom de l'archive porte la version : sans elle, deux téléchargements
+    # successifs deviennent indiscernables dans un dossier Téléchargements.
+    [string]$Version = '1.2.0',
     [switch]$FrameworkDependent   # nécessite le runtime .NET Desktop sur la cible, mais ~15 Mo
 )
 
@@ -49,7 +52,7 @@ Write-Host "  FaultTracePC.Cli.exe      — diagnostic en ligne de commande"
 Write-Host "  FaultTracePC.Monitor.exe  — service de surveillance (installé par l'application ou le MSI)"
 
 if ($Zip) {
-    $zipPath = Join-Path $root 'dist\FaultTracePC-portable.zip'
+    $zipPath = Join-Path $root "dist\FaultTracePC-$Version-portable.zip"
     if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
     Compress-Archive -Path "$out\*" -DestinationPath $zipPath
     Write-Host "Archive portable : $zipPath" -ForegroundColor Green

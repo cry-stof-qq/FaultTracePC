@@ -465,6 +465,43 @@ public sealed class FlightInfo
     public List<FlightCrashContext> Contexts { get; set; } = new();
     /// <summary>Alertes préventives émises par le service sur la période analysée.</summary>
     public List<PreventiveAlert> Alerts { get; set; } = new();
+
+    /// <summary>Temps cumulé passé au-dessus des seuils, par capteur.</summary>
+    public List<ThermalStats> Thermal { get; set; } = new();
+}
+
+/// <summary>
+/// Bilan thermique d'un capteur sur la période : ce n'est pas la température
+/// instantanée qui annonce un plantage, mais le temps passé trop haut.
+/// </summary>
+public sealed class ThermalStats
+{
+    public string Sensor { get; set; } = "";
+    public double WarnThreshold { get; set; }
+    public double CritThreshold { get; set; }
+    public double? MaxC { get; set; }
+    public DateTime? MaxAt { get; set; }
+    public double? AverageC { get; set; }
+    public int SampleCount { get; set; }
+    /// <summary>Durée réellement couverte par les relevés (hors coupures de mesure).</summary>
+    public TimeSpan Observed { get; set; }
+    public TimeSpan AboveWarn { get; set; }
+    public TimeSpan AboveCrit { get; set; }
+    public List<ThermalEpisode> LongestEpisodes { get; set; } = new();
+
+    /// <summary>Part du temps observé passée au-dessus du seuil d'alerte.</summary>
+    public double WarnPercent =>
+        Observed.TotalSeconds <= 0 ? 0 : Math.Round(100 * AboveWarn.TotalSeconds / Observed.TotalSeconds, 1);
+
+    public bool HasData => SampleCount > 0;
+}
+
+/// <summary>Un épisode continu au-dessus du seuil d'alerte.</summary>
+public sealed class ThermalEpisode
+{
+    public DateTime Start { get; set; }
+    public double Minutes { get; set; }
+    public double PeakC { get; set; }
 }
 
 /// <summary>Résultat de la comparaison avec le scan précédent — la boucle « est-ce réparé ? ».</summary>

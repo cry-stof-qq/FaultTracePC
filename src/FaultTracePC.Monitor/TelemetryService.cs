@@ -127,6 +127,18 @@ public sealed class TelemetryService : BackgroundService
                     break;
                 }
 
+                case "/api/summary":
+                    // Résumé du dernier scan : versions de pilotes, crashs, disques,
+                    // conclusions critiques. C'est ce que le mode parc corrèle entre
+                    // postes. Rien de nominatif n'y figure — ni chemins utilisateur,
+                    // ni processus, ni contenu de fichiers.
+                    // Une machine jamais analysée n'a pas de résumé : on répond
+                    // explicitement « rien à comparer » plutôt que null, pour que le
+                    // maître distingue « poste sans scan » de « poste injoignable ».
+                    if (Core.Report.ScanHistory.LoadLatest() is { } latest) Json(ctx, latest);
+                    else Json(ctx, new { available = false, reason = "Cette machine n'a jamais été analysée." });
+                    break;
+
                 case "/api/alerts":
                 {
                     int days = int.TryParse(ctx.Request.QueryString["days"], out var ad) ? Math.Clamp(ad, 1, 30) : 7;

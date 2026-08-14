@@ -25,6 +25,7 @@ public sealed class RulesEngine
         AnalyzeFlightRecorder(r);
         AnalyzeSmart(r);
         AnalyzeBattery(r);
+        AnalyzeThermal(r);
         AnalyzeStorage(r);
         AnalyzeGpu(r);
         AnalyzePowerLoss(r);
@@ -754,6 +755,66 @@ public sealed class RulesEngine
                 Details = $"Analyse SMART — {string.Join(" ; ", facts)}.{age} Source : {s.Source}.",
                 Recommendation = reco,
             });
+        }
+    }
+
+    /// <summary>
+    /// Surchauffe dans la durée. Une pointe à 95 °C pendant dix secondes est sans
+    /// conséquence ; une heure cumulée au-dessus de 90 °C use le matériel et
+    /// provoque des arrêts de protection que rien, dans les journaux, ne relie
+    /// spontanément à la température.
+    /// </summary>
+    private static void AnalyzeThermal(DiagnosticReport r)
+    {
+        foreach (var t in r.System is not null ? r.Flight.Thermal : [])
+        {
+            if (!t.HasData || t.Observed < TimeSpan.FromMinutes(10)) continue;
+
+            var crit = t.AboveCrit;
+            var warn = t.AboveWarn;
+            if (warn < TimeSpan.FromMinutes(2)) continue; // rien de significatif
+
+            var longest = t.LongestEpisodes.FirstOrDefault();
+            var episode = longest is not null
+                ? $" Le plus long épisode a duré {longest.Minutes:0.#} minute(s) le {longest.Start:dd/MM à HH:mm}, avec une pointe à {longest.PeakC:0.#} °C."
+                : "";
+            var context = $" Mesuré sur {ThermalHistory.Humanize(t.Observed)} de relevés"
+                        + (t.MaxC is { } mx ? $", maximum {mx:0.#} °C le {t.MaxAt:dd/MM à HH:mm}" : "") + ".";
+
+            if (crit >= TimeSpan.FromMinutes(5))
+            {
+                r.Findings.Add(new Finding
+                {
+                    Severity = Severity.Critical,
+                    Confidence = Confidence.High,
+                    Category = FaultCategory.Hardware,
+                    Title = $"Surchauffe — {t.Sensor} : {ThermalHistory.Humanize(crit)} au-dessus de {t.CritThreshold:0} °C",
+                    Details = $"Le {t.Sensor.ToLowerInvariant()} a passé {ThermalHistory.Humanize(crit)} au-delà du seuil critique "
+                            + $"de {t.CritThreshold:0} °C, et {ThermalHistory.Humanize(warn)} au-delà de {t.WarnThreshold:0} °C "
+                            + $"({t.WarnPercent:0.#} % du temps mesuré)." + episode + context
+                            + " À ces températures, la machine se protège en ralentissant, puis s'éteint brutalement — "
+                            + "des arrêts que rien, dans les journaux, ne relie spontanément à la chaleur.",
+                    Recommendation = "Dépoussiérer les ventilateurs et les grilles d'aération, vérifier qu'aucune sortie d'air n'est obstruée, "
+                                   + "et sur une machine de plus de trois ans envisager le remplacement de la pâte thermique. "
+                                   + "Retirer tout overclocking. Sur un portable, éviter de l'utiliser posé sur un lit ou un canapé, qui bouchent les aérations.",
+                });
+            }
+            else if (warn >= TimeSpan.FromMinutes(30) || t.WarnPercent >= 20)
+            {
+                r.Findings.Add(new Finding
+                {
+                    Severity = Severity.Warning,
+                    Confidence = Confidence.High,
+                    Category = FaultCategory.Hardware,
+                    Title = $"Températures élevées — {t.Sensor} : {ThermalHistory.Humanize(warn)} au-dessus de {t.WarnThreshold:0} °C",
+                    Details = $"Le {t.Sensor.ToLowerInvariant()} a passé {ThermalHistory.Humanize(warn)} au-delà de {t.WarnThreshold:0} °C, "
+                            + $"soit {t.WarnPercent:0.#} % du temps mesuré." + episode + context
+                            + " Ce n'est pas une panne, mais c'est le signe avant-coureur des arrêts thermiques.",
+                    Recommendation = "Dépoussiérer les aérations et surveiller l'évolution : si la durée passée trop haut augmente d'un scan à l'autre, "
+                                   + "le refroidissement se dégrade. Vérifier aussi qu'un logiciel ne sollicite pas le matériel en permanence "
+                                   + "(voir les processus en cours dans ce rapport).",
+                });
+            }
         }
     }
 

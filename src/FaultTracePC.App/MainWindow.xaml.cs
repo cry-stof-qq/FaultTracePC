@@ -24,7 +24,7 @@ public partial class MainWindow : Window
         // pas mentir sur ce qui tourne.
         Loaded += (_, _) =>
         {
-            TxtFoot.Text = $"v{UpdateChecker.CurrentVersion} — diagnostic, boîte noire, alertes préventives, parc et réparation";
+            TxtFoot.Text = $"v{UpdateChecker.CurrentVersion} — diagnostic et réparation";
             // Vérification au démarrage : uniquement si l'utilisateur l'a demandée.
             _startupPrefLoaded = false;
             ChkUpdateStartup.IsChecked = UpdateChecker.CheckAtStartup;
@@ -291,6 +291,7 @@ public partial class MainWindow : Window
             _lastReportPath = HtmlReportGenerator.WriteToDisk(report);
             _lastRepairScriptPath = report.RepairScriptPath;
             BtnOpenReport.IsEnabled = true;
+            BtnPdf.IsEnabled = true;
             BtnRepair.IsEnabled = _lastRepairScriptPath is not null;
             ShowResults(report);
             OpenInBrowser(_lastReportPath);
@@ -333,7 +334,12 @@ public partial class MainWindow : Window
         LstFindings.ItemsSource = report.Findings.Select(f => new FindingVm(f)).ToList();
         LstFindings.Visibility = Visibility.Visible;
 
-        TxtFoot.Text = $"Rapport : {_lastReportPath}";
+        // Seulement le NOM du fichier : le chemin complet fait 60 caractères, pousse
+        // tout le pied de fenêtre vers la droite et finissait par passer sous les
+        // boutons. Le chemin entier reste accessible en infobulle, et le bouton
+        // « Ouvrir le dernier rapport » évite d'avoir à le lire.
+        TxtFoot.Text = _lastReportPath is null ? "" : $"Rapport : {Path.GetFileName(_lastReportPath)}";
+        TxtFoot.ToolTip = _lastReportPath;
     }
 
     /// <summary>Ouvre le visualiseur du journal de la boîte noire.</summary>
@@ -358,6 +364,10 @@ public partial class MainWindow : Window
 
     private void BtnPark_Click(object sender, RoutedEventArgs e) =>
         new ParkWindow { Owner = this }.Show();
+
+    /// <summary>Assistant guidé — pour qui ne sait pas ce qu'est un pilote.</summary>
+    private void BtnGuided_Click(object sender, RoutedEventArgs e) =>
+        new GuidedRepairWindow { Owner = this }.Show();
 
     private void BtnToolbox_Click(object sender, RoutedEventArgs e) =>
         new RepairToolboxWindow { Owner = this }.Show();
@@ -447,6 +457,40 @@ public partial class MainWindow : Window
             _checkingUpdate = false;
             BtnUpdate.IsEnabled = true;
             BtnUpdate.Content = "🔄 Vérifier les mises à jour";
+        }
+    }
+
+    /// <summary>
+    /// Export PDF — uniquement quand l'utilisateur le demande. Aucun PDF n'est
+    /// produit à l'issue d'une analyse : générer des fichiers que personne n'a
+    /// réclamés encombre le dossier Documents et fait douter de ce que le
+    /// logiciel fait d'autre sans le dire.
+    /// </summary>
+    private async void BtnPdf_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastReportPath is null || !File.Exists(_lastReportPath)) return;
+
+        BtnPdf.IsEnabled = false;
+        var previous = TxtStatus.Text;
+        TxtStatus.Text = "Création du PDF… (quelques secondes)";
+
+        var result = await Task.Run(() => PdfExporter.Export(_lastReportPath));
+
+        BtnPdf.IsEnabled = true;
+        if (result.Ok && result.PdfPath is not null)
+        {
+            TxtStatus.Text = "PDF créé : " + Path.GetFileName(result.PdfPath);
+            if (MessageBox.Show(this,
+                    $"PDF créé :\n\n{result.PdfPath}\n\nL'ouvrir maintenant ?",
+                    "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Information,
+                    MessageBoxResult.Yes) == MessageBoxResult.Yes)
+                OpenInBrowser(result.PdfPath);
+        }
+        else
+        {
+            TxtStatus.Text = previous;
+            MessageBox.Show(this, "Le PDF n'a pas pu être créé.\n\n" + result.Error,
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

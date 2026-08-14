@@ -1,0 +1,132 @@
+<Window x:Class="FaultTracePC.App.GuidedRepairWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FaultTracePC — Je ne sais pas ce que j'ai"
+        Icon="Assets/FaultTracePC.ico"
+        Width="820" Height="620" MinWidth="680" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
+        Closing="Window_Closing">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ============ Bandeau ============ -->
+        <Border Grid.Row="0" Background="#182848" Padding="20,14">
+            <StackPanel>
+                <TextBlock Text="Je ne sais pas ce que j'ai" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                <TextBlock Foreground="#B9C4DC" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"
+                           Text="Cet assistant examine l'ordinateur, applique les réparations sans risque, puis vérifie si le problème a disparu. Il commence par créer un point de restauration : tout reste annulable. Rien qui puisse casser quelque chose n'est fait sans ton accord."/>
+            </StackPanel>
+        </Border>
+
+        <!-- ============ Étapes ============ -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#DBE2EC" BorderThickness="0,0,0,1" Padding="20,14">
+            <ItemsControl x:Name="IcSteps">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="0,3">
+                            <TextBlock Text="{Binding Icon}" FontSize="14" Width="26" VerticalAlignment="Top"/>
+                            <TextBlock Text="{Binding Label}" FontSize="13" Foreground="{Binding Brush}"
+                                       TextWrapping="Wrap" MaxWidth="700"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Border>
+
+        <!-- ============ Zone centrale ============ -->
+        <Grid Grid.Row="2" Margin="20,14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0">
+                <TextBlock x:Name="TxtStatus" FontSize="14" TextWrapping="Wrap" Foreground="#182848"
+                           Text="Prêt. Clique sur « Démarrer » : l'assistant s'occupe du reste."/>
+                <ProgressBar x:Name="PbMain" Height="10" Margin="0,10,0,0" Minimum="0" Maximum="100"
+                             Foreground="#2A78D6" Background="#E7ECF3" BorderThickness="0"/>
+            </StackPanel>
+
+            <!-- Conclusion et actions restantes -->
+            <ScrollViewer Grid.Row="1" Margin="0,14,0,0" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Border x:Name="ConclusionBorder" Visibility="Collapsed" CornerRadius="8" Padding="16,13"
+                            BorderThickness="1" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock x:Name="TxtConclusionLabel" FontSize="11" FontWeight="Bold"
+                                       Foreground="#6B7C91" Text="CONCLUSION"/>
+                            <TextBlock x:Name="TxtConclusion" FontSize="15" FontWeight="SemiBold"
+                                       TextWrapping="Wrap" Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock x:Name="TxtProposalsIntro" Visibility="Collapsed" FontSize="13" TextWrapping="Wrap"
+                               Foreground="#44546A" Margin="0,0,0,8"
+                               Text="Ce qui reste à faire demande ton accord, parce que ces actions ne sont pas anodines. Chacune s'explique ; tu décides une par une."/>
+
+                    <ItemsControl x:Name="IcProposals">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="White" BorderBrush="#DBE2EC" BorderThickness="1"
+                                        CornerRadius="7" Padding="14,11" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Why}" FontSize="12" Foreground="#44546A"
+                                                       TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="{Binding ButtonText}" Padding="12,7"
+                                                VerticalAlignment="Center" MinWidth="130"
+                                                Tag="{Binding}" Click="BtnProposal_Click"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ============ Journal ============ -->
+        <Expander Grid.Row="3" Header="  Détail technique (ce que l'assistant exécute)" Margin="20,0,20,8"
+                  IsExpanded="False" Foreground="#44546A">
+            <TextBox x:Name="TxtLog" Height="130" Margin="0,6,0,0" IsReadOnly="True"
+                     FontFamily="Consolas" FontSize="11" TextWrapping="NoWrap"
+                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                     Background="#1E1E1E" Foreground="#D4D4D4" BorderThickness="0"/>
+        </Expander>
+
+        <!-- ============ Pied ============ -->
+        <Border Grid.Row="4" Background="#EDF1F6" Padding="20,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="TxtFooterHint" Grid.Column="0" FontSize="11" Foreground="#6B7C91"
+                           VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="420"
+                           Text="Compte 20 à 40 minutes. Tu peux laisser tourner et revenir plus tard."/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="BtnReport" Content="Ouvrir le rapport complet" Padding="12,7"
+                            Margin="0,0,8,0" IsEnabled="False" Click="BtnReport_Click"/>
+                    <Button x:Name="BtnStart" Content="Démarrer" Padding="20,8" FontSize="14" FontWeight="SemiBold"
+                            Background="#27AE60" Foreground="White" BorderThickness="0"
+                            Cursor="Hand" Click="BtnStart_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

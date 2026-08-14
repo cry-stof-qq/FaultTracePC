@@ -20,6 +20,7 @@ public static class HtmlReportGenerator
 
         Header(sb, r);
         VerdictBanner(sb, r);
+        GuidedHint(sb, r);
         ComparisonSection(sb, r);
         Findings(sb, r);
         RepairSection(sb, r);
@@ -83,6 +84,38 @@ public static class HtmlReportGenerator
         var cls = r.Findings.Any(f => f.Severity == Severity.Critical) ? "crit"
                 : r.Findings.Any(f => f.Severity == Severity.Warning) ? "warn" : "ok";
         sb.Append($"<div class=\"verdict {cls}\"><div class=\"verdict-label\">Verdict</div><div class=\"verdict-text\">{H(r.Verdict)}</div></div>");
+    }
+
+    /// <summary>
+    /// « Et maintenant, je fais quoi ? »
+    ///
+    /// Un rapport de diagnostic laisse souvent son lecteur avec un constat et aucun
+    /// point de départ. Ce bandeau indique qu'un assistant guidé existe dans le
+    /// logiciel, juste sous le verdict — c'est-à-dire à l'endroit exact où la
+    /// question se pose. Il n'apparaît que s'il y a réellement quelque chose à
+    /// traiter : sur une machine saine, ce serait du bruit.
+    /// </summary>
+    private static void GuidedHint(StringBuilder sb, DiagnosticReport r)
+    {
+        bool somethingToDo = r.Findings.Any(f => f.Severity is Severity.Critical or Severity.Warning);
+        if (!somethingToDo) return;
+
+        var driver = r.Findings.FirstOrDefault(f =>
+            f.Category == FaultCategory.Driver && f.Severity == Severity.Critical);
+
+        sb.Append("<div class=\"guided\">");
+        sb.Append("<div class=\"guided-t\">Tu ne sais pas par où commencer ?</div>");
+        sb.Append("<p>Dans FaultTracePC, le bouton <strong>« Je ne sais pas ce que j'ai »</strong> enchaîne tout seul "
+                + "ce qu'il est possible de faire sans risque : point de restauration, examen, réparation des fichiers "
+                + "système et de l'image Windows, contrôle du disque — puis il revérifie et conclut en une phrase. "
+                + "Ce qui demande une décision t'est proposé à la fin, une action à la fois, avec sa raison.</p>");
+
+        if (driver is not null)
+            sb.Append("<p><strong>Dans ton cas</strong>, le problème principal vient d'un pilote. L'assistant ne le "
+                    + "remplacera pas à ta place — un pilote se choisit — mais il écarte tout le reste et te laisse "
+                    + "face à la seule action qui compte, décrite plus bas.</p>");
+
+        sb.Append("</div>");
     }
 
     /// <summary>Évolution depuis le scan précédent — la réponse à « est-ce que c'est réparé ? ».</summary>
@@ -230,6 +263,35 @@ public static class HtmlReportGenerator
                 sb.Append($"<tr><td>{a.Time:dd/MM HH:mm}</td><td>{badge}</td><td>{H(a.Title)}</td><td class=\"small\">{H(a.Recommendation)}</td></tr>");
             }
             sb.Append("</tbody></table>");
+        }
+
+        if (f.Thermal.Count > 0)
+        {
+            sb.Append("<h4 class=\"ctxtitle\">Températures dans la durée</h4>");
+            sb.Append("<p class=\"explain\">Ce qui annonce un plantage thermique n'est pas la température d'un instant — une pointe "
+                    + "pendant un jeu ou une compilation est normale — mais le TEMPS CUMULÉ passé trop haut. "
+                    + "Les durées ci-dessous ne comptent que les périodes réellement mesurées : machine éteinte ou service arrêté, rien n'est compté.</p>");
+            sb.Append("<table><thead><tr><th>Capteur</th><th>Maximum</th><th>Moyenne</th>"
+                    + "<th>Au-dessus du seuil d'alerte</th><th>Au-dessus du seuil critique</th><th>Durée mesurée</th></tr></thead><tbody>");
+            foreach (var t in f.Thermal)
+            {
+                bool bad = t.AboveCrit >= TimeSpan.FromMinutes(5);
+                bool warn = !bad && (t.AboveWarn >= TimeSpan.FromMinutes(30) || t.WarnPercent >= 20);
+                sb.Append($"<tr{(bad || warn ? " class=\"oldrow\"" : "")}><td>{H(t.Sensor)}</td>");
+                sb.Append($"<td>{(t.MaxC is { } m ? $"{m:0.#} °C" : "—")}"
+                        + (t.MaxAt is { } at ? $" <span class=\"small\">({at:dd/MM HH:mm})</span>" : "") + "</td>");
+                sb.Append($"<td>{(t.AverageC is { } a2 ? $"{a2:0.#} °C" : "—")}</td>");
+                sb.Append($"<td>{(t.AboveWarn > TimeSpan.Zero ? $"<strong>{Analysis.ThermalHistory.Humanize(t.AboveWarn)}</strong> <span class=\"small\">({t.WarnPercent:0.#} % · seuil {t.WarnThreshold:0} °C)</span>" : $"aucun <span class=\"small\">(seuil {t.WarnThreshold:0} °C)</span>")}</td>");
+                sb.Append($"<td>{(t.AboveCrit > TimeSpan.Zero ? $"<strong>{Analysis.ThermalHistory.Humanize(t.AboveCrit)}</strong> <span class=\"small\">(seuil {t.CritThreshold:0} °C)</span>" : $"aucun <span class=\"small\">(seuil {t.CritThreshold:0} °C)</span>")}</td>");
+                sb.Append($"<td class=\"small\">{Analysis.ThermalHistory.Humanize(t.Observed)}</td></tr>");
+
+                foreach (var ep in t.LongestEpisodes)
+                    sb.Append($"<tr><td colspan=\"6\" class=\"small\">↳ épisode continu de {ep.Minutes:0.#} min "
+                            + $"le {ep.Start:dd/MM à HH:mm}, pointe à {ep.PeakC:0.#} °C</td></tr>");
+            }
+            sb.Append("</tbody></table>");
+            sb.Append("<p class=\"empty\">Les seuils sont modifiables dans <code>ProgramData\\FaultTracePC\\alerts.json</code> "
+                    + "(<code>CpuTempWarn</code>, <code>CpuTempCrit</code>, <code>GpuTempWarn</code>, <code>GpuTempCrit</code>).</p>");
         }
 
         sb.Append($"<p class=\"sub2\">État : <strong>{(f.Active ? "🟢 service actif" : "🔴 service arrêté")}</strong>"
@@ -512,17 +574,45 @@ public static class HtmlReportGenerator
                 + "n'est <em>pas</em> un problème en soi — s'il n'apparaît dans aucun crash, c'est simplement un suspect potentiel à connaître. "
                 + "Les pilotes bas niveau anciens (lecteurs virtuels, antivirus, outils disque) sont en revanche des causes classiques de BSOD "
                 + "lorsqu'ils sont impliqués : si un BSOD cite l'un d'eux, mettre à jour l'application associée ou la désinstaller si elle ne sert plus.</div>");
-        sb.Append("<table><thead><tr><th>Pilote</th><th>Éditeur</th><th>Version</th><th>Date du fichier</th><th>Âge</th><th>Fichier</th></tr></thead><tbody>");
+        sb.Append("<table><thead><tr><th>Pilote</th><th>Éditeur</th><th>Version</th><th>Date du fichier</th><th>Âge</th><th>Fichier</th>"
+                + "<th>Connu de FaultTracePC ?</th></tr></thead><tbody>");
+        int documented = 0, family = 0;
         foreach (var d in thirdParty)
         {
             bool isOld = d.FileDate is { } fd && fd < DateTime.Now.AddYears(-4);
             var ageBadge = d.FileDate is null ? "—"
                 : isOld ? $"<span class=\"agebadge\">ancien ({(int)((DateTime.Now - d.FileDate.Value).TotalDays / 365)} ans)</span>"
                 : "récent";
+
+            // Base de correspondance pilote → logiciel → action : quand le fichier y
+            // figure, on affiche à QUOI il correspond et on met la marche à suivre en
+            // infobulle. Un nom de fichier seul n'aide personne à réparer quoi que ce soit.
+            var file = Path.GetFileName(d.Path);
+            var hit = Analysis.DriverKnowledgeBase.LookupAny(file, d.CompanyName);
+            string known;
+            if (hit is { } h2)
+            {
+                if (h2.Exact) documented++; else family++;
+                // Le point d'interrogation distingue une identification par FAMILLE
+                // d'une correspondance nominative : le conseil reste valable, mais il
+                // est générique. Laisser croire à une identification précise serait
+                // une petite malhonnêteté qui finit par coûter cher.
+                known = $"<span class=\"kbhit\" title=\"{H(h2.Entry.Context)} — Que faire : {H(h2.Entry.Fix)}\">"
+                      + $"{H(h2.Entry.Owner)}{(h2.Exact ? "" : " <span class=\"small\">(famille)</span>")}</span>";
+            }
+            else known = "<span class=\"small\">—</span>";
+
             sb.Append($"<tr{(isOld ? " class=\"oldrow\"" : "")}><td>{H(FirstNonEmpty(d.DisplayName, d.Name))}</td><td>{H(d.CompanyName)}</td><td class=\"small\">{H(d.FileVersion)}</td>");
-            sb.Append($"<td>{(d.FileDate?.ToString("dd/MM/yyyy") ?? "?")}</td><td>{ageBadge}</td><td class=\"small\">{H(Path.GetFileName(d.Path))}</td></tr>");
+            sb.Append($"<td>{(d.FileDate?.ToString("dd/MM/yyyy") ?? "?")}</td><td>{ageBadge}</td><td class=\"small\">{H(file)}</td><td class=\"small\">{known}</td></tr>");
         }
-        sb.Append("</tbody></table></section>");
+        sb.Append("</tbody></table>");
+        sb.Append($"<p class=\"empty\">Sur {thirdParty.Count} pilote(s) tiers : <strong>{documented}</strong> identifié(s) nommément "
+                + $"(base de {Analysis.DriverKnowledgeBase.Count} pilotes documentés), <strong>{family}</strong> rattaché(s) à une famille "
+                + $"connue, {thirdParty.Count - documented - family} non documenté(s). Survole la dernière colonne pour savoir à quel logiciel "
+                + "un pilote appartient et quoi faire s'il est impliqué dans un crash.<br>"
+                + "« (famille) » signale une identification par plateforme : le conseil est valable mais générique, contrairement à une "
+                + "correspondance nominative qui donne le correctif éprouvé. Un tiret ne veut pas dire suspect — seulement non documenté.</p>");
+        sb.Append("</section>");
     }
 
     private static void ReliabilitySection(StringBuilder sb, DiagnosticReport r)
@@ -666,6 +756,22 @@ public static class HtmlReportGenerator
         .btn2{margin-top:12px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:inherit}
         .btn2:hover{background:rgba(255,255,255,.22)}
         body.simple section.tech{display:none}
+        @media print{
+          /* Un rapport imprimé ou exporté en PDF ne doit pas couper une conclusion
+             en deux : chaque carte reste d'un seul tenant, et le bouton de bascule
+             n'a évidemment aucun sens sur papier. */
+          #mode-toggle,.filterbar{display:none!important}
+          body{background:#fff}
+          .card,.syscard,.repair,.guided,.verdict{break-inside:avoid;page-break-inside:avoid}
+          section{break-inside:auto}
+          h2{break-after:avoid;page-break-after:avoid}
+          table{font-size:10px}
+          a{color:#000;text-decoration:none}
+        }
+        .guided{background:#f2ecf7;border:1px solid #7D3C98;border-left:5px solid #7D3C98;border-radius:8px;padding:14px 18px;margin:0 0 18px;font-size:13px}
+        .guided-t{font-weight:700;color:#5B2C6F;font-size:14px;margin-bottom:6px}
+        .guided p{margin:6px 0 0}
+        .kbhit{border-bottom:1px dotted #2A78D6;cursor:help;color:#2A78D6}
         .agebadge{background:#e6a817;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap}
         .repair{background:#fff;border:1px solid #dbe2ec;border-left:5px solid #27ae60;border-radius:8px;padding:14px 18px;font-size:14px}
         .repair pre{background:#182848;color:#d8e4f5;padding:10px 12px;border-radius:6px;overflow-x:auto;font-size:12px}

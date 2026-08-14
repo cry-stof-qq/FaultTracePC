@@ -84,6 +84,7 @@ public partial class RepairToolboxWindow : Window
                 "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
+        _currentTool = "uninstallkb";
         LaunchPs($"Write-Host 'Désinstallation de {row.Kb}…' -ForegroundColor Cyan; " +
                  $"wusa /uninstall /kb:{m.Value} /promptrestart");
         TxtStatus.Text = $"Désinstallation de {row.Kb} lancée — suis la fenêtre PowerShell.";
@@ -96,6 +97,7 @@ public partial class RepairToolboxWindow : Window
     /// </summary>
     private void BtnRestorePoint_Click(object sender, RoutedEventArgs e)
     {
+        _currentTool = "restorepoint";
         if (MessageBox.Show(this,
                 "Créer un point de restauration système maintenant ?\n\n" +
                 "Cela permettra de revenir à l'état actuel si une réparation se passe mal. " +
@@ -136,6 +138,9 @@ public partial class RepairToolboxWindow : Window
     private void BtnTool_Click(object sender, RoutedEventArgs e)
     {
         var tag = (sender as FrameworkElement)?.Tag as string ?? "";
+        // Mémorisé ici plutôt que passé à chaque appel : LaunchPs y lit l'action
+        // en cours pour savoir si elle modifie le système et comment la nommer.
+        _currentTool = tag;
 
         // Actions qui MODIFIENT le système : confirmation préalable.
         var confirmations = new Dictionary<string, string>
@@ -265,18 +270,58 @@ public partial class RepairToolboxWindow : Window
         }
     }
 
-    /// <summary>Lance une commande dans une fenêtre PowerShell VISIBLE qui reste ouverte.</summary>
+    /// <summary>Action de la boîte à outils en cours de déclenchement.</summary>
+    private string _currentTool = "";
+
+    /// <summary>
+    /// Lance une commande dans une fenêtre PowerShell VISIBLE qui reste ouverte.
+    ///
+    /// Deux réparations qui écrivent en même temps se gênent : sfc et DISM se
+    /// disputent le magasin de composants, deux nettoyages se marchent dessus,
+    /// une analyse antivirus complète ralentit tout le reste. Une seule action
+    /// modifiante à la fois, donc — les consultations restent libres.
+    /// </summary>
     private void LaunchPs(string command)
     {
+        var tool = _currentTool;
+
+        if (RunningTools.IsExclusive(tool) && RunningTools.BlockingLabel() is { } busy)
+        {
+            var r = MessageBox.Show(this,
+                $"Une action est déjà en cours :\n\n    {busy}\n\n" +
+                "Deux réparations lancées en même temps se gênent mutuellement et peuvent laisser " +
+                "le système dans un état incohérent — c'est particulièrement vrai pour sfc, DISM, " +
+                "chkdsk et les analyses antivirus.\n\n" +
+                "OUI — basculer vers la fenêtre en cours et attendre qu'elle finisse.\n" +
+                "NON — lancer quand même (déconseillé).\n" +
+                "ANNULER — ne rien faire.",
+                "FaultTracePC — une action est déjà en cours",
+                MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Yes);
+
+            if (r == MessageBoxResult.Cancel) return;
+            if (r == MessageBoxResult.Yes)
+            {
+                if (!RunningTools.FocusBlocking())
+                    TxtStatus.Text = "La fenêtre en cours n'a pas pu être ramenée au premier plan — cherche-la dans la barre des tâches.";
+                return;
+            }
+        }
+
         try
         {
-            Process.Start(new ProcessStartInfo
+            var started = Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
                 Arguments = $"-NoProfile -ExecutionPolicy Bypass -NoExit -Command \"{command.Replace("\"", "\\\"")}\"",
                 UseShellExecute = true,
             });
-            TxtStatus.Text = "Commande lancée — suis son déroulement dans la fenêtre PowerShell.";
+
+            if (started is not null && tool.Length > 0)
+                RunningTools.Track(RunningTools.LabelOf(tool), started, RunningTools.IsExclusive(tool));
+
+            TxtStatus.Text = RunningTools.IsExclusive(tool)
+                ? $"« {RunningTools.LabelOf(tool)} » en cours — les autres réparations attendront la fin de celle-ci."
+                : "Commande lancée — suis son déroulement dans la fenêtre PowerShell.";
         }
         catch (Exception ex)
         {

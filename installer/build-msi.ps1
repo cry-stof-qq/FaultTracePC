@@ -28,7 +28,7 @@
 [CmdletBinding()]
 param(
     [string]$WixVersion = '6.0.2',
-    [string]$Version = '1.1.0',
+    [string]$Version = '1.2.0',
     [switch]$SkipPublish
 )
 
@@ -64,9 +64,36 @@ if (-not (Test-Path (Join-Path $publishDir 'FaultTracePC.exe'))) {
 Write-Host 'Construction du paquet MSI…' -ForegroundColor Cyan
 New-Item -ItemType Directory -Force -Path (Split-Path $msiPath) | Out-Null
 
+# L'extension d'interface fournit les écrans d'installation (arbre des
+# fonctionnalités avec cases à cocher, écran final avec « Lancer maintenant »).
+#
+# PIÈGE : la version de l'extension doit être EXACTEMENT celle de l'outil wix.
+# Sans numéro, la résolution échoue et la construction s'arrête plus loin sur
+# « WIX0144: extension could not be found », sans rapport apparent avec l'ajout.
+# La sortie n'est plus masquée : une erreur ici doit se voir tout de suite.
+$wixVer = (wix --version) -replace '\+.*$', ''
+if (-not $wixVer) { $wixVer = $WixVersion }
+Write-Host "Extension d'interface WiX ($wixVer)…" -ForegroundColor Gray
+
+$installed = (wix extension list -g 2>&1) -join "`n"
+if ($installed -notmatch 'WixToolset\.UI\.wixext') {
+    wix extension add -g "WixToolset.UI.wixext/$wixVer"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Impossible d'ajouter l'extension d'interface WiX en version $wixVer. " +
+              "Vérifie la connexion réseau (l'extension se télécharge depuis NuGet), " +
+              "ou installe-la à la main : wix extension add -g WixToolset.UI.wixext/$wixVer"
+    }
+}
+
+# -culture fr-FR : les écrans d'installation sont fournis traduits par
+# l'extension d'interface. Sans cette option, WiX prend l'anglais par défaut —
+# un installeur anglais devant une application entièrement française.
 wix build (Join-Path $PSScriptRoot 'FaultTracePC.wxs') `
+    -ext WixToolset.UI.wixext `
+    -culture fr-FR `
     -d "SourceDir=$publishDir" `
     -d "AssetsDir=$(Join-Path $root 'assets')" `
+    -d "LicenseRtf=$(Join-Path $PSScriptRoot 'License.rtf')" `
     -d "Version=$Version" `
     -arch x64 `
     -out $msiPath

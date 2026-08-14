@@ -44,6 +44,10 @@
                 <Button x:Name="BtnPark" Content="🖥  Parc" Padding="14,9" Margin="12,0,0,6"
                         FontSize="13" Cursor="Hand" Click="BtnPark_Click"
                         ToolTip="Console maître : état temps réel et rapports de toutes tes machines clientes."/>
+                <Button x:Name="BtnGuided" Content="🧭  Je ne sais pas ce que j'ai" Padding="14,9" Margin="12,0,0,6"
+                        FontSize="13" Cursor="Hand" Click="BtnGuided_Click"
+                        Background="#7D3C98" Foreground="White" BorderThickness="0"
+                        ToolTip="Assistant guidé : point de restauration, analyse, réparations sans risque, puis vérification. Une conclusion en une phrase, et les actions qui demandent ton accord proposées une par une."/>
                 <Button x:Name="BtnToolbox" Content="🧰  Outils" Padding="14,9" Margin="12,0,0,6"
                         FontSize="13" Cursor="Hand" Click="BtnToolbox_Click"
                         ToolTip="Boîte à outils de réparation : désinstaller une mise à jour Windows, réinitialiser Windows Update, sfc/DISM/chkdsk, diagnostic mémoire… à un clic, dans une fenêtre PowerShell visible."/>
@@ -101,25 +105,48 @@
 
         <!-- Pied -->
         <Border Grid.Row="3" Background="#EDF1F6" Padding="22,10">
+            <!-- Deux colonnes plutôt qu'une seule superposition : sans elles, le bloc
+                 de gauche et les boutons alignés à droite occupent la MÊME cellule et
+                 se chevauchent dès que la fenêtre est un peu étroite. La colonne
+                 gauche est élastique et son texte se tronque ; les boutons, eux,
+                 gardent toujours leur largeur. -->
             <Grid>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtFoot" Text="v1.1 — diagnostic, boîte noire, alertes préventives, parc et réparation" FontSize="11" Foreground="#6B7C91"
-                               VerticalAlignment="Center"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="0"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <!-- WrapPanel et non StackPanel : une Grid délimite des colonnes mais
+                     ne DÉCOUPE pas ce qui déborde. Un StackPanel horizontal continue
+                     tout droit hors de sa colonne et se fait recouvrir par le bloc de
+                     droite, déclaré après lui. Le WrapPanel, lui, replie ses éléments
+                     sur une seconde ligne dès que la place manque : le pied grandit
+                     un peu, mais plus rien n'est masqué. ClipToBounds ferme le sujet
+                     dans le cas extrême d'une fenêtre réduite au minimum. -->
+                <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                           Margin="0,0,12,0" ClipToBounds="True">
+                    <TextBlock x:Name="TxtFoot" Text="v1.1 — diagnostic et réparation" FontSize="11" Foreground="#6B7C91"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,2,0,2"
+                               MaxWidth="340"
+                               ToolTip="Diagnostic des pannes, boîte noire temps réel, alertes préventives, console de parc et aide à la réparation."/>
                     <TextBlock x:Name="TxtUpdate" FontSize="11" Margin="14,0,0,0" VerticalAlignment="Center"
                                Visibility="Collapsed" FontWeight="SemiBold" Foreground="#C0392B"/>
                     <Button x:Name="BtnUpdate" Content="🔄 Vérifier les mises à jour" FontSize="11" Padding="8,3"
-                            Margin="14,0,0,0" VerticalAlignment="Center" Click="BtnUpdate_Click"
+                            Margin="14,2,0,2" VerticalAlignment="Center" Click="BtnUpdate_Click"
                             ToolTip="Interroge la page des versions publiées sur GitHub. FaultTracePC ne télécharge et n'installe jamais rien tout seul : il te dit ce qui existe, tu décides."/>
-                    <CheckBox x:Name="ChkUpdateStartup" Content="au démarrage" FontSize="11" Margin="8,0,0,0"
+                    <CheckBox x:Name="ChkUpdateStartup" Content="au démarrage" FontSize="11" Margin="8,2,0,2"
                               VerticalAlignment="Center" Foreground="#6B7C91"
                               Checked="ChkUpdateStartup_Changed" Unchecked="ChkUpdateStartup_Changed"
                               ToolTip="Décoché par défaut : sans cette case, FaultTracePC ne contacte jamais Internet de lui-même. À laisser décoché sur un poste d'établissement si les sorties réseau sont contrôlées."/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                </WrapPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
                     <Button x:Name="BtnRepair" Content="🛠  Lancer la réparation" Padding="12,6" FontSize="12"
                             Margin="0,0,8,0" IsEnabled="False" Click="BtnRepair_Click"
                             Background="#27AE60" Foreground="White" BorderThickness="0"
                             ToolTip="Exécute le script PowerShell de réparation généré par le dernier scan (tests en lecture seule automatiques, actions avec confirmation O/N)."/>
+                    <Button x:Name="BtnPdf" Content="📑  PDF" Padding="12,6" FontSize="12"
+                            Margin="0,0,8,0" IsEnabled="False" Click="BtnPdf_Click"
+                            ToolTip="Crée un PDF du dernier rapport, à la demande uniquement — aucun PDF n'est généré automatiquement. Le document contient le rapport COMPLET, détails techniques inclus, pour être joint à un ticket ou transmis à un réparateur."/>
                     <Button x:Name="BtnOpenReport" Content="📄  Ouvrir le dernier rapport"
                             Padding="12,6" FontSize="12" IsEnabled="False" Click="BtnOpenReport_Click"/>
                 </StackPanel>

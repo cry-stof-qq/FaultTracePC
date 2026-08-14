@@ -94,6 +94,30 @@ public static class ScanHistory
         catch (Exception ex) { errors.Add($"Historique des scans (écriture) : {ex.Message}"); }
     }
 
+    /// <summary>
+    /// Résumé du dernier scan de cette machine, ou null si elle n'a jamais été
+    /// analysée. C'est ce que le mode parc rapatrie pour comparer les postes entre
+    /// eux : il contient déjà versions de pilotes, crashs, disques et conclusions
+    /// critiques, sans rien exposer de nominatif.
+    /// </summary>
+    public static ScanSummary? LoadLatest()
+    {
+        try
+        {
+            if (!Directory.Exists(HistoryDir)) return null;
+            foreach (var file in Directory.EnumerateFiles(HistoryDir, "Scan_*.json").OrderByDescending(f => f))
+            {
+                try
+                {
+                    if (JsonSerializer.Deserialize<ScanSummary>(File.ReadAllText(file), JsonOpts) is { } s) return s;
+                }
+                catch { /* fichier corrompu : on essaie le précédent */ }
+            }
+        }
+        catch { /* historique illisible */ }
+        return null;
+    }
+
     /// <summary>Charge le résumé du scan le plus récent AVANT le scan courant.</summary>
     public static ScanSummary? LoadPrevious(DateTime before, List<string> errors)
     {

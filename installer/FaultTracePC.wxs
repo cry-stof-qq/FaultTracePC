@@ -18,7 +18,8 @@
     NOTE : l'élément <Files> (récolte automatique d'un dossier) n'existe qu'à
     partir de WiX v5 — d'où la version épinglée dans le script de construction.
 -->
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
   <Package Name="FaultTracePC"
            Manufacturer="Cry-stof"
@@ -43,18 +44,84 @@
     <Icon Id="AppIcon.ico" SourceFile="$(AssetsDir)\FaultTracePC.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
 
+    <!-- ================= Interface d'installation =================
+         WixUI_FeatureTree affiche la liste des composants avec des cases à
+         cocher : le raccourci du Bureau y figure, coché par défaut, et peut
+         être décoché. La case « Lancer maintenant » est celle, standard, de
+         l'écran final.
+
+         Les deux restent pilotables en installation silencieuse (GPO) :
+             msiexec /i FaultTracePC.msi /qn ADDLOCAL=Main,DesktopShortcutFeature
+             msiexec /i FaultTracePC.msi /qn ADDLOCAL=Main          (sans raccourci Bureau)
+         En mode /qn l'écran final n'existe pas : rien n'est lancé, ce qui est
+         le comportement attendu d'un déploiement automatisé. -->
+    <UI>
+      <ui:WixUI Id="WixUI_FeatureTree" InstallDirectory="INSTALLFOLDER" />
+
+      <!-- Publish DOIT être enfant de <UI> : placé directement sous <Package>,
+           WiX répond « WIX0005: unexpected child element 'Publish' ». -->
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+    <WixVariable Id="WixUILicenseRtf" Value="$(LicenseRtf)" />
+
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Lancer FaultTracePC maintenant" />
+
+    <!-- Lancement de l'application depuis l'écran final.
+         Action de type 50 (exécutable désigné par une propriété) : elle évite
+         d'ajouter l'extension Util juste pour un ShellExec. Impersonate="yes"
+         est important — sans cela l'application démarrerait avec le compte
+         SYSTEM du programme d'installation, pas avec celui de l'utilisateur.
+         Return="asyncNoWait" : l'installeur se ferme sans attendre. -->
+    <!-- ============ Lancement à la fin de l'installation ============
+
+         Deux approches ont échoué avant celle-ci, toutes deux SILENCIEUSEMENT :
+
+         1. deux actions homonymes — <SetProperty Id="X"> crée aussi une action
+            nommée X, qui écrasait celle censée lancer l'exécutable ;
+         2. un chemin bâti sur [#FaultTracePC.exe], c'est-à-dire sur l'identifiant
+            de fichier engendré par la collecte automatique <Files Include="**"> :
+            cet identifiant n'est pas garanti d'être « FaultTracePC.exe », et une
+            référence non résolue produit une chaîne VIDE, donc une action qui ne
+            lance rien sans lever la moindre erreur.
+
+         D'où ce choix, volontairement fruste : on exécute cmd.exe — dont le
+         chemin est donné par une propriété standard de Windows Installer — avec
+         « start », et on construit le chemin cible à partir du dossier
+         d'installation. Plus aucun identifiant interne dans l'équation.
+
+         « start » rend la main aussitôt, donc l'installeur ne reste pas suspendu.
+         Impersonate="yes" est indispensable : sans lui, l'application démarrerait
+         sous le compte SYSTEM du programme d'installation au lieu de celui de
+         l'utilisateur. Le premier guillemet vide après « start » est le titre de
+         fenêtre — l'omettre ferait prendre le chemin entre guillemets pour un
+         titre, et rien ne se lancerait. -->
+    <SetProperty Id="LaunchShell" Value="[System64Folder]cmd.exe" Sequence="ui" After="CostFinalize" />
+    <CustomAction Id="LaunchApplication" Property="LaunchShell"
+                  ExeCommand="/c start &quot;&quot; &quot;[INSTALLFOLDER]FaultTracePC.exe&quot;"
+                  Execute="immediate" Impersonate="yes" Return="asyncNoWait" />
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="FaultTracePC" />
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="AppShortcutFolder" Name="FaultTracePC" />
     </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
 
     <Feature Id="Main" Title="FaultTracePC" Level="1" AllowAbsent="no"
              Description="Application, outil en ligne de commande et service de surveillance.">
       <ComponentGroupRef Id="ProductFiles" />
       <ComponentRef Id="MonitorService" />
       <ComponentRef Id="AppShortcuts" />
+    </Feature>
+
+    <!-- Fonctionnalité séparée = case à cocher dans l'arbre, cochée par défaut
+         (Level="1"). L'utilisateur peut la décocher ; un déploiement GPO peut
+         l'omettre via ADDLOCAL. -->
+    <Feature Id="DesktopShortcutFeature" Title="Raccourci sur le Bureau" Level="1"
+             Description="Place une icône FaultTracePC sur le Bureau.">
+      <ComponentRef Id="DesktopShortcut" />
     </Feature>
 
     <!-- ===================== Fichiers publiés ===================== -->
@@ -103,6 +170,18 @@
       <RemoveFolder Id="RemoveAppShortcutFolder" Directory="AppShortcutFolder" On="uninstall" />
       <RegistryValue Root="HKLM" Key="Software\Cry-stof\FaultTracePC"
                      Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcut" Directory="DesktopFolder"
+               Guid="7C4B9E22-1F3A-4D58-9A6E-2B8C51D0F4A7">
+      <Shortcut Id="AppDesktopShortcut"
+                Name="FaultTracePC"
+                Description="Diagnostic des pannes Windows"
+                Target="[INSTALLFOLDER]FaultTracePC.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon.ico" />
+      <RegistryValue Root="HKCU" Key="Software\Cry-stof\FaultTracePC"
+                     Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
   </Package>

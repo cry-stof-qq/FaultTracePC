@@ -36,6 +36,12 @@ public sealed class FlightJournalCollector
             info.JournalFound = true;
             info.DaysCovered = files.Count;
 
+            // Bilan thermique : on cumule au fil de la lecture, sans second passage
+            // sur des journaux qui peuvent peser plusieurs dizaines de mégaoctets.
+            var thresholds = AlertSettings.Load();
+            var cpuThermal = new Analysis.ThermalHistory("Processeur", thresholds.CpuTempWarn, thresholds.CpuTempCrit);
+            var gpuThermal = new Analysis.ThermalHistory("Carte graphique", thresholds.GpuTempWarn, thresholds.GpuTempCrit);
+
             var targets = crashTimes.Distinct().OrderBy(t => t).ToList();
             var window = new Queue<FlightSample>(WindowSize + 1);
             var contexts = new Dictionary<DateTime, FlightCrashContext>();
@@ -59,6 +65,8 @@ public sealed class FlightJournalCollector
                             break;
                         case "s":
                             info.LastSampleTime = entry.Time;
+                            cpuThermal.Add(entry.Time, entry.CpuTemp);
+                            gpuThermal.Add(entry.Time, entry.GpuTemp);
                             window.Enqueue(entry);
                             while (window.Count > WindowSize) window.Dequeue();
                             break;
@@ -86,6 +94,11 @@ public sealed class FlightJournalCollector
 
             info.Contexts = contexts.Values.OrderByDescending(c => c.CrashTime).ToList();
             info.Active = info.LastSampleTime is { } last && DateTime.Now - last < TimeSpan.FromMinutes(2);
+
+            // Un capteur muet ne produit rien : on n'affiche pas une ligne vide qui
+            // laisserait croire que la machine reste froide alors qu'on n'a rien mesuré.
+            foreach (var stats in new[] { cpuThermal.Build(), gpuThermal.Build() })
+                if (stats.HasData) info.Thermal.Add(stats);
         }
         catch (Exception ex)
         {

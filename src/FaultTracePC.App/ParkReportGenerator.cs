@@ -28,7 +28,8 @@ public static class ParkReportGenerator
         public string LastAlert { get; set; } = "";
     }
 
-    public static string Generate(IReadOnlyList<MachineLine> machines)
+    public static string Generate(IReadOnlyList<MachineLine> machines,
+                                 FaultTracePC.Core.Analysis.ParkComparator.ParkAnalysis? comparison = null)
     {
         var now = DateTime.Now;
         var sb = new StringBuilder(32 * 1024);
@@ -86,6 +87,37 @@ public static class ParkReportGenerator
             sb.Append("</tbody></table></section>");
         }
 
+        // ---------- Comparateur de parc ----------
+        if (comparison is not null)
+        {
+            sb.Append("<section><h2>Ce que les postes ont en commun</h2>");
+            sb.Append("<p class=\"explain\">Un diagnostic individuel ne peut pas voir ceci : un pilote ancien identique sur six postes "
+                    + "n'est plus un suspect, c'est une image de déploiement à corriger — et la réparation se fait une fois pour tout le parc.</p>");
+            sb.Append($"<p class=\"parkverdict\">{H(comparison.Summary)}</p>");
+
+            foreach (var c in comparison.Correlations)
+            {
+                var badge = c.Severity switch
+                {
+                    "crit" => "<span class=\"badge crit\">Critique</span>",
+                    "warn" => "<span class=\"badge warn\">À surveiller</span>",
+                    _ => "<span class=\"badge info\">Information</span>",
+                };
+                var kind = c.Kind switch
+                {
+                    "divergence" => "divergence de version",
+                    "isolé" => "poste isolé",
+                    _ => "point commun",
+                };
+                sb.Append($"<div class=\"corr {c.Severity}\"><div class=\"corr-head\">{badge}<span class=\"kind\">{kind}</span></div>");
+                sb.Append($"<h3>{H(c.Title)}</h3><p>{H(c.Details)}</p>");
+                if (c.Machines.Count > 0)
+                    sb.Append($"<p class=\"machines\"><strong>Postes concernés :</strong> {H(string.Join(", ", c.Machines))}</p>");
+                sb.Append($"<p class=\"reco\"><strong>Que faire :</strong> {H(c.Action)}</p></div>");
+            }
+            sb.Append("</section>");
+        }
+
         sb.Append($"<footer>Généré par FaultTracePC (console Parc) le {now:dd/MM/yyyy à HH:mm}. ");
         sb.Append("Les machines injoignables peuvent être éteintes, hors du réseau, ou avoir un service de surveillance arrêté.</footer>");
         sb.Append("</body></html>");
@@ -93,12 +125,13 @@ public static class ParkReportGenerator
     }
 
     /// <summary>Écrit le rapport dans Documents\FaultTracePC et retourne son chemin.</summary>
-    public static string WriteToDisk(IReadOnlyList<MachineLine> machines)
+    public static string WriteToDisk(IReadOnlyList<MachineLine> machines,
+                                     FaultTracePC.Core.Analysis.ParkComparator.ParkAnalysis? comparison = null)
     {
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC");
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, $"Parc_{DateTime.Now:yyyy-MM-dd_HHmm}.html");
-        File.WriteAllText(path, Generate(machines), Encoding.UTF8);
+        File.WriteAllText(path, Generate(machines, comparison), Encoding.UTF8);
         return path;
     }
 
@@ -130,6 +163,18 @@ public static class ParkReportGenerator
         td{padding:7px 10px;border-top:1px solid #e8edf3;vertical-align:top}
         tr.crit td{background:#fdecea}tr.warn td{background:#fef8ec}
         .small{font-size:12px;color:#42546b}
+        .badge{display:inline-block;padding:2px 9px;border-radius:11px;color:#fff;font-size:11px;font-weight:700}
+        .badge.crit{background:#c0392b}.badge.warn{background:#e67e22}.badge.info{background:#6b7c91}
+        .parkverdict{font-size:15px;font-weight:600;color:#182848;margin:0 0 16px}
+        .corr{background:#fff;border:1px solid #dbe2ec;border-left:5px solid #6b7c91;border-radius:8px;padding:14px 18px;margin:0 0 12px}
+        .corr.crit{border-left-color:#c0392b}
+        .corr.warn{border-left-color:#e67e22}
+        .corr-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+        .corr .kind{font-size:11px;color:#6b7c91;text-transform:uppercase;letter-spacing:.4px}
+        .corr h3{margin:4px 0 6px;font-size:15px}
+        .corr p{margin:5px 0;font-size:13px}
+        .corr .machines{color:#44546a}
+        .corr .reco{background:#f4f6f9;border-radius:6px;padding:8px 10px}
         footer{max-width:1200px;margin:28px auto;padding:14px 24px;color:#6b7c91;font-size:12px;border-top:1px solid #dbe2ec}
         @media print{body{background:#fff}header{background:#fff;color:#000;border-bottom:2px solid #000}}
         """;

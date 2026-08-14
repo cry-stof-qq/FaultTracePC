@@ -84,12 +84,46 @@ rapport vérifie s'il est toujours installé, s'il a été désinstallé, ou s'i
 été **réinstallé ou mis à jour après le dernier crash** — et le dit, au lieu
 d'afficher éternellement un problème déjà réglé.
 
+**Chaque pilote a un nom, un propriétaire et une action.** Une base de 59 pilotes
+documentés relie un fichier `.sys` au logiciel ou au matériel qui l'installe, et
+au correctif éprouvé — « nvlddmkm.sys » devient « pilote NVIDIA, réinstallation
+propre avec DDU en mode sans échec ». Les pilotes absents de la base sont
+rattachés à leur **famille de plateforme** (AMD, Intel, Realtek, VirtualBox,
+Fortinet, OEM…) quand le nom **et** l'éditeur concordent. Le rapport distingue
+les deux niveaux : une correspondance nominative donne le correctif précis, une
+identification par famille un conseil générique mais juste.
+
+**« Je ne sais pas ce que j'ai ».** Un bouton unique, pensé pour qui ne sait pas
+ce qu'est un pilote : point de restauration, examen, réparations **sans risque**
+appliquées seules, puis nouvelle analyse et une conclusion en une phrase. Tout ce
+qui redémarre, installe ou désinstalle est **proposé à la fin, une action à la
+fois, avec sa raison**. Sans point de restauration possible, l'assistant propose
+d'activer la protection du système — et à défaut continue en **mode réduit**, en
+s'interdisant alors de toucher aux fichiers système.
+
+**Températures dans la durée.** Ce n'est pas la température d'un instant qui
+annonce un plantage, mais le temps cumulé passé trop haut : *« 40 minutes
+au-dessus de 90 °C cette semaine »*, avec les épisodes continus les plus longs.
+Les périodes machine éteinte ne sont jamais comptées.
+
+**Export PDF, à la demande.** Un bouton crée un PDF du rapport **complet**,
+détails techniques inclus, pour le joindre à un ticket. Aucun PDF n'est généré
+automatiquement.
+
 **Suivi et parc.** Chaque scan est archivé : le suivant répond à la vraie
 question — « est-ce que la réparation a marché ? ». En mode parc, une console
 affiche l'état de plusieurs machines et permet de lancer un diagnostic à
 distance sans se déplacer.
 
-**Suis-je à jour ?** Le bouton `⭯ Vérifier les mises à jour` compare la version
+**Comparateur de parc.** Ce qu'aucun diagnostic individuel ne peut voir : un
+pilote ancien identique sur six postes n'est plus un suspect, c'est une image de
+déploiement à corriger — une fois, pour tout le parc. Le comparateur relève ce
+qui est **commun** (pilote, code d'arrêt, modèle de disque qui se dégrade), ce
+qui **diverge** (même pilote en plusieurs versions : les retardataires sont
+nommés) et ce qui est **isolé** (un poste qui accumule seul, et relève d'un
+traitement individuel).
+
+**Suis-je à jour ?** Le bouton `🔄 Vérifier les mises à jour` compare la version
 réellement embarquée dans l'exécutable à la dernière publiée sur
 [la page des versions](https://github.com/cry-stof-qq/FaultTracePC/releases/latest).
 S'il y a du neuf, il affiche les nouveautés et propose d'ouvrir la page de
@@ -104,7 +138,7 @@ clairement et ne bloque rien.
 
 | Format | Pour qui | Comment |
 |---|---|---|
-| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.1.0.msi` (ou double-clic) |
+| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.2.0.msi` (ou double-clic) |
 | **Portable (.zip)** | Dépannage sur clé USB, rien à installer | Décompresser, lancer `FaultTracePC.exe` |
 
 Les deux sont disponibles dans les [Releases](../../releases). Aucun prérequis :
@@ -174,7 +208,7 @@ Produire les distribuables :
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.1.0
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.2.0
 ```
 
 ## Architecture

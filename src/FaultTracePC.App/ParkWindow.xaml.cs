@@ -182,7 +182,27 @@ public partial class ParkWindow : Window
                 };
             }).ToList();
 
-            var path = ParkReportGenerator.WriteToDisk(lines);
+            // Comparateur de parc : on rapatrie le résumé du dernier scan de chaque
+            // poste joignable. C'est la seule information qui permette de corréler —
+            // les relevés temps réel disent l'état, pas l'inventaire.
+            TxtStatus.Text = "Récupération des résumés d'analyse pour la comparaison…";
+            var summaries = new List<Core.Analysis.ParkComparator.MachineSummary>();
+            foreach (var m in _machines)
+            {
+                try
+                {
+                    using var req = SignedRequest(m, HttpMethod.Get, "/api/summary");
+                    using var resp = await Http.SendAsync(req);
+                    if (!resp.IsSuccessStatusCode) continue;
+                    var json = await resp.Content.ReadAsStringAsync();
+                    if (JsonSerializer.Deserialize<Core.Report.ScanHistory.ScanSummary>(json) is { } sum)
+                        summaries.Add(new Core.Analysis.ParkComparator.MachineSummary(m.Name, sum));
+                }
+                catch { /* poste injoignable ou jamais analysé : il sort simplement de la comparaison */ }
+            }
+
+            var comparison = Core.Analysis.ParkComparator.Analyze(summaries);
+            var path = ParkReportGenerator.WriteToDisk(lines, comparison);
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             TxtStatus.Text = $"Rapport du parc généré : {path}";
         }
