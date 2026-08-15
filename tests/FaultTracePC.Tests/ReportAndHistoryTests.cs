@@ -938,16 +938,21 @@ public class ReportAndHistoryTests
     [Fact]
     public void ErreursDisque_SignalentUnPeripheriqueNonInventorie()
     {
+        // Un support absent ET un port de contrôleur : la machine reste concernée,
+        // donc le conseil « identifier avant de réparer » garde tout son sens.
+        // (Le cas où TOUT se rapporte à des supports débranchés est couvert par
+        // ErreursDisque_ToutesSurDesSupportsDebranches_NAlarmentPlusLaMachine, qui
+        // vérifie qu'on cesse alors d'alarmer la machine.)
         var r = AvecErreursDisque(
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1, a été émise."),
             ("disk", 51, @"Une erreur a été détectée sur le périphérique \Device\Harddisk1\DR1 lors d'une opération de pagination."),
-            ("disk", 51, @"Une erreur a été détectée sur le périphérique \Device\Harddisk1\DR1 lors d'une opération de pagination."),
-            ("disk", 51, @"Une erreur a été détectée sur le périphérique \Device\Harddisk1\DR2 lors d'une opération de pagination."));
+            ("disk", 51, @"Une erreur a été détectée sur le périphérique \Device\Harddisk1\DR1 lors d'une opération de pagination."));
         r.System.Disks.Add(NvmeSain(index: 0));   // le seul disque connu est Harddisk0
 
         var f = ErreursDisque(r);
 
         Assert.Contains(@"\Device\Harddisk1", f.Details);
-        Assert.Contains("AUCUN disque inventorié", f.Details);
+        Assert.Contains("ABSENT", f.Details);
         // Et le conseil doit dire de l'identifier AVANT de réparer quoi que ce soit.
         Assert.Contains("Identifier le périphérique non inventorié", f.Recommendation);
     }
@@ -959,12 +964,74 @@ public class ReportAndHistoryTests
             ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0 lors d'une opération de pagination."),
             ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0 lors d'une opération de pagination."),
             ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0 lors d'une opération de pagination."));
+        var d = NvmeSain(index: 0);
+        d.Letters.Add("C:");
+        r.System.Disks.Add(d);
+
+        var f = ErreursDisque(r);
+
+        // Numéro du Gestionnaire de disques, lettre, modèle : les trois désignations,
+        // pour que n'importe quel niveau de lecteur reconnaisse le disque.
+        Assert.Contains("Disque 0", f.Details);
+        Assert.Contains("C:", f.Details);
+        Assert.Contains("RPEYJ1T24MML1AWX", f.Details);
+    }
+
+    [Fact]
+    public void ErreursDisque_NInvententPasUnNumeroPourUnDisqueAbsent()
+    {
+        // LE piège : les numéros de disque sont attribués au branchement. Écrire
+        // « Disque 1 » pour un support débranché enverrait l'utilisateur ouvrir le
+        // Gestionnaire de disques, n'y rien trouver, et douter du rapport.
+        var r = AvecErreursDisque(
+            ("disk", 51, @"Erreur sur \Device\Harddisk1\DR1."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk1\DR2."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk1\DR2."));
         r.System.Disks.Add(NvmeSain(index: 0));
 
         var f = ErreursDisque(r);
 
-        Assert.Contains("RPEYJ1T24MML1AWX", f.Details);
-        Assert.DoesNotContain("AUCUN disque inventorié", f.Details);
+        Assert.Contains("ABSENT", f.Details);
+        // Ni « Disque 1 » sec, ni renvoi vers un Gestionnaire de disques qui ne
+        // l'affichera pas.
+        Assert.DoesNotContain("Disque 1 ", f.Details);
+        // Les dates sont la seule information exploitable pour un support disparu.
+        Assert.Contains("Vu ", f.Details);
+        // Deux instances DR distinctes = deux branchements = support amovible.
+        Assert.Contains("branché puis débranché", f.Details);
+    }
+
+    [Fact]
+    public void ErreursDisque_ToutesSurDesSupportsDebranches_NAlarmentPlusLaMachine()
+    {
+        // Cas du technicien qui branche des disques à réparer : les erreurs
+        // concernent le disque en réparation, pas la machine qui l'analyse.
+        var r = AvecErreursDisque(
+            ("disk", 51, @"Erreur sur \Device\Harddisk3\DR7."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk3\DR7."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk3\DR7."));
+        r.System.Disks.Add(NvmeSain(index: 0));
+
+        var f = ErreursDisque(r);
+
+        Assert.Equal(Severity.Info, f.Severity);
+        Assert.Contains("Aucun disque actuellement monté", f.Details);
+        Assert.Contains("Rien à réparer sur cette machine", f.Recommendation);
+    }
+
+    [Fact]
+    public void ErreursDisque_SurUnPortDeControleur_RestentUnAvertissement()
+    {
+        // Un RaidPort appartient bien à la machine : lui, on ne le minimise pas.
+        var r = AvecErreursDisque(
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1, a été émise."),
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1, a été émise."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk9\DR9."));
+        r.System.Disks.Add(NvmeSain(index: 0));
+
+        var f = ErreursDisque(r);
+
+        Assert.Equal(Severity.Warning, f.Severity);
     }
 
     [Fact]
@@ -1017,6 +1084,7 @@ public class ReportAndHistoryTests
 
         // Le mot « Outils » n'apparaissait nulle part dans le rapport.
         Assert.Contains("Dans FaultTracePC", html);
+        Assert.Contains("Alimentation des liens", html);
 
         // ATTENTION à qui voudra renforcer ce test : le texte des conclusions passe
         // par WebUtility.HtmlEncode, qui convertit TOUT caractère non-ASCII en entité

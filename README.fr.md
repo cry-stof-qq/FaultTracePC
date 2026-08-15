@@ -140,7 +140,7 @@ clairement et ne bloque rien.
 
 | Format | Pour qui | Comment |
 |---|---|---|
-| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.2.2.msi` (ou double-clic) |
+| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.2.3.msi` (ou double-clic) |
 | **Portable (.zip)** | Dépannage sur clé USB, rien à installer | Décompresser, lancer `FaultTracePC.exe` |
 
 Les deux sont disponibles dans les [Releases](../../releases). Aucun prérequis :
@@ -210,7 +210,7 @@ Produire les distribuables :
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.2.2
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.2.3
 ```
 
 ## Architecture

@@ -202,6 +202,7 @@ public static class HtmlReportGenerator
     private static string? ToolboxHint(FaultCategory category) => category switch
     {
         FaultCategory.Storage => "« 💽 Vérifier le disque système (lecture seule) », puis « 🌡 Santé des disques (SMART) ». "
+                               + "En cas de réinitialisations de contrôleur, « 🔌 Alimentation des liens ». "
                                + "« 💾 Gestion des disques » permet d'identifier un périphérique inconnu.",
         FaultCategory.Memory => "« 🧠 Diagnostic mémoire Windows (redémarre !) ».",
         FaultCategory.Driver or FaultCategory.GpuDriver =>
@@ -490,7 +491,12 @@ public static class HtmlReportGenerator
         Card(sb, "Disques physiques",
             s.Disks.Count == 0 ? "aucun détecté"
             : string.Join("<br>", s.Disks.Select(d =>
-                $"{H(d.Model)} ({RulesEngine.FormatBytes(d.SizeBytes)}, {H(string.IsNullOrEmpty(d.MediaType) ? d.InterfaceType : d.MediaType)}) — santé : {H(FirstNonEmpty(d.HealthStatus, d.WmiStatus, "inconnue"))}"
+                // Numéro et lettres d'abord : c'est ce qui permet de reconnaître le
+                // disque dans le Gestionnaire de disques et dans l'Explorateur. Le
+                // modèle seul ne dit à personne de quel disque il s'agit.
+                (d.Index is { } ix ? $"<strong>Disque {ix}</strong>" : "<strong>Disque</strong>")
+                + (d.Letters.Count > 0 ? $" ({H(string.Join(", ", d.Letters))})" : " (aucune lettre)")
+                + $" — {H(d.Model)} ({RulesEngine.FormatBytes(d.SizeBytes)}, {H(string.IsNullOrEmpty(d.MediaType) ? d.InterfaceType : d.MediaType)}) — santé : {H(FirstNonEmpty(d.HealthStatus, d.WmiStatus, "inconnue"))}"
                 + (d.TemperatureC is { } t ? $" · {t} °C" : "")
                 + (d.WearPercent is { } w and > 0 ? $" · usure {w} %" : ""))));
 

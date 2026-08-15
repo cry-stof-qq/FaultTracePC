@@ -907,18 +907,35 @@ public sealed class RulesEngine
             var resets = diskEvents.Count(e => e.EventId == 129);
             var paging = diskEvents.Count(e => e.Provider.Equals("disk", StringComparison.OrdinalIgnoreCase) && e.EventId == 51);
 
+            // Tous les périphériques cités sont-ils des disques ABSENTS de la machine ?
+            //
+            // Le cas est fréquent chez un technicien qui branche des disques à
+            // réparer : les erreurs concernent alors le disque en réparation, pas la
+            // machine qui l'analyse. Continuer à afficher un avertissement sur SA
+            // machine reviendrait à l'alarmer pour le travail qu'il vient de faire.
+            // Un port de contrôleur (RaidPort) ne compte pas comme absent : celui-là
+            // appartient bien à la machine.
+            bool tousAbsents = devices.Count > 0 && devices.All(d =>
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(d.Device, @"Harddisk(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                return m.Success && int.TryParse(m.Groups[1].Value, out var i) && r.System.Disks.All(x => x.Index != i);
+            });
+
             r.Findings.Add(new Finding
             {
-                Severity = storageBsods.Count > 0 ? Severity.Critical : Severity.Warning,
+                Severity = storageBsods.Count > 0 ? Severity.Critical
+                         : tousAbsents ? Severity.Info
+                         : Severity.Warning,
                 Confidence = storageBsods.Count > 0 ? Confidence.High : Confidence.Medium,
                 Category = FaultCategory.Storage,
                 Title = $"Erreurs disque répétées ({diskEvents.Count})",
                 Details = $"Sources : {string.Join(", ", bySource)}."
                           + (storageBsods.Count > 0 ? $" Corrélées à {storageBsods.Count} BSOD de type stockage." : "")
-                          + " " + DescribeDevices(devices, r.System.Disks)
+                          + " " + DescribeDevices(devices, r.System.Disks, diskEvents)
                           + (resets > 0 ? $" {resets} de ces événements sont des réinitialisations de contrôleur (ID 129) : l'opération a été retentée, pas perdue." : "")
-                          + (paging > 0 ? $" {paging} concernent une opération de pagination (disk 51) — Windows lisait ou écrivait le fichier d'échange." : ""),
-                Recommendation = StorageAdvice(r.System.Disks, devices, resets, paging)
+                          + (paging > 0 ? $" {paging} concernent une opération de pagination (disk 51) — Windows lisait ou écrivait le fichier d'échange." : "")
+                          + (tousAbsents ? " Aucun disque actuellement monté sur cette machine n'est mis en cause : ces erreurs concernent uniquement des supports qui ne sont plus connectés." : ""),
+                Recommendation = StorageAdvice(r.System.Disks, devices, resets, paging, tousAbsents)
             });
         }
     }
@@ -939,8 +956,18 @@ public sealed class RulesEngine
               .Select(g => (g.Key, g.Count()))
               .ToList();
 
-    /// <summary>Traduit les chemins « \Device\… » en langage compréhensible.</summary>
-    private static string DescribeDevices(List<(string Device, int Count)> devices, List<DiskInfo> inventory)
+    /// <summary>
+    /// Traduit les chemins « \Device\… » en langage compréhensible.
+    ///
+    /// PIÈGE ÉVITÉ ICI : le numéro de disque n'est PAS un identifiant stable. Il
+    /// est attribué à l'énumération, au démarrage ou au branchement. Écrire
+    /// « Disque 1 » pour un périphérique qui n'est plus connecté enverrait le
+    /// lecteur ouvrir le Gestionnaire de disques, n'y rien trouver, et conclure que
+    /// le rapport se trompe. On ne nomme donc un disque que lorsqu'il est
+    /// réellement là ; sinon on donne ce qui reste vrai : quand il était là.
+    /// </summary>
+    private static string DescribeDevices(
+        List<(string Device, int Count)> devices, List<DiskInfo> inventory, List<WinEvent> events)
     {
         if (devices.Count == 0) return "Les événements ne nomment aucun périphérique précis.";
 
@@ -951,21 +978,62 @@ public sealed class RulesEngine
             if (hd.Success && int.TryParse(hd.Groups[1].Value, out var idx))
             {
                 var match = inventory.FirstOrDefault(d => d.Index == idx);
-                parts.Add(match is not null
-                    ? $"{device} (×{count}) correspond au disque {match.Model}"
-                    : $"{device} (×{count}) ne correspond à AUCUN disque inventorié — support amovible, lecteur de cartes, ou disque absent au moment de l'analyse");
+                if (match is not null)
+                {
+                    // Présent : on le nomme de la façon la plus reconnaissable
+                    // possible — numéro du Gestionnaire de disques, modèle, lettres.
+                    var lettres = match.Letters.Count > 0 ? $" ({string.Join(", ", match.Letters)})" : "";
+                    parts.Add($"Disque {idx}{lettres} — {match.Model} (×{count}, « {device} »)");
+                }
+                else
+                {
+                    parts.Add($"un disque qui portait le numéro {idx} au moment des faits, ABSENT aujourd'hui de la machine "
+                            + $"(×{count}, « {device} ») — le Gestionnaire de disques ne l'affichera donc pas{WhenSeen(device, events)}");
+                }
                 continue;
             }
 
             if (device.Contains("RaidPort", StringComparison.OrdinalIgnoreCase))
             {
-                parts.Add($"{device} (×{count}) désigne un port du contrôleur de stockage, pas un disque en particulier");
+                parts.Add($"« {device} » (×{count}) désigne un port du contrôleur de stockage, pas un disque en particulier");
                 continue;
             }
 
-            parts.Add($"{device} (×{count})");
+            parts.Add($"« {device} » (×{count})");
         }
         return "Périphériques mis en cause : " + string.Join(" ; ", parts) + ".";
+    }
+
+    /// <summary>
+    /// Quand un périphérique disparu a-t-il été vu, et sur combien de branchements
+    /// distincts ?
+    ///
+    /// Pour un périphérique absent, la date est la SEULE information exploitable :
+    /// le numéro ne désigne plus rien, mais « le 21/07 à 08:19 » permet de se
+    /// rappeler ce qui était branché. Le suffixe « \DRn » change à chaque
+    /// rattachement : deux valeurs distinctes signalent deux branchements, donc un
+    /// support amovible plutôt qu'un disque fixe.
+    /// </summary>
+    private static string WhenSeen(string device, List<WinEvent> events)
+    {
+        var liés = events.Where(e => (e.Message ?? "").Contains(device, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (liés.Count == 0) return "";
+
+        var dates = liés.Select(e => e.TimeLocal).OrderBy(d => d).ToList();
+        var instances = liés
+            .Select(e => System.Text.RegularExpressions.Regex.Match(e.Message ?? "", System.Text.RegularExpressions.Regex.Escape(device) + @"\\(DR\d+)"))
+            .Where(m => m.Success).Select(m => m.Groups[1].Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Count();
+
+        var quand = dates.Count == 1
+            ? $" Vu le {dates[0]:dd/MM/yyyy} à {dates[0]:HH:mm}."
+            : $" Vu entre le {dates[0]:dd/MM/yyyy} à {dates[0]:HH:mm} et le {dates[^1]:dd/MM/yyyy} à {dates[^1]:HH:mm}.";
+
+        var branchements = instances >= 2
+            ? $" Le compteur de rattachement prend {instances} valeurs différentes : c'est un support qui a été branché puis débranché à plusieurs reprises, pas un disque fixe."
+            : "";
+
+        return quand + branchements;
     }
 
     /// <summary>
@@ -973,7 +1041,8 @@ public sealed class RulesEngine
     /// réellement présent. Conseiller de vérifier un câble SATA à quelqu'un dont le
     /// seul disque est un NVMe lui fait chercher un câble qui n'existe pas.
     /// </summary>
-    private static string StorageAdvice(List<DiskInfo> inventory, List<(string Device, int Count)> devices, int resets, int paging)
+    private static string StorageAdvice(
+        List<DiskInfo> inventory, List<(string Device, int Count)> devices, int resets, int paging, bool tousAbsents)
     {
         bool anySata = inventory.Any(d => !IsNvme(d));
         bool unknownDevice = devices.Any(d =>
@@ -981,6 +1050,13 @@ public sealed class RulesEngine
             var hd = System.Text.RegularExpressions.Regex.Match(d.Device, @"Harddisk(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             return hd.Success && int.TryParse(hd.Groups[1].Value, out var i) && inventory.All(x => x.Index != i);
         });
+
+        // Quand tout se rapporte à des supports débranchés, il n'y a rien à réparer
+        // ici : le dire en une phrase vaut mieux qu'une liste d'actions inutiles.
+        if (tousAbsents)
+            return "Rien à réparer sur cette machine : toutes ces erreurs se rapportent à des supports qui n'y sont plus connectés. "
+                 + "Si l'un d'eux vous appartient, c'est LUI qu'il faut examiner, rebranché, avec un contrôle du disque et une lecture de ses compteurs SMART. "
+                 + "Les dates ci-dessus permettent de retrouver de quel support il s'agissait.";
 
         var steps = new List<string>();
 

@@ -235,6 +235,61 @@ public sealed class SystemInfoCollector
             }
         }
         catch { /* non bloquant */ }
+
+        AttachDriveLetters(list);
+    }
+
+    /// <summary>
+    /// Rattache à chaque disque physique les lettres de ses volumes.
+    ///
+    /// POURQUOI : « \Device\Harddisk0 » et « Disque 0 » ne parlent qu'aux
+    /// techniciens. « C: » parle à tout le monde, et c'est ce qu'affiche
+    /// l'Explorateur. Sans ce rattachement, le rapport peut nommer un disque
+    /// fautif sans que son lecteur puisse le reconnaître.
+    ///
+    /// COMMENT : la chaîne d'associations WMI documentée, en deux sauts —
+    /// Win32_DiskDrive → Win32_DiskDriveToDiskPartition → Win32_DiskPartition
+    /// → Win32_LogicalDiskToPartition → Win32_LogicalDisk. Il n'existe pas de
+    /// lien direct : une partition peut ne porter aucune lettre (réservée au
+    /// système, partition de récupération), et un disque peut n'en porter aucune.
+    ///
+    /// Entièrement non bloquant : un échec laisse simplement la liste vide, et le
+    /// rapport se rabat sur le numéro de disque.
+    /// </summary>
+    private void AttachDriveLetters(List<DiskInfo> list)
+    {
+        foreach (var disk in list)
+        {
+            if (disk.Index is not { } index) continue;
+            try
+            {
+                var lettres = new List<string>();
+                var diskPath = $"Win32_DiskDrive.DeviceID='\\\\\\\\.\\\\PHYSICALDRIVE{index}'";
+
+                foreach (var part in Query(
+                    $"ASSOCIATORS OF {{{diskPath}}} WHERE AssocClass=Win32_DiskDriveToDiskPartition"))
+                {
+                    var partId = S(part, "DeviceID");
+                    if (partId.Length == 0) continue;
+
+                    foreach (var vol in Query(
+                        $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partId}'}} WHERE AssocClass=Win32_LogicalDiskToPartition"))
+                    {
+                        var lettre = S(vol, "DeviceID");   // « C: »
+                        if (lettre.Length > 0 && !lettres.Contains(lettre, StringComparer.OrdinalIgnoreCase))
+                            lettres.Add(lettre);
+                    }
+                }
+
+                lettres.Sort(StringComparer.OrdinalIgnoreCase);
+                disk.Letters = lettres;
+            }
+            catch
+            {
+                // Un disque dont les lettres restent introuvables reste un disque
+                // parfaitement diagnosticable : on n'échoue pas pour si peu.
+            }
+        }
     }
 
     /// <summary>

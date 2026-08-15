@@ -174,6 +174,31 @@ public partial class RepairToolboxWindow : Window
                 LaunchPs("Get-PhysicalDisk | Select-Object FriendlyName, MediaType, HealthStatus, OperationalStatus | Format-Table -AutoSize; " +
                          "Get-PhysicalDisk | Get-StorageReliabilityCounter | Select-Object DeviceId, Temperature, Wear, ReadErrorsTotal, WriteErrorsTotal, PowerOnHours | Format-Table -AutoSize");
                 break;
+            // Réglage d'alimentation des liens : cause la plus fréquemment
+            // documentée des « réinitialisation au périphérique » (storahci 129).
+            //
+            // On AFFICHE, on ne modifie pas. Microsoft documente la syntaxe de
+            // powercfg mais précise que les alias de sous-groupes varient selon les
+            // systèmes : écrire un réglage à partir d'un alias non garanti ne
+            // produirait aucune erreur, juste un réglage inchangé — et l'utilisateur
+            // croirait avoir corrigé son problème. On lui montre l'état réel et on
+            // lui ouvre le bon panneau ; c'est lui qui décide.
+            case "linkpower":
+                // Volontairement SANS ACCENTS : cette sortie s'affiche dans une
+                // console dont la page de codes n'est pas UTF-8. L'ASCII s'affiche
+                // correctement partout, y compris sur une session non francophone.
+                LaunchPs(
+                    "Write-Host 'Reglages d''alimentation du schema actif' -ForegroundColor Cyan; " +
+                    "Write-Host ''; " +
+                    "$q = powercfg /query SCHEME_CURRENT 2>&1 | Out-String; " +
+                    "$bloc = ($q -split '(?=Sous-groupe|Subgroup)') | Where-Object { $_ -match 'PCI|Disque dur|Hard disk' }; " +
+                    "if ($bloc) { $bloc | ForEach-Object { Write-Host $_ } } else { Write-Host 'Sous-groupes PCI Express / Disque introuvables dans la sortie de powercfg. Sortie complete ci-dessous :' -ForegroundColor Yellow; Write-Host $q }; " +
+                    "Write-Host ''; " +
+                    "Write-Host 'Une valeur d''index differente de 0 signifie que la gestion d''alimentation du lien est ACTIVE.' -ForegroundColor Yellow; " +
+                    "Write-Host 'A modifier dans le panneau qui vient de s''ouvrir : PCI Express > Gestion de l''alimentation a l''etat de liaison > Desactive,' -ForegroundColor Yellow; " +
+                    "Write-Host 'et Disque dur > Arreter le disque dur apres > Jamais. Un redemarrage est necessaire.' -ForegroundColor Yellow; " +
+                    "Start-Process control.exe -ArgumentList 'powercfg.cpl,,3'");
+                break;
             case "wureset":
                 LaunchPs(
                     "Write-Host 'Réinitialisation des composants Windows Update…' -ForegroundColor Cyan; " +

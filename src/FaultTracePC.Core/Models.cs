@@ -93,6 +93,16 @@ public sealed class DiskInfo
     public ulong? PowerOnHours { get; set; }
     public ulong? ReadErrorsTotal { get; set; }
 
+    /// <summary>
+    /// Lettres des volumes portés par ce disque physique (« C: », « D: »…).
+    ///
+    /// C'est la seule désignation qu'un utilisateur non technicien reconnaît :
+    /// « Disque 0 » ne lui dit rien, « C: » lui dit tout. Vide quand le disque ne
+    /// porte aucun volume monté — un disque neuf, non partitionné, ou branché en
+    /// lecture par un technicien.
+    /// </summary>
+    public List<string> Letters { get; set; } = new();
+
     /// <summary>Attributs SMART détaillés (ceux qui prédisent réellement une panne).</summary>
     public SmartInfo? Smart { get; set; }
 }

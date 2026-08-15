@@ -157,7 +157,7 @@ FaultTracePC never contacts the Internet on its own.
 
 | Format | For whom | How |
 |---|---|---|
-| **MSI** | Permanent install, GPO deployment | `msiexec /i FaultTracePC-1.2.2.msi` (or double-click) |
+| **MSI** | Permanent install, GPO deployment | `msiexec /i FaultTracePC-1.2.3.msi` (or double-click) |
 | **Portable (.zip)** | USB-stick troubleshooting, nothing to install | Unzip, run `FaultTracePC.exe` |
 
 Both are on the [Releases page](../../releases). No prerequisites: the .NET
@@ -235,7 +235,7 @@ Produce the distributables:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.2.2
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.2.3
 ```
 
 ## Architecture
