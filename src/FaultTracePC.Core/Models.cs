@@ -521,6 +521,40 @@ public sealed class ScanComparison
     public int NewDiskErrorEvents { get; set; }
     public int NewWheaEvents { get; set; }
     public string MemoryTrend { get; set; } = "";
+
+    /// <summary>
+    /// Dégradations matérielles constatées DEPUIS le scan précédent.
+    ///
+    /// Distinct de <see cref="DiskChanges"/>, qui liste toutes les variations, y
+    /// compris anodines (température, retour à un meilleur état). Ici ne figurent
+    /// que les évolutions défavorables — celles qui doivent peser sur le verdict.
+    /// </summary>
+    public List<HardwareConcern> HardwareConcerns { get; set; } = new();
+
+    /// <summary>
+    /// Sévérité la plus élevée parmi <see cref="HardwareConcerns"/> :
+    /// "" (aucune), "warn" ou "crit".
+    /// </summary>
+    public string HardwareSeverity { get; set; } = "";
+}
+
+/// <summary>
+/// Une dégradation matérielle constatée entre deux scans.
+///
+/// POURQUOI CE TYPE EXISTE : jusqu'à la 1.2.0, la conclusion du rapport ne se
+/// calculait qu'à partir des plantages. Une machine qui n'avait jamais planté
+/// mais dont le disque perdait des secteurs s'entendait dire « Machine stable »,
+/// l'alerte étant reléguée en petit sous le titre. C'est précisément le cas où
+/// l'utilisateur n'a AUCUN autre signal pour se méfier — et donc le pire endroit
+/// possible pour le rassurer.
+/// </summary>
+public sealed class HardwareConcern
+{
+    /// <summary>"warn" ou "crit".</summary>
+    public string Severity { get; set; } = "warn";
+
+    /// <summary>Phrase explicative, destinée à être lue telle quelle par l'utilisateur.</summary>
+    public string Message { get; set; } = "";
 }
 
 public sealed class ScanOptions

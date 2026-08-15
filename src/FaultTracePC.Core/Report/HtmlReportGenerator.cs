@@ -128,6 +128,17 @@ public static class HtmlReportGenerator
         sb.Append($"<div class=\"card {(c.Tone == "ok" ? "okcard" : c.Tone)}\">");
         sb.Append($"<h3>{H(c.Assessment)}</h3>");
 
+        // Les dégradations matérielles se lisent AVANT le détail : ce sont elles qui
+        // justifient la couleur de la carte, et les reléguer dans la liste du bas
+        // reproduirait le défaut que ce bloc corrige.
+        if (c.HardwareConcerns.Count > 0)
+        {
+            sb.Append("<ul class=\"concerns\">");
+            foreach (var h in c.HardwareConcerns.OrderByDescending(x => x.Severity == "crit"))
+                sb.Append($"<li class=\"{(h.Severity == "crit" ? "crit" : "warn")}\">{(h.Severity == "crit" ? "🛑" : "⚠️")} {H(h.Message)}</li>");
+            sb.Append("</ul>");
+        }
+
         var items = new List<string>();
         items.Add(c.NewBsodCount == 0
             ? "✅ Aucun nouveau crash système"
@@ -726,6 +737,9 @@ public static class HtmlReportGenerator
         .card{background:#fff;border:1px solid #dbe2ec;border-left-width:5px;border-radius:8px;padding:14px 18px;margin-bottom:12px}
         .card.crit{border-left-color:#e74c3c}.card.warn{border-left-color:#e67e22}.card.info{border-left-color:#2980b9}
         .card.okcard{border-left-color:#27ae60;background:#f4fbf7}
+        .concerns{margin:.6em 0 .4em;padding-left:1.2em}
+        .concerns li{margin:.35em 0;line-height:1.45}
+        .concerns li.crit{font-weight:600}
         .ctxtitle{margin:14px 0 6px;font-size:13px;color:#44546a}
         .card h3{margin:8px 0 6px;font-size:16px}
         .card p{margin:4px 0;font-size:14px}

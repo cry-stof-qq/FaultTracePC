@@ -10,7 +10,7 @@
 
     <AssemblyName>FaultTracePC.Monitor</AssemblyName>
     <RootNamespace>FaultTracePC.Monitor</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Product>FaultTracePC Monitor</Product>
     <Description>Service de surveillance temps réel (boîte noire) de FaultTracePC</Description>
     <ApplicationIcon>..\..\assets\FaultTracePC.ico</ApplicationIcon>

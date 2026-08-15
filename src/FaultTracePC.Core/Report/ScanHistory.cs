@@ -146,7 +146,18 @@ public static class ScanHistory
     {
         var prev = LoadPrevious(r.GeneratedAt, errors);
         if (prev is null) return null;
+        return Compare(r, prev);
+    }
 
+    /// <summary>
+    /// Cœur de la comparaison, sans aucun accès disque.
+    ///
+    /// Séparé de <see cref="CompareWithPrevious"/> pour être testable : le verdict
+    /// est ce que l'utilisateur lit en premier, c'est donc la dernière chose qui
+    /// devrait dépendre du contenu de son dossier Documents pour être vérifiée.
+    /// </summary>
+    internal static ScanComparison Compare(DiagnosticReport r, ScanSummary prev)
+    {
         var c = new ScanComparison { PreviousScanAt = prev.GeneratedAt };
 
         // Nouveaux crashs = postérieurs au scan précédent.
@@ -173,21 +184,63 @@ public static class ScanHistory
         if (c.DriverUpdates.Count > 12) c.DriverUpdates = c.DriverUpdates.Take(12).ToList();
 
         // Évolution des disques (santé, usure, température, erreurs de lecture).
+        //
+        // Deux listes sont alimentées ici, et il ne faut pas les confondre :
+        //   - DiskChanges      : TOUT ce qui a bougé, y compris anodin — c'est le détail affiché.
+        //   - HardwareConcerns : seulement ce qui s'est DÉGRADÉ — c'est ce qui pèse sur le verdict.
+        // Une température qui varie ou une santé qui redevient « Sain » appartiennent
+        // à la première et pas à la seconde.
         foreach (var d in r.System.Disks)
         {
             var old = prev.Disks.FirstOrDefault(x => x.Model.Equals(d.Model, StringComparison.OrdinalIgnoreCase));
             if (old is null) continue;
+
             if (!string.IsNullOrEmpty(old.Health) && !string.IsNullOrEmpty(d.HealthStatus) && old.Health != d.HealthStatus)
+            {
                 c.DiskChanges.Add($"{d.Model} : santé {old.Health} → {d.HealthStatus}");
+                // Seule une AGGRAVATION compte. Un disque qui repasse de « Avertissement »
+                // à « Sain » ne doit pas déclencher d'alarme, et un état inconnu ne permet
+                // de conclure ni dans un sens ni dans l'autre.
+                int before = HealthRank(old.Health), after = HealthRank(d.HealthStatus);
+                if (before >= 0 && after > before)
+                    AddConcern(c, after >= 2 ? "crit" : "warn",
+                        $"{d.Model} : l'état de santé rapporté par le disque est passé de « {old.Health} » à « {d.HealthStatus} » depuis le scan précédent.");
+            }
+
             if (old.WearPercent is { } ow && d.WearPercent is { } nw && nw > ow)
+            {
                 c.DiskChanges.Add($"{d.Model} : usure {ow} % → {nw} %");
+                // Un point d'usure de plus sur un SSD est le fonctionnement normal.
+                // Une progression franche entre deux scans, non.
+                if (nw - ow >= 2)
+                    AddConcern(c, "warn",
+                        $"{d.Model} : l'usure du SSD est passée de {ow} % à {nw} % entre deux scans — une progression rapide à ce rythme raccourcit nettement la durée de vie annoncée.");
+            }
+
             if (old.ReadErrorsTotal is { } oe && d.ReadErrorsTotal is { } ne && ne > oe)
+            {
                 c.DiskChanges.Add($"{d.Model} : erreurs de lecture {oe} → {ne}");
+                AddConcern(c, "warn",
+                    $"{d.Model} : {ne - oe} nouvelle(s) erreur(s) de lecture depuis le scan précédent. Le disque a dû s'y reprendre à plusieurs fois pour relire des données.");
+            }
+
             // L'augmentation des secteurs défectueux est LE signal d'un disque qui meurt.
             if (old.BadSectors is { } ob && d.Smart?.BadSectors is { } nb && nb > ob)
+            {
                 c.DiskChanges.Add($"⚠ {d.Model} : secteurs défectueux {ob} → {nb} — dégradation en cours, sauvegarder");
+                AddConcern(c, "crit",
+                    $"{d.Model} : les secteurs défectueux sont passés de {ob} à {nb}. Un disque qui en perd entre deux scans est en train de se dégrader, même quand son propre auto-diagnostic se déclare sain — c'est la PROGRESSION qui alerte, pas le nombre atteint. Sauvegardez maintenant, avant toute autre manipulation.");
+            }
+
             if (old.CrcErrors is { } oc && d.Smart?.UdmaCrcErrors is { } nc && nc > oc)
+            {
                 c.DiskChanges.Add($"{d.Model} : erreurs de câble (CRC) {oc} → {nc}");
+                // Ce compteur accuse la LIAISON, jamais le disque. Le confondre avec une
+                // usure conduit à remplacer un disque sain à la place d'un câble à 5 €.
+                AddConcern(c, "warn",
+                    $"{d.Model} : {nc - oc} nouvelle(s) erreur(s) CRC. Ce compteur met en cause la LIAISON, pas le disque : câble SATA, connecteur ou alimentation. Le disque lui-même peut être parfaitement sain — changez le câble avant d'envisager de le remplacer.");
+            }
+
             if (old.TemperatureC is { } ot && d.TemperatureC is { } nt && Math.Abs(nt - ot) >= 8)
                 c.DiskChanges.Add($"{d.Model} : température {ot} °C → {nt} °C");
         }
@@ -195,6 +248,21 @@ public static class ScanHistory
         // Événements disque/WHEA apparus depuis le scan précédent.
         c.NewDiskErrorEvents = r.Events.Count(e => e.Category == EventCategory.DiskError && e.TimeLocal > prev.GeneratedAt);
         c.NewWheaEvents = r.Events.Count(e => e.Category == EventCategory.Whea && e.TimeLocal > prev.GeneratedAt);
+
+        // Ces deux compteurs étaient déjà affichés, mais n'entraient pas dans la
+        // conclusion : une machine accumulant des erreurs matérielles sans planter
+        // était déclarée stable. Ils comptent désormais.
+        //
+        // Sévérité « warn » et non « crit » : le détail et la gravité réelle sont
+        // établis par le moteur de règles, qui sait distinguer une erreur corrigée
+        // d'une erreur fatale. Ici on constate seulement une évolution défavorable.
+        if (c.NewWheaEvents > 0)
+            AddConcern(c, "warn",
+                $"{c.NewWheaEvents} nouvelle(s) erreur(s) matérielle(s) (WHEA) enregistrée(s) depuis le scan précédent — le matériel signale des incidents que Windows a pour l'instant absorbés.");
+
+        if (c.NewDiskErrorEvents > 0)
+            AddConcern(c, "warn",
+                $"{c.NewDiskErrorEvents} nouvelle(s) erreur(s) disque dans le journal Windows depuis le scan précédent.");
 
         // Tendance mémoire (virtualisation).
         var curVm = Analysis.RulesEngine.VirtualizationBytes(r);
@@ -205,33 +273,109 @@ public static class ScanHistory
                 c.MemoryTrend = $"Virtualisation (vmmem) : {(deltaGb > 0 ? "+" : "")}{deltaGb:0.#} Go depuis le dernier scan.";
         }
 
+        // ------------------------------------------------------------------
         // Synthèse honnête.
+        //
+        // RÈGLE : le verdict ne parle pas QUE des plantages.
+        //
+        // Jusqu'à la 1.2.0, ce bloc ne regardait que les crashs. Conséquence : une
+        // machine n'ayant jamais planté mais dont le disque perdait des secteurs
+        // recevait une carte verte titrée « Machine stable », l'avertissement étant
+        // relégué en petit dessous. C'est le seul cas où l'utilisateur n'a aucun
+        // autre signal pour se méfier — donc le pire endroit possible pour le
+        // rassurer. Le volet matériel peut désormais faire basculer le verdict à
+        // lui seul.
+        // ------------------------------------------------------------------
         bool prevHadProblems = prev.Bsods.Count > 0 || prev.CriticalFindings.Count > 0;
+
+        // Un problème critique TOUJOURS présent, mais qui n'empire pas, ne produit
+        // aucune « dégradation » : sans ce test, « rien n'a bougé » se dirait
+        // « tout va bien ».
+        bool standingCritical = r.Findings.Any(f => f.Severity == Severity.Critical);
+
+        string crashTone;
+        string crashSentence;
         if (c.SameSignatureRecurred)
         {
-            c.Tone = "crit";
-            c.Assessment = $"Le problème PERSISTE : un nouveau crash avec la même signature qu'au scan du {prev.GeneratedAt:dd/MM/yyyy} s'est produit. La réparation n'a pas suffi.";
+            crashTone = "crit";
+            crashSentence = $"Le problème PERSISTE : un nouveau crash avec la même signature qu'au scan du {prev.GeneratedAt:dd/MM/yyyy} s'est produit. La réparation n'a pas suffi.";
         }
         else if (c.NewBsodCount > 0)
         {
-            c.Tone = "warn";
-            c.Assessment = $"{c.NewBsodCount} nouveau(x) crash(s) depuis le scan du {prev.GeneratedAt:dd/MM/yyyy}, mais avec une signature DIFFÉRENTE : l'ancien problème semble réglé, un nouveau est apparu.";
+            crashTone = "warn";
+            crashSentence = $"{c.NewBsodCount} nouveau(x) crash(s) depuis le scan du {prev.GeneratedAt:dd/MM/yyyy}, mais avec une signature DIFFÉRENTE : l'ancien problème semble réglé, un nouveau est apparu.";
         }
         else if (prevHadProblems)
         {
             var days = (r.GeneratedAt - prev.GeneratedAt).TotalDays;
-            c.Tone = "ok";
-            c.Assessment = $"Aucun nouveau crash depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} ({days:0.#} jour(s)). "
-                         + (days >= 7 ? "La réparation semble efficace." : "Bon signe — à confirmer sur la durée (recommandé : re-scanner après une semaine d'utilisation normale).");
+            crashTone = "ok";
+            crashSentence = $"Aucun nouveau crash depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} ({days:0.#} jour(s)). "
+                          + (days >= 7 ? "La réparation semble efficace." : "Bon signe — à confirmer sur la durée (recommandé : re-scanner après une semaine d'utilisation normale).");
         }
         else
         {
-            c.Tone = "ok";
-            c.Assessment = $"Machine stable depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} : aucun crash avant comme après.";
+            crashTone = "ok";
+            // « Machine stable » n'est affirmé que si rien d'autre ne le contredit :
+            // sinon on se contente de constater l'absence de crash.
+            crashSentence = (c.HardwareConcerns.Count > 0 || standingCritical)
+                ? $"Aucun crash système avant comme après le scan du {prev.GeneratedAt:dd/MM/yyyy}."
+                : $"Machine stable depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} : aucun crash avant comme après.";
+        }
+
+        // La tonalité retenue est la PIRE des deux : matériel ou plantages.
+        c.Tone = ToneRank(c.HardwareSeverity) > ToneRank(crashTone) ? c.HardwareSeverity : crashTone;
+
+        if (c.HardwareConcerns.Count > 0)
+        {
+            // La dégradation la plus grave est reprise dans le titre : c'est elle
+            // que l'utilisateur doit lire en premier, pas en note de bas de carte.
+            var worst = c.HardwareConcerns.OrderByDescending(h => ToneRank(h.Severity)).First();
+            c.Assessment = crashSentence + (c.HardwareSeverity == "crit"
+                ? " En revanche, le MATÉRIEL se dégrade : " + worst.Message
+                : " Un point de vigilance matériel : " + worst.Message);
+        }
+        else if (standingCritical && crashTone == "ok")
+        {
+            c.Assessment = crashSentence
+                + " En revanche, un problème critique signalé dans ce rapport est toujours là : rien ne s'est aggravé depuis le dernier scan, mais rien n'est réglé non plus.";
+            c.Tone = "warn";
+        }
+        else
+        {
+            c.Assessment = crashSentence;
         }
 
         return c;
     }
+
+    /// <summary>
+    /// Enregistre une dégradation et relève la sévérité globale si nécessaire.
+    /// </summary>
+    private static void AddConcern(ScanComparison c, string severity, string message)
+    {
+        c.HardwareConcerns.Add(new HardwareConcern { Severity = severity, Message = message });
+        if (ToneRank(severity) > ToneRank(c.HardwareSeverity)) c.HardwareSeverity = severity;
+    }
+
+    /// <summary>Ordre de gravité des tonalités d'affichage.</summary>
+    private static int ToneRank(string? tone) => tone switch { "crit" => 2, "warn" => 1, _ => 0 };
+
+    /// <summary>
+    /// Gravité d'un état de santé disque, pour ne réagir qu'aux AGGRAVATIONS.
+    /// Renvoie -1 quand la valeur est inconnue : on préfère ne rien conclure
+    /// plutôt que de conclure à tort.
+    ///
+    /// Les libellés anglais sont acceptés en plus des français : le collecteur les
+    /// traduit aujourd'hui, mais un rapport relu depuis un historique plus ancien
+    /// ou produit par une future version anglaise ne doit pas passer à travers.
+    /// </summary>
+    private static int HealthRank(string? status) => (status ?? "").Trim().ToLowerInvariant() switch
+    {
+        "sain" or "healthy" or "ok" => 0,
+        "avertissement" or "warning" or "degraded" => 1,
+        "défaillant" or "defaillant" or "unhealthy" or "failing" or "failed" => 2,
+        _ => -1,
+    };
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {

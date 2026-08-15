@@ -722,4 +722,154 @@ public class ReportAndHistoryTests
         Assert.Empty(a.Correlations);
         Assert.Contains("propres à chaque machine", a.Summary, StringComparison.OrdinalIgnoreCase);
     }
+
+    // ==================================================================
+    // Verdict de comparaison : la santé matérielle doit peser autant que
+    // les plantages.
+    //
+    // Jusqu'à la 1.2.0, la conclusion ne se calculait qu'à partir des crashs :
+    // une machine n'ayant jamais planté mais dont le disque perdait des secteurs
+    // était titrée « Machine stable ». Ces tests verrouillent la correction.
+    // ==================================================================
+
+    /// <summary>Scan précédent minimal : machine saine, disque intact.</summary>
+    private static ScanHistory.ScanSummary PrecedentSain(ulong badSectors = 0, ulong crc = 0, string health = "Sain") => new()
+    {
+        GeneratedAt = new DateTime(2026, 8, 1, 10, 0, 0),
+        ScanPeriodDays = 30,
+        Disks = [new ScanHistory.DiskBrief { Model = "Samsung SSD 980", Health = health, BadSectors = badSectors, CrcErrors = crc, WearPercent = 1 }],
+    };
+
+    /// <summary>Scan courant : aucun crash, un seul disque dont on pilote l'état.</summary>
+    private static DiagnosticReport ScanActuel(SmartInfo? smart = null, string health = "Sain", int? wear = 1)
+    {
+        // Volontairement sans RulesEngine : on isole l'effet de l'ÉVOLUTION sur le
+        // verdict, sans qu'un constat absolu vienne le masquer.
+        return new DiagnosticReport
+        {
+            GeneratedAt = new DateTime(2026, 8, 15, 10, 0, 0),
+            ScanPeriodDays = 30,
+            System = new SystemSnapshot
+            {
+                MachineName = "POSTE-01",
+                Disks = [new DiskInfo { Model = "Samsung SSD 980", HealthStatus = health, WearPercent = wear, Smart = smart }],
+            },
+        };
+    }
+
+    [Fact]
+    public void Verdict_SecteursDefectueuxEnHausse_SansAucunCrash_NeDitPlusStable()
+    {
+        // LE cas du bug : zéro plantage avant comme après, mais le disque se dégrade.
+        var c = ScanHistory.Compare(
+            ScanActuel(new SmartInfo { ReallocatedSectors = 7 }),
+            PrecedentSain(badSectors: 0));
+
+        Assert.DoesNotContain("stable", c.Assessment, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual("ok", c.Tone);
+        Assert.Equal("crit", c.HardwareSeverity);
+        // La dégradation doit être dans le TITRE, pas reléguée dans le détail.
+        Assert.Contains("0 à 7", c.Assessment);
+    }
+
+    [Fact]
+    public void Verdict_RienNaBouge_ResteVertEtDitStable()
+    {
+        // Le garde-fou inverse : on ne doit pas inquiéter une machine réellement saine.
+        var c = ScanHistory.Compare(ScanActuel(new SmartInfo { ReallocatedSectors = 0 }), PrecedentSain());
+
+        Assert.Equal("ok", c.Tone);
+        Assert.Contains("stable", c.Assessment, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(c.HardwareConcerns);
+    }
+
+    [Fact]
+    public void Verdict_ErreursCrc_AccusentLeCableEtPasLeDisque()
+    {
+        var c = ScanHistory.Compare(
+            ScanActuel(new SmartInfo { UdmaCrcErrors = 12 }),
+            PrecedentSain(crc: 4));
+
+        Assert.Equal("warn", c.HardwareSeverity);
+        var msg = Assert.Single(c.HardwareConcerns).Message;
+        Assert.Contains("câble", msg, StringComparison.OrdinalIgnoreCase);
+        // Une erreur CRC ne doit JAMAIS être présentée comme un disque qui meurt :
+        // c'est ce qui fait remplacer un disque sain à la place d'un câble à 5 €.
+        Assert.DoesNotContain("secteurs défectueux", msg, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Verdict_SanteQuiSameliore_NestPasUneAlerte()
+    {
+        var c = ScanHistory.Compare(
+            ScanActuel(new SmartInfo { ReallocatedSectors = 0 }, health: "Sain"),
+            PrecedentSain(health: "Avertissement"));
+
+        Assert.Empty(c.HardwareConcerns);
+        Assert.Equal("ok", c.Tone);
+        // Le changement reste affiché dans le détail : on informe sans alarmer.
+        Assert.Contains(c.DiskChanges, s => s.Contains("santé"));
+    }
+
+    [Fact]
+    public void Verdict_SanteQuiSaggrave_FaitBasculerLaCouleur()
+    {
+        var c = ScanHistory.Compare(
+            ScanActuel(new SmartInfo { ReallocatedSectors = 0 }, health: "Défaillant"),
+            PrecedentSain(health: "Sain"));
+
+        Assert.Equal("crit", c.HardwareSeverity);
+        Assert.Equal("crit", c.Tone);
+    }
+
+    [Fact]
+    public void Verdict_NouvellesErreursWhea_SansCrash_NeSontPlusIgnorees()
+    {
+        var r = ScanActuel(new SmartInfo { ReallocatedSectors = 0 });
+        r.Events.Add(new WinEvent { Category = EventCategory.Whea, TimeLocal = new DateTime(2026, 8, 10) });
+        r.Events.Add(new WinEvent { Category = EventCategory.Whea, TimeLocal = new DateTime(2026, 8, 12) });
+
+        var c = ScanHistory.Compare(r, PrecedentSain());
+
+        Assert.Equal(2, c.NewWheaEvents);
+        Assert.NotEqual("ok", c.Tone);
+        Assert.DoesNotContain("stable", c.Assessment, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Verdict_UsureSsdDunPoint_NestPasUneAlerte()
+    {
+        // Un point d'usure de plus est le fonctionnement normal d'un SSD.
+        var c = ScanHistory.Compare(
+            ScanActuel(new SmartInfo { ReallocatedSectors = 0 }, wear: 2),
+            PrecedentSain());
+
+        Assert.Empty(c.HardwareConcerns);
+        Assert.Contains(c.DiskChanges, s => s.Contains("usure"));
+    }
+
+    [Fact]
+    public void Verdict_ProblemeCritiqueQuiPersiste_NestPasPresenteCommeStable()
+    {
+        var r = ScanActuel(new SmartInfo { ReallocatedSectors = 0 });
+        r.Findings.Add(new Finding { Severity = Severity.Critical, Title = "Disque en fin de vie" });
+
+        var c = ScanHistory.Compare(r, PrecedentSain());
+
+        // Rien ne s'est aggravé — mais rien n'est réglé, et le titre doit le dire.
+        Assert.DoesNotContain("Machine stable", c.Assessment);
+        Assert.NotEqual("ok", c.Tone);
+    }
+
+    [Fact]
+    public void Rapport_LaDegradationMaterielleApparaitDansLeHtml()
+    {
+        var r = ScanActuel(new SmartInfo { ReallocatedSectors = 7 });
+        r.Comparison = ScanHistory.Compare(r, PrecedentSain());
+
+        var html = HtmlReportGenerator.Generate(r);
+
+        Assert.Contains("class=\"concerns\"", html);
+        Assert.Contains("Sauvegardez maintenant", html);
+    }
 }

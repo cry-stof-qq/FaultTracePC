@@ -25,6 +25,7 @@ dist/
 # retrouvent dans le dépôt.
 # ---------------------------------------------------------------------------
 Diagnostic_*.html
+Diagnostic_*.pdf
 Parc_*.html
 Reparation_PC_*.ps1
 Reparation_PC_*.bat
@@ -33,8 +34,10 @@ Reparation_log_*.txt
 # Note : .gitignore n'accepte PAS de commentaire en fin de ligne — le texte
 # ferait partie du motif. Toujours sur une ligne dédiée.
 *.log
-rapport-energie.html
+rapport-*.html
 inventaire_pilotes.txt
+MajWindows_*.txt
+maj.txt
 
 # Historique des scans (résumés machine) et configuration locale
 Historique/
@@ -45,3 +48,6 @@ alerts.json
 
 # Dumps éventuellement copiés pour analyse
 *.dmp
+
+# Corbeille locale : fichiers de test sortis du dossier de travail.
+_to_delete/

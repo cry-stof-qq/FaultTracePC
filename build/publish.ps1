@@ -18,7 +18,7 @@ param(
     [switch]$Zip,
     # Le nom de l'archive porte la version : sans elle, deux téléchargements
     # successifs deviennent indiscernables dans un dossier Téléchargements.
-    [string]$Version = '1.2.0',
+    [string]$Version = '1.2.1',
     [switch]$FrameworkDependent   # nécessite le runtime .NET Desktop sur la cible, mais ~15 Mo
 )
 
