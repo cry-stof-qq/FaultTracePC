@@ -1,7 +1,0 @@
-﻿# FaultTracePC — journal des mises à jour Windows — 14/08/2026
-# Machine : TECH-INFO-2025 — utilisateur : cp
-
-[15:57:15] === Recherche démarrée (pilotes : inclus, masquées : incluses) ===
-[15:57:36] Critère de recherche : IsInstalled=0
-[15:57:36] Catalogue interrogé : Microsoft Update (pilotes et produits Microsoft inclus).
-[15:57:36] 1 élément(s) renvoyé(s) par le service.
