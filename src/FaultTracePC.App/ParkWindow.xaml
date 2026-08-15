@@ -42,6 +42,7 @@
                     <GridViewColumn Header="Machine" Width="130" DisplayMemberBinding="{Binding Name}"/>
                     <GridViewColumn Header="Hôte" Width="130" DisplayMemberBinding="{Binding Host}"/>
                     <GridViewColumn Header="État" Width="150" DisplayMemberBinding="{Binding Etat}"/>
+                    <GridViewColumn Header="Version" Width="165" DisplayMemberBinding="{Binding Version}"/>
                     <GridViewColumn Header="Dernier relevé" Width="120" DisplayMemberBinding="{Binding DernierReleve}"/>
                     <GridViewColumn Header="CPU %" Width="60" DisplayMemberBinding="{Binding Cpu}"/>
                     <GridViewColumn Header="T° CPU" Width="65" DisplayMemberBinding="{Binding TempCpu}"/>

@@ -378,6 +378,72 @@ public partial class MainWindow : Window
 
     private void BtnUpdate_Click(object sender, RoutedEventArgs e) => _ = CheckUpdateAsync(silent: false);
 
+    /// <summary>
+    /// « ? » — version installée et informations utiles au dépannage.
+    ///
+    /// La version n'était visible nulle part dans l'interface : impossible de
+    /// répondre à « tu es en quelle version ? » sans passer par les propriétés du
+    /// fichier. Elle est lue dans l'assembly, jamais codée en dur — un numéro écrit
+    /// à la main finit toujours par mentir sur ce qui tourne réellement.
+    /// </summary>
+    private void BtnAbout_Click(object sender, RoutedEventArgs e)
+    {
+        var exe = Environment.ProcessPath ?? "(chemin inconnu)";
+
+        string service;
+        try
+        {
+            service = MonitorServiceManager.GetState() switch
+            {
+                MonitorState.Running => "installé et en cours d'exécution",
+                MonitorState.Stopped => "installé mais arrêté",
+                MonitorState.NotInstalled => "non installé",
+                _ => "exécutable introuvable",
+            };
+        }
+        catch { service = "état indéterminé"; }
+
+        bool admin;
+        try
+        {
+            using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+            admin = new System.Security.Principal.WindowsPrincipal(identity)
+                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        }
+        catch { admin = false; }
+
+        var docs = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC");
+
+        var texte =
+            $"FaultTracePC {UpdateChecker.CurrentVersion.ToString(3)}\n" +
+            "Licence MIT — sans aucune garantie.\n\n" +
+            $"Droits administrateur : {(admin ? "oui" : "NON — les dumps et les journaux complets seront inaccessibles")}\n" +
+            $"Surveillance temps réel : {service}\n" +
+            $"Windows : {Environment.OSVersion.VersionString} ({(Environment.Is64BitOperatingSystem ? "64 bits" : "32 bits")})\n\n" +
+            $"Exécutable : {exe}\n" +
+            $"Rapports : {docs}\n\n" +
+            "Interface et rapports en français uniquement.\n\n" +
+            "Ouvrir la page des versions pour comparer avec la dernière publiée ?";
+
+        var choix = MessageBox.Show(this, texte, "À propos de FaultTracePC",
+            MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+        if (choix == MessageBoxResult.Yes)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(
+                    "https://github.com/cry-stof-qq/FaultTracePC/releases/latest") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Impossible d'ouvrir le navigateur : " + ex.Message,
+                    "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+    }
+
     private bool _startupPrefLoaded;
 
     private void ChkUpdateStartup_Changed(object sender, RoutedEventArgs e)

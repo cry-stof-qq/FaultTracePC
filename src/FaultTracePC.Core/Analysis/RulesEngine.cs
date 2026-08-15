@@ -893,21 +893,128 @@ public sealed class RulesEngine
 
         if (diskEvents.Count >= 3 || (diskEvents.Count > 0 && storageBsods.Count > 0))
         {
-            var byProvider = diskEvents.GroupBy(e => e.Provider)
+            // Sources RÉELLEMENT observées, avec leurs identifiants. Jusqu'à la 1.2.1
+            // ce texte citait « disk 153 / stornvme 129 » quels que soient les
+            // événements collectés — une phrase toute faite qui pouvait nommer des
+            // identifiants absents du rapport, deux lignes sous le tableau qui
+            // affichait les vrais.
+            var bySource = diskEvents
+                .GroupBy(e => $"{e.Provider} {e.EventId}")
+                .OrderByDescending(g => g.Count())
                 .Select(g => $"{g.Key} ×{g.Count()}").ToList();
+
+            var devices = DevicesCited(diskEvents);
+            var resets = diskEvents.Count(e => e.EventId == 129);
+            var paging = diskEvents.Count(e => e.Provider.Equals("disk", StringComparison.OrdinalIgnoreCase) && e.EventId == 51);
+
             r.Findings.Add(new Finding
             {
                 Severity = storageBsods.Count > 0 ? Severity.Critical : Severity.Warning,
                 Confidence = storageBsods.Count > 0 ? Confidence.High : Confidence.Medium,
                 Category = FaultCategory.Storage,
                 Title = $"Erreurs disque répétées ({diskEvents.Count})",
-                Details = $"Sources : {string.Join(", ", byProvider)}."
+                Details = $"Sources : {string.Join(", ", bySource)}."
                           + (storageBsods.Count > 0 ? $" Corrélées à {storageBsods.Count} BSOD de type stockage." : "")
-                          + " L'événement disk 153 / stornvme 129 signale des opérations retentées : disque, câble ou contrôleur en cause.",
-                Recommendation = "Vérifier câbles SATA/alimentation, mettre à jour le firmware du SSD, exécuter chkdsk, surveiller le SMART."
+                          + " " + DescribeDevices(devices, r.System.Disks)
+                          + (resets > 0 ? $" {resets} de ces événements sont des réinitialisations de contrôleur (ID 129) : l'opération a été retentée, pas perdue." : "")
+                          + (paging > 0 ? $" {paging} concernent une opération de pagination (disk 51) — Windows lisait ou écrivait le fichier d'échange." : ""),
+                Recommendation = StorageAdvice(r.System.Disks, devices, resets, paging)
             });
         }
     }
+
+    /// <summary>
+    /// Périphériques cités par les événements, du plus fréquent au moins fréquent.
+    ///
+    /// Le chemin « \Device\… » n'est jamais traduit par Windows, contrairement au
+    /// reste du message : c'est le seul identifiant exploitable quelle que soit la
+    /// langue du système, et c'est l'information la plus utile de toute la règle —
+    /// sans elle, l'utilisateur sait qu'il a des erreurs mais pas sur quoi agir.
+    /// </summary>
+    private static List<(string Device, int Count)> DevicesCited(List<WinEvent> events) =>
+        events.Select(e => System.Text.RegularExpressions.Regex.Match(e.Message ?? "", @"\\Device\\[A-Za-z0-9]+"))
+              .Where(m => m.Success)
+              .GroupBy(m => m.Value, StringComparer.OrdinalIgnoreCase)
+              .OrderByDescending(g => g.Count())
+              .Select(g => (g.Key, g.Count()))
+              .ToList();
+
+    /// <summary>Traduit les chemins « \Device\… » en langage compréhensible.</summary>
+    private static string DescribeDevices(List<(string Device, int Count)> devices, List<DiskInfo> inventory)
+    {
+        if (devices.Count == 0) return "Les événements ne nomment aucun périphérique précis.";
+
+        var parts = new List<string>();
+        foreach (var (device, count) in devices.Take(4))
+        {
+            var hd = System.Text.RegularExpressions.Regex.Match(device, @"Harddisk(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (hd.Success && int.TryParse(hd.Groups[1].Value, out var idx))
+            {
+                var match = inventory.FirstOrDefault(d => d.Index == idx);
+                parts.Add(match is not null
+                    ? $"{device} (×{count}) correspond au disque {match.Model}"
+                    : $"{device} (×{count}) ne correspond à AUCUN disque inventorié — support amovible, lecteur de cartes, ou disque absent au moment de l'analyse");
+                continue;
+            }
+
+            if (device.Contains("RaidPort", StringComparison.OrdinalIgnoreCase))
+            {
+                parts.Add($"{device} (×{count}) désigne un port du contrôleur de stockage, pas un disque en particulier");
+                continue;
+            }
+
+            parts.Add($"{device} (×{count})");
+        }
+        return "Périphériques mis en cause : " + string.Join(" ; ", parts) + ".";
+    }
+
+    /// <summary>
+    /// Conseil bâti sur ce qui a réellement été observé — et sur le matériel
+    /// réellement présent. Conseiller de vérifier un câble SATA à quelqu'un dont le
+    /// seul disque est un NVMe lui fait chercher un câble qui n'existe pas.
+    /// </summary>
+    private static string StorageAdvice(List<DiskInfo> inventory, List<(string Device, int Count)> devices, int resets, int paging)
+    {
+        bool anySata = inventory.Any(d => !IsNvme(d));
+        bool unknownDevice = devices.Any(d =>
+        {
+            var hd = System.Text.RegularExpressions.Regex.Match(d.Device, @"Harddisk(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return hd.Success && int.TryParse(hd.Groups[1].Value, out var i) && inventory.All(x => x.Index != i);
+        });
+
+        var steps = new List<string>();
+
+        // La cause la plus fréquemment documentée des réinitialisations de contrôleur
+        // n'est ni un disque mourant ni un câble : c'est la mise en veille du lien.
+        if (resets > 0)
+            steps.Add("Commencer par la gestion d'alimentation des liens, cause la plus fréquemment documentée de ces réinitialisations : "
+                    + "Options d'alimentation → Modifier les paramètres avancés → PCI Express → Gestion de l'alimentation à l'état de liaison → Désactivé, "
+                    + "et Disque dur → Arrêter le disque dur après → Jamais. Un redémarrage est nécessaire.");
+
+        if (unknownDevice)
+            steps.Add("Identifier le périphérique non inventorié avant toute réparation : Gestionnaire de disques, ou brancher/débrancher les supports amovibles et relancer une analyse. "
+                    + "Tant qu'il n'est pas identifié, une réparation lancée sur le disque système ne corrigera rien.");
+
+        if (paging > 0)
+            steps.Add("Les erreurs de pagination visent le fichier d'échange : si elles portent sur le disque système, un contrôle du disque est justifié.");
+
+        if (anySata)
+            steps.Add("Sur les disques SATA, vérifier le câble de données et l'alimentation — une erreur de liaison se prend souvent pour un disque en fin de vie.");
+
+        steps.Add("Mettre à jour le firmware du SSD et les pilotes de contrôleur de stockage du fabricant.");
+        steps.Add("Surveiller l'ÉVOLUTION des compteurs SMART d'une analyse à l'autre : c'est la progression qui annonce une panne, pas la valeur atteinte.");
+
+        return string.Join(" ", steps.Select((s, i) => $"{i + 1}. {s}"));
+    }
+
+    /// <summary>
+    /// Disque NVMe ? On se fie aux compteurs réellement lus plutôt qu'à
+    /// InterfaceType, que Windows renseigne souvent à « SCSI » pour du NVMe.
+    /// </summary>
+    private static bool IsNvme(DiskInfo d) =>
+        d.Smart?.AvailableSparePercent is not null
+        || (d.Smart?.Source.Contains("NVMe", StringComparison.OrdinalIgnoreCase) ?? false)
+        || d.InterfaceType.Contains("NVMe", StringComparison.OrdinalIgnoreCase);
 
     private static void AnalyzeGpu(DiagnosticReport r)
     {

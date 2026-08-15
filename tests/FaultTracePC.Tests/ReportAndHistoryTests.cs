@@ -872,4 +872,158 @@ public class ReportAndHistoryTests
         Assert.Contains("class=\"concerns\"", html);
         Assert.Contains("Sauvegardez maintenant", html);
     }
+
+    // ==================================================================
+    // Erreurs disque : nommer le périphérique, et conseiller ce qui
+    // correspond au matériel réellement présent.
+    //
+    // En 1.2.1, la conclusion annonçait « 28 erreurs disque » sans jamais
+    // dire lesquelles ni sur quoi, citait des identifiants d'événements
+    // absents du rapport, et conseillait de vérifier un câble SATA à des
+    // machines dont le seul disque est un NVMe.
+    // ==================================================================
+
+    private static DiagnosticReport AvecErreursDisque(params (string Provider, int Id, string Message)[] events)
+    {
+        var r = new DiagnosticReport
+        {
+            GeneratedAt = new DateTime(2026, 8, 15, 12, 0, 0),
+            ScanPeriodDays = 30,
+            System = new SystemSnapshot { MachineName = "POSTE-01" },
+        };
+        foreach (var (p, id, msg) in events)
+            r.Events.Add(new WinEvent
+            {
+                Category = EventCategory.DiskError,
+                Provider = p,
+                EventId = id,
+                Message = msg,
+                TimeLocal = new DateTime(2026, 8, 10),
+            });
+        return r;
+    }
+
+    /// <summary>Le NVMe du poste de test : réserve exposée = NVMe, donc aucun câble SATA.</summary>
+    private static DiskInfo NvmeSain(int index = 0) => new()
+    {
+        Model = "RPEYJ1T24MML1AWX",
+        Index = index,
+        HealthStatus = "Sain",
+        Smart = new SmartInfo { AvailableSparePercent = 100, AvailableSpareThresholdPercent = 10, Source = "SMART NVMe (journal de santé)" },
+    };
+
+    private static Finding ErreursDisque(DiagnosticReport r)
+    {
+        new RulesEngine().Analyze(r);
+        return r.Findings.First(f => f.Title.StartsWith("Erreurs disque répétées"));
+    }
+
+    [Fact]
+    public void ErreursDisque_CitentLesIdentifiantsReellementObserves()
+    {
+        var r = AvecErreursDisque(
+            ("storahci", 129, @"Une réinitialisation au périphérique, \Device\RaidPort1, a été émise."),
+            ("storahci", 129, @"Une réinitialisation au périphérique, \Device\RaidPort1, a été émise."),
+            ("storahci", 129, @"Une réinitialisation au périphérique, \Device\RaidPort1, a été émise."));
+        r.System.Disks.Add(NvmeSain());
+
+        var f = ErreursDisque(r);
+
+        Assert.Contains("storahci 129", f.Details);
+        // Ne doit plus citer des identifiants que la machine n'a pas produits.
+        Assert.DoesNotContain("disk 153", f.Details);
+        Assert.DoesNotContain("stornvme 129", f.Details);
+    }
+
+    [Fact]
+    public void ErreursDisque_SignalentUnPeripheriqueNonInventorie()
+    {
+        var r = AvecErreursDisque(
+            ("disk", 51, @"Une erreur a été détectée sur le périphérique \Device\Harddisk1\DR1 lors d'une opération de pagination."),
+            ("disk", 51, @"Une erreur a été détectée sur le périphérique \Device\Harddisk1\DR1 lors d'une opération de pagination."),
+            ("disk", 51, @"Une erreur a été détectée sur le périphérique \Device\Harddisk1\DR2 lors d'une opération de pagination."));
+        r.System.Disks.Add(NvmeSain(index: 0));   // le seul disque connu est Harddisk0
+
+        var f = ErreursDisque(r);
+
+        Assert.Contains(@"\Device\Harddisk1", f.Details);
+        Assert.Contains("AUCUN disque inventorié", f.Details);
+        // Et le conseil doit dire de l'identifier AVANT de réparer quoi que ce soit.
+        Assert.Contains("Identifier le périphérique non inventorié", f.Recommendation);
+    }
+
+    [Fact]
+    public void ErreursDisque_NommentLeDisqueQuandIlEstConnu()
+    {
+        var r = AvecErreursDisque(
+            ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0 lors d'une opération de pagination."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0 lors d'une opération de pagination."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0 lors d'une opération de pagination."));
+        r.System.Disks.Add(NvmeSain(index: 0));
+
+        var f = ErreursDisque(r);
+
+        Assert.Contains("RPEYJ1T24MML1AWX", f.Details);
+        Assert.DoesNotContain("AUCUN disque inventorié", f.Details);
+    }
+
+    [Fact]
+    public void ErreursDisque_SurNvme_NeConseillentPasDeCableSata()
+    {
+        var r = AvecErreursDisque(
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1, a été émise."),
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1, a été émise."),
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1, a été émise."));
+        r.System.Disks.Add(NvmeSain());
+
+        var f = ErreursDisque(r);
+
+        // Chercher un câble SATA sur une machine qui n'en a pas, c'est envoyer
+        // l'utilisateur dans le mur.
+        Assert.DoesNotContain("SATA", f.Recommendation);
+        // La cause la plus documentée de ces réinitialisations arrive en premier.
+        Assert.Contains("PCI Express", f.Recommendation);
+    }
+
+    [Fact]
+    public void ErreursDisque_SurSata_ConseillentBienDeVerifierLeCable()
+    {
+        var r = AvecErreursDisque(
+            ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0."),
+            ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0."));
+        r.System.Disks.Add(new DiskInfo
+        {
+            Model = "WDC WD10EZEX", Index = 0, HealthStatus = "Sain",
+            Smart = new SmartInfo { ReallocatedSectors = 0, Source = "SMART (SATA)" },
+        });
+
+        var f = ErreursDisque(r);
+
+        Assert.Contains("SATA", f.Recommendation);
+    }
+
+    [Fact]
+    public void Rapport_IndiqueQuelBoutonDeLaBoiteAOutilsUtiliser()
+    {
+        var r = AvecErreursDisque(
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1."),
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1."),
+            ("storahci", 129, @"Réinitialisation au périphérique, \Device\RaidPort1."));
+        r.System.Disks.Add(NvmeSain());
+        new RulesEngine().Analyze(r);
+
+        var html = HtmlReportGenerator.Generate(r);
+
+        // Le mot « Outils » n'apparaissait nulle part dans le rapport.
+        Assert.Contains("Dans FaultTracePC", html);
+
+        // ATTENTION à qui voudra renforcer ce test : le texte des conclusions passe
+        // par WebUtility.HtmlEncode, qui convertit TOUT caractère non-ASCII en entité
+        // numérique — « Vérifier » devient « V&#233;rifier » dans la source. Le
+        // navigateur l'affiche correctement, mais une assertion sur une chaîne
+        // accentuée échoue toujours. On vérifie donc un fragment ASCII du libellé.
+        Assert.Contains("lecture seule", html);
+        Assert.Contains("SMART", html);
+    }
 }

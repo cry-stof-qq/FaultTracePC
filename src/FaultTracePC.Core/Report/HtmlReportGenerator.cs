@@ -177,10 +177,40 @@ public static class HtmlReportGenerator
             sb.Append($"<h3>{H(f.Title)}</h3><p>{H(f.Details)}</p>");
             if (!string.IsNullOrEmpty(f.Recommendation))
                 sb.Append($"<p class=\"reco\"><span class=\"recolabel\">💡 Recommandation</span> {H(f.Recommendation)}</p>");
+
+            // Le rapport conseillait des actions sans jamais dire qu'un bouton les
+            // exécute : le mot « Outils » n'apparaissait nulle part. Un lecteur qui
+            // ne connaît pas déjà le logiciel n'avait aucun moyen de faire le lien.
+            if (ToolboxHint(f.Category) is { } hint)
+                sb.Append($"<p class=\"toolhint\"><span class=\"toollabel\">🧰 Dans FaultTracePC</span> bouton <strong>🧰 Outils</strong>, puis : {H(hint)}</p>");
             sb.Append("</div>");
         }
         sb.Append("</section>");
     }
+
+    /// <summary>
+    /// Bouton de la boîte à outils correspondant à une catégorie de problème.
+    ///
+    /// Les libellés sont recopiés à l'identique de ceux de la fenêtre Outils : un
+    /// intitulé approximatif ferait chercher un bouton qui n'existe pas, ce qui est
+    /// pire que de ne rien indiquer.
+    ///
+    /// null pour les catégories qu'aucun outil ne traite — alimentation, matériel
+    /// physique. Promettre une réparation logicielle là où il faut ouvrir la machine
+    /// serait exactement le remède imaginaire que ce logiciel refuse de proposer.
+    /// </summary>
+    private static string? ToolboxHint(FaultCategory category) => category switch
+    {
+        FaultCategory.Storage => "« 💽 Vérifier le disque système (lecture seule) », puis « 🌡 Santé des disques (SMART) ». "
+                               + "« 💾 Gestion des disques » permet d'identifier un périphérique inconnu.",
+        FaultCategory.Memory => "« 🧠 Diagnostic mémoire Windows (redémarre !) ».",
+        FaultCategory.Driver or FaultCategory.GpuDriver =>
+            "« ⬇ Rechercher et installer les mises à jour (optionnelles et pilotes inclus) » — c'est là que se trouvent les pilotes que la page Paramètres masque.",
+        FaultCategory.WindowsUpdate =>
+            "« 🗑 Désinstaller la mise à jour sélectionnée » si une mise à jour est en cause, ou « ♻ Réinitialiser les composants Windows Update » si les installations échouent.",
+        FaultCategory.Software => "« 🧪 sfc /scannow (fichiers système) », puis « 🔍 DISM — vérifier l'image Windows ».",
+        _ => null,
+    };
 
     /// <summary>Carte « Aide à la réparation » : chemin du script + bouton de téléchargement (Blob).</summary>
     private static void RepairSection(StringBuilder sb, DiagnosticReport r)
@@ -740,6 +770,8 @@ public static class HtmlReportGenerator
         .concerns{margin:.6em 0 .4em;padding-left:1.2em}
         .concerns li{margin:.35em 0;line-height:1.45}
         .concerns li.crit{font-weight:600}
+        .toolhint{margin:.5em 0 0;font-size:13px;background:#f0f4fa;border-left:3px solid #2470B3;padding:7px 11px;border-radius:0 5px 5px 0}
+        .toollabel{font-weight:600;color:#1d4f7f;margin-right:6px}
         .ctxtitle{margin:14px 0 6px;font-size:13px;color:#44546a}
         .card h3{margin:8px 0 6px;font-size:16px}
         .card p{margin:4px 0;font-size:14px}

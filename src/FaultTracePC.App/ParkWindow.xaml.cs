@@ -140,7 +140,24 @@ public partial class ParkWindow : Window
         var results = await Task.WhenAll(_machines.Select(QueryAsync));
         _lastResults = results.ToDictionary(r => r.Machine, r => r);
         RenderRows(_lastResults);
-        TxtStatus.Text = $"Actualisé à {DateTime.Now:HH:mm:ss} — {results.Count(r => r.Ok)}/{_machines.Count} machine(s) joignable(s).";
+
+        // Synthèse des versions : la question posée devant un parc n'est pas
+        // « quelle version tourne où » mais « qu'est-ce que je dois mettre à jour,
+        // et est-ce que c'est ma console ou les postes ».
+        var joignables = results.Where(r => r.Ok).ToList();
+        var enRetard = joignables.Count(r => string.IsNullOrEmpty(r.Version)
+                                          || (Version.TryParse(r.Version, out var v)
+                                              && Version.TryParse(ConsoleVersion, out var loc) && v < loc));
+        var enAvance = joignables.Count(r => Version.TryParse(r.Version, out var v)
+                                          && Version.TryParse(ConsoleVersion, out var loc) && v > loc);
+
+        var versions = enAvance > 0
+            ? $" ⚠ {enAvance} poste(s) plus récent(s) que cette console ({ConsoleVersion}) — c'est ELLE qu'il faut mettre à jour."
+            : enRetard > 0
+                ? $" ⬆ {enRetard} poste(s) à mettre à jour vers la {ConsoleVersion}."
+                : joignables.Count > 0 ? $" Tous les postes joignables sont en {ConsoleVersion}." : "";
+
+        TxtStatus.Text = $"Actualisé à {DateTime.Now:HH:mm:ss} — {joignables.Count}/{_machines.Count} machine(s) joignable(s)." + versions;
     }
 
     /// <summary>Génère et ouvre le rapport HTML consolidé du parc.</summary>
@@ -216,6 +233,12 @@ public partial class ParkWindow : Window
     {
         /// <summary>Alertes préventives récupérées lors de la même interrogation.</summary>
         public List<PreventiveAlert> Alerts { get; init; } = new();
+
+        /// <summary>
+        /// Version du poste, telle qu'il l'annonce. Vide si le client est antérieur
+        /// à la 1.2.2 : le champ n'existait pas, ce n'est pas une erreur.
+        /// </summary>
+        public string Version { get; init; } = "";
     }
 
     /// <summary>
@@ -248,6 +271,11 @@ public partial class ParkWindow : Window
             if (doc.RootElement.TryGetProperty("lastSample", out var ls) && ls.ValueKind == JsonValueKind.Object)
                 last = ls.Deserialize<FlightSample>();
 
+            // Champ apparu en 1.2.2 : absent chez les clients antérieurs, ce qui est
+            // une information en soi (« ce poste est en retard ») et non une panne.
+            var version = doc.RootElement.TryGetProperty("version", out var v) && v.ValueKind == JsonValueKind.String
+                ? v.GetString() ?? "" : "";
+
             // Alertes préventives des 7 derniers jours (best effort : une machine
             // avec un service ancien n'expose pas encore cet endpoint).
             var alerts = new List<PreventiveAlert>();
@@ -261,7 +289,7 @@ public partial class ParkWindow : Window
             }
             catch { }
 
-            return new(m, true, active, last, "") { Alerts = alerts };
+            return new(m, true, active, last, "") { Alerts = alerts, Version = version };
         }
         catch (Exception ex)
         {
@@ -284,6 +312,33 @@ public partial class ParkWindow : Window
         public string TempGpu { get; set; } = "";
         public string Ram { get; set; } = "";
         public string Top { get; set; } = "";
+
+        /// <summary>Version du poste, comparée à celle de cette console.</summary>
+        public string Version { get; set; } = "";
+    }
+
+    /// <summary>Version de cette console — la référence à laquelle les postes sont comparés.</summary>
+    private static string ConsoleVersion => UpdateChecker.CurrentVersion.ToString(3);
+
+    /// <summary>
+    /// Compare la version d'un poste à celle de la console.
+    ///
+    /// Volontairement symétrique : c'est parfois la CONSOLE qui est en retard, et
+    /// une colonne qui ne saurait dire que « le poste est vieux » ferait mettre à
+    /// jour la mauvaise machine — exactement la question qu'on se pose devant un parc.
+    /// </summary>
+    private static string DescribeVersion(QueryResult? r)
+    {
+        if (r is null || !r.Ok) return "";
+        if (string.IsNullOrEmpty(r.Version)) return "⬆ antérieure à 1.2.2";
+
+        if (!Version.TryParse(r.Version, out var remote) || !Version.TryParse(ConsoleVersion, out var local))
+            return r.Version;
+
+        var cmp = remote.CompareTo(local);
+        return cmp < 0 ? $"⬆ {r.Version} — à mettre à jour"
+             : cmp > 0 ? $"⚠ {r.Version} — console en retard"
+             : r.Version;
     }
 
     private void RenderRows(Dictionary<ParkMachine, QueryResult>? results)
@@ -305,6 +360,7 @@ public partial class ParkWindow : Window
                 TempGpu = r?.Last?.GpuTemp is { } gt ? $"{gt:0.#} °C" : "",
                 Ram = r?.Last?.MemPct?.ToString("0.#") ?? "",
                 Top = r?.Last?.TopProcesses ?? "",
+                Version = DescribeVersion(r),
             };
         }).ToList();
     }

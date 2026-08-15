@@ -241,6 +241,13 @@ public sealed class TelemetryService : BackgroundService
             uptimeHours = Math.Round(Environment.TickCount64 / 3_600_000.0, 1),
             active = last is not null && DateTime.Now - last.Time < TimeSpan.FromMinutes(2),
             lastSample = last,
+            // Version du poste, pour que la console sache qui mettre à jour — elle
+            // était déjà exposée par /api/ping, mais la console n'appelle que
+            // /api/status : l'ajouter ici évite un aller-retour réseau par machine.
+            // Ajout PUREMENT additif : un client antérieur ne renvoie simplement pas
+            // ce champ, et la console l'affiche comme « version inconnue » sans que
+            // l'interrogation échoue.
+            version = typeof(TelemetryService).Assembly.GetName().Version?.ToString(3) ?? "",
         };
     }
 

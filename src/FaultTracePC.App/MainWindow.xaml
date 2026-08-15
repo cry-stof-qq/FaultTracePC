@@ -17,11 +17,24 @@
 
         <!-- Bandeau -->
         <Border Grid.Row="0" Background="#182848" Padding="22,16">
-            <StackPanel>
-                <TextBlock Text="FaultTracePC" Foreground="White" FontSize="22" FontWeight="SemiBold"/>
-                <TextBlock Text="Trouver la cause d'une panne Windows 10/11 — scan post-mortem et surveillance temps réel"
-                           Foreground="#B9C4DC" FontSize="12" Margin="0,3,0,0"/>
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="FaultTracePC" Foreground="White" FontSize="22" FontWeight="SemiBold"/>
+                    <TextBlock Text="Trouver la cause d'une panne Windows 10/11 — scan post-mortem et surveillance temps réel"
+                               Foreground="#B9C4DC" FontSize="12" Margin="0,3,0,0"/>
+                </StackPanel>
+                <!-- Version installée : la première question posée à quelqu'un qui
+                     signale un problème, et jusqu'ici invisible depuis l'interface. -->
+                <Button x:Name="BtnAbout" Grid.Column="1" Content="?" Width="30" Height="30"
+                        FontSize="15" FontWeight="Bold" Cursor="Hand"
+                        VerticalAlignment="Top" Background="#2470B3" Foreground="White"
+                        BorderThickness="0" Click="BtnAbout_Click"
+                        ToolTip="Version installée et informations utiles au dépannage"/>
+            </Grid>
         </Border>
 
         <!-- Commandes : WrapPanel = retour à la ligne automatique, plus jamais de bouton
