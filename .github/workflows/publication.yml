@@ -19,6 +19,10 @@ on:
       version:
         description: "Version à construire, sans le « v » — par exemple 1.2.4"
         required: true
+      publier:
+        description: "Créer la release. Décocher pour un essai à blanc : tout est construit, rien n'est publié."
+        type: boolean
+        default: true
 
 permissions:
   # Créer la release et y attacher les fichiers. Rien d'autre : le jeton n'a aucun
@@ -110,7 +114,29 @@ jobs:
           [IO.File]::WriteAllText("$env:RUNNER_TEMP/corps.md", $corps, [Text.UTF8Encoding]::new($false))
           Write-Host "Corps composé : $($corps.Length) caractères."
 
+      # ESSAI À BLANC
+      #
+      # Tout ce qui précède s'est exécuté : tests, contrôle de version, publication,
+      # MSI, empreintes, composition du corps de la release. Seule la publication
+      # est sautée. C'est ce qui permet de vérifier la partie que rien d'autre
+      # n'éprouve — la lecture des notes dans docs/releases/ et l'encodage du corps,
+      # précisément là où une écriture par défaut de PowerShell avait produit un
+      # fichier à encodage mixte sur la 1.2.2.
+      - name: Déposer les fichiers sans publier (essai à blanc)
+        if: github.event_name == 'workflow_dispatch' && !inputs.publier
+        uses: actions/upload-artifact@v4
+        with:
+          name: essai-a-blanc-v${{ steps.v.outputs.version }}
+          path: |
+            dist/FaultTracePC-${{ steps.v.outputs.version }}.msi
+            dist/FaultTracePC-${{ steps.v.outputs.version }}-portable.zip
+            ${{ runner.temp }}/corps.md
+          retention-days: 5
+
       - name: Créer la release
+        # Sur un tag, on publie toujours. Au déclenchement manuel, seulement si la
+        # case est cochée.
+        if: github.event_name == 'push' || inputs.publier
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -121,3 +147,10 @@ jobs:
               "dist/FaultTracePC-$v-portable.zip" `
               --title "FaultTracePC v$v" `
               --notes-file "$env:RUNNER_TEMP/corps.md"
+
+      - name: Rappel
+        if: github.event_name == 'workflow_dispatch' && !inputs.publier
+        shell: pwsh
+        run: |
+          Write-Host "Essai à blanc : aucune release créée." -ForegroundColor Yellow
+          Write-Host "Le MSI, l'archive et le corps composé sont dans l'artefact de cette exécution."

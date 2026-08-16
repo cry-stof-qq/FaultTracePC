@@ -11,6 +11,12 @@ a readable report and guided repair. Free, no telemetry, no account.
 
 🇬🇧 English · [🇫🇷 Français](README.fr.md)
 
+[![Build and tests](https://github.com/cry-stof-qq/FaultTracePC/actions/workflows/ci.yml/badge.svg)](https://github.com/cry-stof-qq/FaultTracePC/actions/workflows/ci.yml)
+[![Installer](https://github.com/cry-stof-qq/FaultTracePC/actions/workflows/installeur.yml/badge.svg)](https://github.com/cry-stof-qq/FaultTracePC/actions/workflows/installeur.yml)
+
+Every commit is built and tested on a clean Windows runner, and released
+packages are produced by that same automated build — not from a workstation.
+
 </div>
 
 ---

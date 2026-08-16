@@ -11,6 +11,13 @@ rapport lisible et aide à la réparation. Gratuit, en français, sans télémé
 
 [🇬🇧 English](README.md) · 🇫🇷 Français
 
+[![Compilation et tests](https://github.com/cry-stof-qq/FaultTracePC/actions/workflows/ci.yml/badge.svg)](https://github.com/cry-stof-qq/FaultTracePC/actions/workflows/ci.yml)
+[![Installeur](https://github.com/cry-stof-qq/FaultTracePC/actions/workflows/installeur.yml/badge.svg)](https://github.com/cry-stof-qq/FaultTracePC/actions/workflows/installeur.yml)
+
+Chaque commit est compilé et testé sur une machine Windows vierge, et les paquets
+publiés proviennent de cette même construction automatisée — pas d'un poste de
+travail.
+
 </div>
 
 ---
