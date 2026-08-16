@@ -89,10 +89,13 @@ public sealed class CdbAnalyzer
         var cdb = LocateCdb();
         if (cdb is null)
         {
-            _errors.Add("Analyse profonde indisponible : CDB/WinDbg introuvable. "
-                      + "Installation en 1 commande : winget install Microsoft.WinDbg "
-                      + "(ou « Debugging Tools for Windows » du SDK). Sans lui, le code STOP est lu "
-                      + "nativement mais le pilote exact n'est pas nommé.");
+            // Le message disait déjà quoi faire, mais laissait l'utilisateur recopier
+            // une commande à la main. Il renvoie désormais vers le bouton qui l'exécute.
+            _errors.Add("Analyse profonde indisponible : CDB/WinDbg introuvable. Sans lui, le code STOP "
+                      + "est lu nativement mais le pilote exact n'est pas nommé. "
+                      + "Pour l'installer : bouton 🧰 Outils, puis « 🐞 Installer WinDbg (analyse des dumps) ». "
+                      + "En ligne de commande : winget install Microsoft.WinDbg, ou les « Debugging Tools for "
+                      + "Windows » du SDK pour une installation valable sur toute la machine.");
             return;
         }
 

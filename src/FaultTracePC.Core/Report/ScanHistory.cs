@@ -81,6 +81,20 @@ public static class ScanHistory
         };
     }
 
+    /// <summary>Durée au-delà de laquelle un résumé peut être supprimé.</summary>
+    private const int RetentionDays = 90;
+
+    /// <summary>
+    /// Nombre de résumés conservés quoi qu'il arrive, même très anciens.
+    ///
+    /// Purger uniquement sur l'âge ferait perdre son scan précédent à une machine
+    /// analysée une fois par an — et avec lui la réponse à « est-ce que c'est
+    /// réglé ? », qui est la raison d'être de cet historique. Dix suffisent à
+    /// garantir la continuité ; au-delà, sur une machine peu analysée, une pente
+    /// calculée sur des points étalés sur dix ans ne serait plus une tendance.
+    /// </summary>
+    private const int RetentionMinimumCount = 10;
+
     /// <summary>Sauvegarde le résumé du scan courant (après analyse).</summary>
     public static void Save(DiagnosticReport r, List<string> errors)
     {
@@ -92,6 +106,47 @@ public static class ScanHistory
             File.WriteAllText(path, json);
         }
         catch (Exception ex) { errors.Add($"Historique des scans (écriture) : {ex.Message}"); }
+
+        if (Purge() is { } note) r.Notes.Add(note);
+    }
+
+    /// <summary>
+    /// Supprime les résumés à la fois PLUS VIEUX que la rétention ET au-delà des
+    /// derniers conservés — les deux conditions réunies, jamais une seule.
+    ///
+    /// Retourne une phrase décrivant ce qui a été supprimé, ou null si rien ne
+    /// l'a été. La suppression est annoncée dans le rapport : effacer en silence
+    /// des données de l'utilisateur détonnerait avec un logiciel qui ne fait rien
+    /// d'irréversible sans le dire.
+    /// </summary>
+    internal static string? Purge(DateTime? now = null)
+    {
+        try
+        {
+            if (!Directory.Exists(HistoryDir)) return null;
+
+            var fichiers = Directory.EnumerateFiles(HistoryDir, "Scan_*.json")
+                                    .Select(f => (Path: f, Modifie: File.GetLastWriteTime(f)))
+                                    .ToList();
+
+            var candidats = ACandidats(fichiers, now ?? DateTime.Now);
+            if (candidats.Count == 0) return null;
+
+            var supprimes = 0;
+            foreach (var f in candidats)
+            {
+                try { File.Delete(f); supprimes++; } catch { /* fichier verrouillé : on réessaiera au prochain scan */ }
+            }
+            if (supprimes == 0) return null;
+
+            return $"Historique : {supprimes} résumé(s) de plus de {RetentionDays} jours supprimé(s). "
+                 + $"Les {RetentionMinimumCount} plus récents sont conservés quel que soit leur âge, "
+                 + "pour qu'une comparaison reste toujours possible.";
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -307,10 +362,27 @@ public static class ScanHistory
         }
         else if (prevHadProblems)
         {
-            var days = (r.GeneratedAt - prev.GeneratedAt).TotalDays;
+            // Trois paliers, et non deux.
+            //
+            // Sous deux heures, la machine n'a pas eu le temps de reproduire quoi que
+            // ce soit : « aucun nouveau crash » y est exact et vide de sens. Deux scans
+            // à dix minutes d'intervalle affichaient « Bon signe » — un utilisateur en
+            // a conclu, à tort, que quelque chose s'était amélioré entre les deux.
+            var ecoule = r.GeneratedAt - prev.GeneratedAt;
+            var days = ecoule.TotalDays;
             crashTone = "ok";
-            crashSentence = $"Aucun nouveau crash depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} ({days:0.#} jour(s)). "
-                          + (days >= 7 ? "La réparation semble efficace." : "Bon signe — à confirmer sur la durée (recommandé : re-scanner après une semaine d'utilisation normale).");
+
+            if (ecoule < TimeSpan.FromHours(2))
+            {
+                crashSentence = $"Scan précédent il y a {Humaniser(ecoule)} seulement : "
+                              + "trop récent pour conclure quoi que ce soit. Une comparaison n'a de sens qu'après "
+                              + "plusieurs heures d'utilisation normale.";
+            }
+            else
+            {
+                crashSentence = $"Aucun nouveau crash depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} ({days:0.#} jour(s)). "
+                              + (days >= 7 ? "La réparation semble efficace." : "Bon signe — à confirmer sur la durée (recommandé : re-scanner après une semaine d'utilisation normale).");
+            }
         }
         else
         {
@@ -347,6 +419,34 @@ public static class ScanHistory
 
         return c;
     }
+
+    /// <summary>
+    /// Règle de purge, isolée de l'accès disque pour être vérifiable.
+    ///
+    /// Un fichier n'est candidat que s'il remplit les DEUX conditions : plus vieux
+    /// que la rétention, ET au-delà des N derniers. Une seule des deux ne suffit
+    /// jamais — c'est ce qui garantit qu'une machine analysée une fois par an
+    /// conserve de quoi se comparer.
+    /// </summary>
+    internal static List<string> ACandidats(IEnumerable<(string Path, DateTime Modifie)> fichiers, DateTime now)
+    {
+        var limite = now.AddDays(-RetentionDays);
+
+        // Tri par nom : les fichiers sont nommés Scan_aaaa-MM-jj_HHmmss.json, donc
+        // l'ordre alphabétique décroissant est l'ordre chronologique inverse.
+        return fichiers
+            .OrderByDescending(f => f.Path, StringComparer.Ordinal)
+            .Skip(RetentionMinimumCount)
+            .Where(f => f.Modifie < limite)
+            .Select(f => f.Path)
+            .ToList();
+    }
+
+    /// <summary>Durée courte en langage humain : « 12 minutes », « 1 h 40 ».</summary>
+    private static string Humaniser(TimeSpan d) =>
+        d.TotalMinutes < 1 ? "moins d'une minute"
+        : d.TotalMinutes < 60 ? $"{(int)d.TotalMinutes} minute(s)"
+        : $"{(int)d.TotalHours} h {d.Minutes:00}";
 
     /// <summary>
     /// Enregistre une dégradation et relève la sévérité globale si nécessaire.

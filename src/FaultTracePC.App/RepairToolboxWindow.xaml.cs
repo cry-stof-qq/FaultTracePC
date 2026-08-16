@@ -183,6 +183,31 @@ public partial class RepairToolboxWindow : Window
             // produirait aucune erreur, juste un réglage inchangé — et l'utilisateur
             // croirait avoir corrigé son problème. On lui montre l'état réel et on
             // lui ouvre le bon panneau ; c'est lui qui décide.
+            // Installation de WinDbg. Sortie volontairement SANS ACCENTS : la console
+            // n'est pas en UTF-8, l'ASCII s'affiche correctement sur toute page de codes.
+            //
+            // On installe le paquet winget, pas le SDK : le bouton sert une personne
+            // devant sa machine. Sur un parc, WinDbg se déploie par GPO à côté de
+            // FaultTracePC — c'est une decision de deploiement, pas un clic.
+            case "windbg":
+                LaunchPs(
+                    "if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { " +
+                    "  Write-Host 'winget est introuvable sur cette machine.' -ForegroundColor Red; " +
+                    "  Write-Host 'Installe App Installer depuis le Microsoft Store, ou les Debugging Tools for Windows via le SDK Windows.' -ForegroundColor Yellow " +
+                    "} else { " +
+                    "  Write-Host 'Installation de WinDbg via winget...' -ForegroundColor Cyan; " +
+                    "  winget install --id Microsoft.WinDbg --accept-package-agreements --accept-source-agreements; " +
+                    "  if ($LASTEXITCODE -ne 0) { " +
+                    "    Write-Host ''; " +
+                    "    Write-Host ('winget s''est termine avec le code ' + $LASTEXITCODE + '.') -ForegroundColor Yellow; " +
+                    "    Write-Host 'En etablissement, les sources winget sont frequemment bloquees par strategie.' -ForegroundColor Yellow; " +
+                    "    Write-Host 'Repli : Debugging Tools for Windows via le SDK Windows, qui installe pour TOUTE la machine.' -ForegroundColor Yellow " +
+                    "  } else { " +
+                    "    Write-Host ''; " +
+                    "    Write-Host 'Termine. Relance une analyse : le pilote fautif sera nomme si un dump est exploitable.' -ForegroundColor Green " +
+                    "  } " +
+                    "}");
+                break;
             case "linkpower":
                 // Volontairement SANS ACCENTS : cette sortie s'affiche dans une
                 // console dont la page de codes n'est pas UTF-8. L'ASCII s'affiche

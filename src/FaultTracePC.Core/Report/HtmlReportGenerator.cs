@@ -495,7 +495,11 @@ public static class HtmlReportGenerator
                 // disque dans le Gestionnaire de disques et dans l'Explorateur. Le
                 // modèle seul ne dit à personne de quel disque il s'agit.
                 (d.Index is { } ix ? $"<strong>Disque {ix}</strong>" : "<strong>Disque</strong>")
-                + (d.Letters.Count > 0 ? $" ({H(string.Join(", ", d.Letters))})" : " (aucune lettre)")
+                // Sans lettre, on n'écrit rien : un disque sans volume monté est
+                // normal (disque neuf, non partitionné, ou branché en lecture par un
+                // technicien). Afficher « aucune lettre » entre parenthèses donnait
+                // l'impression d'un défaut là où il n'y en a pas.
+                + (d.Letters.Count > 0 ? $" ({H(string.Join(", ", d.Letters))})" : "")
                 + $" — {H(d.Model)} ({RulesEngine.FormatBytes(d.SizeBytes)}, {H(string.IsNullOrEmpty(d.MediaType) ? d.InterfaceType : d.MediaType)}) — santé : {H(FirstNonEmpty(d.HealthStatus, d.WmiStatus, "inconnue"))}"
                 + (d.TemperatureC is { } t ? $" · {t} °C" : "")
                 + (d.WearPercent is { } w and > 0 ? $" · usure {w} %" : ""))));
@@ -675,6 +679,16 @@ public static class HtmlReportGenerator
 
     private static void ErrorsSection(StringBuilder sb, DiagnosticReport r)
     {
+        // Deux sections distinctes : ce qui a échoué, et ce qui a été fait. Mélanger
+        // un entretien normal avec des limitations le ferait passer pour un problème.
+        if (r.Notes.Count > 0)
+        {
+            sb.Append("<section><h2>Entretien effectué</h2><ul>");
+            foreach (var n in r.Notes)
+                sb.Append($"<li>{H(n)}</li>");
+            sb.Append("</ul></section>");
+        }
+
         if (r.CollectorErrors.Count == 0) return;
         sb.Append("<section><h2>Limitations de cette analyse</h2><ul>");
         foreach (var e in r.CollectorErrors)

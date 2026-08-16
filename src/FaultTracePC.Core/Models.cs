@@ -362,6 +362,17 @@ public sealed class DiagnosticReport
     public FaultCategory VerdictCategory { get; set; } = FaultCategory.None;
     /// <summary>Erreurs non bloquantes rencontrées pendant la collecte (transparence).</summary>
     public List<string> CollectorErrors { get; set; } = new();
+
+    /// <summary>
+    /// Actions d'entretien effectuées pendant l'analyse — purge de l'historique
+    /// notamment.
+    ///
+    /// Distinct de <see cref="CollectorErrors"/> : ce ne sont pas des échecs, et les
+    /// ranger parmi les « limitations de cette analyse » ferait passer un entretien
+    /// normal pour un problème. Mais ce sont des modifications du disque de
+    /// l'utilisateur, donc elles se disent.
+    /// </summary>
+    public List<string> Notes { get; set; } = new();
     /// <summary>Chemin du script PowerShell de réparation généré (si des problèmes ont été trouvés).</summary>
     public string? RepairScriptPath { get; set; }
     /// <summary>Lanceur .bat à double-clic (élévation UAC + ExecutionPolicy Bypass automatiques).</summary>

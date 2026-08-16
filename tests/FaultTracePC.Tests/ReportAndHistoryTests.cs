@@ -772,6 +772,88 @@ public class ReportAndHistoryTests
         Assert.Contains("0 à 7", c.Assessment);
     }
 
+    // ------------------------------------------------------------------
+    // Purge de l'historique : les DEUX conditions, jamais une seule.
+    // ------------------------------------------------------------------
+
+    private static List<(string Path, DateTime Modifie)> Resumes(int nombre, DateTime plusRecent, int joursEntreScans)
+    {
+        var l = new List<(string, DateTime)>();
+        for (var i = 0; i < nombre; i++)
+        {
+            var d = plusRecent.AddDays(-i * (double)joursEntreScans);
+            l.Add(($"Scan_{d:yyyy-MM-dd_HHmmss}.json", d));
+        }
+        return l;
+    }
+
+    [Fact]
+    public void Purge_NeTouchePasAuxDixDerniers_MemeTresAnciens()
+    {
+        // Machine analysée une fois par an : tout est vieux, mais rien ne doit
+        // partir — sinon elle perd la réponse à « est-ce que c'est réglé ? ».
+        var now = new DateTime(2026, 8, 16);
+        var fichiers = Resumes(8, now.AddYears(-3), joursEntreScans: 365);
+
+        Assert.Empty(ScanHistory.ACandidats(fichiers, now));
+    }
+
+    [Fact]
+    public void Purge_SupprimeCeQuiEstAncienEtAuDelaDesDixDerniers()
+    {
+        var now = new DateTime(2026, 8, 16);
+        var fichiers = Resumes(15, now.AddDays(-100), joursEntreScans: 10); // tous > 90 jours
+
+        var candidats = ScanHistory.ACandidats(fichiers, now);
+
+        Assert.Equal(5, candidats.Count);          // 15 - les 10 conservés
+        Assert.All(candidats, c => Assert.Contains("Scan_", c));
+    }
+
+    [Fact]
+    public void Purge_NeSupprimeRienDeRecent_MemeAuDelaDesDixDerniers()
+    {
+        // 30 scans en un mois : au-delà des 10 derniers, mais tous récents.
+        var now = new DateTime(2026, 8, 16);
+        var fichiers = Resumes(30, now, joursEntreScans: 1);
+
+        Assert.Empty(ScanHistory.ACandidats(fichiers, now));
+    }
+
+    [Fact]
+    public void Verdict_DeuxScansTropRapproches_NeConcluentPas()
+    {
+        // Le cas remonté par un utilisateur : deux scans à quelques minutes
+        // d'intervalle affichaient « Bon signe », alors que la machine n'avait
+        // rien eu le temps de faire entre les deux.
+        var prev = PrecedentSain();
+        prev.Bsods.Add(new ScanHistory.BsodBrief { Time = new DateTime(2026, 7, 30), Code = 0x50 });
+
+        var r = ScanActuel(new SmartInfo { ReallocatedSectors = 0 });
+        r.GeneratedAt = prev.GeneratedAt.AddMinutes(12);
+
+        var c = ScanHistory.Compare(r, prev);
+
+        Assert.Contains("trop récent pour conclure", c.Assessment);
+        Assert.DoesNotContain("Bon signe", c.Assessment);
+    }
+
+    [Fact]
+    public void Verdict_ApresQuelquesJours_ConclutNormalement()
+    {
+        // Le garde-fou inverse : au-delà du plancher, le comportement ne change pas.
+        var prev = PrecedentSain();
+        prev.Bsods.Add(new ScanHistory.BsodBrief { Time = new DateTime(2026, 7, 30), Code = 0x50 });
+
+        var r = ScanActuel(new SmartInfo { ReallocatedSectors = 0 });
+        r.GeneratedAt = prev.GeneratedAt.AddDays(3);
+
+        var c = ScanHistory.Compare(r, prev);
+
+        Assert.DoesNotContain("trop récent", c.Assessment);
+        Assert.Contains("Bon signe", c.Assessment);
+    }
+
     [Fact]
     public void Verdict_RienNaBouge_ResteVertEtDitStable()
     {

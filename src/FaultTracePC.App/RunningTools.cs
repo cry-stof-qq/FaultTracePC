@@ -105,6 +105,10 @@ public static class RunningTools
         "sfc", "dismscan", "dismrestore", "chkdskscan", "chkdskfix", "mdsched",
         "wureset", "componentcleanup", "temp", "cleanmgr",
         "defenderquick", "defenderfull", "networkreset", "restorepoint", "uninstallkb",
+        // Installer un logiciel modifie le système : même règle que les autres.
+        // « linkpower » n'y figure PAS : il affiche un réglage et ouvre un panneau,
+        // il n'écrit rien.
+        "windbg",
     };
 
     public static bool IsExclusive(string tool) => ExclusiveTools.Contains(tool);

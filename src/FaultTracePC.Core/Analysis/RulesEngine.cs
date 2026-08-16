@@ -988,7 +988,8 @@ public sealed class RulesEngine
                 else
                 {
                     parts.Add($"un disque qui portait le numéro {idx} au moment des faits, ABSENT aujourd'hui de la machine "
-                            + $"(×{count}, « {device} ») — le Gestionnaire de disques ne l'affichera donc pas{WhenSeen(device, events)}");
+                            + $"(×{count}, « {device} ») — le Gestionnaire de disques ne l'affichera donc pas."
+                            + WhenSeen(device, events));
                 }
                 continue;
             }
@@ -1001,7 +1002,10 @@ public sealed class RulesEngine
 
             parts.Add($"« {device} » (×{count})");
         }
-        return "Périphériques mis en cause : " + string.Join(" ; ", parts) + ".";
+        // Les fragments peuvent déjà se terminer par un point (WhenSeen rend des
+        // phrases complètes) : on ne le double pas.
+        var texte = string.Join(" ; ", parts);
+        return "Périphériques mis en cause : " + texte + (texte.EndsWith('.') ? "" : ".");
     }
 
     /// <summary>

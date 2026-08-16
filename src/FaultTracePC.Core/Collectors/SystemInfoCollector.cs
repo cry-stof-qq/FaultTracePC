@@ -264,16 +264,40 @@ public sealed class SystemInfoCollector
             try
             {
                 var lettres = new List<string>();
-                var diskPath = $"Win32_DiskDrive.DeviceID='\\\\\\\\.\\\\PHYSICALDRIVE{index}'";
+
+                // ATTENTION À L'ÉCHAPPEMENT — deux erreurs successives ici.
+                //
+                // À l'intérieur de « ASSOCIATORS OF { … } », la valeur est un CHEMIN
+                // D'OBJET WMI, pas un littéral WQL : les antislashs s'y écrivent tels
+                // quels. Doubler les antislashs, comme on le ferait dans une chaîne
+                // WQL, fait échouer la requête sur « Non trouvé » — vérifié :
+                //   '\\.\PHYSICALDRIVE0'      → 3 partitions
+                //   '\\\\.\\PHYSICALDRIVE0'   → Non trouvé
+                //
+                // Chaîne verbatim pour que ce qui est écrit ici soit exactement ce que
+                // WMI reçoit, sans comptage d'antislashs.
+                var diskPath = $@"Win32_DiskDrive.DeviceID='\\.\PHYSICALDRIVE{index}'";
 
                 foreach (var part in Query(
                     $"ASSOCIATORS OF {{{diskPath}}} WHERE AssocClass=Win32_DiskDriveToDiskPartition"))
                 {
-                    var partId = S(part, "DeviceID");
-                    if (partId.Length == 0) continue;
+                    // NE PAS reconstruire le chemin à partir de DeviceID.
+                    //
+                    // Win32_DiskPartition.DeviceID vaut « Disk #0, Partition #0 » — avec
+                    // une VIRGULE, qui sépare les paires clé-valeur dans un chemin d'objet
+                    // WMI. Le chemin fabriqué à la main était donc rejeté, et la collecte
+                    // des lettres échouait en silence (1.2.3 affichait « aucune lettre »
+                    // sur un disque portant C:).
+                    //
+                    // __RELPATH est le chemin que WMI a lui-même produit, correctement
+                    // échappé — exactement la solution déjà retenue par
+                    // RelatedReliabilityCounters quelques lignes plus bas.
+                    string? relPath = null;
+                    try { relPath = part["__RELPATH"]?.ToString(); } catch { /* propriété système indisponible */ }
+                    if (string.IsNullOrWhiteSpace(relPath)) continue;
 
                     foreach (var vol in Query(
-                        $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partId}'}} WHERE AssocClass=Win32_LogicalDiskToPartition"))
+                        $"ASSOCIATORS OF {{{relPath}}} WHERE AssocClass=Win32_LogicalDiskToPartition"))
                     {
                         var lettre = S(vol, "DeviceID");   // « C: »
                         if (lettre.Length > 0 && !lettres.Contains(lettre, StringComparer.OrdinalIgnoreCase))
@@ -284,10 +308,17 @@ public sealed class SystemInfoCollector
                 lettres.Sort(StringComparer.OrdinalIgnoreCase);
                 disk.Letters = lettres;
             }
-            catch
+            catch (Exception ex)
             {
-                // Un disque dont les lettres restent introuvables reste un disque
-                // parfaitement diagnosticable : on n'échoue pas pour si peu.
+                // Un disque dont les lettres restent introuvables reste diagnosticable :
+                // on n'interrompt rien. Mais on ne se tait plus.
+                //
+                // Ce catch était muet, et c'est précisément pour ça que l'échec a
+                // survécu à deux corrections : le logiciel affichait un disque sans
+                // lettres exactement comme un disque qui n'en a pas. Présenter un échec
+                // de mesure comme un résultat est la seule chose que ce logiciel
+                // s'interdit partout ailleurs.
+                _errors.Add($"Lettres de lecteur du disque {index} : {ex.Message}");
             }
         }
     }

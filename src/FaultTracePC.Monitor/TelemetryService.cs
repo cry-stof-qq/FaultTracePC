@@ -273,7 +273,14 @@ public sealed class TelemetryService : BackgroundService
                     var i = line.IndexOf("\"t\":\"", StringComparison.Ordinal);
                     if (i < 0) continue;
                     var end = line.IndexOf('"', i + 5);
-                    if (end < 0 || !DateTime.TryParse(line.AsSpan(i + 5, end - i - 5), out var t)) continue;
+                    // InvariantCulture explicite : le journal est écrit par le service
+                    // et relu ici. Faire dépendre cette lecture des paramètres
+                    // régionaux ferait disparaître la boîte noire sans un mot le jour
+                    // où ils changent.
+                    if (end < 0 || !DateTime.TryParse(
+                        line.AsSpan(i + 5, end - i - 5),
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out var t)) continue;
                     lines.Add((t, line));
                 }
             }

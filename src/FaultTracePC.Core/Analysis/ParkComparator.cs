@@ -238,7 +238,12 @@ public static class ParkComparator
     {
         var parts = (packed ?? "").Split('|');
         var version = parts.Length > 0 ? parts[0].Trim() : "";
-        DateTime? date = parts.Length > 1 && DateTime.TryParse(parts[1], out var d) ? d : null;
+        // InvariantCulture explicite : cette valeur est ÉCRITE par une machine et
+        // RELUE par une autre. Un poste dont les paramètres régionaux diffèrent de
+        // ceux de la console ne doit pas disparaître silencieusement du comparateur.
+        DateTime? date = parts.Length > 1 && DateTime.TryParse(
+            parts[1], System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var d) ? d : null;
         return (version, date);
     }
 }

@@ -295,6 +295,7 @@ public partial class MainWindow : Window
             BtnRepair.IsEnabled = _lastRepairScriptPath is not null;
             ShowResults(report);
             OpenInBrowser(_lastReportPath);
+            ProposerWinDbg(report, options);
         }
         catch (Exception ex)
         {
@@ -310,6 +311,42 @@ public partial class MainWindow : Window
             BtnScan.IsEnabled = true;
             _scanning = false;
         }
+    }
+
+    /// <summary>
+    /// Après un scan qui a trouvé des dumps sans pouvoir les analyser, propose
+    /// d'installer WinDbg.
+    ///
+    /// La question est posée ICI et pas ailleurs parce que c'est ici qu'elle a un
+    /// sens : l'utilisateur vient de constater qu'aucun pilote n'est nommé. Un
+    /// bouton dans un menu, il n'irait jamais le chercher.
+    ///
+    /// Et elle renvoie vers la boîte à outils plutôt que d'installer directement :
+    /// c'est là que vivent les actions modifiant le système, avec leur garde-fou de
+    /// concurrence et leur fenêtre visible. Un second chemin d'installation, posé à
+    /// côté, contournerait tout ça.
+    /// </summary>
+    private void ProposerWinDbg(DiagnosticReport report, ScanOptions options)
+    {
+        if (!options.DeepDumpAnalysis) return;
+
+        var dumpsNoyau = report.Dumps
+            .Where(d => d.Kind is DumpKind.KernelMinidump or DumpKind.FullMemoryDump)
+            .ToList();
+
+        // Aucun dump : rien à analyser, donc rien à proposer.
+        // Au moins un dump analysé en profondeur : l'outil est présent, rien à faire.
+        if (dumpsNoyau.Count == 0 || dumpsNoyau.Any(d => d.DeepAnalyzed)) return;
+
+        var choix = MessageBox.Show(this,
+            $"{dumpsNoyau.Count} fichier(s) d'incident ont été trouvés, mais le pilote fautif n'a pas pu être nommé : "
+            + "les outils de débogage de Microsoft ne sont pas installés sur cette machine.\n\n"
+            + "Sans eux, le code d'arrêt est lu, mais le coupable reste souvent anonyme — c'est la différence "
+            + "entre « la machine a planté » et « c'est ce pilote-là ».\n\n"
+            + "Ouvrir la boîte à outils pour les installer ?",
+            "Analyse incomplète", MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+        if (choix == MessageBoxResult.Yes) BtnToolbox_Click(this, new RoutedEventArgs());
     }
 
     private void ShowResults(DiagnosticReport report)

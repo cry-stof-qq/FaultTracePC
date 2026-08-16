@@ -128,6 +128,8 @@
                                 ToolTip="powercfg /energy — analyse alimentation/veille pendant 60 secondes."/>
                         <Button Content="🌡 Santé des disques (SMART)" Padding="10,6" Margin="0,0,8,6" Tag="smart" Click="BtnTool_Click"
                                 ToolTip="Get-PhysicalDisk + compteurs de fiabilité (température, usure, erreurs)."/>
+                        <Button Content="🐞 Installer WinDbg (analyse des dumps)" Padding="10,6" Margin="0,0,8,6" Tag="windbg" Click="BtnTool_Click"
+                                ToolTip="Installe les outils de débogage Microsoft via winget. Sans eux, le code d'arrêt est lu mais le pilote fautif reste souvent non identifié. N'installe rien sans que tu aies cliqué."/>
                         <Button Content="🔌 Alimentation des liens (réinitialisations de contrôleur)" Padding="10,6" Margin="0,0,8,6" Tag="linkpower" Click="BtnTool_Click"
                                 ToolTip="Affiche le réglage actuel de la gestion d'alimentation des liens PCI Express et des disques, puis ouvre le panneau pour le modifier. C'est la cause la plus fréquemment documentée des événements « réinitialisation au périphérique » (storahci 129). Ne modifie rien tout seul."/>
                     </WrapPanel>
