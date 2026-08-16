@@ -1,0 +1,57 @@
+name: Construction de l'installeur
+
+# POURQUOI CE WORKFLOW EST SÉPARÉ DE CELUI DES TESTS
+#
+# Construire le MSI demande d'installer l'outil WiX et son extension d'interface,
+# puis de publier les trois exécutables en autonome : plusieurs minutes et près de
+# 180 Mo. Le faire à chaque poussée coûterait cher pour rien, puisque l'immense
+# majorité des changements ne touchent pas l'installeur.
+#
+# Il ne se déclenche donc que lorsque l'installeur ou les scripts de construction
+# changent — précisément les fichiers où se produisent les erreurs WiX.
+
+on:
+  push:
+    paths:
+      - 'installer/**'
+      - 'build/**'
+      - '.github/workflows/installeur.yml'
+  pull_request:
+    paths:
+      - 'installer/**'
+      - 'build/**'
+  workflow_dispatch:
+
+concurrency:
+  group: msi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  msi:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      # Le script installe lui-même l'outil WiX et son extension s'ils manquent, et
+      # ajoute le dossier des outils globaux au PATH du processus courant. Rien à
+      # préparer ici : on vérifie justement que ce script fonctionne sur une machine
+      # vierge, ce qu'une machine de développement ne peut pas prouver.
+      - name: Construire le MSI
+        shell: pwsh
+        run: ./installer/build-msi.ps1 -Version '0.0.0'
+
+      # Conservé quelques jours seulement : ce MSI n'est pas destiné à être
+      # distribué, il sert à prouver que la construction aboutit. Les vrais paquets
+      # viennent du workflow de publication.
+      - name: Conserver le MSI construit
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-verification
+          path: dist/*.msi
+          retention-days: 5

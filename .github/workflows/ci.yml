@@ -1,0 +1,53 @@
+name: Compilation et tests
+
+# POURQUOI CE WORKFLOW EXISTE
+#
+# Jusqu'ici, chaque erreur se découvrait à la main : quatre erreurs WiX
+# consécutives ont demandé quatre recompilations locales, et deux tests devenus
+# obsolètes n'ont échoué qu'une fois les fichiers récupérés sur la machine de
+# développement. Ces deux catégories d'échec se signalent maintenant toutes
+# seules, avant d'arriver là.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Une poussée qui en suit une autre annule la précédente plutôt que d'attendre :
+# seul l'état le plus récent de la branche mérite d'être vérifié.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # windows-latest est OBLIGATOIRE et non un confort : tous les projets ciblent
+    # net10.0-windows, et l'application utilise WPF, qui ne compile nulle part
+    # ailleurs.
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Récupérer les sources
+        uses: actions/checkout@v4
+
+      - name: Installer le SDK .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          # Le dépôt n'a pas de global.json : la version se fixe ici, et nulle part
+          # ailleurs. « 10.0.x » prend le dernier correctif du canal 10.0.
+          dotnet-version: '10.0.x'
+
+      - name: Restaurer les dépendances
+        run: dotnet restore
+
+      # Compilation et tests délibérément séparés : quand le travail échoue, on sait
+      # au premier coup d'œil si c'est le code qui ne compile pas ou un test qui ne
+      # passe plus. Un seul « dotnet test » mélangerait les deux.
+      - name: Compiler
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Exécuter les tests
+        run: dotnet test --no-build --configuration Release

@@ -1,0 +1,123 @@
+name: Publication
+
+# POURQUOI LA PUBLICATION PASSE PAR ICI ET PLUS PAR LA MACHINE DE DÉVELOPPEMENT
+#
+# Les conditions de la SignPath Foundation — voie retenue pour la signature de
+# code — exigent que « les binaires soient issus de constructions automatisées et
+# vérifiables à partir du code source ». Un MSI fabriqué sur un poste de travail
+# ne remplit pas cette condition, quelle que soit la rigueur de son auteur.
+#
+# À partir d'ici, publier consiste donc à pousser un tag. Les fichiers proviennent
+# de cette construction et d'elle seule, à partir du commit exact que le tag
+# désigne.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à construire, sans le « v » — par exemple 1.2.4"
+        required: true
+
+permissions:
+  # Créer la release et y attacher les fichiers. Rien d'autre : le jeton n'a aucun
+  # droit dont ce travail n'a pas besoin.
+  contents: write
+
+jobs:
+  publier:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Déterminer la version
+        id: v
+        shell: pwsh
+        run: |
+          $v = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+                   '${{ github.event.inputs.version }}'
+               } else {
+                   '${{ github.ref_name }}' -replace '^v', ''
+               }
+          # Un numéro mal formé doit arrêter le travail ICI, et pas produire des
+          # fichiers nommés « FaultTracePC-.msi » découverts après publication.
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Numéro de version inattendu : « $v »" }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Version à construire : $v"
+
+      # Les tests d'abord, sans exception : on ne publie pas ce qui ne passe pas.
+      - name: Exécuter les tests
+        run: dotnet test --configuration Release
+
+      - name: Vérifier que la version des sources correspond au tag
+        shell: pwsh
+        run: |
+          $attendu = '${{ steps.v.outputs.version }}'
+          # @() est indispensable : sans lui, un résultat unique revient sous forme de
+          # chaîne, et $trouves[0] renverrait son PREMIER CARACTÈRE au lieu du numéro.
+          $trouves = @(Select-String -Path 'src/*/*.csproj' -Pattern '<Version>(.+?)</Version>' |
+                       ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
+          Write-Host "Tag : $attendu — sources : $($trouves -join ', ')"
+          if ($trouves.Count -eq 0) { throw "Aucune balise <Version> trouvée dans les projets." }
+          # Un tag v1.2.4 posé sur des sources restées en 1.2.3 produirait un paquet
+          # dont le nom et le contenu se contredisent. Autant s'en apercevoir avant.
+          if ($trouves.Count -ne 1 -or $trouves[0] -ne $attendu) {
+              throw "La version déclarée dans les projets ne correspond pas au tag."
+          }
+
+      - name: Publier les exécutables et l'archive portable
+        shell: pwsh
+        run: ./build/publish.ps1 -Zip -Version '${{ steps.v.outputs.version }}'
+
+      - name: Construire le MSI
+        shell: pwsh
+        # -SkipPublish : les exécutables viennent d'être produits par l'étape
+        # précédente, les republier doublerait inutilement plusieurs minutes.
+        run: ./installer/build-msi.ps1 -Version '${{ steps.v.outputs.version }}' -SkipPublish
+
+      - name: Composer le corps de la release
+        shell: pwsh
+        run: |
+          $v = '${{ steps.v.outputs.version }}'
+          $notes = "docs/releases/RELEASE_NOTES_v$v.md"
+          if (-not (Test-Path $notes)) {
+              throw "Notes de version introuvables : $notes — les écrire avant de poser le tag."
+          }
+
+          # Guillemets simples : PowerShell n'y interprète pas l'accent grave, ce qui
+          # évite d'échapper les délimiteurs de bloc de code.
+          $cloture = '```'
+
+          $corps  = Get-Content $notes -Raw -Encoding utf8
+          $corps += "`n`n## Sommes de contrôle (SHA-256)`n`n"
+          $corps += "Ces fichiers ne sont pas signés numériquement. Vérifier l'empreinte est le seul moyen de s'assurer que le fichier téléchargé est bien celui publié ici :`n`n"
+          $corps += "$cloture`powershell`nGet-FileHash FaultTracePC-$v.msi -Algorithm SHA256`n$cloture`n`n"
+          $corps += "$cloture`n"
+          Get-FileHash "dist/FaultTracePC-$v.msi", "dist/FaultTracePC-$v-portable.zip" -Algorithm SHA256 |
+              ForEach-Object { $corps += ("{0}  {1}`n" -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf)) }
+          $corps += "$cloture`n"
+
+          # UTF-8 SANS BOM, explicitement. L'écriture par défaut de PowerShell avait
+          # déjà produit un fichier à encodage mixte sur la 1.2.2, avec un « ô »
+          # illisible au milieu d'un texte par ailleurs correct.
+          [IO.File]::WriteAllText("$env:RUNNER_TEMP/corps.md", $corps, [Text.UTF8Encoding]::new($false))
+          Write-Host "Corps composé : $($corps.Length) caractères."
+
+      - name: Créer la release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $v = '${{ steps.v.outputs.version }}'
+          gh release create "v$v" `
+              "dist/FaultTracePC-$v.msi" `
+              "dist/FaultTracePC-$v-portable.zip" `
+              --title "FaultTracePC v$v" `
+              --notes-file "$env:RUNNER_TEMP/corps.md"
