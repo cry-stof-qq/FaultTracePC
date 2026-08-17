@@ -1,3 +1,22 @@
+## In English
+
+This release makes FaultTracePC **bilingual**: the interface, the reports, every message and the command line now exist in English as well as French. It also fixes four places where the software made decisions based on French words, which made it wrong as soon as it ran outside France.
+
+The notes below are in French. The full English description is here: **[FaultTracePC — diagnose, monitor and repair a Windows PC](https://palisser.fr/spip.php?article31)**
+
+| File | For whom |
+|---|---|
+| `FaultTracePC-1.3.0.msi` | Classic installation, or Group Policy deployment |
+| `FaultTracePC-1.3.0-portable.zip` | No installation: unzip and run |
+
+The `Source code` archives are generated automatically by GitHub: they contain the code, not the compiled software.
+
+Set the language at install time: `msiexec /i FaultTracePC-1.3.0.msi FTPCLANG=en /qn`
+
+**These files are not digitally signed.** Windows will show "Unknown publisher" — click *More info* then *Run anyway*. Checking the SHA-256 fingerprint at the bottom of this page is the only way to be sure the file you downloaded is the one published here.
+
+---
+
 ﻿FaultTracePC parle anglais. Toute l'interface, tout le rapport, tous les messages, la ligne de commande et le script de réparation — pas une couche de traduction posée par-dessus, mais les deux langues écrites côte à côte dans le code, où l'oubli de l'une empêche la compilation.
 
 Cette version ne change **aucun diagnostic**. Elle corrige en revanche quatre endroits où le logiciel décidait à partir de mots français, ce qui le rendait faux dès qu'il tournait ailleurs qu'en France.
