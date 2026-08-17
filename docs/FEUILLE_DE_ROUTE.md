@@ -7,7 +7,7 @@
 | Version | État |
 |---|---|
 | 1.2.2 | **publiée** — MSI + ZIP + sommes de contrôle |
-| 1.2.3 | construite, 138 tests verts, poussée — **non publiée** |
+| 1.2.3 | **publiée** — release GitHub, 4 fichiers, sommes de contrôle |
 | 1.3.0 | version bilingue FR/EN, 250 tests verts — **non publiée** |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.

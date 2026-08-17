@@ -41,6 +41,14 @@ public partial class GuidedRepairWindow : Window
     /// toute action qui modifie des fichiers système.</summary>
     private bool _safetyNet = true;
 
+    /// <summary>
+    /// Marque d'echec des scripts PowerShell lances ici. Elle est LUE par le code
+    /// et RECOPIEE dans le message montre a l'utilisateur : un mot francais y
+    /// fuirait donc dans une session anglaise. Neutre, et assez improbable pour
+    /// ne jamais apparaitre par hasard dans une sortie de Windows.
+    /// </summary>
+    private const string FailureMark = "FTPC_ERR: ";
+
     public GuidedRepairWindow()
     {
         InitializeComponent();
@@ -241,20 +249,26 @@ public partial class GuidedRepairWindow : Window
     {
         // La bride Windows limite à un point toutes les 24 h : on la lève le temps
         // de l'opération, puis on remet le réglage d'origine.
-        const string cmd =
+        // Ce libelle s'affiche tel quel dans la Restauration du systeme de Windows :
+        // il suit donc la langue de l'application. Sans accent, la console PowerShell
+        // lancee ici n'etant pas garantie en UTF-8 a l'aller.
+        var description = Lang.T("FaultTracePC - assistant guide", "FaultTracePC - guided assistant");
+
+        var cmd =
             "$k='HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SystemRestore';" +
             "$old=(Get-ItemProperty -Path $k -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue).SystemRestorePointCreationFrequency;" +
             "try{New-ItemProperty -Path $k -Name SystemRestorePointCreationFrequency -Value 0 -PropertyType DWord -Force|Out-Null}catch{};" +
             "$err=$null;" +
-            "try{Checkpoint-Computer -Description 'FaultTracePC - assistant guide' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop}catch{$err=$_.Exception.Message};" +
+            "try{Checkpoint-Computer -Description '" + description + "' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop}catch{$err=$_.Exception.Message};" +
             "try{if($null -ne $old){Set-ItemProperty -Path $k -Name SystemRestorePointCreationFrequency -Value $old}else{Remove-ItemProperty -Path $k -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue}}catch{};" +
-            "if($err){Write-Output ('ECHEC: '+$err)}else{Write-Output 'OK'}";
+            "if($err){Write-Output ('" + FailureMark + "'+$err)}else{Write-Output 'OK'}";
 
         var (code, output) = await RunPsAsync(cmd, ct, TimeSpan.FromMinutes(5));
 
         bool ok = code == 0 && output.Contains("OK", StringComparison.Ordinal)
-                            && !output.Contains("ECHEC", StringComparison.Ordinal);
-        var detail = ok ? "" : Shorten(output);
+                            && !output.Contains(FailureMark, StringComparison.Ordinal);
+        // La sentinelle est retiree avant affichage : elle sert au code, pas a l'utilisateur.
+        var detail = ok ? "" : Shorten(output.Replace(FailureMark, "", StringComparison.Ordinal).Trim());
         Log(ok ? Lang.T("Point de restauration créé.", "Restore point created.") : Lang.T("Point de restauration IMPOSSIBLE. Motif : ", "Restore point IMPOSSIBLE. Reason: ") + detail);
         return (ok, detail);
     }
@@ -283,11 +297,11 @@ public partial class GuidedRepairWindow : Window
             "$ok=$true;" +
             "foreach($s in 'VSS','swprv','SDRSVC'){try{Set-Service -Name $s -StartupType Manual -ErrorAction Stop}catch{$ok=$false}};" +
             "try{Start-Service -Name VSS -ErrorAction Stop}catch{$ok=$false};" +
-            "try{Enable-ComputerRestore -Drive \"$env:SystemDrive\\\" -ErrorAction Stop}catch{$ok=$false;Write-Output ('ECHEC: '+$_.Exception.Message)};" +
+            "try{Enable-ComputerRestore -Drive \"$env:SystemDrive\\\" -ErrorAction Stop}catch{$ok=$false;Write-Output ('" + FailureMark + "'+$_.Exception.Message)};" +
             "if($ok){Write-Output 'OK'}";
         var (_, outp) = await RunPsAsync(cmd, ct, TimeSpan.FromMinutes(3));
-        bool ok = outp.Contains("OK", StringComparison.Ordinal) && !outp.Contains("ECHEC", StringComparison.Ordinal);
-        Log(ok ? Lang.T("Protection du système activée.", "System protection turned on.") : Lang.T("Activation refusée : ", "Activation refused: ") + Shorten(outp));
+        bool ok = outp.Contains("OK", StringComparison.Ordinal) && !outp.Contains(FailureMark, StringComparison.Ordinal);
+        Log(ok ? Lang.T("Protection du système activée.", "System protection turned on.") : Lang.T("Activation refusée : ", "Activation refused: ") + Shorten(outp.Replace(FailureMark, "", StringComparison.Ordinal).Trim()));
         return ok;
     }
 
