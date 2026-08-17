@@ -86,6 +86,19 @@ Les dates suivent la langue : `jj/mm/aaaa` en français, la forme ISO `aaaa-mm-j
 
 **Aucune nouvelle fonction de diagnostic.** Le triage RAW, la pente SMART, le bloc winget et la surveillance de l'espace disque restent prévus pour la 1.4.
 
+## Que télécharger
+
+| Fichier | Pour qui |
+|---|---|
+| `FaultTracePC-1.3.0.msi` | Installation classique, ou déploiement par GPO sur un parc |
+| `FaultTracePC-1.3.0-portable.zip` | Aucune installation : décompresser et lancer `FaultTracePC.exe` |
+
+Les deux embarquent le runtime .NET : rien à installer au préalable. Le logiciel demande les droits administrateur, indispensables pour lire les fichiers dump et les journaux système complets.
+
+Les archives `Source code` sont produites automatiquement par GitHub : elles contiennent le code, pas le logiciel compilé.
+
+**L'interface et les rapports existent en français et en anglais.** La langue suit celle de la session Windows au premier lancement et se change dans le bandeau, à côté du `?`.
+
 ## Sommes de contrôle (SHA-256)
 
 Ces fichiers ne sont pas signés numériquement. Vérifier l'empreinte est le seul moyen de s'assurer que le fichier téléchargé est bien celui publié ici :
