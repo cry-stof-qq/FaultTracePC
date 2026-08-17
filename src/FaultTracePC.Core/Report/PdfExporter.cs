@@ -63,14 +63,18 @@ public static class PdfExporter
     public static Result Export(string htmlPath, string? pdfPath = null, TimeSpan? timeout = null)
     {
         if (!File.Exists(htmlPath))
-            return new Result(false, null, "Le rapport HTML est introuvable : " + htmlPath);
+            return new Result(false, null, Lang.T("Le rapport HTML est introuvable : ", "The HTML report cannot be found: ") + htmlPath);
 
         var browser = FindBrowser();
         if (browser is null)
             return new Result(false, null,
-                "Aucun navigateur compatible n'a été trouvé. FaultTracePC s'appuie sur Microsoft Edge, "
-                + "présent d'origine sur Windows 10 et 11, ou sur Google Chrome. "
-                + "Solution de repli : ouvre le rapport dans ton navigateur et utilise « Imprimer » → « Enregistrer au format PDF ».");
+                Lang.T(
+                    "Aucun navigateur compatible n'a été trouvé. FaultTracePC s'appuie sur Microsoft Edge, "
+                    + "présent d'origine sur Windows 10 et 11, ou sur Google Chrome. "
+                    + "Solution de repli : ouvre le rapport dans ton navigateur et utilise « Imprimer » → « Enregistrer au format PDF ».",
+                    "No compatible browser was found. FaultTracePC relies on Microsoft Edge, "
+                    + "shipped with Windows 10 and 11, or on Google Chrome. "
+                    + "Fallback: open the report in your browser and use “Print” → “Save as PDF”."));
 
         pdfPath ??= Path.ChangeExtension(htmlPath, ".pdf");
         string? tempHtml = null;
@@ -107,7 +111,7 @@ public static class PdfExporter
                 if (!p.WaitForExit((int)deadline.TotalMilliseconds))
                 {
                     try { p.Kill(entireProcessTree: true); } catch { }
-                    return new Result(false, null, "La conversion a dépassé le délai imparti et a été interrompue.");
+                    return new Result(false, null, Lang.T("La conversion a dépassé le délai imparti et a été interrompue.", "The conversion exceeded its time limit and was stopped."));
                 }
 
                 // Le fichier peut apparaître avec un court décalage après la sortie.
@@ -117,8 +121,10 @@ public static class PdfExporter
             }
 
             return new Result(false, null,
-                "Le navigateur n'a pas produit de fichier PDF. "
-                + "Solution de repli : ouvre le rapport dans ton navigateur et utilise « Imprimer » → « Enregistrer au format PDF ».");
+                Lang.T("Le navigateur n'a pas produit de fichier PDF. "
+                     + "Solution de repli : ouvre le rapport dans ton navigateur et utilise « Imprimer » → « Enregistrer au format PDF ».",
+                       "The browser produced no PDF file. "
+                     + "Fallback: open the report in your browser and use “Print” → “Save as PDF”."));
         }
         catch (Exception ex)
         {

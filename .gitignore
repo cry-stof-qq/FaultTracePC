@@ -38,6 +38,8 @@ rapport-*.html
 inventaire_pilotes.txt
 MajWindows_*.txt
 maj.txt
+# Préférence de langue, par utilisateur (Documents\FaultTracePC\langue.txt).
+langue.txt
 
 # Historique des scans (résumés machine) et configuration locale
 Historique/

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using FaultTracePC.Core;
 using FaultTracePC.Core.Report;
@@ -23,6 +23,15 @@ internal static class Program
         // Sans cela, les accents sortent en charabia dans une console cmd.exe héritée.
         try { Console.OutputEncoding = Encoding.UTF8; } catch { }
 
+        // Avant toute écriture : la langue conditionne jusqu'au message d'erreur
+        // d'un argument invalide.
+        Lang.Initialize(args);
+
+        // Réglage machine : traité avant tout le reste, parce qu'il n'analyse
+        // rien. C'est l'installeur qui l'appelle (action personnalisée MSI), et
+        // un administrateur peut s'en servir à la main pour rattraper un poste.
+        if (SetMachineLanguage(args) is { } codeSortie) return codeSortie;
+
         var options = CliOptions.Parse(args);
         if (options.ShowHelp)
         {
@@ -31,15 +40,15 @@ internal static class Program
         }
         if (options.Error is not null)
         {
-            Console.Error.WriteLine("ERREUR : " + options.Error);
-            Console.Error.WriteLine("Aide : FaultTracePC.Cli.exe --help");
+            Console.Error.WriteLine(Lang.T("ERREUR : ", "ERROR: ") + options.Error);
+            Console.Error.WriteLine(Lang.T("Aide : FaultTracePC.Cli.exe --help", "Help: FaultTracePC.Cli.exe --help"));
             return 3;
         }
 
         try
         {
             if (!options.Quiet)
-                Console.WriteLine($"FaultTracePC — analyse de {Environment.MachineName} sur {options.Days} jours…");
+                Console.WriteLine(Lang.T($"FaultTracePC — analyse de {Environment.MachineName} sur {options.Days} jours…", $"FaultTracePC — analysing {Environment.MachineName} over {options.Days} days…"));
 
             var progress = options.Quiet
                 ? null
@@ -90,20 +99,20 @@ internal static class Program
                 var jsonPath = Path.Combine(outputDir, baseName + ".json");
                 File.WriteAllText(jsonPath,
                     JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
-                if (!options.Quiet) Console.WriteLine($"Résumé JSON : {jsonPath}");
+                if (!options.Quiet) Console.WriteLine(Lang.T($"Résumé JSON : {jsonPath}", $"JSON summary: {jsonPath}"));
             }
 
             if (!options.Quiet)
             {
                 Console.WriteLine();
-                Console.WriteLine("VERDICT : " + report.Verdict);
-                Console.WriteLine($"  {critical} conclusion(s) critique(s), {warnings} avertissement(s), " +
-                                  $"{report.Bsods.Count} écran(s) bleu(s), {report.Flight.Alerts.Count} alerte(s) préventive(s).");
+                Console.WriteLine(Lang.T("VERDICT : ", "VERDICT: ") + report.Verdict);
+                Console.WriteLine(Lang.T($"  {critical} conclusion(s) critique(s), {warnings} avertissement(s), ", $"  {critical} critical conclusion(s), {warnings} warning(s), ") +
+                                  Lang.T($"{report.Bsods.Count} écran(s) bleu(s), {report.Flight.Alerts.Count} alerte(s) préventive(s).", $"{report.Bsods.Count} blue screen(s), {report.Flight.Alerts.Count} preventive alert(s)."));
                 foreach (var f in report.Findings.Where(f => f.Severity != Severity.Info).Take(10))
-                    Console.WriteLine($"  - [{(f.Severity == Severity.Critical ? "CRITIQUE" : "ATTENTION")}] {f.Title}");
-                Console.WriteLine($"Rapport : {htmlPath}");
+                    Console.WriteLine($"  - [{(f.Severity == Severity.Critical ? Lang.T("CRITIQUE", "CRITICAL") : Lang.T("ATTENTION", "WARNING"))}] {f.Title}");
+                Console.WriteLine(Lang.T($"Rapport : {htmlPath}", $"Report: {htmlPath}"));
                 if (report.CollectorErrors.Count > 0)
-                    Console.WriteLine($"  ({report.CollectorErrors.Count} source(s) non lisible(s) — voir la section Limitations du rapport)");
+                    Console.WriteLine(Lang.T($"  ({report.CollectorErrors.Count} source(s) non lisible(s) — voir la section Limitations du rapport)", $"  ({report.CollectorErrors.Count} source(s) unreadable — see the Limitations section of the report)"));
             }
 
             if (options.Open)
@@ -116,14 +125,63 @@ internal static class Program
                 catch { /* pas d'interface : sans importance */ }
             }
 
-            return critical > 0 ? 2 : warnings > 0 ? 1 : 0;
+            // Même règle que le code transmis à la console de parc : les deux ne
+            // peuvent plus diverger.
+            return ScanLevelInfo.Of(report).ExitCode();
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine("ERREUR : " + ex.Message);
-            Console.Error.WriteLine("Vérifie que la commande est lancée en administrateur et que le dossier de sortie est accessible.");
+            Console.Error.WriteLine(Lang.T("ERREUR : ", "ERROR: ") + ex.Message);
+            Console.Error.WriteLine(Lang.T("Vérifie que la commande est lancée en administrateur et que le dossier de sortie est accessible.", "Check that the command is run as administrator and that the output folder is reachable."));
             return 3;
         }
+    }
+
+    /// <summary>
+    /// Traite « --set-machine-lang &lt;fr|en|auto&gt; ». Renvoie null si l'argument
+    /// est absent — le diagnostic suit alors son cours normalement.
+    ///
+    /// Écrire dans ProgramData exige les droits d'administrateur, que cet outil
+    /// exige déjà. Le succès est vérifié par RELECTURE plutôt que déduit de
+    /// l'absence d'exception : le setter avale les échecs d'écriture pour ne
+    /// jamais casser un diagnostic, ce qui ferait mentir un simple « OK ».
+    /// </summary>
+    private static int? SetMachineLanguage(string[] args)
+    {
+        int i = Array.FindIndex(args, a =>
+            a.Equals("--set-machine-lang", StringComparison.OrdinalIgnoreCase) ||
+            a.Equals("--langue-machine", StringComparison.OrdinalIgnoreCase));
+        if (i < 0) return null;
+
+        var valeur = i + 1 < args.Length ? Lang.NormalizeCode(args[i + 1]) : null;
+        if (valeur is null)
+        {
+            Console.Error.WriteLine(Lang.T("ERREUR : --set-machine-lang attend fr, en ou auto.",
+                                           "ERROR: --set-machine-lang expects fr, en or auto."));
+            return 3;
+        }
+
+        AppLanguage? choix = valeur switch
+        {
+            "fr" => AppLanguage.French,
+            "en" => AppLanguage.English,
+            _ => null,
+        };
+
+        Lang.MachinePreference = choix;
+
+        if (Lang.MachinePreference != choix)
+        {
+            Console.Error.WriteLine(Lang.T($"ERREUR : écriture impossible dans {Lang.MachinePreferencePath} — droits administrateur requis.",
+                                           $"ERROR: cannot write to {Lang.MachinePreferencePath} — administrator rights required."));
+            return 3;
+        }
+
+        Console.WriteLine(Lang.T($"Langue par défaut du poste : {Lang.Code(choix)} ({Lang.MachinePreferencePath})",
+                                 $"Machine default language: {Lang.Code(choix)} ({Lang.MachinePreferencePath})"));
+        Console.WriteLine(Lang.T("Le choix d'un utilisateur dans l'application reste prioritaire sur ce réglage.",
+                                 "A user's own choice in the application still takes precedence over this setting."));
+        return 0;
     }
 
     private static string Sanitize(string name) =>
@@ -131,7 +189,10 @@ internal static class Program
 
     private static void PrintHelp()
     {
-        Console.WriteLine("""
+        // L'aide est écrite en page de codes OEM sur une console française :
+        // les accents survivent parce que Main tente de forcer la sortie en UTF-8 (ligne 24).
+        Console.WriteLine(Lang.IsFrench   // pas-de-traduction : la version anglaise est la branche « : » plus bas.
+            ? """
             FaultTracePC — diagnostic de pannes Windows en ligne de commande
 
             UTILISATION
@@ -143,6 +204,14 @@ internal static class Program
               --json             Écrit aussi un résumé JSON à côté du rapport HTML
               --no-deep          Désactive l'analyse symbolique des dumps (WinDbg/CDB)
               --no-drivers       Désactive l'inventaire des pilotes (plus rapide)
+              --lang <fr|en|auto> Langue du rapport et des messages (défaut : celle de
+                                 la session Windows). Le choix est retenu pour les fois
+                                 suivantes ; « auto » revient au comportement automatique.
+              --set-machine-lang <fr|en|auto>
+                                 Écrit la langue par défaut DU POSTE (tous les comptes)
+                                 puis quitte, sans rien analyser. Utilisé par l'installeur
+                                 et pour un déploiement par GPO. Le choix propre à un
+                                 utilisateur reste prioritaire.
               --quiet, -q        N'affiche rien (usage silencieux par GPO/tâche planifiée)
               --open             Ouvre le rapport à la fin (usage interactif)
               --help, -h, /?     Affiche cette aide
@@ -161,6 +230,44 @@ internal static class Program
             EXEMPLES
               FaultTracePC.Cli.exe --days 90 --open
               FaultTracePC.Cli.exe --quiet --json --output \\srv-fichiers\Diagnostics$
+            """
+            : """
+            FaultTracePC — Windows fault diagnosis from the command line
+
+            USAGE
+              FaultTracePC.Cli.exe [options]
+
+            OPTIONS
+              --days, -d <n>     Analysis period in days (default: 30, max 90)
+              --output, -o <dir> Folder the report is written to (local or UNC \\server\share)
+              --json             Also writes a JSON summary next to the HTML report
+              --no-deep          Turns off symbolic dump analysis (WinDbg/CDB)
+              --no-drivers       Turns off the driver inventory (faster)
+              --lang <fr|en|auto> Language of the report and messages (default: the one
+                                 of the Windows session). The choice is remembered for
+                                 next time; "auto" returns to automatic behaviour.
+              --set-machine-lang <fr|en|auto>
+                                 Writes the default language OF THE MACHINE (all accounts)
+                                 then exits, analysing nothing. Used by the installer and
+                                 for GPO deployment. A user's own choice still wins.
+              --quiet, -q        Prints nothing (silent use from GPO/scheduled task)
+              --open             Opens the report at the end (interactive use)
+              --help, -h, /?     Shows this help
+
+            NOTE
+              The tool requires administrator rights. For interactive use, open an
+              ALREADY elevated terminal: otherwise Windows restarts the tool in a new
+              window and the exit code cannot be retrieved.
+
+            EXIT CODES
+              0  no significant problem
+              1  warnings only
+              2  at least one critical conclusion
+              3  runtime error
+
+            EXAMPLES
+              FaultTracePC.Cli.exe --days 90 --open
+              FaultTracePC.Cli.exe --quiet --json --output \\srv-files\Diagnostics$
             """);
     }
 
@@ -188,9 +295,15 @@ internal static class Program
                     case "--days" or "-d" when i + 1 < args.Length && int.TryParse(args[i + 1], out var d):
                         o.Days = Math.Clamp(d, 1, 90); i++; break;
                     case "--days" or "-d":
-                        o.Error = "valeur invalide ou manquante pour --days (entier entre 1 et 90)"; break;
+                        o.Error = Lang.T("valeur invalide ou manquante pour --days (entier entre 1 et 90)", "invalid or missing value for --days (integer between 1 and 90)"); break;
                     case "--output" or "-o" when i + 1 < args.Length:
                         o.OutputDir = args[++i]; break;
+                    // La langue est résolue par Lang.Initialize avant même cette
+                    // analyse ; ces deux cas existent uniquement pour que la VALEUR
+                    // qui suit « --lang » ne soit pas prise pour un argument à part.
+                    case "--lang" or "--langue" when i + 1 < args.Length && !args[i + 1].StartsWith('-'):
+                        i++; break;
+                    case "--lang" or "--langue": break;
                     case "--json": o.Json = true; break;
                     case "--no-deep": o.NoDeep = true; break;
                     case "--no-drivers": o.NoDrivers = true; break;

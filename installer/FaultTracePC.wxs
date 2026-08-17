@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
     FaultTracePC — paquet d'installation MSI (déployable par GPO)
 
@@ -97,6 +97,89 @@
          l'utilisateur. Le premier guillemet vide après « start » est le titre de
          fenêtre — l'omettre ferait prendre le chemin entre guillemets pour un
          titre, et rien ne se lancerait. -->
+    <!-- ============ Langue imposée au poste (déploiement) ============
+
+         msiexec /i FaultTracePC-1.3.0.msi FTPCLANG=en /qn
+
+         Écrit C:\ProgramData\FaultTracePC\langue.txt, la préférence de portée
+         MACHINE. Elle s'intercale entre la session Windows et le choix propre à
+         chaque utilisateur : elle impose un DÉFAUT au poste, elle ne contredit
+         pas quelqu'un qui a cliqué sur le sélecteur de l'application.
+
+         L'écriture est déléguée à FaultTracePC.Cli.exe plutôt que scriptée en
+         MSI : la CLI connaît déjà le chemin, valide déjà le code de langue, et
+         la même commande sert à rattraper un poste à la main.
+
+         Execute="deferred" + Impersonate="no" : l'action tourne avec le compte
+         SYSTEM du programme d'installation. Indispensable sous GPO « Attribué à
+         l'ordinateur », où il n'y a aucun utilisateur interactif.
+
+         After="InstallFiles" : l'exécutable doit exister quand on l'appelle.
+
+         Return="ignore" : une langue par défaut qui ne se pose pas ne doit
+         JAMAIS faire échouer une installation. En contrepartie l'échec est
+         silencieux — vérification après coup :
+             Get-Content C:\ProgramData\FaultTracePC\langue.txt
+         Sans FTPCLANG, la condition est fausse et rien ne s'exécute : le
+         comportement par défaut reste « suivre la session Windows ».
+
+         Secure="yes" : sans cela, une propriété publique passée en ligne de
+         commande n'atteint pas la partie élevée de l'installation. -->
+    <Property Id="FTPCLANG" Secure="yes" />
+
+    <!-- Action de type « exécutable désigné par une propriété » : aucune
+         extension WiX supplémentaire n'est nécessaire. Le script de construction
+         n'installe que WixToolset.UI.wixext ; toute référence à l'extension Util
+         (CAQuietExec, Wix4UtilCA_X64) échouerait à la compilation.
+
+         TROISIÈME ÉCHEC SILENCIEUX DE CE FICHIER, corrigé ici. Une première
+         version mettait le chemin ET les arguments dans la propriété, en
+         laissant ExeCommand vide. Le journal verbeux dit alors :
+
+             emplacement: «guillemet»C:\…\FaultTracePC.Cli.exe«guillemet» suivi
+             des arguments, commande: (vide) ... puis Note: 1: 1721
+
+         Windows Installer passe l'emplacement à CreateProcess comme NOM
+         D'APPLICATION, pas comme ligne de commande. Un « chemin » qui contient
+         des arguments et des guillemets ne désigne aucun fichier : erreur 1721.
+
+         Le partage correct est donc : la propriété ne porte QUE le chemin, sans
+         guillemets (un nom d'application n'est pas analysé, les espaces de
+         « Program Files » ne posent aucun problème), et ExeCommand porte les
+         arguments.
+
+         Mais ExeCommand est une donnée STATIQUE du paquet : une action différée
+         ne sait pas résoudre [FTPCLANG] au moment de l'exécution. D'où trois
+         actions à arguments figés, départagées par condition. « auto » est
+         proposé pour qu'une mise à niveau puisse EFFACER un réglage posé
+         auparavant, au lieu d'être obligée de le laisser en place. -->
+
+    <SetProperty Id="SetMachineLanguageFr" Value="[INSTALLFOLDER]FaultTracePC.Cli.exe"
+                 Sequence="execute" Before="SetMachineLanguageFr" />
+    <CustomAction Id="SetMachineLanguageFr" Property="SetMachineLanguageFr"
+                  ExeCommand="--set-machine-lang fr"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <SetProperty Id="SetMachineLanguageEn" Value="[INSTALLFOLDER]FaultTracePC.Cli.exe"
+                 Sequence="execute" Before="SetMachineLanguageEn" />
+    <CustomAction Id="SetMachineLanguageEn" Property="SetMachineLanguageEn"
+                  ExeCommand="--set-machine-lang en"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <SetProperty Id="SetMachineLanguageAuto" Value="[INSTALLFOLDER]FaultTracePC.Cli.exe"
+                 Sequence="execute" Before="SetMachineLanguageAuto" />
+    <CustomAction Id="SetMachineLanguageAuto" Property="SetMachineLanguageAuto"
+                  ExeCommand="--set-machine-lang auto"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <!-- « ~= » compare sans tenir compte de la casse : FTPCLANG=EN doit marcher
+         aussi bien que FTPCLANG=en. -->
+    <InstallExecuteSequence>
+      <Custom Action="SetMachineLanguageFr" After="InstallFiles" Condition="FTPCLANG ~= &quot;fr&quot;" />
+      <Custom Action="SetMachineLanguageEn" After="InstallFiles" Condition="FTPCLANG ~= &quot;en&quot;" />
+      <Custom Action="SetMachineLanguageAuto" After="InstallFiles" Condition="FTPCLANG ~= &quot;auto&quot;" />
+    </InstallExecuteSequence>
+
     <SetProperty Id="LaunchShell" Value="[System64Folder]cmd.exe" Sequence="ui" After="CostFinalize" />
     <CustomAction Id="LaunchApplication" Property="LaunchShell"
                   ExeCommand="/c start &quot;&quot; &quot;[INSTALLFOLDER]FaultTracePC.exe&quot;"

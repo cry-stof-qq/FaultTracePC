@@ -1,7 +1,8 @@
-<Window x:Class="FaultTracePC.App.GuidedRepairWindow"
+﻿<Window x:Class="FaultTracePC.App.GuidedRepairWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FaultTracePC — Je ne sais pas ce que j'ai"
+        xmlns:loc="clr-namespace:FaultTracePC.App"
+        Title="{x:Static loc:L.GrTitle}"
         Icon="Assets/FaultTracePC.ico"
         Width="820" Height="620" MinWidth="680" MinHeight="520"
         WindowStartupLocation="CenterOwner"
@@ -20,9 +21,9 @@
         <!-- ============ Bandeau ============ -->
         <Border Grid.Row="0" Background="#182848" Padding="20,14">
             <StackPanel>
-                <TextBlock Text="Je ne sais pas ce que j'ai" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                <TextBlock Text="{x:Static loc:L.GrHeader}" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
                 <TextBlock Foreground="#B9C4DC" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"
-                           Text="Cet assistant examine l'ordinateur, applique les réparations sans risque, puis vérifie si le problème a disparu. Il commence par créer un point de restauration : tout reste annulable. Rien qui puisse casser quelque chose n'est fait sans ton accord."/>
+                           Text="{x:Static loc:L.GrIntro}"/>
             </StackPanel>
         </Border>
 
@@ -50,7 +51,7 @@
 
             <StackPanel Grid.Row="0">
                 <TextBlock x:Name="TxtStatus" FontSize="14" TextWrapping="Wrap" Foreground="#182848"
-                           Text="Prêt. Clique sur « Démarrer » : l'assistant s'occupe du reste."/>
+                           Text="{x:Static loc:L.GrReady}"/>
                 <ProgressBar x:Name="PbMain" Height="10" Margin="0,10,0,0" Minimum="0" Maximum="100"
                              Foreground="#2A78D6" Background="#E7ECF3" BorderThickness="0"/>
             </StackPanel>
@@ -62,7 +63,7 @@
                             BorderThickness="1" Margin="0,0,0,12">
                         <StackPanel>
                             <TextBlock x:Name="TxtConclusionLabel" FontSize="11" FontWeight="Bold"
-                                       Foreground="#6B7C91" Text="CONCLUSION"/>
+                                       Foreground="#6B7C91" Text="{x:Static loc:L.GrConclusionLabel}"/>
                             <TextBlock x:Name="TxtConclusion" FontSize="15" FontWeight="SemiBold"
                                        TextWrapping="Wrap" Margin="0,6,0,0"/>
                         </StackPanel>
@@ -70,7 +71,7 @@
 
                     <TextBlock x:Name="TxtProposalsIntro" Visibility="Collapsed" FontSize="13" TextWrapping="Wrap"
                                Foreground="#44546A" Margin="0,0,0,8"
-                               Text="Ce qui reste à faire demande ton accord, parce que ces actions ne sont pas anodines. Chacune s'explique ; tu décides une par une."/>
+                               Text="{x:Static loc:L.GrProposalsIntro}"/>
 
                     <ItemsControl x:Name="IcProposals">
                         <ItemsControl.ItemTemplate>
@@ -101,7 +102,7 @@
         </Grid>
 
         <!-- ============ Journal ============ -->
-        <Expander Grid.Row="3" Header="  Détail technique (ce que l'assistant exécute)" Margin="20,0,20,8"
+        <Expander Grid.Row="3" Header="{x:Static loc:L.GrLogHeader}" Margin="20,0,20,8"
                   IsExpanded="False" Foreground="#44546A">
             <TextBox x:Name="TxtLog" Height="130" Margin="0,6,0,0" IsReadOnly="True"
                      FontFamily="Consolas" FontSize="11" TextWrapping="NoWrap"
@@ -118,11 +119,11 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="TxtFooterHint" Grid.Column="0" FontSize="11" Foreground="#6B7C91"
                            VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="420"
-                           Text="Compte 20 à 40 minutes. Tu peux laisser tourner et revenir plus tard."/>
+                           Text="{x:Static loc:L.GrFooterHint}"/>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="BtnReport" Content="Ouvrir le rapport complet" Padding="12,7"
+                    <Button x:Name="BtnReport" Content="{x:Static loc:L.GrOpenReport}" Padding="12,7"
                             Margin="0,0,8,0" IsEnabled="False" Click="BtnReport_Click"/>
-                    <Button x:Name="BtnStart" Content="Démarrer" Padding="20,8" FontSize="14" FontWeight="SemiBold"
+                    <Button x:Name="BtnStart" Content="{x:Static loc:L.GrStart}" Padding="20,8" FontSize="14" FontWeight="SemiBold"
                             Background="#27AE60" Foreground="White" BorderThickness="0"
                             Cursor="Hand" Click="BtnStart_Click"/>
                 </StackPanel>

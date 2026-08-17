@@ -33,7 +33,7 @@ public static class InstalledSoftwareCollector
         }
         catch (Exception ex)
         {
-            errors.Add($"Logiciels installés : {ex.Message}");
+            errors.Add(Lang.T($"Logiciels installés : {ex.Message}", $"Installed software: {ex.Message}"));
         }
 
         return apps

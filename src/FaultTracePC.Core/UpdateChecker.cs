@@ -58,14 +58,14 @@ public static class UpdateChecker
         public bool UpdateAvailable => Succeeded && Latest! > Current;
 
         public string Summary => Error is not null
-            ? "Vérification impossible : " + Error
+            ? Lang.T("Vérification impossible : ", "Check failed: ") + Error
             : Latest is null
-                ? "Aucune version publiée n'a été trouvée sur GitHub."
+                ? Lang.T("Aucune version publiée n'a été trouvée sur GitHub.", "No published version was found on GitHub.")
                 : UpdateAvailable
-                    ? $"Version {Latest} disponible (tu utilises la {Current})."
+                    ? Lang.T($"Version {Latest} disponible (tu utilises la {Current}).", $"Version {Latest} available (you are running {Current}).")
                     : Latest < Current
-                        ? $"Ta version ({Current}) est plus récente que la dernière publiée ({Latest}) — build de développement."
-                        : $"FaultTracePC est à jour (version {Current}).";
+                        ? Lang.T($"Ta version ({Current}) est plus récente que la dernière publiée ({Latest}) — build de développement.", $"Your version ({Current}) is newer than the latest published one ({Latest}) — a development build.")
+                        : Lang.T($"FaultTracePC est à jour (version {Current}).", $"FaultTracePC is up to date (version {Current}).");
     }
 
     // ------------------------------------------------------------------
@@ -134,13 +134,16 @@ public static class UpdateChecker
                 return new UpdateInfo
                 {
                     Current = current,
-                    Error = "aucune version publiée n'est visible sur le dépôt (soit aucune n'existe encore, "
-                          + "soit le dépôt est privé — une requête anonyme ne peut pas le distinguer).",
+                    Error = Lang.T(
+                        "aucune version publiée n'est visible sur le dépôt (soit aucune n'existe encore, "
+                        + "soit le dépôt est privé — une requête anonyme ne peut pas le distinguer).",
+                        "no published release is visible on the repository (either none exists yet, "
+                        + "or the repository is private — an anonymous request cannot tell the two apart)."),
                 };
             if ((int)resp.StatusCode == 403)
-                return new UpdateInfo { Current = current, Error = "GitHub a refusé la requête (quota d'appels anonymes atteint). Réessaie dans une heure." };
+                return new UpdateInfo { Current = current, Error = Lang.T("GitHub a refusé la requête (quota d'appels anonymes atteint). Réessaie dans une heure.", "GitHub refused the request (anonymous call quota reached). Try again in an hour.") };
             if (!resp.IsSuccessStatusCode)
-                return new UpdateInfo { Current = current, Error = $"réponse HTTP {(int)resp.StatusCode} de GitHub." };
+                return new UpdateInfo { Current = current, Error = Lang.T($"réponse HTTP {(int)resp.StatusCode} de GitHub.", $"HTTP response {(int)resp.StatusCode} from GitHub.") };
 
             await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
@@ -149,7 +152,7 @@ public static class UpdateChecker
             string tag = root.TryGetProperty("tag_name", out var t) ? t.GetString() ?? "" : "";
             var latest = ParseTag(tag);
             if (latest is null)
-                return new UpdateInfo { Current = current, Error = $"numéro de version illisible côté GitHub (« {tag} »)." };
+                return new UpdateInfo { Current = current, Error = Lang.T($"numéro de version illisible côté GitHub (« {tag} »).", $"unreadable version number on the GitHub side (“{tag}”).") };
 
             var assets = new List<(string, long)>();
             if (root.TryGetProperty("assets", out var arr) && arr.ValueKind == JsonValueKind.Array)
@@ -179,11 +182,11 @@ public static class UpdateChecker
         }
         catch (OperationCanceledException)
         {
-            return new UpdateInfo { Current = current, Error = "délai dépassé — pas de connexion vers github.com (normal sur un poste sans Internet)." };
+            return new UpdateInfo { Current = current, Error = Lang.T("délai dépassé — pas de connexion vers github.com (normal sur un poste sans Internet).", "timed out — no connection to github.com (normal on a machine without Internet access).") };
         }
         catch (HttpRequestException ex)
         {
-            return new UpdateInfo { Current = current, Error = $"github.com est injoignable ({ex.Message.Trim()}). Poste sans Internet, proxy ou filtrage." };
+            return new UpdateInfo { Current = current, Error = Lang.T($"github.com est injoignable ({ex.Message.Trim()}). Poste sans Internet, proxy ou filtrage.", $"github.com is unreachable ({ex.Message.Trim()}). Machine without Internet, proxy or filtering.") };
         }
         catch (Exception ex)
         {

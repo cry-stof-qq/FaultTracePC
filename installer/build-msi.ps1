@@ -22,13 +22,21 @@
            → Installation de logiciel → Nouveau → Package → chemin UNC du MSI
            → « Attribué ».
         3. L'installation se fait au démarrage suivant des machines.
-    Installation silencieuse manuelle :  msiexec /i FaultTracePC-0.9.0.msi /qn
-    Désinstallation silencieuse :        msiexec /x FaultTracePC-0.9.0.msi /qn
+    Installation silencieuse manuelle :  msiexec /i FaultTracePC-1.3.0.msi /qn
+    Désinstallation silencieuse :        msiexec /x FaultTracePC-1.3.0.msi /qn
+
+    LANGUE IMPOSÉE AU POSTE (facultatif) :
+        msiexec /i FaultTracePC-1.3.0.msi FTPCLANG=en /qn
+    Écrit C:\ProgramData\FaultTracePC\langue.txt, valable pour tous les comptes.
+    C'est un DÉFAUT : le choix qu'un utilisateur fait dans l'application reste
+    prioritaire. « auto » efface un réglage posé auparavant.
+    Sans FTPCLANG, chaque poste suit la langue de la session Windows.
+    Vérification :  Get-Content C:\ProgramData\FaultTracePC\langue.txt
 #>
 [CmdletBinding()]
 param(
     [string]$WixVersion = '6.0.2',
-    [string]$Version = '1.2.3',
+    [string]$Version = '1.3.0',
     [switch]$SkipPublish
 )
 

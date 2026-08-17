@@ -87,7 +87,12 @@ public sealed class DiskInfo
     public string InterfaceType { get; set; } = "";
     public string MediaType { get; set; } = "";       // SSD / HDD / inconnu
     public string WmiStatus { get; set; } = "";       // Win32_DiskDrive.Status ("OK"…)
-    public string HealthStatus { get; set; } = "";    // MSFT_PhysicalDisk ("Healthy"…)
+    /// <summary>
+    /// État déclaré par le disque lui-même (MSFT_PhysicalDisk.HealthStatus).
+    /// Énumération et non texte : ce qui sert à DÉCIDER ne doit pas être le mot
+    /// affiché à l'écran. Voir DiskHealth.cs.
+    /// </summary>
+    public DiskHealth Health { get; set; } = DiskHealth.NotReported;
     public int? TemperatureC { get; set; }            // MSFT_StorageReliabilityCounter, si dispo
     public int? WearPercent { get; set; }             // usure SSD, si dispo
     public ulong? PowerOnHours { get; set; }
@@ -342,6 +347,25 @@ public sealed class Finding
     public Severity Severity { get; set; }
     public Confidence Confidence { get; set; }
     public FaultCategory Category { get; set; }
+
+    /// <summary>
+    /// Identifiant stable de la règle qui a produit cette conclusion, quand une
+    /// AUTRE partie du code doit la reconnaître. Vide dans le cas général.
+    ///
+    /// POURQUOI CE CHAMP EXISTE
+    /// Le verdict final cherchait la conclusion « pilote fautif identifié » en
+    /// testant le DÉBUT DE SON TITRE. Le titre étant désormais traduit, ce test
+    /// aurait été vrai en français et faux en anglais : sur un poste anglais, la
+    /// preuve la plus forte du diagnostic — un pilote nommé par l'analyse
+    /// symbolique — aurait été ignorée au profit d'une catégorie déduite des seuls
+    /// codes STOP. Une conclusion qui sert à DÉCIDER ne se reconnaît pas à son
+    /// texte affiché.
+    /// </summary>
+    public string Code { get; set; } = "";
+
+    /// <summary>Objet nommé par la conclusion (fichier .sys, modèle de disque…), non traduit.</summary>
+    public string Subject { get; set; } = "";
+
     public string Title { get; set; } = "";
     public string Details { get; set; } = "";
     public string Recommendation { get; set; } = "";
@@ -431,6 +455,14 @@ public sealed class PreventiveAlert
     [JsonPropertyName("re")] public string Recommendation { get; set; } = "";
     /// <summary>Valeur mesurée ayant déclenché l'alerte (température, %, compteur…).</summary>
     [JsonPropertyName("va")] public double? Value { get; set; }
+
+    /// <summary>
+    /// Fragment NON déductible cité par le texte : extrait du message de Windows,
+    /// liste des processus dominants. Conservé à part pour que la phrase puisse
+    /// être refabriquée dans une autre langue — voir AlertCatalog. Absent des
+    /// alertes écrites avant la 1.3.0 : leur texte d'origine est alors gardé.
+    /// </summary>
+    [JsonPropertyName("ex")] public string? Extract { get; set; }
 }
 
 /// <summary>Seuils de déclenchement des alertes préventives (ProgramData\FaultTracePC\alerts.json).</summary>

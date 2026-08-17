@@ -42,7 +42,7 @@ public static class ScanHistory
     public sealed class DiskBrief
     {
         public string Model { get; set; } = "";
-        public string Health { get; set; } = "";
+        public DiskHealth Health { get; set; } = DiskHealth.NotReported;
         public int? TemperatureC { get; set; }
         public int? WearPercent { get; set; }
         public ulong? ReadErrorsTotal { get; set; }
@@ -67,7 +67,7 @@ public static class ScanHistory
                 .ToDictionary(g => g.Key, g => $"{g.First().FileVersion}|{g.First().FileDate:yyyy-MM-dd}", StringComparer.OrdinalIgnoreCase),
             Disks = r.System.Disks.Select(d => new DiskBrief
             {
-                Model = d.Model, Health = d.HealthStatus,
+                Model = d.Model, Health = d.Health,
                 TemperatureC = d.TemperatureC, WearPercent = d.WearPercent, ReadErrorsTotal = d.ReadErrorsTotal,
                 BadSectors = d.Smart?.BadSectors, CrcErrors = d.Smart?.UdmaCrcErrors,
             }).ToList(),
@@ -105,7 +105,8 @@ public static class ScanHistory
             var json = JsonSerializer.Serialize(Summarize(r), JsonOpts);
             File.WriteAllText(path, json);
         }
-        catch (Exception ex) { errors.Add($"Historique des scans (écriture) : {ex.Message}"); }
+        catch (Exception ex) { errors.Add(Lang.T($"Historique des scans (écriture) : {ex.Message}",
+                                                $"Scan history (write): {ex.Message}")); }
 
         if (Purge() is { } note) r.Notes.Add(note);
     }
@@ -139,9 +140,13 @@ public static class ScanHistory
             }
             if (supprimes == 0) return null;
 
-            return $"Historique : {supprimes} résumé(s) de plus de {RetentionDays} jours supprimé(s). "
-                 + $"Les {RetentionMinimumCount} plus récents sont conservés quel que soit leur âge, "
-                 + "pour qu'une comparaison reste toujours possible.";
+            return Lang.T(
+                $"Historique : {supprimes} résumé(s) de plus de {RetentionDays} jours supprimé(s). "
+                + $"Les {RetentionMinimumCount} plus récents sont conservés quel que soit leur âge, "
+                + "pour qu'une comparaison reste toujours possible.",
+                $"History: {supprimes} summary(ies) older than {RetentionDays} days deleted. "
+                + $"The {RetentionMinimumCount} most recent ones are kept whatever their age, "
+                + "so that a comparison always stays possible.");
         }
         catch
         {
@@ -189,7 +194,8 @@ public static class ScanHistory
                 catch { /* fichier corrompu : on passe au précédent */ }
             }
         }
-        catch (Exception ex) { errors.Add($"Historique des scans (lecture) : {ex.Message}"); }
+        catch (Exception ex) { errors.Add(Lang.T($"Historique des scans (lecture) : {ex.Message}",
+                                                $"Scan history (read): {ex.Message}")); }
         return null;
     }
 
@@ -219,7 +225,7 @@ public static class ScanHistory
         var newBsods = r.Bsods.Where(b => b.TimeLocal > prev.GeneratedAt).ToList();
         c.NewBsodCount = newBsods.Count;
         c.NewBsods = newBsods.Select(b =>
-            $"{b.TimeLocal:dd/MM HH:mm} — {b.BugCheckName}{(b.SuspectDriver is not null ? $" ({b.SuspectDriver})" : "")}").ToList();
+            $"{Lang.ShortDateMinute(b.TimeLocal)} — {b.BugCheckName}{(b.SuspectDriver is not null ? $" ({b.SuspectDriver})" : "")}").ToList();
 
         // Même signature qu'avant ? (code ou pilote déjà vus)
         var prevCodes = prev.Bsods.Where(b => b.Code is not null).Select(b => b.Code!.Value).ToHashSet();
@@ -234,7 +240,7 @@ public static class ScanHistory
         foreach (var (sys, cur) in Summarize(r).DriverVersions)
         {
             if (prevDriverVersions.TryGetValue(sys, out var old) && old != cur)
-                c.DriverUpdates.Add($"{sys} : {old.Split('|')[0]} → {cur.Split('|')[0]}");
+                c.DriverUpdates.Add(Lang.T($"{sys} : {old.Split('|')[0]} → {cur.Split('|')[0]}", $"{sys}: {old.Split('|')[0]} → {cur.Split('|')[0]}"));
         }
         if (c.DriverUpdates.Count > 12) c.DriverUpdates = c.DriverUpdates.Take(12).ToList();
 
@@ -250,54 +256,66 @@ public static class ScanHistory
             var old = prev.Disks.FirstOrDefault(x => x.Model.Equals(d.Model, StringComparison.OrdinalIgnoreCase));
             if (old is null) continue;
 
-            if (!string.IsNullOrEmpty(old.Health) && !string.IsNullOrEmpty(d.HealthStatus) && old.Health != d.HealthStatus)
+            if (old.Health != DiskHealth.NotReported && d.Health != DiskHealth.NotReported && old.Health != d.Health)
             {
-                c.DiskChanges.Add($"{d.Model} : santé {old.Health} → {d.HealthStatus}");
+                c.DiskChanges.Add(Lang.T($"{d.Model} : santé {old.Health.Label()} → {d.Health.Label()}",
+                                         $"{d.Model}: health {old.Health.Label()} → {d.Health.Label()}"));
                 // Seule une AGGRAVATION compte. Un disque qui repasse de « Avertissement »
                 // à « Sain » ne doit pas déclencher d'alarme, et un état inconnu ne permet
-                // de conclure ni dans un sens ni dans l'autre.
-                int before = HealthRank(old.Health), after = HealthRank(d.HealthStatus);
+                // de conclure ni dans un sens ni dans l'autre — c'est Rank() qui refuse de
+                // classer « inconnu » et « non mesuré », en renvoyant -1.
+                int before = old.Health.Rank(), after = d.Health.Rank();
                 if (before >= 0 && after > before)
                     AddConcern(c, after >= 2 ? "crit" : "warn",
-                        $"{d.Model} : l'état de santé rapporté par le disque est passé de « {old.Health} » à « {d.HealthStatus} » depuis le scan précédent.");
+                        Lang.T($"{d.Model} : l'état de santé rapporté par le disque est passé de « {old.Health.Label()} » à « {d.Health.Label()} » depuis le scan précédent.",
+                               $"{d.Model}: the health status reported by the drive went from “{old.Health.Label()}” to “{d.Health.Label()}” since the previous scan."));
             }
 
             if (old.WearPercent is { } ow && d.WearPercent is { } nw && nw > ow)
             {
-                c.DiskChanges.Add($"{d.Model} : usure {ow} % → {nw} %");
+                c.DiskChanges.Add(Lang.T($"{d.Model} : usure {ow} % → {nw} %",
+                                         $"{d.Model}: wear {ow}% → {nw}%"));
                 // Un point d'usure de plus sur un SSD est le fonctionnement normal.
                 // Une progression franche entre deux scans, non.
                 if (nw - ow >= 2)
                     AddConcern(c, "warn",
-                        $"{d.Model} : l'usure du SSD est passée de {ow} % à {nw} % entre deux scans — une progression rapide à ce rythme raccourcit nettement la durée de vie annoncée.");
+                        Lang.T($"{d.Model} : l'usure du SSD est passée de {ow} % à {nw} % entre deux scans — une progression rapide à ce rythme raccourcit nettement la durée de vie annoncée.",
+                               $"{d.Model}: SSD wear went from {ow}% to {nw}% between two scans — sustained at that rate, it markedly shortens the announced lifespan."));
             }
 
             if (old.ReadErrorsTotal is { } oe && d.ReadErrorsTotal is { } ne && ne > oe)
             {
-                c.DiskChanges.Add($"{d.Model} : erreurs de lecture {oe} → {ne}");
+                c.DiskChanges.Add(Lang.T($"{d.Model} : erreurs de lecture {oe} → {ne}",
+                                         $"{d.Model}: read errors {oe} → {ne}"));
                 AddConcern(c, "warn",
-                    $"{d.Model} : {ne - oe} nouvelle(s) erreur(s) de lecture depuis le scan précédent. Le disque a dû s'y reprendre à plusieurs fois pour relire des données.");
+                    Lang.T($"{d.Model} : {ne - oe} nouvelle(s) erreur(s) de lecture depuis le scan précédent. Le disque a dû s'y reprendre à plusieurs fois pour relire des données.",
+                           $"{d.Model}: {ne - oe} new read error(s) since the previous scan. The drive had to retry several times to read data back."));
             }
 
             // L'augmentation des secteurs défectueux est LE signal d'un disque qui meurt.
             if (old.BadSectors is { } ob && d.Smart?.BadSectors is { } nb && nb > ob)
             {
-                c.DiskChanges.Add($"⚠ {d.Model} : secteurs défectueux {ob} → {nb} — dégradation en cours, sauvegarder");
+                c.DiskChanges.Add(Lang.T($"⚠ {d.Model} : secteurs défectueux {ob} → {nb} — dégradation en cours, sauvegarder",
+                                         $"⚠ {d.Model}: bad sectors {ob} → {nb} — degrading now, back up"));
                 AddConcern(c, "crit",
-                    $"{d.Model} : les secteurs défectueux sont passés de {ob} à {nb}. Un disque qui en perd entre deux scans est en train de se dégrader, même quand son propre auto-diagnostic se déclare sain — c'est la PROGRESSION qui alerte, pas le nombre atteint. Sauvegardez maintenant, avant toute autre manipulation.");
+                    Lang.T($"{d.Model} : les secteurs défectueux sont passés de {ob} à {nb}. Un disque qui en perd entre deux scans est en train de se dégrader, même quand son propre auto-diagnostic se déclare sain — c'est la PROGRESSION qui alerte, pas le nombre atteint. Sauvegardez maintenant, avant toute autre manipulation.",
+                           $"{d.Model}: bad sectors went from {ob} to {nb}. A drive losing sectors between two scans is degrading, even when its own self-diagnosis declares itself healthy — what raises the alarm is the PROGRESSION, not the number reached. Back up now, before anything else."));
             }
 
             if (old.CrcErrors is { } oc && d.Smart?.UdmaCrcErrors is { } nc && nc > oc)
             {
-                c.DiskChanges.Add($"{d.Model} : erreurs de câble (CRC) {oc} → {nc}");
+                c.DiskChanges.Add(Lang.T($"{d.Model} : erreurs de câble (CRC) {oc} → {nc}",
+                                         $"{d.Model}: cable errors (CRC) {oc} → {nc}"));
                 // Ce compteur accuse la LIAISON, jamais le disque. Le confondre avec une
                 // usure conduit à remplacer un disque sain à la place d'un câble à 5 €.
                 AddConcern(c, "warn",
-                    $"{d.Model} : {nc - oc} nouvelle(s) erreur(s) CRC. Ce compteur met en cause la LIAISON, pas le disque : câble SATA, connecteur ou alimentation. Le disque lui-même peut être parfaitement sain — changez le câble avant d'envisager de le remplacer.");
+                    Lang.T($"{d.Model} : {nc - oc} nouvelle(s) erreur(s) CRC. Ce compteur met en cause la LIAISON, pas le disque : câble SATA, connecteur ou alimentation. Le disque lui-même peut être parfaitement sain — changez le câble avant d'envisager de le remplacer.",
+                           $"{d.Model}: {nc - oc} new CRC error(s). This counter blames the LINK, not the drive: SATA cable, connector or power supply. The drive itself may be perfectly healthy — change the cable before considering replacing it."));
             }
 
             if (old.TemperatureC is { } ot && d.TemperatureC is { } nt && Math.Abs(nt - ot) >= 8)
-                c.DiskChanges.Add($"{d.Model} : température {ot} °C → {nt} °C");
+                c.DiskChanges.Add(Lang.T($"{d.Model} : température {ot} °C → {nt} °C",
+                                         $"{d.Model}: temperature {ot} °C → {nt} °C"));
         }
 
         // Événements disque/WHEA apparus depuis le scan précédent.
@@ -313,11 +331,13 @@ public static class ScanHistory
         // d'une erreur fatale. Ici on constate seulement une évolution défavorable.
         if (c.NewWheaEvents > 0)
             AddConcern(c, "warn",
-                $"{c.NewWheaEvents} nouvelle(s) erreur(s) matérielle(s) (WHEA) enregistrée(s) depuis le scan précédent — le matériel signale des incidents que Windows a pour l'instant absorbés.");
+                Lang.T($"{c.NewWheaEvents} nouvelle(s) erreur(s) matérielle(s) (WHEA) enregistrée(s) depuis le scan précédent — le matériel signale des incidents que Windows a pour l'instant absorbés.",
+                       $"{c.NewWheaEvents} new hardware error(s) (WHEA) recorded since the previous scan — the hardware is reporting incidents that Windows has absorbed so far."));
 
         if (c.NewDiskErrorEvents > 0)
             AddConcern(c, "warn",
-                $"{c.NewDiskErrorEvents} nouvelle(s) erreur(s) disque dans le journal Windows depuis le scan précédent.");
+                Lang.T($"{c.NewDiskErrorEvents} nouvelle(s) erreur(s) disque dans le journal Windows depuis le scan précédent.",
+                       $"{c.NewDiskErrorEvents} new disk error(s) in the Windows event log since the previous scan."));
 
         // Tendance mémoire (virtualisation).
         var curVm = Analysis.RulesEngine.VirtualizationBytes(r);
@@ -325,7 +345,11 @@ public static class ScanHistory
         {
             var deltaGb = (curVm - prev.VirtualizationBytes) / 1024.0 / 1024 / 1024;
             if (Math.Abs(deltaGb) >= 1)
-                c.MemoryTrend = $"Virtualisation (vmmem) : {(deltaGb > 0 ? "+" : "")}{deltaGb:0.#} Go depuis le dernier scan.";
+                c.MemoryTrend = Lang.T(
+                    $"Virtualisation (vmmem) : {(deltaGb > 0 ? "+" : "")}{deltaGb:0.#} Go depuis le dernier scan.",
+                    // Culture explicite : sans elle, « 1.5 GB » sortirait « 1,5 GB »
+                    // sur un Windows français basculé en anglais.
+                    $"Virtualisation (vmmem): {(deltaGb > 0 ? "+" : "")}{deltaGb.ToString("0.#", Lang.Culture)} GB since the last scan.");
         }
 
         // ------------------------------------------------------------------
@@ -353,12 +377,18 @@ public static class ScanHistory
         if (c.SameSignatureRecurred)
         {
             crashTone = "crit";
-            crashSentence = $"Le problème PERSISTE : un nouveau crash avec la même signature qu'au scan du {prev.GeneratedAt:dd/MM/yyyy} s'est produit. La réparation n'a pas suffi.";
+            // Date : jj/mm/aaaa en français, aaaa-mm-jj en anglais. « 03/04/2026 »
+            // se lit à l'envers d'un pays à l'autre ; la forme ISO ne s'ambiguïse nulle part.
+            crashSentence = Lang.T(
+                $"Le problème PERSISTE : un nouveau crash avec la même signature qu'au scan du {prev.GeneratedAt:dd/MM/yyyy} s'est produit. La réparation n'a pas suffi.",
+                $"The problem PERSISTS: a new crash with the same signature as in the scan of {prev.GeneratedAt:yyyy-MM-dd} occurred. The repair was not enough.");
         }
         else if (c.NewBsodCount > 0)
         {
             crashTone = "warn";
-            crashSentence = $"{c.NewBsodCount} nouveau(x) crash(s) depuis le scan du {prev.GeneratedAt:dd/MM/yyyy}, mais avec une signature DIFFÉRENTE : l'ancien problème semble réglé, un nouveau est apparu.";
+            crashSentence = Lang.T(
+                $"{c.NewBsodCount} nouveau(x) crash(s) depuis le scan du {prev.GeneratedAt:dd/MM/yyyy}, mais avec une signature DIFFÉRENTE : l'ancien problème semble réglé, un nouveau est apparu.",
+                $"{c.NewBsodCount} new crash(es) since the scan of {prev.GeneratedAt:yyyy-MM-dd}, but with a DIFFERENT signature: the old problem seems fixed, a new one has appeared.");
         }
         else if (prevHadProblems)
         {
@@ -374,14 +404,21 @@ public static class ScanHistory
 
             if (ecoule < TimeSpan.FromHours(2))
             {
-                crashSentence = $"Scan précédent il y a {Humaniser(ecoule)} seulement : "
-                              + "trop récent pour conclure quoi que ce soit. Une comparaison n'a de sens qu'après "
-                              + "plusieurs heures d'utilisation normale.";
+                crashSentence = Lang.T(
+                    $"Scan précédent il y a {Humaniser(ecoule)} seulement : "
+                    + "trop récent pour conclure quoi que ce soit. Une comparaison n'a de sens qu'après "
+                    + "plusieurs heures d'utilisation normale.",
+                    $"Previous scan only {Humaniser(ecoule)} ago: "
+                    + "far too recent to conclude anything. A comparison only makes sense after "
+                    + "several hours of normal use.");
             }
             else
             {
-                crashSentence = $"Aucun nouveau crash depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} ({days:0.#} jour(s)). "
-                              + (days >= 7 ? "La réparation semble efficace." : "Bon signe — à confirmer sur la durée (recommandé : re-scanner après une semaine d'utilisation normale).");
+                crashSentence = Lang.T(
+                    $"Aucun nouveau crash depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} ({days:0.#} jour(s)). "
+                    + (days >= 7 ? "La réparation semble efficace." : "Bon signe — à confirmer sur la durée (recommandé : re-scanner après une semaine d'utilisation normale)."),
+                    $"No new crash since the scan of {prev.GeneratedAt:yyyy-MM-dd} ({days.ToString("0.#", Lang.Culture)} day(s)). "
+                    + (days >= 7 ? "The repair looks effective." : "Good sign — to be confirmed over time (recommended: scan again after a week of normal use)."));
             }
         }
         else
@@ -390,8 +427,10 @@ public static class ScanHistory
             // « Machine stable » n'est affirmé que si rien d'autre ne le contredit :
             // sinon on se contente de constater l'absence de crash.
             crashSentence = (c.HardwareConcerns.Count > 0 || standingCritical)
-                ? $"Aucun crash système avant comme après le scan du {prev.GeneratedAt:dd/MM/yyyy}."
-                : $"Machine stable depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} : aucun crash avant comme après.";
+                ? Lang.T($"Aucun crash système avant comme après le scan du {prev.GeneratedAt:dd/MM/yyyy}.",
+                         $"No system crash either before or after the scan of {prev.GeneratedAt:yyyy-MM-dd}.")
+                : Lang.T($"Machine stable depuis le scan du {prev.GeneratedAt:dd/MM/yyyy} : aucun crash avant comme après.",
+                         $"Machine stable since the scan of {prev.GeneratedAt:yyyy-MM-dd}: no crash before or after.");
         }
 
         // La tonalité retenue est la PIRE des deux : matériel ou plantages.
@@ -403,13 +442,14 @@ public static class ScanHistory
             // que l'utilisateur doit lire en premier, pas en note de bas de carte.
             var worst = c.HardwareConcerns.OrderByDescending(h => ToneRank(h.Severity)).First();
             c.Assessment = crashSentence + (c.HardwareSeverity == "crit"
-                ? " En revanche, le MATÉRIEL se dégrade : " + worst.Message
-                : " Un point de vigilance matériel : " + worst.Message);
+                ? Lang.T(" En revanche, le MATÉRIEL se dégrade : ", " However, the HARDWARE is degrading: ") + worst.Message
+                : Lang.T(" Un point de vigilance matériel : ", " One hardware point to watch: ") + worst.Message);
         }
         else if (standingCritical && crashTone == "ok")
         {
             c.Assessment = crashSentence
-                + " En revanche, un problème critique signalé dans ce rapport est toujours là : rien ne s'est aggravé depuis le dernier scan, mais rien n'est réglé non plus.";
+                + Lang.T(" En revanche, un problème critique signalé dans ce rapport est toujours là : rien ne s'est aggravé depuis le dernier scan, mais rien n'est réglé non plus.",
+                         " However, a critical problem reported here is still present: nothing has got worse since the last scan, but nothing is fixed either.");
             c.Tone = "warn";
         }
         else
@@ -444,9 +484,9 @@ public static class ScanHistory
 
     /// <summary>Durée courte en langage humain : « 12 minutes », « 1 h 40 ».</summary>
     private static string Humaniser(TimeSpan d) =>
-        d.TotalMinutes < 1 ? "moins d'une minute"
-        : d.TotalMinutes < 60 ? $"{(int)d.TotalMinutes} minute(s)"
-        : $"{(int)d.TotalHours} h {d.Minutes:00}";
+        d.TotalMinutes < 1 ? Lang.T("moins d'une minute", "less than a minute")
+        : d.TotalMinutes < 60 ? Lang.T($"{(int)d.TotalMinutes} minute(s)", $"{(int)d.TotalMinutes} minute(s)")
+        : Lang.T($"{(int)d.TotalHours} h {d.Minutes:00}", $"{(int)d.TotalHours}h{d.Minutes:00}");
 
     /// <summary>
     /// Enregistre une dégradation et relève la sévérité globale si nécessaire.
@@ -469,14 +509,6 @@ public static class ScanHistory
     /// traduit aujourd'hui, mais un rapport relu depuis un historique plus ancien
     /// ou produit par une future version anglaise ne doit pas passer à travers.
     /// </summary>
-    private static int HealthRank(string? status) => (status ?? "").Trim().ToLowerInvariant() switch
-    {
-        "sain" or "healthy" or "ok" => 0,
-        "avertissement" or "warning" or "degraded" => 1,
-        "défaillant" or "defaillant" or "unhealthy" or "failing" or "failed" => 2,
-        _ => -1,
-    };
-
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,

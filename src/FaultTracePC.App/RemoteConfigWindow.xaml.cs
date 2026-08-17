@@ -24,7 +24,7 @@ public partial class RemoteConfigWindow : Window
         if (!string.IsNullOrEmpty(TxtToken.Text))
         {
             Clipboard.SetText(TxtToken.Text);
-            TxtStatus.Text = "Token copié dans le presse-papiers.";
+            TxtStatus.Text = Lang.T("Token copié dans le presse-papiers.", "Token copied to the clipboard.");
         }
     }
 
@@ -51,14 +51,14 @@ public partial class RemoteConfigWindow : Window
                 cfg.Save();
 
                 MonitorServiceManager.EnsureFirewallRule(port);
-                TxtStatus.Text = "Mode Client appliqué.";
+                TxtStatus.Text = Lang.T("Mode Client appliqué.", "Client mode applied.");
             }
             else
             {
                 cfg.Mode = "Local";
                 cfg.Save();
                 MonitorServiceManager.RemoveFirewallRule();
-                TxtStatus.Text = "Mode Local appliqué — plus rien n'est exposé.";
+                TxtStatus.Text = Lang.T("Mode Local appliqué — plus rien n'est exposé.", "Local mode applied — nothing is exposed any more.");
             }
 
             // Le service lit la configuration au démarrage. On REDÉPLOIE la dernière
@@ -67,16 +67,16 @@ public partial class RemoteConfigWindow : Window
             if (MonitorServiceManager.GetState() != MonitorState.NotInstalled)
             {
                 var (ok, msg) = MonitorServiceManager.InstallAndStart();
-                TxtStatus.Text += ok ? " Service mis à jour et redémarré." : $" ⚠ {msg}";
+                TxtStatus.Text += ok ? Lang.T(" Service mis à jour et redémarré.", " Service updated and restarted.") : $" ⚠ {msg}";
             }
             else if (RbClient.IsChecked == true)
             {
-                TxtStatus.Text += " ⚠ Installe la surveillance (bouton 📡) pour activer l'API.";
+                TxtStatus.Text += Lang.T(" ⚠ Installe la surveillance (bouton 📡) pour activer l'API.", " ⚠ Install monitoring (📡 button) to enable the API.");
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Échec : " + ex.Message, "FaultTracePC",
+            MessageBox.Show(this, Lang.T("Échec : ", "Failed: ") + ex.Message, "FaultTracePC",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }

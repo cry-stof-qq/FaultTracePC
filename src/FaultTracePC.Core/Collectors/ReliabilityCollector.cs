@@ -40,7 +40,7 @@ public sealed class ReliabilityCollector
         }
         catch (Exception ex)
         {
-            _errors.Add($"Moniteur de fiabilité : {ex.Message} (données RAC peut-être indisponibles)");
+            _errors.Add(Lang.T($"Moniteur de fiabilité : {ex.Message} (données RAC peut-être indisponibles)", $"Reliability Monitor: {ex.Message} (RAC data may be unavailable)"));
         }
         return list.OrderByDescending(r => r.TimeLocal).ToList();
     }

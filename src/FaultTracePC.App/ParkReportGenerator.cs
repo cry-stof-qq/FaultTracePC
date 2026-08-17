@@ -1,5 +1,7 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
+
+using FaultTracePC.Core;
 
 namespace FaultTracePC.App;
 
@@ -36,7 +38,7 @@ public static class ParkReportGenerator
 
         sb.Append("<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"utf-8\">");
         sb.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-        sb.Append($"<title>État du parc — {now:dd/MM/yyyy}</title><style>").Append(Css).Append("</style></head><body>");
+        sb.Append(Lang.T($"<title>État du parc — {now:dd/MM/yyyy}</title><style>", $"<title>Fleet state — {now:yyyy-MM-dd}</title><style>")).Append(Css).Append("</style></head><body>");
 
         var unreachable = machines.Count(m => !m.Reachable);
         var critical = machines.Count(m => m.Reachable && m.CriticalAlerts > 0);
@@ -45,33 +47,34 @@ public static class ParkReportGenerator
 
         sb.Append("<header><div class=\"brand\">");
         sb.Append($"<img src=\"{FaultTracePC.Core.Report.Branding.LogoDataUri}\" alt=\"FaultTracePC\" width=\"44\" height=\"44\">");
-        sb.Append("<h1>État du parc — FaultTracePC</h1></div>");
-        sb.Append($"<p class=\"sub\">{machines.Count} machine(s) · relevé du {now:dd/MM/yyyy à HH:mm}</p></header>");
+        sb.Append(Lang.T("<h1>État du parc — FaultTracePC</h1></div>", "<h1>Fleet state — FaultTracePC</h1></div>"));
+        sb.Append(Lang.T($"<p class=\"sub\">{machines.Count} machine(s) · relevé du {now:dd/MM/yyyy à HH:mm}</p></header>", $"<p class=\"sub\">{machines.Count} machine(s) · reading of {now:yyyy-MM-dd HH:mm}</p></header>"));
 
         // Bandeau de synthèse : quatre nombres, pas de graphique inutile.
         sb.Append("<section><div class=\"tiles\">");
-        Tile(sb, "Machines saines", healthy, "ok");
-        Tile(sb, "Alertes critiques", critical, critical > 0 ? "crit" : "neutral");
-        Tile(sb, "Injoignables", unreachable, unreachable > 0 ? "warn" : "neutral");
-        Tile(sb, "Surveillance arrêtée", inactive, inactive > 0 ? "warn" : "neutral");
+        Tile(sb, Lang.T("Machines saines", "Healthy machines"), healthy, "ok");
+        Tile(sb, Lang.T("Alertes critiques", "Critical alerts"), critical, critical > 0 ? "crit" : "neutral");
+        Tile(sb, Lang.T("Injoignables", "Unreachable"), unreachable, unreachable > 0 ? "warn" : "neutral");
+        Tile(sb, Lang.T("Surveillance arrêtée", "Monitoring stopped"), inactive, inactive > 0 ? "warn" : "neutral");
         sb.Append("</div></section>");
 
-        sb.Append("<section><h2>Détail par machine</h2>");
-        sb.Append("<table><thead><tr><th>Machine</th><th>Adresse</th><th>État</th><th>Dernier relevé</th>");
-        sb.Append("<th>CPU %</th><th>T° CPU</th><th>T° GPU</th><th>RAM %</th><th>Alertes</th><th>Dernière alerte / erreur</th></tr></thead><tbody>");
+        sb.Append(Lang.T("<section><h2>Détail par machine</h2>", "<section><h2>Detail by machine</h2>"));
+        sb.Append(Lang.T("<table><thead><tr><th>Machine</th><th>Adresse</th><th>État</th><th>Dernier relevé</th>", "<table><thead><tr><th>Machine</th><th>Address</th><th>State</th><th>Last reading</th>"));
+        sb.Append(Lang.T("<th>CPU %</th><th>T° CPU</th><th>T° GPU</th><th>RAM %</th><th>Alertes</th><th>Dernière alerte / erreur</th></tr></thead><tbody>", "<th>CPU %</th><th>CPU temp.</th><th>GPU temp.</th><th>RAM %</th><th>Alerts</th><th>Last alert / error</th></tr></thead><tbody>"));
 
         foreach (var m in machines.OrderBy(m => m.Reachable).ThenByDescending(m => m.CriticalAlerts).ThenBy(m => m.Name))
         {
-            var (cls, state) = !m.Reachable ? ("crit", "🔴 injoignable")
-                : m.CriticalAlerts > 0 ? ("crit", "⛔ alerte critique")
-                : !m.MonitoringActive ? ("warn", "🟠 surveillance arrêtée")
-                : m.WarningAlerts > 0 ? ("warn", "⚠ à surveiller")
-                : ("ok", "🟢 sain");
+            var (cls, state) = !m.Reachable ? ("crit", Lang.T("🔴 injoignable", "🔴 unreachable"))
+                : m.CriticalAlerts > 0 ? ("crit", Lang.T("⛔ alerte critique", "⛔ critical alert"))
+                : !m.MonitoringActive ? ("warn", Lang.T("🟠 surveillance arrêtée", "🟠 monitoring stopped"))
+                : m.WarningAlerts > 0 ? ("warn", Lang.T("⚠ à surveiller", "⚠ to watch"))
+                : ("ok", Lang.T("🟢 sain", "🟢 healthy"));
 
             sb.Append($"<tr class=\"{cls}\"><td><strong>{H(m.Name)}</strong></td><td class=\"small\">{H(m.Host)}</td>");
-            sb.Append($"<td>{state}</td><td class=\"small\">{(m.LastSample?.ToString("dd/MM HH:mm") ?? "—")}</td>");
+            sb.Append($"<td>{state}</td><td class=\"small\">{(m.LastSample is { } ls ? Lang.ShortDateMinute(ls) : "—")}</td>");
             sb.Append($"<td>{Num(m.CpuLoad)}</td><td>{Num(m.CpuTemp, " °C")}</td><td>{Num(m.GpuTemp, " °C")}</td><td>{Num(m.MemPct)}</td>");
-            sb.Append($"<td>{(m.CriticalAlerts + m.WarningAlerts == 0 ? "—" : $"{m.CriticalAlerts} crit. / {m.WarningAlerts} avert.")}</td>");
+            var alertes = Lang.T($"{m.CriticalAlerts} crit. / {m.WarningAlerts} avert.", $"{m.CriticalAlerts} crit. / {m.WarningAlerts} warn.");
+            sb.Append($"<td>{(m.CriticalAlerts + m.WarningAlerts == 0 ? "—" : alertes)}</td>");
             sb.Append($"<td class=\"small\">{H(m.Reachable ? m.LastAlert : m.Error)}</td></tr>");
         }
 
@@ -81,7 +84,7 @@ public static class ParkReportGenerator
         var withTop = machines.Where(m => m.Reachable && !string.IsNullOrEmpty(m.TopProcesses)).ToList();
         if (withTop.Count > 0)
         {
-            sb.Append("<section><h2>Processus dominants au moment du relevé</h2><table><thead><tr><th>Machine</th><th>Processus</th></tr></thead><tbody>");
+            sb.Append(Lang.T("<section><h2>Processus dominants au moment du relevé</h2><table><thead><tr><th>Machine</th><th>Processus</th></tr></thead><tbody>", "<section><h2>Leading processes at the time of the reading</h2><table><thead><tr><th>Machine</th><th>Processes</th></tr></thead><tbody>"));
             foreach (var m in withTop)
                 sb.Append($"<tr><td>{H(m.Name)}</td><td class=\"small\">{H(m.TopProcesses)}</td></tr>");
             sb.Append("</tbody></table></section>");
@@ -90,36 +93,37 @@ public static class ParkReportGenerator
         // ---------- Comparateur de parc ----------
         if (comparison is not null)
         {
-            sb.Append("<section><h2>Ce que les postes ont en commun</h2>");
-            sb.Append("<p class=\"explain\">Un diagnostic individuel ne peut pas voir ceci : un pilote ancien identique sur six postes "
-                    + "n'est plus un suspect, c'est une image de déploiement à corriger — et la réparation se fait une fois pour tout le parc.</p>");
+            sb.Append(Lang.T("<section><h2>Ce que les postes ont en commun</h2>", "<section><h2>What the machines have in common</h2>"));
+            sb.Append(Lang.T("<p class=\"explain\">Un diagnostic individuel ne peut pas voir ceci : un pilote ancien identique sur six postes ", "<p class=\"explain\">An individual diagnosis cannot see this: the same old driver on six machines ")
+                    + Lang.T("n'est plus un suspect, c'est une image de déploiement à corriger — et la réparation se fait une fois pour tout le parc.</p>", "is no longer a suspect, it is a deployment image to fix — and the repair happens once, for the whole fleet.</p>"));
             sb.Append($"<p class=\"parkverdict\">{H(comparison.Summary)}</p>");
 
             foreach (var c in comparison.Correlations)
             {
                 var badge = c.Severity switch
                 {
-                    "crit" => "<span class=\"badge crit\">Critique</span>",
-                    "warn" => "<span class=\"badge warn\">À surveiller</span>",
-                    _ => "<span class=\"badge info\">Information</span>",
+                    "crit" => Lang.T("<span class=\"badge crit\">Critique</span>", "<span class=\"badge crit\">Critical</span>"),
+                    "warn" => Lang.T("<span class=\"badge warn\">À surveiller</span>", "<span class=\"badge warn\">To watch</span>"),
+                    _ => Lang.T("<span class=\"badge info\">Information</span>", "<span class=\"badge info\">Information</span>"),
                 };
                 var kind = c.Kind switch
                 {
-                    "divergence" => "divergence de version",
-                    "isolé" => "poste isolé",
-                    _ => "point commun",
+                    "divergence" => Lang.T("divergence de version", "version divergence"),
+                    // pas-de-traduction : clé interne posée par ParkComparator.Kind.
+                    "isolé" => Lang.T("poste isolé", "isolated machine"),
+                    _ => Lang.T("point commun", "shared trait"),
                 };
                 sb.Append($"<div class=\"corr {c.Severity}\"><div class=\"corr-head\">{badge}<span class=\"kind\">{kind}</span></div>");
                 sb.Append($"<h3>{H(c.Title)}</h3><p>{H(c.Details)}</p>");
                 if (c.Machines.Count > 0)
-                    sb.Append($"<p class=\"machines\"><strong>Postes concernés :</strong> {H(string.Join(", ", c.Machines))}</p>");
-                sb.Append($"<p class=\"reco\"><strong>Que faire :</strong> {H(c.Action)}</p></div>");
+                    sb.Append(Lang.T($"<p class=\"machines\"><strong>Postes concernés :</strong> {H(string.Join(", ", c.Machines))}</p>", $"<p class=\"machines\"><strong>Machines involved:</strong> {H(string.Join(", ", c.Machines))}</p>"));
+                sb.Append(Lang.T($"<p class=\"reco\"><strong>Que faire :</strong> {H(c.Action)}</p></div>", $"<p class=\"reco\"><strong>What to do:</strong> {H(c.Action)}</p></div>"));
             }
             sb.Append("</section>");
         }
 
-        sb.Append($"<footer>Généré par FaultTracePC (console Parc) le {now:dd/MM/yyyy à HH:mm}. ");
-        sb.Append("Les machines injoignables peuvent être éteintes, hors du réseau, ou avoir un service de surveillance arrêté.</footer>");
+        sb.Append(Lang.T($"<footer>Généré par FaultTracePC (console Parc) le {now:dd/MM/yyyy à HH:mm}. ", $"<footer>Generated by FaultTracePC (Fleet console) on {now:yyyy-MM-dd HH:mm}. "));
+        sb.Append(Lang.T("Les machines injoignables peuvent être éteintes, hors du réseau, ou avoir un service de surveillance arrêté.</footer>", "Unreachable machines may be switched off, off the network, or have a stopped monitoring service.</footer>"));
         sb.Append("</body></html>");
         return sb.ToString();
     }

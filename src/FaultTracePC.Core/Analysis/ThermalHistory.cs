@@ -133,6 +133,7 @@ public sealed class ThermalHistory
         if (d < TimeSpan.FromMinutes(1)) return $"{(int)d.TotalSeconds} s";
         if (d < TimeSpan.FromHours(1)) return $"{(int)d.TotalMinutes} min";
         int h = (int)d.TotalHours, m = d.Minutes;
-        return m == 0 ? $"{h} h" : $"{h} h {m:00}";
+        return Lang.T(m == 0 ? $"{h} h" : $"{h} h {m:00}",
+                      m == 0 ? $"{h}h" : $"{h}h{m:00}");
     }
 }

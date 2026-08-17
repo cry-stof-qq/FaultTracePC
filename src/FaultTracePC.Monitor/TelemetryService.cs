@@ -136,7 +136,7 @@ public sealed class TelemetryService : BackgroundService
                     // explicitement « rien à comparer » plutôt que null, pour que le
                     // maître distingue « poste sans scan » de « poste injoignable ».
                     if (Core.Report.ScanHistory.LoadLatest() is { } latest) Json(ctx, latest);
-                    else Json(ctx, new { available = false, reason = "Cette machine n'a jamais été analysée." });
+                    else Json(ctx, new { available = false, reason = Lang.T("Cette machine n'a jamais été analysée.", "This machine has never been analysed.") });
                     break;
 
                 case "/api/alerts":
@@ -182,12 +182,21 @@ public sealed class TelemetryService : BackgroundService
                         File.WriteAllText(Path.Combine(RemoteConfig.SharedReportsDir, name),
                             HtmlReportGenerator.Generate(report), Encoding.UTF8);
 
+                        // AJOUTS PUREMENT ADDITIFS (level, critical, warnings) : une
+                        // console restée en 1.2.3 ignore ces champs et continue
+                        // d'afficher « verdict ». Le code, lui, permet à une console à
+                        // jour d'écrire la phrase dans SA langue — celle de
+                        // l'administrateur, qui n'est pas forcément celle du poste.
+                        var niveau = ScanLevelInfo.Of(report);
                         Json(ctx, new
                         {
                             ok = true,
                             report = name,
                             verdict = report.Verdict,
                             findings = report.Findings.Count(f => f.Severity != Severity.Info),
+                            level = niveau.Code(),
+                            critical = report.Findings.Count(f => f.Severity == Severity.Critical),
+                            warnings = report.Findings.Count(f => f.Severity == Severity.Warning),
                         });
                     }
                     catch (Exception ex)

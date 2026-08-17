@@ -184,7 +184,7 @@ public class ReportAndHistoryTests
     {
         var r = SampleReport();
         r.System.Disks.Clear();
-        r.System.Disks.Add(new DiskInfo { Model = "RPEYJ1T24MML1AWX", MediaType = "SSD", HealthStatus = "Sain", Smart = null });
+        r.System.Disks.Add(new DiskInfo { Model = "RPEYJ1T24MML1AWX", MediaType = "SSD", Health = DiskHealth.Healthy, Smart = null });
         new RulesEngine().Analyze(r);
 
         var html = HtmlReportGenerator.Generate(r);
@@ -733,7 +733,7 @@ public class ReportAndHistoryTests
     // ==================================================================
 
     /// <summary>Scan précédent minimal : machine saine, disque intact.</summary>
-    private static ScanHistory.ScanSummary PrecedentSain(ulong badSectors = 0, ulong crc = 0, string health = "Sain") => new()
+    private static ScanHistory.ScanSummary PrecedentSain(ulong badSectors = 0, ulong crc = 0, DiskHealth health = DiskHealth.Healthy) => new()
     {
         GeneratedAt = new DateTime(2026, 8, 1, 10, 0, 0),
         ScanPeriodDays = 30,
@@ -741,7 +741,7 @@ public class ReportAndHistoryTests
     };
 
     /// <summary>Scan courant : aucun crash, un seul disque dont on pilote l'état.</summary>
-    private static DiagnosticReport ScanActuel(SmartInfo? smart = null, string health = "Sain", int? wear = 1)
+    private static DiagnosticReport ScanActuel(SmartInfo? smart = null, DiskHealth health = DiskHealth.Healthy, int? wear = 1)
     {
         // Volontairement sans RulesEngine : on isole l'effet de l'ÉVOLUTION sur le
         // verdict, sans qu'un constat absolu vienne le masquer.
@@ -752,7 +752,7 @@ public class ReportAndHistoryTests
             System = new SystemSnapshot
             {
                 MachineName = "POSTE-01",
-                Disks = [new DiskInfo { Model = "Samsung SSD 980", HealthStatus = health, WearPercent = wear, Smart = smart }],
+                Disks = [new DiskInfo { Model = "Samsung SSD 980", Health = health, WearPercent = wear, Smart = smart }],
             },
         };
     }
@@ -884,8 +884,8 @@ public class ReportAndHistoryTests
     public void Verdict_SanteQuiSameliore_NestPasUneAlerte()
     {
         var c = ScanHistory.Compare(
-            ScanActuel(new SmartInfo { ReallocatedSectors = 0 }, health: "Sain"),
-            PrecedentSain(health: "Avertissement"));
+            ScanActuel(new SmartInfo { ReallocatedSectors = 0 }, health: DiskHealth.Healthy),
+            PrecedentSain(health: DiskHealth.Warning));
 
         Assert.Empty(c.HardwareConcerns);
         Assert.Equal("ok", c.Tone);
@@ -897,8 +897,8 @@ public class ReportAndHistoryTests
     public void Verdict_SanteQuiSaggrave_FaitBasculerLaCouleur()
     {
         var c = ScanHistory.Compare(
-            ScanActuel(new SmartInfo { ReallocatedSectors = 0 }, health: "Défaillant"),
-            PrecedentSain(health: "Sain"));
+            ScanActuel(new SmartInfo { ReallocatedSectors = 0 }, health: DiskHealth.Failing),
+            PrecedentSain(health: DiskHealth.Healthy));
 
         Assert.Equal("crit", c.HardwareSeverity);
         Assert.Equal("crit", c.Tone);
@@ -990,7 +990,7 @@ public class ReportAndHistoryTests
     {
         Model = "RPEYJ1T24MML1AWX",
         Index = index,
-        HealthStatus = "Sain",
+        Health = DiskHealth.Healthy,
         Smart = new SmartInfo { AvailableSparePercent = 100, AvailableSpareThresholdPercent = 10, Source = "SMART NVMe (journal de santé)" },
     };
 
@@ -1143,7 +1143,7 @@ public class ReportAndHistoryTests
             ("disk", 51, @"Erreur sur \Device\Harddisk0\DR0."));
         r.System.Disks.Add(new DiskInfo
         {
-            Model = "WDC WD10EZEX", Index = 0, HealthStatus = "Sain",
+            Model = "WDC WD10EZEX", Index = 0, Health = DiskHealth.Healthy,
             Smart = new SmartInfo { ReallocatedSectors = 0, Source = "SMART (SATA)" },
         });
 

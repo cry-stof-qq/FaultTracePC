@@ -1,7 +1,8 @@
 <Window x:Class="FaultTracePC.App.WindowsUpdateWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FaultTracePC — Mises à jour Windows (optionnelles et pilotes inclus)"
+        xmlns:loc="clr-namespace:FaultTracePC.App"
+        Title="{x:Static loc:L.WuTitle}"
         Icon="Assets/FaultTracePC.ico"
         Width="960" Height="640" MinWidth="760" MinHeight="480"
         WindowStartupLocation="CenterOwner"
@@ -19,28 +20,28 @@
         <!-- ============ Bandeau ============ -->
         <Border Grid.Row="0" Background="#182848" Padding="16,12">
             <StackPanel>
-                <TextBlock Text="⬇ Mises à jour Windows" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{x:Static loc:L.WuHeader}" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
                 <TextBlock Foreground="#B9C4DC" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
-                           Text="Cette fenêtre interroge directement le service Windows Update et affiche TOUT ce qui est disponible, y compris les mises à jour optionnelles et les pilotes que la page Paramètres masque. Tu choisis ligne par ligne ce qui s'installe. L'ordinateur n'est JAMAIS redémarré automatiquement."/>
+                           Text="{x:Static loc:L.WuIntro}"/>
             </StackPanel>
         </Border>
 
         <!-- ============ Barre d'actions ============ -->
         <Border Grid.Row="1" Background="White" BorderBrush="#DBE2EC" BorderThickness="0,0,0,1" Padding="12,10">
             <WrapPanel VerticalAlignment="Center">
-                <Button x:Name="BtnSearch" Content="🔍 Rechercher les mises à jour" Padding="12,6" Margin="0,0,10,4"
+                <Button x:Name="BtnSearch" Content="{x:Static loc:L.WuSearch}" Padding="12,6" Margin="0,0,10,4"
                         FontWeight="SemiBold" Click="BtnSearch_Click"/>
-                <CheckBox x:Name="ChkDrivers" Content="Inclure les pilotes et autres produits Microsoft"
+                <CheckBox x:Name="ChkDrivers" Content="{x:Static loc:L.WuIncludeDrivers}"
                           IsChecked="True" VerticalAlignment="Center" Margin="0,0,16,4"
-                          ToolTip="Utilise le catalogue « Microsoft Update » (pilotes, Office, Visual C++…). Si ce catalogue n'est pas activé sur le poste, la recherche bascule automatiquement sur Windows Update seul et te le signale."/>
-                <CheckBox x:Name="ChkHidden" Content="Inclure les mises à jour masquées"
+                          ToolTip="{x:Static loc:L.WuIncludeDriversTip}"/>
+                <CheckBox x:Name="ChkHidden" Content="{x:Static loc:L.WuIncludeHidden}"
                           VerticalAlignment="Center" Margin="0,0,16,4"
-                          ToolTip="Affiche aussi les mises à jour que quelqu'un a explicitement masquées sur ce poste."/>
-                <Button x:Name="BtnSelectImportant" Content="Cocher les importantes" Padding="10,6" Margin="0,0,8,4"
+                          ToolTip="{x:Static loc:L.WuIncludeHiddenTip}"/>
+                <Button x:Name="BtnSelectImportant" Content="{x:Static loc:L.WuCheckImportant}" Padding="10,6" Margin="0,0,8,4"
                         Click="BtnSelectImportant_Click"/>
-                <Button x:Name="BtnSelectAll" Content="Tout cocher" Padding="10,6" Margin="0,0,8,4"
+                <Button x:Name="BtnSelectAll" Content="{x:Static loc:L.WuCheckAll}" Padding="10,6" Margin="0,0,8,4"
                         Click="BtnSelectAll_Click"/>
-                <Button x:Name="BtnSelectNone" Content="Tout décocher" Padding="10,6" Margin="0,0,8,4"
+                <Button x:Name="BtnSelectNone" Content="{x:Static loc:L.WuUncheckAll}" Padding="10,6" Margin="0,0,8,4"
                         Click="BtnSelectNone_Click"/>
             </WrapPanel>
         </Border>
@@ -62,7 +63,7 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn Header="Mise à jour" Width="430">
+                    <GridViewColumn Header="{x:Static loc:L.WuColUpdate}" Width="430">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"
@@ -70,17 +71,17 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn Header="Type" Width="95" DisplayMemberBinding="{Binding Kind}"/>
-                    <GridViewColumn Header="Catégorie" Width="105" DisplayMemberBinding="{Binding Category}"/>
-                    <GridViewColumn Header="Taille" Width="80" DisplayMemberBinding="{Binding SizeText}"/>
-                    <GridViewColumn Header="Redémarrage" Width="110" DisplayMemberBinding="{Binding RebootText}"/>
-                    <GridViewColumn Header="KB" Width="90" DisplayMemberBinding="{Binding KbText}"/>
+                    <GridViewColumn Header="{x:Static loc:L.WuColType}" Width="95" DisplayMemberBinding="{Binding Kind}"/>
+                    <GridViewColumn Header="{x:Static loc:L.WuColCategory}" Width="105" DisplayMemberBinding="{Binding Category}"/>
+                    <GridViewColumn Header="{x:Static loc:L.WuColSize}" Width="80" DisplayMemberBinding="{Binding SizeText}"/>
+                    <GridViewColumn Header="{x:Static loc:L.WuColReboot}" Width="110" DisplayMemberBinding="{Binding RebootText}"/>
+                    <GridViewColumn Header="{x:Static loc:L.WuColKb}" Width="90" DisplayMemberBinding="{Binding KbText}"/>
                 </GridView>
             </ListView.View>
         </ListView>
 
         <!-- ============ Journal ============ -->
-        <Expander Grid.Row="3" Header="  Détail technique — aussi enregistré dans Documents\FaultTracePC\MajWindows_AAAA-MM-JJ.txt" Margin="10,0,10,6"
+        <Expander Grid.Row="3" Header="{x:Static loc:L.WuTabDetail}" Margin="10,0,10,6"
                   IsExpanded="False" Foreground="#44546A">
             <TextBox x:Name="TxtLog" Height="120" Margin="0,6,0,0" IsReadOnly="True"
                      FontFamily="Consolas" FontSize="11" TextWrapping="NoWrap"
@@ -97,11 +98,11 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock x:Name="TxtStatus" FontSize="12" Foreground="#44546A" TextWrapping="Wrap"
-                               Text="Clique sur « Rechercher les mises à jour » pour interroger Windows Update."/>
+                               Text="{x:Static loc:L.WuHint}"/>
                     <ProgressBar x:Name="PbBusy" Height="4" Margin="0,6,0,0" IsIndeterminate="True"
                                  Visibility="Collapsed" Foreground="#2A78D6" Background="#E7ECF3" BorderThickness="0"/>
                 </StackPanel>
-                <Button x:Name="BtnInstall" Grid.Column="1" Content="⬇ Télécharger et installer la sélection"
+                <Button x:Name="BtnInstall" Grid.Column="1" Content="{x:Static loc:L.WuInstall}"
                         Padding="14,8" Margin="12,0,0,0" FontWeight="SemiBold" IsEnabled="False"
                         Click="BtnInstall_Click"/>
             </Grid>

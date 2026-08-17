@@ -60,7 +60,7 @@ public sealed class ProcessCollector
         }
         catch (Exception ex)
         {
-            _errors.Add($"Processus en cours : {ex.Message}");
+            _errors.Add(Lang.T($"Processus en cours : {ex.Message}", $"Running processes: {ex.Message}"));
         }
 
         return result.OrderByDescending(p => p.PrivateBytes).ToList();

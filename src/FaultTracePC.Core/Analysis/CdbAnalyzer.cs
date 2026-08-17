@@ -91,11 +91,17 @@ public sealed class CdbAnalyzer
         {
             // Le message disait déjà quoi faire, mais laissait l'utilisateur recopier
             // une commande à la main. Il renvoie désormais vers le bouton qui l'exécute.
-            _errors.Add("Analyse profonde indisponible : CDB/WinDbg introuvable. Sans lui, le code STOP "
-                      + "est lu nativement mais le pilote exact n'est pas nommé. "
-                      + "Pour l'installer : bouton 🧰 Outils, puis « 🐞 Installer WinDbg (analyse des dumps) ». "
-                      + "En ligne de commande : winget install Microsoft.WinDbg, ou les « Debugging Tools for "
-                      + "Windows » du SDK pour une installation valable sur toute la machine.");
+            _errors.Add(Lang.T(
+                "Analyse profonde indisponible : CDB/WinDbg introuvable. Sans lui, le code STOP "
+                + "est lu nativement mais le pilote exact n'est pas nommé. "
+                + "Pour l'installer : bouton 🧰 Outils, puis « 🐞 Installer WinDbg (analyse des dumps) ». "
+                + "En ligne de commande : winget install Microsoft.WinDbg, ou les « Debugging Tools for "
+                + "Windows » du SDK pour une installation valable sur toute la machine.",
+                "Deep analysis unavailable: CDB/WinDbg not found. Without it the STOP code "
+                + "is read natively but the exact driver is not named. "
+                + "To install it: button 🧰 Tools, then “🐞 Install WinDbg (dump analysis)”. "
+                + "From the command line: winget install Microsoft.WinDbg, or the “Debugging Tools for "
+                + "Windows” from the SDK for a machine-wide installation."));
             return;
         }
 
@@ -140,14 +146,14 @@ public sealed class CdbAnalyzer
             }
 
             using var p = Process.Start(psi);
-            if (p is null) { dump.DeepAnalysisError = "Impossible de démarrer CDB."; return; }
+            if (p is null) { dump.DeepAnalysisError = Lang.T("Impossible de démarrer CDB.", "Could not start CDB."); return; }
 
             var stdout = p.StandardOutput.ReadToEndAsync();
             _ = p.StandardError.ReadToEndAsync(); // drainé pour éviter tout blocage
             if (!p.WaitForExit(timeoutMs))
             {
                 try { p.Kill(entireProcessTree: true); } catch { }
-                dump.DeepAnalysisError = $"Délai dépassé ({timeoutMs / 1000} s) — symboles trop longs à télécharger ?";
+                dump.DeepAnalysisError = Lang.T($"Délai dépassé ({timeoutMs / 1000} s) — symboles trop longs à télécharger ?", $"Timed out ({timeoutMs / 1000} s) — symbols taking too long to download?");
                 return;
             }
 
@@ -157,7 +163,7 @@ public sealed class CdbAnalyzer
         catch (Exception ex)
         {
             dump.DeepAnalysisError = ex.Message;
-            _errors.Add($"Analyse CDB de {Path.GetFileName(dump.Path)} : {ex.Message}");
+            _errors.Add(Lang.T($"Analyse CDB de {Path.GetFileName(dump.Path)} : {ex.Message}", $"CDB analysis of {Path.GetFileName(dump.Path)}: {ex.Message}"));
         }
     }
 

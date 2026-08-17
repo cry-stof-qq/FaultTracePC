@@ -52,7 +52,7 @@ public sealed class DumpCollector
         }
         catch (Exception ex)
         {
-            _errors.Add($"Dumps ({dir}) : {ex.Message}");
+            _errors.Add(Lang.T($"Dumps ({dir}) : {ex.Message}", $"Dumps ({dir}): {ex.Message}"));
         }
     }
 
@@ -86,7 +86,7 @@ public sealed class DumpCollector
         int read;
         using (var fs = new FileStream(info.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             read = fs.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
-        if (read < 0x60) { info.ParseError = "Fichier trop court pour contenir un en-tête."; return; }
+        if (read < 0x60) { info.ParseError = Lang.T("Fichier trop court pour contenir un en-tête.", "File too short to contain a header."); return; }
 
         uint sig = BinaryPrimitives.ReadUInt32LittleEndian(header);            // "PAGE" ou "MDMP"
         uint valid = BinaryPrimitives.ReadUInt32LittleEndian(header[4..]);     // "DU64" / "DUMP"
@@ -132,7 +132,7 @@ public sealed class DumpCollector
         }
         else
         {
-            info.ParseError = "En-tête PAGE avec sous-signature inconnue.";
+            info.ParseError = Lang.T("En-tête PAGE avec sous-signature inconnue.", "PAGE header with an unknown sub-signature.");
         }
     }
 

@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -7,6 +7,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using FaultTracePC.Core;
+using FaultTracePC.Core.Repair;
 using FaultTracePC.Core.Report;
 
 namespace FaultTracePC.App;
@@ -48,10 +49,10 @@ public partial class GuidedRepairWindow : Window
 
         foreach (var label in new[]
                  {
-                     "Créer un point de restauration (tout reste annulable)",
-                     "Examiner l'ordinateur",
-                     "Appliquer les réparations sans risque",
-                     "Vérifier si le problème a disparu",
+                     Lang.T("Créer un point de restauration (tout reste annulable)", "Create a restore point (everything stays reversible)"),
+                     Lang.T("Examiner l'ordinateur", "Examine the computer"),
+                     Lang.T("Appliquer les réparations sans risque", "Apply the risk-free repairs"),
+                     Lang.T("Vérifier si le problème a disparu", "Check whether the problem is gone"),
                  })
             _steps.Add(new StepVm(label));
     }
@@ -104,9 +105,9 @@ public partial class GuidedRepairWindow : Window
         if (RunningTools.BlockingLabel() is { } busy)
         {
             MessageBox.Show(this,
-                $"Une réparation est déjà en cours :\n\n    {busy}\n\n" +
-                "L'assistant enchaîne plusieurs réparations qui ne peuvent pas cohabiter avec celle-ci. " +
-                "Attends qu'elle se termine, puis relance.",
+                Lang.T($"Une réparation est déjà en cours :\n\n    {busy}\n\n", $"A repair is already running:") +
+                Lang.T("L'assistant enchaîne plusieurs réparations qui ne peuvent pas cohabiter avec celle-ci. ", "The assistant chains several repairs that cannot coexist with this one. ") +
+                Lang.T("Attends qu'elle se termine, puis relance.", "Wait for it to finish, then start again."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
             RunningTools.FocusBlocking();
             return;
@@ -124,14 +125,14 @@ public partial class GuidedRepairWindow : Window
         ConclusionBorder.Visibility = Visibility.Collapsed;
         TxtProposalsIntro.Visibility = Visibility.Collapsed;
         BtnStart.IsEnabled = false;
-        BtnStart.Content = "En cours…";
+        BtnStart.Content = Lang.T("En cours…", "Running…");
         var ct = _cts.Token;
 
         try
         {
             // ---------- 1. Filet de sécurité ----------
             _steps[0].Running();
-            Status("Création d'un point de restauration…", 2);
+            Status(Lang.T("Création d'un point de restauration…", "Creating a restore point…"), 2);
             var rp = await CreateRestorePointAsync(ct);
 
             if (!rp.Ok)
@@ -142,25 +143,25 @@ public partial class GuidedRepairWindow : Window
                 // et à défaut on continue — mais en ne faisant plus que ce qui n'a
                 // strictement rien à annuler.
                 var question = LooksLikeServiceDisabled(rp.Detail)
-                    ? "Aucun point de restauration n'a pu être créé : la protection du système est DÉSACTIVÉE sur cet ordinateur.\n\n"
-                      + "C'est fréquent — beaucoup de PC sortent d'usine ainsi, et certaines entreprises la désactivent.\n\n"
-                    : "Aucun point de restauration n'a pu être créé.\n\nMotif : " + rp.Detail + "\n\n";
+                    ? Lang.T("Aucun point de restauration n'a pu être créé : la protection du système est DÉSACTIVÉE sur cet ordinateur.\n\n", "No restore point could be created: system protection is DISABLED on this computer.")
+                      + Lang.T("C'est fréquent — beaucoup de PC sortent d'usine ainsi, et certaines entreprises la désactivent.\n\n", "This is common — many PCs ship this way, and some companies disable it.")
+                    : Lang.T("Aucun point de restauration n'a pu être créé.\n\nMotif : ", "No restore point could be created.\n\nReason: ") + rp.Detail + "\n\n";
 
                 var choice = MessageBox.Show(this,
                     question +
-                    "OUI — activer la protection du système, créer le point de restauration, puis continuer normalement. " +
-                    "C'est le choix recommandé : tout redevient annulable, au prix d'un peu d'espace disque.\n\n" +
-                    "NON — continuer sans filet, en mode réduit. L'assistant se limitera alors aux vérifications qui " +
-                    "ne modifient RIEN : examen, contrôle de l'image Windows en lecture seule, contrôle du disque en " +
-                    "lecture seule, fichiers temporaires. Il ne touchera pas aux fichiers système.\n\n" +
-                    "ANNULER — ne rien faire.",
-                    "FaultTracePC — pas de point de restauration",
+                    Lang.T("OUI — activer la protection du système, créer le point de restauration, puis continuer normalement. ", "YES — turn on system protection, create the restore point, then carry on normally. ") +
+                    Lang.T("C'est le choix recommandé : tout redevient annulable, au prix d'un peu d'espace disque.\n\n", "This is the recommended choice: everything becomes reversible again, at the cost of a little disk space.") +
+                    Lang.T("NON — continuer sans filet, en mode réduit. L'assistant se limitera alors aux vérifications qui ", "NO — carry on without a safety net, in reduced mode. The assistant will then limit itself to the checks that ") +
+                    Lang.T("ne modifient RIEN : examen, contrôle de l'image Windows en lecture seule, contrôle du disque en ", "change NOTHING: examination, read-only Windows image check, read-only disk ") +
+                    Lang.T("lecture seule, fichiers temporaires. Il ne touchera pas aux fichiers système.\n\n", "check, temporary files. It will not touch system files.") +
+                    Lang.T("ANNULER — ne rien faire.", "CANCEL — do nothing."),
+                    Lang.T("FaultTracePC — pas de point de restauration", "FaultTracePC — no restore point"),
                     MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Yes);
 
                 if (choice == MessageBoxResult.Cancel)
                 {
-                    _steps[0].Failed("annulé");
-                    Status("Assistant annulé.", 0);
+                    _steps[0].Failed(Lang.T("annulé", "cancelled"));
+                    Status(Lang.T("Assistant annulé.", "Assistant cancelled."), 0);
                     return;
                 }
 
@@ -173,15 +174,15 @@ public partial class GuidedRepairWindow : Window
                 else
                 {
                     _safetyNet = false;
-                    _steps[0].Skipped("sans filet : mode réduit");
-                    Log("MODE RÉDUIT : sfc et la réparation de l'image Windows sont désactivés, "
-                      + "car ils modifient des fichiers système sans possibilité de retour arrière.");
+                    _steps[0].Skipped(Lang.T("sans filet : mode réduit", "no safety net: reduced mode"));
+                    Log(Lang.T("MODE RÉDUIT : sfc et la réparation de l'image Windows sont désactivés, ", "REDUCED MODE: sfc and the Windows image repair are disabled, ")
+                      + Lang.T("car ils modifient des fichiers système sans possibilité de retour arrière.", "because they change system files with no way back."));
                     _proposals.Add(new Proposal
                     {
-                        Title = "Activer la protection du système",
-                        Why = "Sans elle, aucune réparation n'est réversible et l'assistant s'interdit de toucher aux fichiers système. "
-                            + "L'activer prend quelques secondes et réserve un peu d'espace disque.",
-                        ButtonText = "Ouvrir les réglages",
+                        Title = Lang.T("Activer la protection du système", "Turn on system protection"),
+                        Why = Lang.T("Sans elle, aucune réparation n'est réversible et l'assistant s'interdit de toucher aux fichiers système. ", "Without it no repair is reversible, and the assistant forbids itself from touching system files. ")
+                            + Lang.T("L'activer prend quelques secondes et réserve un peu d'espace disque.", "Turning it on takes a few seconds and reserves a little disk space."),
+                        ButtonText = Lang.T("Ouvrir les réglages", "Open the settings"),
                         Run = () => Open("SystemPropertiesProtection.exe"),
                     });
                 }
@@ -190,12 +191,12 @@ public partial class GuidedRepairWindow : Window
 
             // ---------- 2. Analyse initiale ----------
             _steps[1].Running();
-            Status("Examen de l'ordinateur : dumps, journaux, matériel…", 6);
+            Status(Lang.T("Examen de l'ordinateur : dumps, journaux, matériel…", "Examining the computer: dumps, logs, hardware…"), 6);
             var before = await ScanAsync(2, 26, ct);
             _reportPath = HtmlReportGenerator.WriteToDisk(before);
             BtnReport.IsEnabled = true;
             _steps[1].Done();
-            Log($"Analyse initiale : {before.Bsods.Count} crash(s), {before.Findings.Count} conclusion(s).");
+            Log(Lang.T($"Analyse initiale : {before.Bsods.Count} crash(s), {before.Findings.Count} conclusion(s).", $"Initial analysis: {before.Bsods.Count} crash(es), {before.Findings.Count} conclusion(s)."));
 
             // ---------- 3. Réparations sûres ----------
             _steps[2].Running();
@@ -204,7 +205,7 @@ public partial class GuidedRepairWindow : Window
 
             // ---------- 4. Vérification ----------
             _steps[3].Running();
-            Status("Nouvelle analyse pour vérifier…", 82);
+            Status(Lang.T("Nouvelle analyse pour vérifier…", "Running the analysis again to check…"), 82);
             var after = await ScanAsync(82, 96, ct);
             _reportPath = HtmlReportGenerator.WriteToDisk(after);
             _steps[3].Done();
@@ -212,23 +213,23 @@ public partial class GuidedRepairWindow : Window
             BuildProposals(after);
             Conclude(ToneOf(after), Sentence(before, after));
             ShowProposals();
-            Status("Terminé.", 100);
+            Status(Lang.T("Terminé.", "Done."), 100);
             OpenInBrowser(_reportPath);
         }
         catch (OperationCanceledException)
         {
-            Status("Assistant interrompu.", 0);
+            Status(Lang.T("Assistant interrompu.", "Assistant interrupted."), 0);
         }
         catch (Exception ex)
         {
-            Log("ERREUR : " + ex.Message);
-            Conclude("crit", "L'assistant s'est arrêté sur une erreur : " + ex.Message);
+            Log(Lang.T("ERREUR : ", "ERROR: ") + ex.Message);
+            Conclude("crit", Lang.T("L'assistant s'est arrêté sur une erreur : ", "The assistant stopped on an error: ") + ex.Message);
         }
         finally
         {
             _running = false;
             BtnStart.IsEnabled = true;
-            BtnStart.Content = "Relancer";
+            BtnStart.Content = Lang.T("Relancer", "Start again");
         }
     }
 
@@ -254,7 +255,7 @@ public partial class GuidedRepairWindow : Window
         bool ok = code == 0 && output.Contains("OK", StringComparison.Ordinal)
                             && !output.Contains("ECHEC", StringComparison.Ordinal);
         var detail = ok ? "" : Shorten(output);
-        Log(ok ? "Point de restauration créé." : "Point de restauration IMPOSSIBLE. Motif : " + detail);
+        Log(ok ? Lang.T("Point de restauration créé.", "Restore point created.") : Lang.T("Point de restauration IMPOSSIBLE. Motif : ", "Restore point IMPOSSIBLE. Reason: ") + detail);
         return (ok, detail);
     }
 
@@ -264,6 +265,7 @@ public partial class GuidedRepairWindow : Window
     /// d'entreprise — et il se corrige en quelques secondes.
     /// </summary>
     private static bool LooksLikeServiceDisabled(string detail) =>
+        // pas-de-traduction : fragment de la sortie de Windows, pas de la nôtre.
         detail.Contains("désactivé", StringComparison.OrdinalIgnoreCase)
         || detail.Contains("disabled", StringComparison.OrdinalIgnoreCase)
         || detail.Contains("0x80070422", StringComparison.OrdinalIgnoreCase);
@@ -276,7 +278,7 @@ public partial class GuidedRepairWindow : Window
     /// </summary>
     private async Task<bool> EnableSystemProtectionAsync(CancellationToken ct)
     {
-        Status("Activation de la protection du système…", 3);
+        Status(Lang.T("Activation de la protection du système…", "Turning on system protection…"), 3);
         const string cmd =
             "$ok=$true;" +
             "foreach($s in 'VSS','swprv','SDRSVC'){try{Set-Service -Name $s -StartupType Manual -ErrorAction Stop}catch{$ok=$false}};" +
@@ -285,7 +287,7 @@ public partial class GuidedRepairWindow : Window
             "if($ok){Write-Output 'OK'}";
         var (_, outp) = await RunPsAsync(cmd, ct, TimeSpan.FromMinutes(3));
         bool ok = outp.Contains("OK", StringComparison.Ordinal) && !outp.Contains("ECHEC", StringComparison.Ordinal);
-        Log(ok ? "Protection du système activée." : "Activation refusée : " + Shorten(outp));
+        Log(ok ? Lang.T("Protection du système activée.", "System protection turned on.") : Lang.T("Activation refusée : ", "Activation refused: ") + Shorten(outp));
         return ok;
     }
 
@@ -301,37 +303,99 @@ public partial class GuidedRepairWindow : Window
         // On s'en abstient donc plutôt que de pratiquer un irréversible discret.
         if (!_safetyNet)
         {
-            Log("sfc ignoré (mode réduit) : il modifie des fichiers système et rien ne serait annulable.");
-            Status("Mode réduit : les fichiers système ne sont pas touchés.", 30);
+            Log(Lang.T("sfc ignoré (mode réduit) : il modifie des fichiers système et rien ne serait annulable.", "sfc skipped (reduced mode): it changes system files and nothing would be reversible."));
+            Status(Lang.T("Mode réduit : les fichiers système ne sont pas touchés.", "Reduced mode: system files are left alone."), 30);
         }
         else
         {
-            Status("Vérification des fichiers système (sfc)… 5 à 15 minutes.", 30);
+            Status(Lang.T("Vérification des fichiers système (sfc)… 5 à 15 minutes.", "Checking the system files (sfc)… 5 to 15 minutes."), 30);
             // sfc écrit sa sortie en UTF-16 quand elle est redirigée : sans cet
             // encodage explicite, on ne lit qu'un texte truffé de caractères nuls.
             var (_, sfc) = await RunHiddenAsync("sfc.exe", "/scannow", ct, TimeSpan.FromMinutes(30), Encoding.Unicode);
-            bool sfcRepaired = sfc.Contains("réparé", StringComparison.OrdinalIgnoreCase)
-                            || sfc.Contains("repaired", StringComparison.OrdinalIgnoreCase);
-            Log(sfcRepaired ? "sfc : des fichiers ont été réparés." : "sfc : terminé.");
+            switch (RepairOutput.ReadSfc(sfc))
+            {
+                case SfcResult.Repaired:
+                    Log(Lang.T("sfc : des fichiers système endommagés ont été trouvés et réparés.", "sfc: damaged system files were found and repaired."));
+                    break;
+
+                case SfcResult.NoViolations:
+                    Log(Lang.T("sfc : aucun fichier système endommagé.", "sfc: no damaged system file."));
+                    break;
+
+                case SfcResult.RepairIncomplete:
+                    // Le cas que la version précédente confondait avec un succès.
+                    Log(Lang.T("sfc : des fichiers endommagés n'ont PAS pu être réparés.", "sfc: damaged files could NOT be repaired."));
+                    _proposals.Add(new Proposal
+                    {
+                        Title = Lang.T("Des fichiers système restent endommagés", "Some system files are still damaged"),
+                        Why = Lang.T("sfc a trouvé des fichiers système endommagés et n'a pas pu tous les réparer. ", "sfc found damaged system files and could not repair them all. ")
+                            + Lang.T("C'est presque toujours que l'image de référence dans laquelle il puise ses fichiers sains ", "Almost always this means the reference image it draws its healthy files from ")
+                            + Lang.T("est elle-même abîmée : il faut donc réparer l'image (DISM) PUIS relancer sfc, dans cet ordre. ", "is itself damaged: the image must therefore be repaired (DISM) THEN sfc run again, in that order. ")
+                            + Lang.T("Le détail des fichiers concernés est écrit dans %windir%\\Logs\\CBS\\CBS.log.", "The list of affected files is written to %windir%\\Logs\\CBS\\CBS.log."),
+                        ButtonText = Lang.T("Relancer sfc en visible", "Run sfc in a visible window"),
+                        Run = () => Launch("sfc /scannow"),
+                    });
+                    break;
+
+                case SfcResult.CouldNotRun:
+                    Log(Lang.T("sfc n'a pas pu s'exécuter — son compte rendu figure dans le journal ci-dessus.", "sfc could not run — its output appears in the log above."));
+                    break;
+
+                default:
+                    // On ne conclut RIEN. Annoncer « terminé » sur un compte rendu
+                    // qu'on n'a pas su lire, c'est présenter une machine peut-être
+                    // abîmée comme saine.
+                    Log(Lang.T("sfc a terminé, mais son compte rendu n'a pas pu être lu : aucune conclusion sur les fichiers système.", "sfc finished, but its output could not be read: no conclusion about the system files."));
+                    _proposals.Add(new Proposal
+                    {
+                        Title = Lang.T("Vérifier les fichiers système soi-même", "Check the system files yourself"),
+                        Why = Lang.T("La vérification a bien été exécutée, mais l'assistant n'a pas su lire sa conclusion — ", "The check did run, but the assistant could not read its conclusion — ")
+                            + Lang.T("Windows l'écrit dans sa langue d'affichage, et celle-ci ne fait pas partie de celles qu'il sait analyser. ", "Windows writes it in its display language, and that language is not one it can parse. ")
+                            + Lang.T("Plutôt que d'affirmer que tout va bien sans l'avoir lu, il ne conclut pas.", "Rather than claiming all is well without having read it, it draws no conclusion."),
+                        ButtonText = Lang.T("Relancer sfc en visible", "Run sfc in a visible window"),
+                        Run = () => Launch("sfc /scannow"),
+                    });
+                    break;
+            }
         }
 
         // --- Image Windows : on MESURE avant de réparer ---
-        Status("Contrôle de l'image Windows (lecture seule)… 5 minutes.", 45);
-        var (_, scan) = await RunPsAsync("DISM /Online /Cleanup-Image /ScanHealth | Out-String", ct, TimeSpan.FromMinutes(30));
-        bool corrupt = scan.Contains("réparable", StringComparison.OrdinalIgnoreCase)
-                    || scan.Contains("repairable", StringComparison.OrdinalIgnoreCase)
-                    || scan.Contains("est endommagé", StringComparison.OrdinalIgnoreCase);
+        Status(Lang.T("Contrôle de l'image Windows (lecture seule)… 5 minutes.", "Checking the Windows image (read-only)… 5 minutes."), 45);
+        var scan = await RunDismAsync("/Online /Cleanup-Image /ScanHealth", ct, TimeSpan.FromMinutes(30));
+        var image = RepairOutput.ReadImageScan(scan);
+        bool corrupt = image is ImageHealth.Repairable or ImageHealth.NotRepairable;
 
-        if (corrupt && !_safetyNet)
+        if (image == ImageHealth.Unreadable)
         {
-            Log("Corruption détectée, mais réparation ignorée (mode réduit) : elle modifie l'image Windows.");
+            Log(Lang.T("DISM : compte rendu illisible — aucune conclusion sur l'image Windows.", "DISM: unreadable output — no conclusion about the Windows image."));
             _proposals.Add(new Proposal
             {
-                Title = "Réparer l'image Windows",
-                Why = "Le contrôle en lecture seule a trouvé une corruption de l'image Windows. La réparation la corrigerait, "
-                    + "mais l'assistant ne l'a pas lancée : sans point de restauration, elle ne serait pas annulable. "
-                    + "Active la protection du système, puis relance l'assistant — ou lance la réparation en connaissance de cause.",
-                ButtonText = "Réparer maintenant",
+                Title = Lang.T("Vérifier l'image Windows soi-même", "Check the Windows image yourself"),
+                Why = Lang.T("Le contrôle a bien été exécuté, mais l'assistant n'a pas su lire sa conclusion. ", "The check did run, but the assistant could not read its conclusion. ")
+                    + Lang.T("Il ne lancera donc aucune réparation : la déclencher sans avoir lu le diagnostic serait ", "It will therefore start no repair: triggering one without having read the diagnosis would be ")
+                    + Lang.T("aussi faux que d'annoncer une image saine. La commande ci-dessous ne modifie rien, ", "as wrong as announcing a healthy image. The command below changes nothing, ")
+                    + Lang.T("elle affiche le résultat à lire directement.", "it shows the result to read directly."),
+                ButtonText = Lang.T("Lancer le contrôle en visible", "Run the check in a visible window"),
+                Run = () => Launch("DISM /Online /Cleanup-Image /ScanHealth"),
+            });
+        }
+        else if (image == ImageHealth.NotRepairable)
+        {
+            // Windows le dit lui-même : inutile de faire tourner /RestoreHealth
+            // vingt minutes pour se voir opposer le même refus.
+            Log(Lang.T("DISM : l'image Windows est endommagée et se déclare NON réparable par ce moyen.", "DISM: the Windows image is damaged and reports itself NOT repairable this way."));
+            _proposals.Add(SourceLocaleProposal());
+        }
+        else if (corrupt && !_safetyNet)
+        {
+            Log(Lang.T("Corruption détectée, mais réparation ignorée (mode réduit) : elle modifie l'image Windows.", "Corruption found, but the repair was skipped (reduced mode): it changes the Windows image."));
+            _proposals.Add(new Proposal
+            {
+                Title = Lang.T("Réparer l'image Windows", "Repair the Windows image"),
+                Why = Lang.T("Le contrôle en lecture seule a trouvé une corruption de l'image Windows. La réparation la corrigerait, ", "The read-only check found corruption in the Windows image. The repair would fix it, ")
+                    + Lang.T("mais l'assistant ne l'a pas lancée : sans point de restauration, elle ne serait pas annulable. ", "but the assistant did not start it: without a restore point it would not be reversible. ")
+                    + Lang.T("Active la protection du système, puis relance l'assistant — ou lance la réparation en connaissance de cause.", "Turn on system protection, then run the assistant again — or start the repair knowing what it means."),
+                ButtonText = Lang.T("Réparer maintenant", "Repair now"),
                 Run = () => Launch("DISM /Online /Cleanup-Image /RestoreHealth"),
             });
         }
@@ -340,61 +404,57 @@ public partial class GuidedRepairWindow : Window
             // Réparation lancée d'office : à ce stade c'est le correctif correct, et
             // la question « faut-il réparer le magasin de composants ? » n'a pas de
             // sens pour la personne à qui cet assistant s'adresse.
-            Status("Corruption détectée — réparation de l'image Windows… 15 à 20 minutes.", 55);
-            var (_, restore) = await RunPsAsync("DISM /Online /Cleanup-Image /RestoreHealth | Out-String", ct, TimeSpan.FromMinutes(45));
-            bool ok = restore.Contains("terminée", StringComparison.OrdinalIgnoreCase)
-                   || restore.Contains("completed successfully", StringComparison.OrdinalIgnoreCase);
-            Log(ok ? "DISM : image Windows réparée." : "DISM : la réparation n'a pas abouti. " + Shorten(restore));
-            if (!ok)
-                _proposals.Add(new Proposal
-                {
-                    Title = "Réparer l'image Windows depuis une source locale",
-                    Why = "La réparation automatique n'a pas abouti — le plus souvent parce que la machine n'a pas accès à Windows Update, "
-                        + "ou parce qu'un serveur de mises à jour d'entreprise (WSUS) filtre les téléchargements. "
-                        + "La solution est de fournir à DISM une image d'installation Windows locale avec l'option /Source.",
-                    ButtonText = "Voir la marche à suivre",
-                    Run = () => MessageBox.Show(this,
-                        "1) Télécharger l'ISO de la MÊME version de Windows que celle installée.\n" +
-                        "2) Faire un double-clic dessus pour la monter (elle apparaît comme un lecteur, par exemple D:).\n" +
-                        "3) Dans un terminal administrateur :\n\n" +
-                        "    DISM /Online /Cleanup-Image /RestoreHealth /Source:WIM:D:\\sources\\install.wim:1 /LimitAccess\n\n" +
-                        "En remplaçant D: par la lettre du lecteur monté.",
-                        "Réparer depuis une source locale", MessageBoxButton.OK, MessageBoxImage.Information),
-                });
+            Status(Lang.T("Corruption détectée — réparation de l'image Windows… 15 à 20 minutes.", "Corruption found — repairing the Windows image… 15 to 20 minutes."), 55);
+            var restore = await RunDismAsync("/Online /Cleanup-Image /RestoreHealth", ct, TimeSpan.FromMinutes(45));
+            var issue = RepairOutput.ReadImageRepair(restore);
+            Log(issue switch
+            {
+                ImageRepair.Completed => Lang.T("DISM : image Windows réparée.", "DISM: Windows image repaired."),
+                ImageRepair.Failed => Lang.T("DISM : la réparation n'a pas abouti. ", "DISM: the repair did not succeed. ") + Shorten(restore),
+                _ => Lang.T("DISM : compte rendu de réparation illisible — je ne peux pas affirmer qu'elle a abouti. ", "DISM: unreadable repair output — I cannot state that it succeeded. ") + Shorten(restore),
+            });
+            // Illisible est traité comme un échec : proposer la marche à suivre ne
+            // coûte rien, laisser croire à une réparation réussie coûte cher.
+            if (issue != ImageRepair.Completed)
+                _proposals.Add(SourceLocaleProposal());
         }
         else
         {
-            Log("DISM : aucune corruption détectée — réparation inutile, elle est sautée (20 minutes économisées).");
-            Status("Image Windows saine — réparation inutile.", 55);
+            Log(Lang.T("DISM : aucune corruption détectée — réparation inutile, elle est sautée (20 minutes économisées).", "DISM: no corruption found — the repair is pointless and is skipped (20 minutes saved)."));
+            Status(Lang.T("Image Windows saine — réparation inutile.", "Windows image healthy — repair unnecessary."), 55);
         }
 
         // --- Disque, en LECTURE SEULE ---
-        Status("Contrôle du disque système (lecture seule)…", 66);
+        Status(Lang.T("Contrôle du disque système (lecture seule)…", "Checking the system disk (read-only)…"), 66);
         var (_, vol) = await RunPsAsync("Repair-Volume -DriveLetter C -Scan | Out-String", ct, TimeSpan.FromMinutes(20));
-        bool diskNeedsFix = vol.Contains("NeedsScan", StringComparison.OrdinalIgnoreCase)
-                         || vol.Contains("SpotFixNeeded", StringComparison.OrdinalIgnoreCase)
-                         || vol.Contains("FullRepairNeeded", StringComparison.OrdinalIgnoreCase);
-        Log(diskNeedsFix ? "Disque : des corrections sont nécessaires." : "Disque : aucune anomalie signalée.");
+        var volume = RepairOutput.ReadVolumeScan(vol);
+        bool diskNeedsFix = volume == VolumeScan.NeedsRepair;
+        Log(volume switch
+        {
+            VolumeScan.NeedsRepair => Lang.T("Disque : des corrections sont nécessaires.", "Disk: corrections are needed."),
+            VolumeScan.NoErrors => Lang.T("Disque : aucune anomalie signalée.", "Disk: no anomaly reported."),
+            _ => Lang.T("Disque : compte rendu illisible — aucune conclusion sur le système de fichiers.", "Disk: unreadable output — no conclusion about the file system."),
+        });
         if (diskNeedsFix)
             _proposals.Add(new Proposal
             {
-                Title = "Corriger le disque système",
-                Why = "Le contrôle en lecture seule a trouvé des anomalies sur le disque. La correction ne peut se faire "
-                    + "qu'au démarrage, avant le chargement de Windows : elle exige donc un redémarrage, et peut durer longtemps. "
-                    + "C'est pour cette raison que l'assistant ne la lance pas de lui-même.",
-                ButtonText = "Planifier au redémarrage",
+                Title = Lang.T("Corriger le disque système", "Fix the system disk"),
+                Why = Lang.T("Le contrôle en lecture seule a trouvé des anomalies sur le disque. La correction ne peut se faire ", "The read-only check found anomalies on the disk. The fix can only run ")
+                    + Lang.T("qu'au démarrage, avant le chargement de Windows : elle exige donc un redémarrage, et peut durer longtemps. ", "at boot, before Windows loads: it therefore requires a restart, and can take a long time. ")
+                    + Lang.T("C'est pour cette raison que l'assistant ne la lance pas de lui-même.", "That is why the assistant does not start it by itself."),
+                ButtonText = Lang.T("Planifier au redémarrage", "Schedule at restart"),
                 Run = () => Launch("chkdsk C: /f"),
             });
 
         // --- Fichiers temporaires ---
-        Status("Vidage des fichiers temporaires…", 74);
+        Status(Lang.T("Vidage des fichiers temporaires…", "Emptying the temporary files…"), 74);
         var (_, tmp) = await RunPsAsync(
             "$b=(Get-ChildItem $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue|Measure-Object -Property Length -Sum).Sum;" +
             "Get-ChildItem $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue|Remove-Item -Recurse -Force -ErrorAction SilentlyContinue;" +
             "$a=(Get-ChildItem $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue|Measure-Object -Property Length -Sum).Sum;" +
             "Write-Output ('LIBERE:'+[math]::Round((($b-$a)/1MB),1))", ct, TimeSpan.FromMinutes(15));
         var freed = System.Text.RegularExpressions.Regex.Match(tmp, @"LIBERE:([\d.,]+)");
-        Log(freed.Success ? $"Fichiers temporaires : {freed.Groups[1].Value} Mo libérés." : "Fichiers temporaires : vidés.");
+        Log(freed.Success ? Lang.T($"Fichiers temporaires : {freed.Groups[1].Value} Mo libérés.", $"Temporary files: {freed.Groups[1].Value} MB freed.") : Lang.T("Fichiers temporaires : vidés.", "Temporary files: emptied."));
     }
 
     // ==================================================================
@@ -409,38 +469,38 @@ public partial class GuidedRepairWindow : Window
         if (driverFinding is not null)
             _proposals.Add(new Proposal
             {
-                Title = "Traiter le pilote mis en cause",
+                Title = Lang.T("Traiter le pilote mis en cause", "Deal with the driver named"),
                 Why = driverFinding.Recommendation.Length > 0 ? driverFinding.Recommendation : driverFinding.Details,
-                ButtonText = "Ouvrir le rapport",
+                ButtonText = Lang.T("Ouvrir le rapport", "Open the report"),
                 Run = () => OpenInBrowser(_reportPath),
             });
 
         if (after.Findings.Any(f => f.Category == FaultCategory.Memory && f.Severity == Severity.Critical))
             _proposals.Add(new Proposal
             {
-                Title = "Tester la mémoire (RAM)",
-                Why = "L'analyse pointe vers la mémoire. Le test redémarre immédiatement l'ordinateur et l'occupe "
-                    + "plusieurs dizaines de minutes : impossible de le lancer sans ton accord. Enregistre ton travail avant.",
-                ButtonText = "Lancer le test",
+                Title = Lang.T("Tester la mémoire (RAM)", "Test the memory (RAM)"),
+                Why = Lang.T("L'analyse pointe vers la mémoire. Le test redémarre immédiatement l'ordinateur et l'occupe ", "The analysis points to the memory. The test restarts the computer immediately and keeps it busy ")
+                    + Lang.T("plusieurs dizaines de minutes : impossible de le lancer sans ton accord. Enregistre ton travail avant.", "for several tens of minutes: it cannot be started without your agreement. Save your work first."),
+                ButtonText = Lang.T("Lancer le test", "Start the test"),
                 Run = () => Launch("mdsched.exe"),
             });
 
         if (after.System.Disks.Any(d => d.Smart is { } s && (s.BadSectors > 0 || s.SpareExhausted || s.PredictedFailure == true)))
             _proposals.Add(new Proposal
             {
-                Title = "Sauvegarder tes fichiers sans attendre",
-                Why = "Le disque signale une dégradation. Aucune réparation logicielle ne corrige cela : ce qui compte "
-                    + "maintenant est de mettre les fichiers importants à l'abri avant d'envisager un remplacement.",
-                ButtonText = "Ouvrir la sauvegarde",
+                Title = Lang.T("Sauvegarder tes fichiers sans attendre", "Back up your files right away"),
+                Why = Lang.T("Le disque signale une dégradation. Aucune réparation logicielle ne corrige cela : ce qui compte ", "The disk is reporting degradation. No software repair fixes that: what matters ")
+                    + Lang.T("maintenant est de mettre les fichiers importants à l'abri avant d'envisager un remplacement.", "now is getting the important files to safety before considering a replacement."),
+                ButtonText = Lang.T("Ouvrir la sauvegarde", "Open Backup"),
                 Run = () => Open("control.exe", "/name Microsoft.BackupAndRestoreCenter"),
             });
 
         _proposals.Add(new Proposal
         {
-            Title = "Installer les mises à jour Windows en attente",
-            Why = "Les mises à jour, notamment celles de pilotes, corrigent une grande part des plantages. "
-                + "L'assistant ne les installe pas seul : certaines demandent un redémarrage, et c'est à toi de choisir quand.",
-            ButtonText = "Voir les mises à jour",
+            Title = Lang.T("Installer les mises à jour Windows en attente", "Install the pending Windows updates"),
+            Why = Lang.T("Les mises à jour, notamment celles de pilotes, corrigent une grande part des plantages. ", "Updates, driver updates above all, fix a large share of crashes. ")
+                + Lang.T("L'assistant ne les installe pas seul : certaines demandent un redémarrage, et c'est à toi de choisir quand.", "The assistant does not install them on its own: some require a restart, and when is your call."),
+            ButtonText = Lang.T("Voir les mises à jour", "See the updates"),
             Run = () => new WindowsUpdateWindow { Owner = this }.Show(),
         });
     }
@@ -455,24 +515,32 @@ public partial class GuidedRepairWindow : Window
         var crit = after.Findings.Where(f => f.Severity == Severity.Critical).ToList();
 
         if (crit.Count == 0 && after.Bsods.Count == 0)
-            return "Aucun problème sérieux détecté. L'ordinateur a été vérifié et nettoyé ; si des ralentissements ou des blocages "
-                 + "persistent, active la surveillance en temps réel : elle enregistrera ce qui se passe juste avant le prochain incident.";
+            return Lang.T("Aucun problème sérieux détecté. L'ordinateur a été vérifié et nettoyé ; si des ralentissements ou des blocages ", "No serious problem found. The computer was checked and cleaned; if slowdowns or freezes ")
+                 + Lang.T("persistent, active la surveillance en temps réel : elle enregistrera ce qui se passe juste avant le prochain incident.", "persist, turn on real-time monitoring: it will record what happens just before the next incident.");
 
-        var driver = crit.FirstOrDefault(f => f.Category == FaultCategory.Driver);
+        // Le nom du pilote se lit dans Subject, posé par le moteur de règles.
+        // Le reconstituer en découpant Title reviendrait à décider sur du texte
+        // traduit : le découpage tomberait à côté dès que la langue change.
+        var driver = crit.FirstOrDefault(f => f.Code == "driver.identified")
+                  ?? crit.FirstOrDefault(f => f.Category == FaultCategory.Driver);
         if (driver is not null)
-            return $"La cause la plus probable est un pilote : {driver.Title.Replace("Pilote fautif identifié", "").Trim(' ', ':', '(', ')')}. "
-                 + "Les réparations sans risque ont été appliquées ; le traitement de ce pilote demande ton accord, il est proposé ci-dessous.";
+        {
+            var name = driver.Subject.Length > 0 ? driver.Subject : driver.Title;
+            return Lang.T($"La cause la plus probable est un pilote : {name}. ", $"The most likely cause is a driver: {name}. ")
+                 + Lang.T("Les réparations sans risque ont été appliquées ; le traitement de ce pilote demande ton accord, il est proposé ci-dessous.",
+                          "The risk-free repairs have been applied; dealing with this driver needs your agreement, and is offered below.");
+        }
 
         if (crit.Any(f => f.Category == FaultCategory.Storage))
-            return "Le disque montre des signes de faiblesse. Aucune réparation logicielle ne corrige cela : sauvegarde tes fichiers "
-                 + "sans attendre, puis fais remplacer le disque.";
+            return Lang.T("Le disque montre des signes de faiblesse. Aucune réparation logicielle ne corrige cela : sauvegarde tes fichiers ", "The disk is showing signs of weakness. No software repair fixes that: back up your files ")
+                 + Lang.T("sans attendre, puis fais remplacer le disque.", "right away, then have the disk replaced.");
 
         if (crit.Any(f => f.Category == FaultCategory.Hardware || f.Category == FaultCategory.Memory))
-            return "Les symptômes pointent vers le matériel, pas vers un logiciel : les réparations appliquées n'y changeront rien. "
-                 + "Les vérifications à faire sont proposées ci-dessous.";
+            return Lang.T("Les symptômes pointent vers le matériel, pas vers un logiciel : les réparations appliquées n'y changeront rien. ", "The symptoms point to the hardware, not to software: the repairs applied will change nothing there. ")
+                 + Lang.T("Les vérifications à faire sont proposées ci-dessous.", "The checks worth doing are offered below.");
 
-        return $"{crit.Count} problème(s) sérieux subsistent après les réparations automatiques. "
-             + "Le rapport complet les détaille, et les actions qui demandent ton accord sont proposées ci-dessous.";
+        return Lang.T($"{crit.Count} problème(s) sérieux subsistent après les réparations automatiques. ", $"{crit.Count} serious problem(s) remain after the automatic repairs. ")
+             + Lang.T("Le rapport complet les détaille, et les actions qui demandent ton accord sont proposées ci-dessous.", "The full report details them, and the actions needing your agreement are offered below.");
     }
 
     // ==================================================================
@@ -487,6 +555,50 @@ public partial class GuidedRepairWindow : Window
     /// sortie devient « le service est d‚sactiv‚ ». Un message d'erreur illisible au
     /// moment précis où l'utilisateur en a besoin, c'est pire que pas de message.
     /// </summary>
+    /// <summary>
+    /// Marche à suivre quand la réparation par Windows Update est hors de portée :
+    /// fournir soi-même une image d'installation. Le cas est fréquent en
+    /// établissement, où les postes n'atteignent pas Windows Update directement.
+    /// </summary>
+    private Proposal SourceLocaleProposal() => new()
+    {
+        Title = Lang.T("Réparer l'image Windows depuis une source locale", "Repair the Windows image from a local source"),
+        Why = Lang.T("La réparation automatique n'a pas abouti — le plus souvent parce que la machine n'a pas accès à Windows Update, ", "The automatic repair did not succeed — most often because the machine cannot reach Windows Update, ")
+            + Lang.T("ou parce qu'un serveur de mises à jour d'entreprise (WSUS) filtre les téléchargements. ", "or because a corporate update server (WSUS) is filtering the downloads. ")
+            + Lang.T("La solution est de fournir à DISM une image d'installation Windows locale avec l'option /Source.", "The answer is to give DISM a local Windows installation image through the /Source option."),
+        ButtonText = Lang.T("Voir la marche à suivre", "See how to do it"),
+        Run = () => MessageBox.Show(this,
+            Lang.T("1) Télécharger l'ISO de la MÊME version de Windows que celle installée.\n", "1) Download the ISO of the SAME Windows version as the one installed.\n") +
+            Lang.T("2) Faire un double-clic dessus pour la monter (elle apparaît comme un lecteur, par exemple D:).\n", "2) Double-click it to mount it (it shows up as a drive, D: for example).\n") +
+            Lang.T("3) Dans un terminal administrateur :\n\n", "3) In an administrator terminal:\n\n") +
+            "    DISM /Online /Cleanup-Image /RestoreHealth /Source:WIM:D:\\sources\\install.wim:1 /LimitAccess\n\n" +
+            Lang.T("En remplaçant D: par la lettre du lecteur monté.", "Replacing D: with the letter of the mounted drive."),
+            Lang.T("Réparer depuis une source locale", "Repair from a local source"), MessageBoxButton.OK, MessageBoxImage.Information),
+    };
+
+    /// <summary>
+    /// Exécute DISM en forçant sa sortie en anglais (/English, option globale
+    /// documentée). Ce n'est pas un choix d'affichage : c'est le seul moyen de
+    /// rendre le compte rendu lisible PAR LE PROGRAMME quelle que soit la langue
+    /// du poste. Là où c'est un HUMAIN qui lit — la boîte à outils, qui ouvre une
+    /// console visible — l'option n'est surtout pas ajoutée : la sortie doit alors
+    /// être dans la langue de la personne.
+    ///
+    /// La documentation Microsoft prévient que « certaines ressources ne peuvent
+    /// pas être affichées en anglais » : la lecture reconnaît donc encore le
+    /// français, et sait dire qu'elle n'a pas su lire.
+    /// </summary>
+    private async Task<string> RunDismAsync(string args, CancellationToken ct, TimeSpan timeout)
+    {
+        var (_, output) = await RunPsAsync($"DISM {args} /English | Out-String", ct, timeout);
+        if (RepairOutput.RejectedEnglishOption(output))
+        {
+            Log(Lang.T("DISM a refusé l'option /English : nouvelle tentative sans elle.", "DISM refused the /English option: trying again without it."));
+            (_, output) = await RunPsAsync($"DISM {args} | Out-String", ct, timeout);
+        }
+        return output;
+    }
+
     private Task<(int Code, string Output)> RunPsAsync(string command, CancellationToken ct, TimeSpan timeout) =>
         RunHiddenAsync("powershell.exe",
             "-NoProfile -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; "
@@ -506,7 +618,7 @@ public partial class GuidedRepairWindow : Window
         };
         if (encoding is not null) { psi.StandardOutputEncoding = encoding; psi.StandardErrorEncoding = encoding; }
 
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException($"Impossible de lancer {file}.");
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException(Lang.T($"Impossible de lancer {file}.", $"Cannot start {file}."));
         var sb = new StringBuilder();
         var outTask = p.StandardOutput.ReadToEndAsync(ct);
         var errTask = p.StandardError.ReadToEndAsync(ct);
@@ -517,7 +629,7 @@ public partial class GuidedRepairWindow : Window
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             try { p.Kill(entireProcessTree: true); } catch { }
-            Log($"  (délai dépassé après {timeout.TotalMinutes:0} min — étape abandonnée)");
+            Log(Lang.T($"  (délai dépassé après {timeout.TotalMinutes:0} min — étape abandonnée)", $"  (timed out after {timeout.TotalMinutes:0} min — step abandoned)"));
             return (-1, "");
         }
 
@@ -584,8 +696,8 @@ public partial class GuidedRepairWindow : Window
     {
         if (!_running) return;
         var r = MessageBox.Show(this,
-            "L'assistant est en cours. Interrompre maintenant peut laisser une réparation à moitié faite.\n\n" +
-            "Fermer quand même ?",
+            Lang.T("L'assistant est en cours. Interrompre maintenant peut laisser une réparation à moitié faite.\n\n", "The assistant is running. Stopping now can leave a repair half done.\n\n") +
+            Lang.T("Fermer quand même ?", "Close anyway?"),
             "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (r != MessageBoxResult.Yes) { e.Cancel = true; return; }
         _cts?.Cancel();
@@ -602,20 +714,20 @@ public partial class GuidedRepairWindow : Window
                 UseShellExecute = true,
             });
         }
-        catch (Exception ex) { Log("Impossible de lancer la commande : " + ex.Message); }
+        catch (Exception ex) { Log(Lang.T("Impossible de lancer la commande : ", "Cannot start the command: ") + ex.Message); }
     }
 
     private void Open(string file, string args = "")
     {
         try { Process.Start(new ProcessStartInfo(file, args) { UseShellExecute = true }); }
-        catch (Exception ex) { Log($"Impossible d'ouvrir {file} : {ex.Message}"); }
+        catch (Exception ex) { Log(Lang.T($"Impossible d'ouvrir {file} : {ex.Message}", $"Cannot open {file}: {ex.Message}")); }
     }
 
     private void OpenInBrowser(string? path)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-        catch (Exception ex) { Log("Impossible d'ouvrir le rapport : " + ex.Message); }
+        catch (Exception ex) { Log(Lang.T("Impossible d'ouvrir le rapport : ", "Cannot open the report: ") + ex.Message); }
     }
 
     private static string Shorten(string s)

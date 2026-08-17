@@ -56,7 +56,7 @@ public sealed class BatteryCollector
         }
         catch (Exception ex)
         {
-            _errors.Add($"Batterie : {ex.Message}");
+            _errors.Add(Lang.T($"Batterie : {ex.Message}", $"Battery: {ex.Message}"));
         }
         return result;
     }
@@ -86,17 +86,17 @@ public sealed class BatteryCollector
 
     private static string ChemistryLabel(object? value) => Convert.ToInt32(value ?? 0) switch
     {
-        3 => "Plomb", 4 => "Nickel-Cadmium", 5 => "Nickel-Hydrure métallique",
-        6 => "Lithium-ion", 7 => "Zinc-air", 8 => "Lithium-polymère",
+        3 => Lang.T("Plomb", "Lead acid"), 4 => "Nickel-Cadmium", 5 => Lang.T("Nickel-Hydrure métallique", "Nickel metal hydride"),
+        6 => "Lithium-ion", 7 => Lang.T("Zinc-air", "Zinc air"), 8 => Lang.T("Lithium-polymère", "Lithium polymer"),
         _ => "",
     };
 
     private static string StatusLabel(object? value) => Convert.ToInt32(value ?? 0) switch
     {
-        1 => "Sur batterie", 2 => "Sur secteur", 3 => "Pleine charge",
-        4 => "Faible", 5 => "Critique", 6 => "En charge",
-        7 => "En charge (élevée)", 8 => "En charge (faible)", 9 => "En charge (critique)",
-        10 => "Indéterminé", 11 => "Partiellement chargée",
+        1 => Lang.T("Sur batterie", "On battery"), 2 => Lang.T("Sur secteur", "On mains"), 3 => Lang.T("Pleine charge", "Fully charged"),
+        4 => Lang.T("Faible", "Low"), 5 => Lang.T("Critique", "Critical"), 6 => Lang.T("En charge", "Charging"),
+        7 => Lang.T("En charge (élevée)", "Charging (high)"), 8 => Lang.T("En charge (faible)", "Charging (low)"), 9 => Lang.T("En charge (critique)", "Charging (critical)"),
+        10 => Lang.T("Indéterminé", "Undetermined"), 11 => Lang.T("Partiellement chargée", "Partly charged"),
         _ => "",
     };
 }

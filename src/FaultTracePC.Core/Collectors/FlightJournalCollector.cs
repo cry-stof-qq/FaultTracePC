@@ -102,7 +102,7 @@ public sealed class FlightJournalCollector
         }
         catch (Exception ex)
         {
-            _errors.Add($"Boîte noire (lecture du journal) : {ex.Message}");
+            _errors.Add(Lang.T($"Boîte noire (lecture du journal) : {ex.Message}", $"Flight recorder (reading the log): {ex.Message}"));
         }
         return info;
     }

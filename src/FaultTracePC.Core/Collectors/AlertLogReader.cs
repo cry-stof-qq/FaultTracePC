@@ -33,8 +33,11 @@ public static class AlertLogReader
         }
         catch (Exception ex)
         {
-            errors?.Add($"Journal des alertes : {ex.Message}");
+            errors?.Add(Lang.T($"Journal des alertes : {ex.Message}", $"Alerts log: {ex.Message}"));
         }
+        // Le texte du fichier est celui de la langue en vigueur à l'écriture.
+        // On le refabrique dans la langue en cours quand c'est possible.
+        AlertCatalog.LocalizeAll(result);
         return result.OrderByDescending(a => a.Time).ToList();
     }
 
@@ -71,6 +74,7 @@ public static class AlertLogReader
             }
         }
         catch { }
+        AlertCatalog.LocalizeAll(result);
         return result.OrderBy(a => a.Time).ToList();
     }
 }

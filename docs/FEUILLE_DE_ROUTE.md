@@ -1,6 +1,6 @@
-# FaultTracePC — feuille de route
+﻿# FaultTracePC — feuille de route
 
-État au 15/08/2026. Document de travail, pas un engagement.
+État au 17/08/2026. Document de travail, pas un engagement.
 
 ## Où on en est
 
@@ -8,6 +8,13 @@
 |---|---|
 | 1.2.2 | **publiée** — MSI + ZIP + sommes de contrôle |
 | 1.2.3 | construite, 138 tests verts, poussée — **non publiée** |
+| 1.3.0 | version bilingue FR/EN, 250 tests verts — **non publiée** |
+
+**Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
+
+**Reporté de la 1.3.0 en 1.4.0**, décidé le 17/08/2026 : donner un identifiant stable aux 32 conclusions du moteur de règles, pour que `Historique\*.json` cesse de stocker des titres en clair — la console de parc les réaffiche, et une console anglaise lit donc des titres français. C'est un contrat entre versions, pas un rangement.
+
+**Reporté de la 1.3.0 en 1.4.0**, décidé le 17/08/2026 : persister le rapport complet (JSON à côté du HTML) pour pouvoir le régénérer dans une autre langue — ou avec un générateur plus récent. Écarté de la 1.3 parce que le déclencheur n'existe pas : `Lang.Apply` n'est appelé nulle part à l'exécution, la langue est fixée au démarrage et le sélecteur redémarre l'application. Une régénération « si la langue a changé » serait du code mort.
 
 ---
 
@@ -26,11 +33,11 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | # | Sujet | Pourquoi ça compte | Difficulté |
 |---|---|---|---|
 | 4 | `DateTime.TryParse` sans culture explicite (`ParkComparator.cs:241`, `TelemetryService.cs:269`) | Fonctionne aujourd'hui car les formats sont ISO. Casse le jour où une machine écrit et une autre relit | triviale |
-| 5 | Analyse de la sortie de `sfc` | Sur une session non francophone, aucun motif ne correspond et le mode guidé conclut « rien trouvé ». **Faux négatif silencieux.** Détecter l'échec d'analyse, pas la langue | moyenne |
-| 6 | `DISM /English` | Rend la lecture déterministe quelle que soit la session | faible |
+| 5 | ~~Analyse de la sortie de `sfc`~~ | **fait en 1.3.0** : les deux langues sont reconnues, et l'échec d'analyse est distingué du « rien trouvé » | — |
+| 6 | ~~`DISM /English`~~ | **fait en 1.3.0**, uniquement là où c'est le programme qui lit — pas dans la console visible de la boîte à outils | — |
 | 7 | Canal d'alerte inadapté au parc | La bulle de notification vit dans une session utilisateur. Machine réveillée en WoL sans session : l'alerte n'a aucun destinataire. Journal d'événements Windows + point d'accès de télémétrie | moyenne |
 | 8 | `Historique\` ne purge jamais | La boîte noire purge à 14 jours ; l'historique des scans, non. ~800 fichiers/an/machine, et chaque lecture énumère tout le dossier. **Attention** : la rétention devra être longue (90 jours et plus), la pente SMART en dépend | faible |
-| 9 | `DiskBrief.Health` — valeur française ou neutre WMI ? | Non vérifié. Détermine si le comparateur de parc survit à un poste anglais | à vérifier |
+| 9 | ~~`DiskBrief.Health`~~ | **tranché en 1.3.0** : c'était bien une valeur française. Devenu une énumération ; les résumés écrits par la 1.2.x restent relus | — |
 | **30** | **Fraîcheur des données non signalée** | Remonté par un test sur une machine éteinte depuis des mois (1.1.0). Trois manques distincts : l'âge du fait le plus récent n'est jamais indiqué ; la couverture réelle non plus (« 30 jours analysés, dont 2 jours machine allumée ») ; et la comparaison n'a **aucun plancher de durée** — deux scans espacés de dix minutes produisent « Bon signe ». Les données existent déjà (dernier démarrage, durée d'allumage, horodatage des événements), elles ne sont pas exploitées | moyenne |
 
 ## 3. Tes propositions validées, non faites
@@ -39,7 +46,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 |---|---|---|
 | 10 | **Triage RAW** — disque mourant / sain / jamais `chkdsk /f` | validé « ok à 100 % » |
 | 11 | **Pente SMART sur N scans** plutôt que le seul écart avec le précédent | validé |
-| 12 | **Localisation FR/EN**, détection par session utilisateur, sélecteur dans l'application | validé |
+| 12 | **Localisation FR/EN**, détection par session utilisateur, sélecteur dans l'application | **fait en 1.3.0** |
 | 13 | `--configure-remote --generate-token` en ligne de commande | ta proposition |
 | 14 | **ACL sur `remote.json`** (fichier, pas dossier — le dossier abrite aussi les rapports et le journal d'alertes) | validé |
 | 15 | **Bloc winget** : section du rapport + boutons « tout mettre à jour » / choix par logiciel | validé sur le principe |
@@ -49,7 +56,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 
 | # | Sujet | Statut au 15/08 |
 |---|---|---|
-| 17 | Choix de langue à l'installation | **remplacé**, pas reporté : détection automatique par session + sélecteur dans l'application |
+| 17 | Choix de langue à l'installation | **remplacé**, pas reporté : détection automatique par session + sélecteur dans l'application — **fait en 1.3.0**. L'installateur lui-même reste français |
 | 18 | **Signature de code** | **validé pour les futures versions.** Voie retenue : SignPath Foundation (gratuit, open source) |
 | 19 | **Construction par GitHub Actions** | **passe de « confort » à prérequis** — voir ci-dessous |
 | 20 | Segoe Fluent Icons | **à exclure** — voir §5, point 31 |

@@ -18,7 +18,7 @@ public sealed class SystemInfoCollector
         var s = new SystemSnapshot { MachineName = Environment.MachineName };
 
         Safe("OS", () => CollectOs(s.Os));
-        Safe("BIOS/carte mère", () => CollectBios(s.Bios));
+        Safe(Lang.T("BIOS/carte mère", "BIOS/motherboard"), () => CollectBios(s.Bios));
         Safe("CPU", () => CollectCpu(s.Cpu));
         Safe("RAM", () => CollectRam(s.RamModules));
         Safe("GPU", () => CollectGpu(s.Gpus));
@@ -26,7 +26,7 @@ public sealed class SystemInfoCollector
         Safe("Volumes", () => CollectVolumes(s.Volumes));
         Safe("SMART", () => new SmartCollector(_errors).Enrich(s.Disks));
         Safe("Batterie", () => s.Batteries.AddRange(new BatteryCollector(_errors).Collect()));
-        Safe("Logiciels installés", () => s.InstalledApps.AddRange(InstalledSoftwareCollector.Collect(_errors)));
+        Safe(Lang.T("Logiciels installés", "Installed software"), () => s.InstalledApps.AddRange(InstalledSoftwareCollector.Collect(_errors)));
         if (includeDrivers)
             Safe("Pilotes", () => s.Drivers.AddRange(DriverCollector.Collect()));
 
@@ -36,7 +36,7 @@ public sealed class SystemInfoCollector
     private void Safe(string what, Action action)
     {
         try { action(); }
-        catch (Exception ex) { _errors.Add($"Collecte {what} : {ex.Message}"); }
+        catch (Exception ex) { _errors.Add(Lang.T($"Collecte {what} : {ex.Message}", $"Collecting {what}: {ex.Message}")); }
     }
 
     private static IEnumerable<ManagementObject> Query(string wql, string? scope = null)
@@ -91,8 +91,8 @@ public sealed class SystemInfoCollector
         {
             var parts = new List<string>();
             foreach (var mo in Query("SELECT * FROM Win32_PageFileUsage"))
-                parts.Add($"{S(mo, "Name")} ({V<uint>(mo, "AllocatedBaseSize")} Mo alloués, pic {V<uint>(mo, "PeakUsage")} Mo)");
-            os.PageFileInfo = parts.Count > 0 ? string.Join(" ; ", parts) : "géré automatiquement / aucun";
+                parts.Add(Lang.T($"{S(mo, "Name")} ({V<uint>(mo, "AllocatedBaseSize")} Mo alloués, pic {V<uint>(mo, "PeakUsage")} Mo)", $"{S(mo, "Name")} ({V<uint>(mo, "AllocatedBaseSize")} MB allocated, peak {V<uint>(mo, "PeakUsage")} MB)"));
+            os.PageFileInfo = parts.Count > 0 ? string.Join(Lang.T(" ; ", "; "), parts) : Lang.T("géré automatiquement / aucun", "managed automatically / none");
         }
         catch { /* non bloquant */ }
     }
@@ -199,14 +199,10 @@ public sealed class SystemInfoCollector
                          model.Contains(d.Model, StringComparison.OrdinalIgnoreCase)));
                 if (match is null) continue;
 
-                var health = V<ushort>(mo, "HealthStatus");
-                match.HealthStatus = health switch
-                {
-                    0 => "Sain",
-                    1 => "Avertissement",
-                    2 => "Défaillant",
-                    _ => "Inconnu"
-                };
+                // Correspondance des codes faite une seule fois, dans FromWmi.
+                // Propriété absente → 5, la valeur « Unknown » de Windows : surtout
+                // pas 0, qui signifierait « sain » sans qu'on ait rien mesuré.
+                match.Health = DiskHealthInfo.FromWmi(V<ushort>(mo, "HealthStatus") ?? 5);
                 var media = V<ushort>(mo, "MediaType");
                 match.MediaType = media switch { 3 => "HDD", 4 => "SSD", 5 => "SCM", _ => match.MediaType };
 
@@ -318,7 +314,7 @@ public sealed class SystemInfoCollector
                 // lettres exactement comme un disque qui n'en a pas. Présenter un échec
                 // de mesure comme un résultat est la seule chose que ce logiciel
                 // s'interdit partout ailleurs.
-                _errors.Add($"Lettres de lecteur du disque {index} : {ex.Message}");
+                _errors.Add(Lang.T($"Lettres de lecteur du disque {index} : {ex.Message}", $"Drive letters of disk {index}: {ex.Message}"));
             }
         }
     }

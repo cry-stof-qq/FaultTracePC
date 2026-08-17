@@ -45,7 +45,7 @@ public sealed class SmartCollector
             if (h is null) continue;
 
             var s = d.Smart ??= new SmartInfo();
-            s.Source = "SMART NVMe (journal de santé)";
+            s.Source = Lang.T("SMART NVMe (journal de santé)", "SMART NVMe (health log)");
             s.CriticalWarning = h.CriticalWarning;
             s.TemperatureC ??= h.TemperatureC;
             s.AvailableSparePercent = h.AvailableSparePercent;
@@ -83,7 +83,7 @@ public sealed class SmartCollector
                 if (disk is not null && pnp.Length > 0) byPnp[Normalize(pnp)] = disk;
             }
         }
-        catch (Exception ex) { _errors.Add($"SMART (association des disques) : {ex.Message}"); }
+        catch (Exception ex) { _errors.Add(Lang.T($"SMART (association des disques) : {ex.Message}", $"SMART (matching the drives): {ex.Message}")); }
 
         // 1) Le disque annonce-t-il lui-même une défaillance ?
         try
@@ -192,7 +192,7 @@ public sealed class SmartCollector
             if (!s.HasData) { d.Smart = null; continue; }
 
             if (needsSource)
-                s.Source = "Compteurs de fiabilité Windows";
+                s.Source = Lang.T("Compteurs de fiabilité Windows", "Windows reliability counters");
             d.Smart = s;
         }
     }

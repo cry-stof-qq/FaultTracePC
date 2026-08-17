@@ -20,40 +20,43 @@ public sealed class ScanOrchestrator
         var report = new DiagnosticReport { ScanPeriodDays = options.Days };
         var errors = report.CollectorErrors;
 
-        Step(progress, "Collecte des informations système (WMI)…", 5);
+        Step(progress, Lang.T("Collecte des informations système (WMI)…", "Collecting system information (WMI)…"), 5);
         report.System = new SystemInfoCollector(errors).Collect(options.IncludeDrivers);
         ct.ThrowIfCancellationRequested();
 
-        Step(progress, "Relevé des processus en cours (RAM, CPU, disque)…", 25);
+        Step(progress, Lang.T("Relevé des processus en cours (RAM, CPU, disque)…", "Reading the running processes (RAM, CPU, disk)…"), 25);
         report.Processes = new ProcessCollector(errors).Collect();
         ct.ThrowIfCancellationRequested();
 
-        Step(progress, "Lecture du journal d'événements Windows…", 40);
+        Step(progress, Lang.T("Lecture du journal d'événements Windows…", "Reading the Windows event log…"), 40);
         report.Events = new EventLogCollector(errors).Collect(options.Days);
         ct.ThrowIfCancellationRequested();
 
-        Step(progress, "Lecture du Moniteur de fiabilité…", 60);
+        Step(progress, Lang.T("Lecture du Moniteur de fiabilité…", "Reading the Reliability Monitor…"), 60);
         report.ReliabilityRecords = new ReliabilityCollector(errors).Collect(options.Days);
         ct.ThrowIfCancellationRequested();
 
-        Step(progress, "Analyse des fichiers dump (Minidump, MEMORY.DMP)…", 70);
+        Step(progress, Lang.T("Analyse des fichiers dump (Minidump, MEMORY.DMP)…", "Analysing the dump files (Minidump, MEMORY.DMP)…"), 70);
         report.Dumps = new DumpCollector(errors).Collect();
         ct.ThrowIfCancellationRequested();
 
         bool hasKernelDumps = report.Dumps.Any(d => d.Kind is DumpKind.KernelMinidump or DumpKind.FullMemoryDump);
         if (options.DeepDumpAnalysis && report.Dumps.Count > 0)
         {
-            Step(progress, "Analyse profonde des dumps (WinDbg/CDB, symboles Microsoft)…", 78);
+            Step(progress, Lang.T("Analyse profonde des dumps (WinDbg/CDB, symboles Microsoft)…", "Deep analysis of the dumps (WinDbg/CDB, Microsoft symbols)…"), 78);
             new CdbAnalyzer(errors).AnalyzeAll(report.Dumps, options.MaxDeepDumps, ct);
         }
         else if (!options.DeepDumpAnalysis && hasKernelDumps)
         {
-            errors.Add("Analyse profonde des dumps DÉSACTIVÉE (case décochée) : le pilote fautif des BSOD "
-                     + "ne sera pas identifié. Recocher « Analyse profonde (WinDbg) » pour un diagnostic complet.");
+            errors.Add(Lang.T(
+                "Analyse profonde des dumps DÉSACTIVÉE (case décochée) : le pilote fautif des BSOD "
+                + "ne sera pas identifié. Recocher « Analyse profonde (WinDbg) » pour un diagnostic complet.",
+                "Deep dump analysis DISABLED (box unticked): the driver behind the BSODs will not be "
+                + "identified. Tick “Deep analysis (WinDbg)” again for a complete diagnosis."));
         }
         ct.ThrowIfCancellationRequested();
 
-        Step(progress, "Lecture de la boîte noire (surveillance temps réel)…", 86);
+        Step(progress, Lang.T("Lecture de la boîte noire (surveillance temps réel)…", "Reading the flight recorder (real-time monitoring)…"), 86);
         try
         {
             var crashTimes = new List<DateTime>();
@@ -66,20 +69,20 @@ public sealed class ScanOrchestrator
             report.Flight = new FlightJournalCollector(errors).Collect(crashTimes, options.Days);
             report.Flight.Alerts = AlertLogReader.Read(options.Days, errors);
         }
-        catch (Exception ex) { errors.Add($"Boîte noire : {ex.Message}"); }
+        catch (Exception ex) { errors.Add(Lang.T($"Boîte noire : {ex.Message}", $"Flight recorder: {ex.Message}")); }
 
-        Step(progress, "Corrélation et diagnostic…", 90);
+        Step(progress, Lang.T("Corrélation et diagnostic…", "Cross-referencing and diagnosis…"), 90);
         new RulesEngine().Analyze(report);
 
-        Step(progress, "Comparaison avec le scan précédent…", 96);
+        Step(progress, Lang.T("Comparaison avec le scan précédent…", "Comparing with the previous scan…"), 96);
         try
         {
             report.Comparison = Report.ScanHistory.CompareWithPrevious(report, errors);
             Report.ScanHistory.Save(report, errors);
         }
-        catch (Exception ex) { errors.Add($"Historique des scans : {ex.Message}"); }
+        catch (Exception ex) { errors.Add(Lang.T($"Historique des scans : {ex.Message}", $"Scan history: {ex.Message}")); }
 
-        Step(progress, "Terminé.", 100);
+        Step(progress, Lang.T("Terminé.", "Done."), 100);
         return report;
     }
 

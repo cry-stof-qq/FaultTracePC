@@ -1,0 +1,222 @@
+using System.Text.RegularExpressions;
+using FaultTracePC.Core;
+using FaultTracePC.Core.Analysis;
+using FaultTracePC.Core.Report;
+using Xunit;
+
+namespace FaultTracePC.Tests;
+
+/// <summary>
+/// Vérification du RENDU, en complément de <see cref="TraductionTests"/>.
+///
+/// TraductionTests lit le code source : il attrape un littéral oublié. Il ne peut
+/// rien dire, en revanche, du français qui arrive par les DONNÉES — le catalogue
+/// des codes d'arrêt, la base des pilotes, les libellés d'état de disque. Ces
+/// trois-là sont justement exemptés du contrôle de source parce qu'ils stockent
+/// les deux langues côte à côte ; c'est ici qu'on vérifie que la bonne des deux
+/// ressort.
+///
+/// On produit donc le rapport complet EN ANGLAIS et on relit le texte rendu.
+/// </summary>
+[Collection("Langue")]
+public class RenduAnglaisTests
+{
+    // ==================================================================
+    // Un rapport de démonstration qui traverse un maximum de sections
+    // ==================================================================
+
+    private static DiagnosticReport RapportRiche()
+    {
+        var r = new DiagnosticReport
+        {
+            ScanPeriodDays = 30,
+            System = new SystemSnapshot
+            {
+                MachineName = "POSTE-01",
+                Os = new OsInfo
+                {
+                    Caption = "Windows 11",
+                    TotalVisibleMemoryKB = 16 * 1024 * 1024,
+                    FreePhysicalMemoryKB = 2 * 1024 * 1024,
+                },
+                Cpu = new CpuInfo { Name = "AMD Ryzen 7", Cores = 8, LogicalProcessors = 16 },
+                Disks =
+                [
+                    new DiskInfo
+                    {
+                        Model = "Samsung SSD 980",
+                        Index = 0,
+                        SizeBytes = 512UL * 1024 * 1024 * 1024,
+                        InterfaceType = "SCSI",
+                        MediaType = "SSD",
+                        WmiStatus = "OK",
+                        Health = DiskHealth.Warning,
+                        TemperatureC = 44,
+                        WearPercent = 3,
+                    },
+                    // Health non rapporté ET WmiStatus vide : c'est le chemin qui
+                    // retombait sur « inconnue » en dur avant le lot 7a.
+                    new DiskInfo { Model = "WDC WD10EZEX", Index = 1, SizeBytes = 1000UL * 1024 * 1024 * 1024 },
+                ],
+                Drivers =
+                [
+                    // Un pilote de la base documentée, un pilote de famille, un inconnu :
+                    // les trois branches de DriverKnowledgeBase.
+                    new DriverInfo
+                    {
+                        Name = "nvlddmkm", DisplayName = "nvlddmkm", CompanyName = "NVIDIA Corporation",
+                        FileVersion = "31.0.15.3742", FileDate = DateTime.Now.AddYears(-6),
+                        State = "Running", StartMode = "Auto", IsMicrosoft = false,
+                        Path = @"C:\Windows\System32\drivers\nvlddmkm.sys",
+                    },
+                    new DriverInfo
+                    {
+                        Name = "amdpsp", DisplayName = "amdpsp", CompanyName = "Advanced Micro Devices",
+                        FileVersion = "5.17.0.0", FileDate = DateTime.Now.AddYears(-2),
+                        State = "Running", StartMode = "Auto", IsMicrosoft = false,
+                        Path = @"C:\Windows\System32\drivers\amdpsp.sys",
+                    },
+                    new DriverInfo
+                    {
+                        Name = "zzunknown", DisplayName = "zzunknown", CompanyName = "",
+                        FileVersion = "1.0.0.0", FileDate = DateTime.Now.AddYears(-1),
+                        State = "Stopped", StartMode = "Manual", IsMicrosoft = false,
+                        Path = @"C:\Windows\System32\drivers\zzunknown.sys",
+                    },
+                ],
+            },
+            Dumps =
+            [
+                new DumpFileInfo
+                {
+                    Path = @"C:\Windows\Minidump\010126-1-01.dmp",
+                    Kind = DumpKind.KernelMinidump,
+                    BugCheckCode = 0x50,                 // PAGE_FAULT_IN_NONPAGED_AREA
+                    BugCheckParameters = [1, 2, 3, 4],
+                    CrashTimeFromHeader = DateTime.Now.AddDays(-2),
+                    LastWriteTime = DateTime.Now.AddDays(-2),
+                    DeepAnalyzed = true,
+                    FaultingModule = "nvlddmkm.sys",
+                    StackExcerpt = "nt!KeBugCheckEx\nnvlddmkm+0x104",
+                },
+                new DumpFileInfo
+                {
+                    Path = @"C:\Windows\Minidump\010226-1-01.dmp",
+                    Kind = DumpKind.KernelMinidump,
+                    BugCheckCode = 0x133,                // DPC_WATCHDOG_VIOLATION
+                    BugCheckParameters = [0, 0, 0, 0],
+                    CrashTimeFromHeader = DateTime.Now.AddDays(-1),
+                    LastWriteTime = DateTime.Now.AddDays(-1),
+                    DeepAnalyzed = true,
+                    FaultingModule = "nvlddmkm.sys",
+                    StackExcerpt = "nt!KeBugCheckEx",
+                },
+            ],
+        };
+
+        new RulesEngine().Analyze(r);
+        return r;
+    }
+
+    // ==================================================================
+    // Les vérifications
+    // ==================================================================
+
+    [Fact]
+    public void Le_rapport_html_anglais_ne_laisse_passer_aucune_phrase_francaise()
+    {
+        var fautes = EnAnglais(() => PhrasesFrancaises(TexteDuHtml(HtmlReportGenerator.Generate(RapportRiche()))));
+
+        Assert.True(fautes.Count == 0,
+            $"{fautes.Count} passage(s) français dans le rapport anglais :\n  " + string.Join("\n  ", fautes));
+    }
+
+    [Fact]
+    public void Le_script_de_reparation_anglais_ne_laisse_passer_aucune_phrase_francaise()
+    {
+        var fautes = EnAnglais(() =>
+        {
+            var r = RapportRiche();
+            Assert.True(RepairScriptGenerator.IsRepairable(r), "le rapport de démonstration doit produire un script");
+            return PhrasesFrancaises(RepairScriptGenerator.Generate(r).Split('\n'));
+        });
+
+        Assert.True(fautes.Count == 0,
+            $"{fautes.Count} passage(s) français dans le script anglais :\n  " + string.Join("\n  ", fautes));
+    }
+
+    [Fact]
+    public void Le_meme_rapport_en_francais_est_bien_francais()
+    {
+        // Contrôle positif. Sans lui, un générateur qui renverrait une page vide
+        // passerait les deux tests ci-dessus sans que personne ne s'en aperçoive.
+        var initial = Lang.Current;
+        try
+        {
+            Lang.Apply(AppLanguage.French);
+            var phrases = PhrasesFrancaises(TexteDuHtml(HtmlReportGenerator.Generate(RapportRiche())));
+            Assert.True(phrases.Count >= 20,
+                $"seulement {phrases.Count} passage(s) reconnus comme français dans le rapport français");
+        }
+        finally { Lang.Apply(initial); }
+    }
+
+    [Fact]
+    public void Le_catalogue_des_codes_d_arret_ressort_en_anglais()
+    {
+        // BugCheckCatalog et DriverKnowledgeBase sont exemptés du contrôle de
+        // source : c'est ici, et seulement ici, que leur moitié anglaise est lue.
+        var initial = Lang.Current;
+        try
+        {
+            Lang.Apply(AppLanguage.English);
+            var html = HtmlReportGenerator.Generate(RapportRiche());
+
+            Assert.Contains("PAGE_FAULT_IN_NONPAGED_AREA", html);   // jamais traduit
+            Assert.Contains("DPC_WATCHDOG_VIOLATION", html);
+            Assert.Contains("nvlddmkm.sys", html);                  // jamais traduit non plus
+        }
+        finally { Lang.Apply(initial); }
+    }
+
+    // ==================================================================
+    // Outils
+    // ==================================================================
+
+    /// <summary>Exécute en anglais, puis remet la langue comme on l'a trouvée.</summary>
+    private static T EnAnglais<T>(Func<T> action)
+    {
+        var initial = Lang.Current;
+        try
+        {
+            Lang.Apply(AppLanguage.English);
+            return action();
+        }
+        finally { Lang.Apply(initial); }
+    }
+
+    private static readonly Regex BlocsNonTexte =
+        new("<(script|style)\\b[^>]*>.*?</\\1>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex Balises = new("<[^>]+>", RegexOptions.Compiled);
+
+    /// <summary>Texte visible d'une page : CSS et JS retirés, balises remplacées par des sauts de ligne.</summary>
+    private static IEnumerable<string> TexteDuHtml(string html)
+    {
+        var sansBlocs = BlocsNonTexte.Replace(html, "\n");
+        var sansBalises = Balises.Replace(sansBlocs, "\n");
+        return System.Net.WebUtility.HtmlDecode(sansBalises).Split('\n');
+    }
+
+    /// <summary>
+    /// Garde les passages que le détecteur de <see cref="TraductionTests"/> juge
+    /// français. Le même détecteur des deux côtés : un test qui utiliserait une
+    /// autre règle ne vérifierait pas la même chose.
+    /// </summary>
+    private static List<string> PhrasesFrancaises(IEnumerable<string> lignes) =>
+        lignes.Select(l => l.Trim())
+              .Where(l => l.Length >= 8)
+              .Where(TraductionTests.SembleFrancais)
+              .Distinct(StringComparer.Ordinal)
+              .ToList();
+}

@@ -1,3 +1,4 @@
+using FaultTracePC.Core;
 using FaultTracePC.Monitor;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +9,12 @@ using Microsoft.Extensions.Hosting;
 // dernières secondes AVANT un crash survivent au crash.
 //
 // Exécutable aussi en console pour test : FaultTracePC.Monitor.exe (Ctrl+C pour arrêter).
+
+// Le service tourne sous le compte SYSTEM : il n'a pas de préférence utilisateur
+// à lire et suivra donc la langue par défaut de la machine, sauf si le service
+// est installé avec « --lang ». Ses journaux et ses notifications sont les seuls
+// textes concernés.
+Lang.Initialize(args);
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddWindowsService(options => options.ServiceName = "FaultTracePCMonitor");

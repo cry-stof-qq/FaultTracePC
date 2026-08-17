@@ -1,10 +1,12 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.IO;
 using System.Text;
 using System.Windows;
+
+using FaultTracePC.Core;
 
 namespace FaultTracePC.App;
 
@@ -120,10 +122,11 @@ public partial class WindowsUpdateWindow : Window
         bool includeDrivers = ChkDrivers.IsChecked == true;
         bool includeHidden = ChkHidden.IsChecked == true;
 
-        SetBusy(true, "Interrogation de Windows Update… (cela peut prendre 1 à 3 minutes)");
+        SetBusy(true, Lang.T("Interrogation de Windows Update… (cela peut prendre 1 à 3 minutes)", "Querying Windows Update… (this can take 1 to 3 minutes)"));
         ClearRows();
-        Log($"=== Recherche démarrée (pilotes : {(includeDrivers ? "inclus" : "exclus")}, "
-          + $"masquées : {(includeHidden ? "incluses" : "exclues")}) ===");
+        Log(Lang.T(
+            $"=== Recherche démarrée (pilotes : {(includeDrivers ? "inclus" : "exclus")}, masquées : {(includeHidden ? "incluses" : "exclues")}) ===",
+            $"=== Search started (drivers: {(includeDrivers ? "included" : "excluded")}, hidden: {(includeHidden ? "included" : "excluded")}) ==="));
 
         try
         {
@@ -138,29 +141,29 @@ public partial class WindowsUpdateWindow : Window
 
             if (found.Count == 0)
             {
-                TxtStatus.Text = "Aucune mise à jour disponible : ce poste est à jour (rien d'important, d'optionnel ni de pilote en attente).";
+                TxtStatus.Text = Lang.T("Aucune mise à jour disponible : ce poste est à jour (rien d'important, d'optionnel ni de pilote en attente).", "No update available: this machine is up to date (nothing important, optional or driver-related pending).");
             }
             else
             {
                 int important = found.Count(r => !r.IsOptional);
                 int drivers = found.Count(r => r.IsDriver);
-                TxtStatus.Text = $"{found.Count} mise(s) à jour disponible(s) : {important} importante(s), "
-                               + $"{found.Count - important} optionnelle(s) dont {drivers} pilote(s). "
-                               + "Coche ce que tu veux installer.";
+                TxtStatus.Text = Lang.T(
+                    $"{found.Count} mise(s) à jour disponible(s) : {important} importante(s), {found.Count - important} optionnelle(s) dont {drivers} pilote(s). Coche ce que tu veux installer.",
+                    $"{found.Count} update(s) available: {important} important, {found.Count - important} optional including {drivers} driver(s). Tick the ones you want to install.");
             }
             BtnInstall.IsEnabled = found.Count > 0;
         }
         catch (Exception ex)
         {
             var msg = Unwrap(ex);
-            TxtStatus.Text = "La recherche a échoué : " + msg;
-            Log("ERREUR : " + msg);
+            TxtStatus.Text = Lang.T("La recherche a échoué : ", "The search failed: ") + msg;
+            Log(Lang.T("ERREUR : ", "ERROR: ") + msg);
             MessageBox.Show(this,
-                "Impossible d'interroger Windows Update.\n\n" + msg +
-                "\n\nCauses fréquentes :\n" +
-                "• le service « Windows Update » (wuauserv) est arrêté ou désactivé ;\n" +
-                "• une stratégie de groupe (GPO/WSUS) bloque la recherche en ligne ;\n" +
-                "• pas de connexion réseau vers les serveurs de mise à jour.",
+                Lang.T("Impossible d'interroger Windows Update.\n\n", "Cannot query Windows Update.\n\n") + msg +
+                Lang.T("\n\nCauses fréquentes :\n", "\n\nCommon causes:\n") +
+                Lang.T("• le service « Windows Update » (wuauserv) est arrêté ou désactivé ;\n", "• the “Windows Update” service (wuauserv) is stopped or disabled;\n") +
+                Lang.T("• une stratégie de groupe (GPO/WSUS) bloque la recherche en ligne ;\n", "• a group policy (GPO/WSUS) blocks the online search;\n") +
+                Lang.T("• pas de connexion réseau vers les serveurs de mise à jour.", "• no network connection to the update servers."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
@@ -177,15 +180,15 @@ public partial class WindowsUpdateWindow : Window
 
         var sessionType = Type.GetTypeFromProgID("Microsoft.Update.Session", throwOnError: false)
             ?? throw new InvalidOperationException(
-                "L'API Windows Update (Microsoft.Update.Session) est introuvable sur ce système.");
+                Lang.T("L'API Windows Update (Microsoft.Update.Session) est introuvable sur ce système.", "The Windows Update API (Microsoft.Update.Session) was not found on this system."));
 
         _session ??= Activator.CreateInstance(sessionType)
-            ?? throw new InvalidOperationException("Création de la session Windows Update impossible.");
+            ?? throw new InvalidOperationException(Lang.T("Création de la session Windows Update impossible.", "Could not create the Windows Update session."));
         var session = _session!;
         try { Set(session, "ClientApplicationID", "FaultTracePC"); } catch { /* facultatif */ }
 
         string criteria = includeHidden ? "IsInstalled=0" : "IsInstalled=0 and IsHidden=0";
-        notes.Add("Critère de recherche : " + criteria);
+        notes.Add(Lang.T("Critère de recherche : ", "Search criterion: ") + criteria);
 
         object? result = null;
 
@@ -202,13 +205,13 @@ public partial class WindowsUpdateWindow : Window
                 Set(searcher, "ServerSelection", 3); // ssOthers
                 Set(searcher, "ServiceID", MicrosoftUpdateServiceId);
                 result = Call(searcher, "Search", criteria);
-                notes.Add("Catalogue interrogé : Microsoft Update (pilotes et produits Microsoft inclus).");
+                notes.Add(Lang.T("Catalogue interrogé : Microsoft Update (pilotes et produits Microsoft inclus).", "Catalogue queried: Microsoft Update (drivers and Microsoft products included)."));
             }
             catch (Exception ex)
             {
-                notes.Add("Microsoft Update indisponible (" + Unwrap(ex) + ") — bascule sur Windows Update seul.");
-                notes.Add("Pour activer les pilotes : Paramètres > Windows Update > Options avancées > "
-                        + "« Recevoir des mises à jour pour d'autres produits Microsoft ».");
+                notes.Add(Lang.T("Microsoft Update indisponible (", "Microsoft Update unavailable (") + Unwrap(ex) + Lang.T(") — bascule sur Windows Update seul.", ") — falling back to Windows Update alone."));
+                notes.Add(Lang.T("Pour activer les pilotes : Paramètres > Windows Update > Options avancées > ", "To enable drivers: Settings > Windows Update > Advanced options > ")
+                        + Lang.T("« Recevoir des mises à jour pour d'autres produits Microsoft ».", "“Receive updates for other Microsoft products”."));
                 result = null;
             }
         }
@@ -218,13 +221,13 @@ public partial class WindowsUpdateWindow : Window
             var searcher = Call(session, "CreateUpdateSearcher")!;
             Set(searcher, "Online", true);
             result = Call(searcher, "Search", criteria)
-                ?? throw new InvalidOperationException("Réponse vide du service Windows Update.");
-            if (!includeDrivers) notes.Add("Catalogue interrogé : Windows Update.");
+                ?? throw new InvalidOperationException(Lang.T("Réponse vide du service Windows Update.", "Empty response from the Windows Update service."));
+            if (!includeDrivers) notes.Add(Lang.T("Catalogue interrogé : Windows Update.", "Catalogue queried: Windows Update."));
         }
 
         var updates = Get(result!, "Updates")!;
         int count = GetInt(updates, "Count");
-        notes.Add($"{count} élément(s) renvoyé(s) par le service.");
+        notes.Add(Lang.T($"{count} élément(s) renvoyé(s) par le service.", $"{count} item(s) returned by the service."));
 
         for (int i = 0; i < count; i++)
         {
@@ -256,10 +259,10 @@ public partial class WindowsUpdateWindow : Window
             }
             catch { /* pas de KB (typique des pilotes) */ }
 
-            string category = browseOnly ? "Optionnelle"
-                            : isDriver ? "Pilote"
-                            : !string.IsNullOrEmpty(severity) ? "Sécurité"
-                            : "Importante";
+            string category = browseOnly ? Lang.T("Optionnelle", "Optional")
+                            : isDriver ? Lang.T("Pilote", "Driver")
+                            : !string.IsNullOrEmpty(severity) ? Lang.T("Sécurité", "Security")
+                            : Lang.T("Importante", "Important");
 
             string desc = GetStr(u, "Description");
             if (desc.Length > 600) desc = desc[..600] + "…";
@@ -323,8 +326,8 @@ public partial class WindowsUpdateWindow : Window
     {
         int n = _rows.Count(r => r.Selected);
         TxtStatus.Text = n == 0
-            ? "Aucune mise à jour cochée."
-            : $"{n} mise(s) à jour cochée(s) — {FormatSize(_rows.Where(r => r.Selected).Sum(SizeOf))} à télécharger.";
+            ? Lang.T("Aucune mise à jour cochée.", "No update ticked.")
+            : Lang.T($"{n} mise(s) à jour cochée(s) — {FormatSize(_rows.Where(r => r.Selected).Sum(SizeOf))} à télécharger.", $"{n} update(s) ticked — {FormatSize(_rows.Where(r => r.Selected).Sum(SizeOf))} to download.");
     }
 
     private static long SizeOf(UpdateRow r)
@@ -357,7 +360,7 @@ public partial class WindowsUpdateWindow : Window
         var selected = _rows.Where(r => r.Selected).ToList();
         if (selected.Count == 0)
         {
-            MessageBox.Show(this, "Coche d'abord au moins une mise à jour dans la liste.",
+            MessageBox.Show(this, Lang.T("Coche d'abord au moins une mise à jour dans la liste.", "Tick at least one update in the list first."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -366,42 +369,42 @@ public partial class WindowsUpdateWindow : Window
         bool anyEula = selected.Any(r => !r.EulaAccepted);
 
         var sb = new StringBuilder();
-        sb.AppendLine($"Installer {selected.Count} mise(s) à jour ?");
+        sb.AppendLine(Lang.T($"Installer {selected.Count} mise(s) à jour ?", $"Install {selected.Count} update(s)?"));
         sb.AppendLine();
         foreach (var r in selected.Take(15)) sb.AppendLine($"  • [{r.Category}] {r.Title}");
-        if (selected.Count > 15) sb.AppendLine($"  … et {selected.Count - 15} autre(s).");
+        if (selected.Count > 15) sb.AppendLine(Lang.T($"  … et {selected.Count - 15} autre(s).", $"  … and {selected.Count - 15} more."));
         sb.AppendLine();
         if (anyEula)
-            sb.AppendLine("⚠ Certaines de ces mises à jour ont un contrat de licence : en continuant, tu l'ACCEPTES en ton nom.");
-        sb.AppendLine("• Le téléchargement puis l'installation peuvent durer longtemps ; ne coupe pas l'alimentation.");
+            sb.AppendLine(Lang.T("⚠ Certaines de ces mises à jour ont un contrat de licence : en continuant, tu l'ACCEPTES en ton nom.", "⚠ Some of these updates carry a licence agreement: by continuing, you ACCEPT it in your own name."));
+        sb.AppendLine(Lang.T("• Le téléchargement puis l'installation peuvent durer longtemps ; ne coupe pas l'alimentation.", "• Downloading then installing can take a long time; do not cut the power."));
         sb.AppendLine(anyReboot
-            ? "• Un redémarrage sera nécessaire à la fin : FaultTracePC ne le déclenchera PAS, tu redémarreras quand tu voudras."
-            : "• Aucun redémarrage n'est annoncé pour cette sélection.");
+            ? Lang.T("• Un redémarrage sera nécessaire à la fin : FaultTracePC ne le déclenchera PAS, tu redémarreras quand tu voudras.", "• A restart will be needed at the end: FaultTracePC will NOT trigger it, you restart when you want.")
+            : Lang.T("• Aucun redémarrage n'est annoncé pour cette sélection.", "• No restart is announced for this selection."));
         sb.AppendLine();
-        sb.AppendLine("Conseil : crée d'abord un point de restauration (bouton 🛟 dans la boîte à outils).");
+        sb.AppendLine(Lang.T("Conseil : crée d'abord un point de restauration (bouton 🛟 dans la boîte à outils).", "Tip: create a restore point first (the 🛟 button in the toolbox)."));
 
         if (MessageBox.Show(this, sb.ToString(), "FaultTracePC — confirmation",
                 MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
             return;
 
-        SetBusy(true, "Téléchargement en cours…");
-        Log($"=== Installation de {selected.Count} mise(s) à jour ===");
+        SetBusy(true, Lang.T("Téléchargement en cours…", "Downloading…"));
+        Log(Lang.T($"=== Installation de {selected.Count} mise(s) à jour ===", $"=== Installing {selected.Count} update(s) ==="));
 
         try
         {
             var report = await Task.Run(() => InstallCore(selected));
 
             foreach (var line in report.Log) Log(line);
-            Log("RÉSULTAT : " + report.Summary
-              + (report.RebootRequired ? " — REDÉMARRAGE REQUIS (non déclenché par FaultTracePC)." : ""));
-            Log($"=== Fin de l'opération — journal : {JournalPath} ===");
+            Log(Lang.T("RÉSULTAT : ", "RESULT: ") + report.Summary
+              + (report.RebootRequired ? Lang.T(" — REDÉMARRAGE REQUIS (non déclenché par FaultTracePC).", " — RESTART REQUIRED (not triggered by FaultTracePC).") : ""));
+            Log(Lang.T($"=== Fin de l'opération — journal : {JournalPath} ===", $"=== End of operation — log: {JournalPath} ==="));
             TxtStatus.Text = report.Summary;
 
             MessageBox.Show(this, report.Summary +
                 (report.RebootRequired
-                    ? "\n\n⚠ Un REDÉMARRAGE est nécessaire pour terminer. FaultTracePC ne redémarre jamais l'ordinateur " +
-                      "à ta place : enregistre ton travail et redémarre quand tu es prêt."
-                    : "\n\nAucun redémarrage n'est réclamé par Windows."),
+                    ? Lang.T("\n\n⚠ Un REDÉMARRAGE est nécessaire pour terminer. FaultTracePC ne redémarre jamais l'ordinateur ", "\n\n⚠ A RESTART is needed to finish. FaultTracePC never restarts the computer ") +
+                      Lang.T("à ta place : enregistre ton travail et redémarre quand tu es prêt.", "for you: save your work and restart when you are ready.")
+                    : Lang.T("\n\nAucun redémarrage n'est réclamé par Windows.", "\n\nWindows is not asking for a restart.")),
                 "FaultTracePC", MessageBoxButton.OK,
                 report.RebootRequired ? MessageBoxImage.Warning : MessageBoxImage.Information);
 
@@ -412,12 +415,12 @@ public partial class WindowsUpdateWindow : Window
         catch (Exception ex)
         {
             var msg = Unwrap(ex);
-            TxtStatus.Text = "L'installation a échoué : " + msg;
-            Log("ERREUR : " + msg);
+            TxtStatus.Text = Lang.T("L'installation a échoué : ", "The installation failed: ") + msg;
+            Log(Lang.T("ERREUR : ", "ERROR: ") + msg);
             MessageBox.Show(this,
-                "L'installation a échoué.\n\n" + msg +
-                "\n\nSi l'erreur persiste, la réparation classique est : boîte à outils → " +
-                "« Réinitialiser les composants Windows Update » (purge des caches), puis relancer.",
+                Lang.T("L'installation a échoué.\n\n", "The installation failed.\n\n") + msg +
+                Lang.T("\n\nSi l'erreur persiste, la réparation classique est : boîte à outils → ", "\n\nIf the error persists, the usual repair is: toolbox → ") +
+                Lang.T("« Réinitialiser les composants Windows Update » (purge des caches), puis relancer.", "“Reset the Windows Update components” (cache purge), then try again."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -438,7 +441,7 @@ public partial class WindowsUpdateWindow : Window
     {
         var rep = new InstallReport();
         var session = _session ?? throw new InvalidOperationException(
-            "Session Windows Update perdue — relance la recherche.");
+            Lang.T("Session Windows Update perdue — relance la recherche.", "Windows Update session lost — run the search again."));
 
         var collType = Type.GetTypeFromProgID("Microsoft.Update.UpdateColl", throwOnError: false)
             ?? throw new InvalidOperationException("Microsoft.Update.UpdateColl introuvable.");
@@ -451,10 +454,10 @@ public partial class WindowsUpdateWindow : Window
                 if (!GetBool(r.Com, "EulaAccepted", true))
                 {
                     Call(r.Com, "AcceptEula");
-                    rep.Log.Add("CLUF accepté : " + r.Title);
+                    rep.Log.Add(Lang.T("CLUF accepté : ", "EULA accepted: ") + r.Title);
                 }
             }
-            catch (Exception ex) { rep.Log.Add("CLUF non accepté (" + Unwrap(ex) + ") : " + r.Title); }
+            catch (Exception ex) { rep.Log.Add(Lang.T("CLUF non accepté (", "EULA not accepted (") + Unwrap(ex) + Lang.T(") : ", "): ") + r.Title); }
         }
 
         // 2) Téléchargement de ce qui ne l'est pas déjà.
@@ -467,16 +470,16 @@ public partial class WindowsUpdateWindow : Window
 
         if (dl > 0)
         {
-            rep.Log.Add($"Téléchargement de {dl} paquet(s)…");
+            rep.Log.Add(Lang.T($"Téléchargement de {dl} paquet(s)…", $"Downloading {dl} package(s)…"));
             var downloader = Call(session, "CreateUpdateDownloader")!;
             Set(downloader, "Updates", toDownload);
             var dres = Call(downloader, "Download")!;
             int dcode = GetInt(dres, "ResultCode");
-            rep.Log.Add("Téléchargement : " + ResultText(dcode) + $" (HRESULT 0x{GetInt(dres, "HResult"):X8})");
+            rep.Log.Add(Lang.T("Téléchargement : ", "Download: ") + ResultText(dcode) + $" (HRESULT 0x{GetInt(dres, "HResult"):X8})");
             if (dcode is 4 or 5)
-                throw new InvalidOperationException("Le téléchargement a échoué (" + ResultText(dcode) + ").");
+                throw new InvalidOperationException(Lang.T("Le téléchargement a échoué (", "The download failed (") + ResultText(dcode) + ").");
         }
-        else rep.Log.Add("Tous les paquets étaient déjà téléchargés.");
+        else rep.Log.Add(Lang.T("Tous les paquets étaient déjà téléchargés.", "All packages were already downloaded."));
 
         // 3) Installation. On garde l'ordre exact d'ajout à la collection COM :
         // c'est lui qui indexe GetUpdateResult(i), pas l'ordre de la sélection.
@@ -485,12 +488,12 @@ public partial class WindowsUpdateWindow : Window
         foreach (var r in selected)
         {
             if (GetBool(r.Com, "IsDownloaded")) { Call(toInstall, "Add", r.Com); installed.Add(r); }
-            else rep.Log.Add("Ignorée (non téléchargée) : " + r.Title);
+            else rep.Log.Add(Lang.T("Ignorée (non téléchargée) : ", "Skipped (not downloaded): ") + r.Title);
         }
         int ok = installed.Count;
-        if (ok == 0) throw new InvalidOperationException("Aucune mise à jour téléchargée : rien à installer.");
+        if (ok == 0) throw new InvalidOperationException(Lang.T("Aucune mise à jour téléchargée : rien à installer.", "No update downloaded: nothing to install."));
 
-        rep.Log.Add($"Installation de {ok} mise(s) à jour…");
+        rep.Log.Add(Lang.T($"Installation de {ok} mise(s) à jour…", $"Installing {ok} update(s)…"));
         var installer = Call(session, "CreateUpdateInstaller")!;
         Set(installer, "Updates", toInstall);
         var ires = Call(installer, "Install")!;
@@ -515,23 +518,23 @@ public partial class WindowsUpdateWindow : Window
 
         rep.Summary = code switch
         {
-            2 => $"{succeeded} mise(s) à jour installée(s) avec succès.",
-            3 => $"Installation terminée avec des erreurs : {succeeded} réussie(s), {failed} en échec. "
-               + "Ouvre « Détail technique » pour voir lesquelles.",
-            5 => "Installation interrompue.",
-            _ => $"Installation en échec ({ResultText(code)}) : {succeeded} réussie(s), {failed} en échec.",
+            2 => Lang.T($"{succeeded} mise(s) à jour installée(s) avec succès.", $"{succeeded} update(s) installed successfully."),
+            3 => Lang.T($"Installation terminée avec des erreurs : {succeeded} réussie(s), {failed} en échec. ", $"Installation finished with errors: {succeeded} succeeded, {failed} failed. ")
+               + Lang.T("Ouvre « Détail technique » pour voir lesquelles.", "Open “Technical detail” to see which ones."),
+            5 => Lang.T("Installation interrompue.", "Installation interrupted."),
+            _ => Lang.T($"Installation en échec ({ResultText(code)}) : {succeeded} réussie(s), {failed} en échec.", $"Installation failed ({ResultText(code)}): {succeeded} succeeded, {failed} failed."),
         };
         return rep;
     }
 
     private static string ResultText(int code) => code switch
     {
-        0 => "non démarrée",
-        1 => "en cours",
-        2 => "réussie",
-        3 => "réussie avec erreurs",
-        4 => "échec",
-        5 => "annulée",
+        0 => Lang.T("non démarrée", "not started"),
+        1 => Lang.T("en cours", "in progress"),
+        2 => Lang.T("réussie", "succeeded"),
+        3 => Lang.T("réussie avec erreurs", "succeeded with errors"),
+        4 => Lang.T("échec", "failed"),
+        5 => Lang.T("annulée", "cancelled"),
         _ => "code " + code,
     };
 
@@ -578,9 +581,9 @@ public partial class WindowsUpdateWindow : Window
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var header = File.Exists(path)
                 ? ""
-                : $"# FaultTracePC — journal des mises à jour Windows — {DateTime.Now:dd/MM/yyyy}"
+                : Lang.T($"# FaultTracePC — journal des mises à jour Windows — {DateTime.Now:dd/MM/yyyy}", $"# FaultTracePC — Windows update log — {DateTime.Now:yyyy-MM-dd}")
                   + Environment.NewLine
-                  + $"# Machine : {Environment.MachineName} — utilisateur : {Environment.UserName}"
+                  + Lang.T($"# Machine : {Environment.MachineName} — utilisateur : {Environment.UserName}", $"# Machine: {Environment.MachineName} — user: {Environment.UserName}")
                   + Environment.NewLine + Environment.NewLine;
             File.AppendAllText(path, header + line + Environment.NewLine, Encoding.UTF8);
         }

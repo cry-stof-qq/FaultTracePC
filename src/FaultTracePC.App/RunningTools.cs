@@ -1,5 +1,7 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+
+using FaultTracePC.Core;
 
 namespace FaultTracePC.App;
 
@@ -113,32 +115,37 @@ public static class RunningTools
 
     public static bool IsExclusive(string tool) => ExclusiveTools.Contains(tool);
 
-    /// <summary>Libellés lisibles, pour que le message dise QUOI tourne encore.</summary>
-    private static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
+    /// <summary>
+    /// Libellés lisibles, pour que le message dise QUOI tourne encore.
+    /// Les deux langues sont stockées côte à côte : une table « static readonly »
+    /// est construite une seule fois, donc appeler Lang.T ici figerait la langue
+    /// au premier accès au type. La résolution se fait dans LabelOf, à la lecture.
+    /// </summary>
+    private static readonly Dictionary<string, (string Fr, string En)> Labels = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["sfc"] = "Vérification des fichiers système (sfc /scannow)",
-        ["dismscan"] = "Vérification de l'image Windows (DISM)",
-        ["dismrestore"] = "Réparation de l'image Windows (DISM)",
-        ["chkdskscan"] = "Analyse du disque système",
-        ["chkdskfix"] = "Planification de chkdsk",
-        ["mdsched"] = "Diagnostic mémoire Windows",
-        ["wureset"] = "Réinitialisation des composants Windows Update",
-        ["componentcleanup"] = "Purge des composants Windows obsolètes",
-        ["temp"] = "Vidage des fichiers temporaires",
-        ["cleanmgr"] = "Nettoyage de disque Windows",
-        ["defenderquick"] = "Analyse rapide Microsoft Defender",
-        ["defenderfull"] = "Analyse complète Microsoft Defender",
-        ["networkreset"] = "Réinitialisation de la pile réseau",
-        ["restorepoint"] = "Création du point de restauration",
-        ["uninstallkb"] = "Désinstallation d'une mise à jour Windows",
-        ["energy"] = "Rapport d'énergie",
-        ["battery"] = "Rapport de batterie",
-        ["smart"] = "Lecture SMART des disques",
-        ["diskusage"] = "Analyse de l'occupation disque",
-        ["startup"] = "Inventaire des programmes au démarrage",
-        ["defenderhistory"] = "Historique des menaces détectées",
+        ["sfc"] = ("Vérification des fichiers système (sfc /scannow)", "System file check (sfc /scannow)"),
+        ["dismscan"] = ("Vérification de l'image Windows (DISM)", "Windows image check (DISM)"),
+        ["dismrestore"] = ("Réparation de l'image Windows (DISM)", "Windows image repair (DISM)"),
+        ["chkdskscan"] = ("Analyse du disque système", "System disk scan"),
+        ["chkdskfix"] = ("Planification de chkdsk", "chkdsk scheduling"),
+        ["mdsched"] = ("Diagnostic mémoire Windows", "Windows Memory Diagnostic"),
+        ["wureset"] = ("Réinitialisation des composants Windows Update", "Windows Update components reset"),
+        ["componentcleanup"] = ("Purge des composants Windows obsolètes", "Superseded Windows components cleanup"),
+        ["temp"] = ("Vidage des fichiers temporaires", "Temporary files cleanup"),
+        ["cleanmgr"] = ("Nettoyage de disque Windows", "Windows Disk Cleanup"),
+        ["defenderquick"] = ("Analyse rapide Microsoft Defender", "Microsoft Defender quick scan"),
+        ["defenderfull"] = ("Analyse complète Microsoft Defender", "Microsoft Defender full scan"),
+        ["networkreset"] = ("Réinitialisation de la pile réseau", "Network stack reset"),
+        ["restorepoint"] = ("Création du point de restauration", "Restore point creation"),
+        ["uninstallkb"] = ("Désinstallation d'une mise à jour Windows", "Windows update uninstall"),
+        ["energy"] = ("Rapport d'énergie", "Energy report"),
+        ["battery"] = ("Rapport de batterie", "Battery report"),
+        ["smart"] = ("Lecture SMART des disques", "Disk SMART read"),
+        ["diskusage"] = ("Analyse de l'occupation disque", "Disk usage analysis"),
+        ["startup"] = ("Inventaire des programmes au démarrage", "Startup programs inventory"),
+        ["defenderhistory"] = ("Historique des menaces détectées", "Detected threats history"),
     };
 
     public static string LabelOf(string tool) =>
-        Labels.TryGetValue(tool, out var l) ? l : tool;
+        Labels.TryGetValue(tool, out var l) ? Lang.T(l.Fr, l.En) : tool;
 }

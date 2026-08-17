@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -63,7 +63,7 @@ public partial class ParkWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Impossible d'enregistrer la liste : " + ex.Message, "FaultTracePC",
+            MessageBox.Show(this, Lang.T("Impossible d'enregistrer la liste : ", "Could not save the list: ") + ex.Message, "FaultTracePC",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -76,7 +76,7 @@ public partial class ParkWindow : Window
     {
         if (string.IsNullOrWhiteSpace(TxtHost.Text) || string.IsNullOrWhiteSpace(TxtToken.Text))
         {
-            MessageBox.Show(this, "Hôte et token sont obligatoires (le token s'obtient sur la machine cliente, fenêtre 🌐 Mode réseau).",
+            MessageBox.Show(this, Lang.T("Hôte et token sont obligatoires (le token s'obtient sur la machine cliente, fenêtre 🌐 Mode réseau).", "Host and token are required (the token is obtained on the client machine, 🌐 Network mode window)."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -97,18 +97,18 @@ public partial class ParkWindow : Window
         if (LvMachines.SelectedItem is not Row row)
         {
             MessageBox.Show(this,
-                "Sélectionne d'abord une machine dans la liste, puis clique sur « Retirer la sélection ».",
+                Lang.T("Sélectionne d'abord une machine dans la liste, puis clique sur « Retirer la sélection ».", "Select a machine in the list first, then click “Remove the selection”."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
         if (MessageBox.Show(this,
-                $"Retirer « {row.Name} » ({row.Host}) de la console de parc ?\n\n" +
-                "Cela retire seulement la machine de TA liste de supervision :\n" +
-                "• rien n'est désinstallé sur le poste distant ;\n" +
-                "• son historique de scans local n'est pas touché ;\n" +
-                "• tu pourras la rajouter plus tard avec son nom, son adresse et son jeton.",
-                "FaultTracePC — retirer une machine",
+                Lang.T($"Retirer « {row.Name} » ({row.Host}) de la console de parc ?\n\n", $"Remove “{row.Name}” ({row.Host}) from the fleet console?\n\n") +
+                Lang.T("Cela retire seulement la machine de TA liste de supervision :\n", "This only removes the machine from YOUR monitoring list:\n") +
+                Lang.T("• rien n'est désinstallé sur le poste distant ;\n", "• nothing is uninstalled on the remote machine;\n") +
+                Lang.T("• son historique de scans local n'est pas touché ;\n", "• its local scan history is untouched;\n") +
+                Lang.T("• tu pourras la rajouter plus tard avec son nom, son adresse et son jeton.", "• you can add it back later with its name, address and token."),
+                Lang.T("FaultTracePC — retirer une machine", "FaultTracePC — remove a machine"),
                 MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
             return;
 
@@ -125,8 +125,8 @@ public partial class ParkWindow : Window
         RenderRows(_lastResults);
 
         TxtStatus.Text = removed > 0
-            ? $"« {row.Name} » retirée de la liste. {_machines.Count} machine(s) supervisée(s)."
-            : $"« {row.Name} » n'était plus dans la liste.";
+            ? Lang.T($"« {row.Name} » retirée de la liste. {_machines.Count} machine(s) supervisée(s).", $"“{row.Name}” removed from the list. {_machines.Count} machine(s) monitored.")
+            : Lang.T($"« {row.Name} » n'était plus dans la liste.", $"“{row.Name}” was no longer in the list.");
     }
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => _ = RefreshAllAsync();
@@ -136,7 +136,7 @@ public partial class ParkWindow : Window
 
     private async Task RefreshAllAsync()
     {
-        TxtStatus.Text = $"Interrogation de {_machines.Count} machine(s)…";
+        TxtStatus.Text = Lang.T($"Interrogation de {_machines.Count} machine(s)…", $"Querying {_machines.Count} machine(s)…");
         var results = await Task.WhenAll(_machines.Select(QueryAsync));
         _lastResults = results.ToDictionary(r => r.Machine, r => r);
         RenderRows(_lastResults);
@@ -152,12 +152,12 @@ public partial class ParkWindow : Window
                                           && Version.TryParse(ConsoleVersion, out var loc) && v > loc);
 
         var versions = enAvance > 0
-            ? $" ⚠ {enAvance} poste(s) plus récent(s) que cette console ({ConsoleVersion}) — c'est ELLE qu'il faut mettre à jour."
+            ? Lang.T($" ⚠ {enAvance} poste(s) plus récent(s) que cette console ({ConsoleVersion}) — c'est ELLE qu'il faut mettre à jour.", $" ⚠ {enAvance} machine(s) newer than this console ({ConsoleVersion}) — it is THE CONSOLE that needs updating.")
             : enRetard > 0
-                ? $" ⬆ {enRetard} poste(s) à mettre à jour vers la {ConsoleVersion}."
-                : joignables.Count > 0 ? $" Tous les postes joignables sont en {ConsoleVersion}." : "";
+                ? Lang.T($" ⬆ {enRetard} poste(s) à mettre à jour vers la {ConsoleVersion}.", $" ⬆ {enRetard} machine(s) to update to {ConsoleVersion}.")
+                : joignables.Count > 0 ? Lang.T($" Tous les postes joignables sont en {ConsoleVersion}.", $" All reachable machines are on {ConsoleVersion}.") : "";
 
-        TxtStatus.Text = $"Actualisé à {DateTime.Now:HH:mm:ss} — {joignables.Count}/{_machines.Count} machine(s) joignable(s)." + versions;
+        TxtStatus.Text = Lang.T($"Actualisé à {DateTime.Now:HH:mm:ss} — {joignables.Count}/{_machines.Count} machine(s) joignable(s).", $"Refreshed at {DateTime.Now:HH:mm:ss} — {joignables.Count}/{_machines.Count} machine(s) reachable.") + versions;
     }
 
     /// <summary>Génère et ouvre le rapport HTML consolidé du parc.</summary>
@@ -165,14 +165,14 @@ public partial class ParkWindow : Window
     {
         if (_machines.Count == 0)
         {
-            MessageBox.Show(this, "Aucune machine enregistrée. Ajoute d'abord tes postes clients.",
+            MessageBox.Show(this, Lang.T("Aucune machine enregistrée. Ajoute d'abord tes postes clients.", "No machine registered. Add your client machines first."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         try
         {
             // On repart d'un état frais : un rapport doit refléter l'instant présent.
-            TxtStatus.Text = "Interrogation des machines pour le rapport…";
+            TxtStatus.Text = Lang.T("Interrogation des machines pour le rapport…", "Querying the machines for the report…");
             await RefreshAllAsync();
 
             var lines = _machines.Select(m =>
@@ -186,7 +186,7 @@ public partial class ParkWindow : Window
                     Host = $"{m.Host}:{m.Port}",
                     Reachable = r?.Ok ?? false,
                     MonitoringActive = r?.Active ?? false,
-                    Error = r?.Error ?? "non interrogée",
+                    Error = r?.Error ?? Lang.T("non interrogée", "not queried"),
                     LastSample = r?.Last?.Time,
                     CpuLoad = r?.Last?.CpuLoad,
                     CpuTemp = r?.Last?.CpuTemp,
@@ -195,14 +195,14 @@ public partial class ParkWindow : Window
                     TopProcesses = r?.Last?.TopProcesses ?? "",
                     CriticalAlerts = alerts.Count(a => a.Level == "crit"),
                     WarningAlerts = alerts.Count(a => a.Level != "crit"),
-                    LastAlert = latest is null ? "" : $"{latest.Time:dd/MM HH:mm} — {latest.Title}",
+                    LastAlert = latest is null ? "" : $"{Lang.ShortDateMinute(latest.Time)} — {latest.Title}",
                 };
             }).ToList();
 
             // Comparateur de parc : on rapatrie le résumé du dernier scan de chaque
             // poste joignable. C'est la seule information qui permette de corréler —
             // les relevés temps réel disent l'état, pas l'inventaire.
-            TxtStatus.Text = "Récupération des résumés d'analyse pour la comparaison…";
+            TxtStatus.Text = Lang.T("Récupération des résumés d'analyse pour la comparaison…", "Fetching the analysis summaries for the comparison…");
             var summaries = new List<Core.Analysis.ParkComparator.MachineSummary>();
             foreach (var m in _machines)
             {
@@ -221,11 +221,11 @@ public partial class ParkWindow : Window
             var comparison = Core.Analysis.ParkComparator.Analyze(summaries);
             var path = ParkReportGenerator.WriteToDisk(lines, comparison);
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-            TxtStatus.Text = $"Rapport du parc généré : {path}";
+            TxtStatus.Text = Lang.T($"Rapport du parc généré : {path}", $"Fleet report generated: {path}");
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = "Échec de la génération du rapport : " + ex.Message;
+            TxtStatus.Text = Lang.T("Échec de la génération du rapport : ", "Report generation failed: ") + ex.Message;
         }
     }
 
@@ -263,7 +263,7 @@ public partial class ParkWindow : Window
             using var resp = await Http.SendAsync(req);
             if (!resp.IsSuccessStatusCode)
                 return new(m, false, false, null, resp.StatusCode == System.Net.HttpStatusCode.Forbidden
-                    ? "refusé (token ou horloge décalée ?)" : $"HTTP {(int)resp.StatusCode}");
+                    ? Lang.T("refusé (token ou horloge décalée ?)", "refused (token or clock skew?)") : $"HTTP {(int)resp.StatusCode}");
 
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
             bool active = doc.RootElement.TryGetProperty("active", out var a) && a.GetBoolean();
@@ -293,7 +293,7 @@ public partial class ParkWindow : Window
         }
         catch (Exception ex)
         {
-            return new(m, false, false, null, ex is TaskCanceledException ? "délai dépassé" : "injoignable");
+            return new(m, false, false, null, ex is TaskCanceledException ? Lang.T("délai dépassé", "timed out") : Lang.T("injoignable", "unreachable"));
         }
     }
 
@@ -330,14 +330,14 @@ public partial class ParkWindow : Window
     private static string DescribeVersion(QueryResult? r)
     {
         if (r is null || !r.Ok) return "";
-        if (string.IsNullOrEmpty(r.Version)) return "⬆ antérieure à 1.2.2";
+        if (string.IsNullOrEmpty(r.Version)) return Lang.T("⬆ antérieure à 1.2.2", "⬆ older than 1.2.2");
 
         if (!Version.TryParse(r.Version, out var remote) || !Version.TryParse(ConsoleVersion, out var local))
             return r.Version;
 
         var cmp = remote.CompareTo(local);
-        return cmp < 0 ? $"⬆ {r.Version} — à mettre à jour"
-             : cmp > 0 ? $"⚠ {r.Version} — console en retard"
+        return cmp < 0 ? Lang.T($"⬆ {r.Version} — à mettre à jour", $"⬆ {r.Version} — to be updated")
+             : cmp > 0 ? Lang.T($"⚠ {r.Version} — console en retard", $"⚠ {r.Version} — console is behind")
              : r.Version;
     }
 
@@ -352,9 +352,9 @@ public partial class ParkWindow : Window
                 Host = $"{m.Host}:{m.Port}",
                 Etat = r is null ? "—"
                      : !r.Ok ? $"🔴 {r.Error}"
-                     : r.Active ? "🟢 surveillance active"
-                     : "🟠 joignable, surveillance arrêtée",
-                DernierReleve = r?.Last?.Time.ToString("dd/MM HH:mm:ss") ?? "",
+                     : r.Active ? Lang.T("🟢 surveillance active", "🟢 monitoring active")
+                     : Lang.T("🟠 joignable, surveillance arrêtée", "🟠 reachable, monitoring stopped"),
+                DernierReleve = r?.Last?.Time is { } rt ? Lang.ShortDateSecond(rt) : "",
                 Cpu = r?.Last?.CpuLoad?.ToString("0.#") ?? "",
                 TempCpu = r?.Last?.CpuTemp is { } ct ? $"{ct:0.#} °C" : "",
                 TempGpu = r?.Last?.GpuTemp is { } gt ? $"{gt:0.#} °C" : "",
@@ -377,7 +377,7 @@ public partial class ParkWindow : Window
     {
         if (LvMachines.SelectedItem is not Row row)
         {
-            MessageBox.Show(this, "Sélectionne d'abord une machine dans la liste.", "FaultTracePC",
+            MessageBox.Show(this, Lang.T("Sélectionne d'abord une machine dans la liste.", "Select a machine in the list first."), "FaultTracePC",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -385,41 +385,48 @@ public partial class ParkWindow : Window
         if (machine is null) return;
 
         if (MessageBox.Show(this,
-                $"Lancer un diagnostic complet sur {machine.Name} ?\n\n" +
-                "Le scan s'exécute sur la machine distante (période 30 jours, analyse des dumps comprise) " +
-                "et peut prendre plusieurs minutes ; son rapport s'ouvrira automatiquement ici.",
+                Lang.T($"Lancer un diagnostic complet sur {machine.Name} ?\n\n", $"Run a full diagnosis on {machine.Name}?\n\n") +
+                Lang.T("Le scan s'exécute sur la machine distante (période 30 jours, analyse des dumps comprise) ", "The scan runs on the remote machine (30-day period, dump analysis included) ") +
+                Lang.T("et peut prendre plusieurs minutes ; son rapport s'ouvrira automatiquement ici.", "and can take several minutes; its report will open here automatically."),
                 "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
         BtnRemoteScan.IsEnabled = false;
         try
         {
-            TxtStatus.Text = $"🩺 Diagnostic en cours sur {machine.Name}… (plusieurs minutes possibles, ne pas fermer cette fenêtre)";
+            TxtStatus.Text = Lang.T($"🩺 Diagnostic en cours sur {machine.Name}… (plusieurs minutes possibles, ne pas fermer cette fenêtre)", $"🩺 Diagnosis running on {machine.Name}… (may take several minutes, do not close this window)");
             using var req = SignedRequest(machine, HttpMethod.Post, "/api/scan", "days=30");
             using var resp = await ScanHttp.SendAsync(req);
 
             if ((int)resp.StatusCode == 429)
             {
-                TxtStatus.Text = $"{machine.Name} : un diagnostic est déjà en cours — réessaie dans quelques minutes.";
+                TxtStatus.Text = Lang.T($"{machine.Name} : un diagnostic est déjà en cours — réessaie dans quelques minutes.", $"{machine.Name}: a diagnosis is already running — try again in a few minutes.");
                 return;
             }
             resp.EnsureSuccessStatusCode();
-            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-            if (!doc.RootElement.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
+            var res = ParkProtocol.ReadScanResponse(await resp.Content.ReadAsStringAsync());
+            if (!res.Ok)
             {
-                TxtStatus.Text = $"{machine.Name} : échec du scan distant — " +
-                    (doc.RootElement.TryGetProperty("error", out var err) ? err.GetString() : "erreur inconnue");
+                // Le motif vient du poste : il est donc écrit dans la langue du
+                // poste, et on le présente comme tel plutôt que de le faire passer
+                // pour une phrase de la console.
+                TxtStatus.Text = Lang.T($"{machine.Name} : échec du scan distant — ", $"{machine.Name}: remote scan failed — ") +
+                    (string.IsNullOrWhiteSpace(res.Error) ? Lang.T("réponse inexploitable", "unusable response") : res.Error);
                 return;
             }
 
-            var name = doc.RootElement.GetProperty("report").GetString()!;
-            await DownloadAndOpenReportAsync(machine, name);
-            TxtStatus.Text = $"✅ Diagnostic de {machine.Name} terminé — verdict : " +
-                (doc.RootElement.TryGetProperty("verdict", out var v) ? v.GetString() : "voir le rapport");
+            await DownloadAndOpenReportAsync(machine, res.ReportName);
+            TxtStatus.Text = Lang.T($"✅ Diagnostic de {machine.Name} terminé — ", $"✅ Diagnosis of {machine.Name} complete — ") + (res.Level is { } niveau
+                // Poste à jour : la phrase est écrite ICI, dans la langue de la console.
+                ? niveau.Sentence(res.Critical, res.Warnings)
+                // Poste antérieur à la 1.3.0 : il n'envoie pas de code, on affiche sa
+                // phrase telle quelle. La retraduire serait inventer.
+                : string.IsNullOrWhiteSpace(res.RemoteSentence) ? Lang.T("voir le rapport", "see the report") : res.RemoteSentence);
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = $"Échec du diagnostic distant : {(ex is TaskCanceledException ? "délai dépassé" : ex.Message)}";
+            TxtStatus.Text = Lang.T($"Échec du diagnostic distant : {(ex is TaskCanceledException ? "délai dépassé" : ex.Message)}",
+                                     $"Remote diagnosis failed: {(ex is TaskCanceledException ? "timed out" : ex.Message)}");
         }
         finally
         {
@@ -446,7 +453,7 @@ public partial class ParkWindow : Window
     {
         if (LvMachines.SelectedItem is not Row row)
         {
-            MessageBox.Show(this, "Sélectionne d'abord une machine dans la liste.", "FaultTracePC",
+            MessageBox.Show(this, Lang.T("Sélectionne d'abord une machine dans la liste.", "Select a machine in the list first."), "FaultTracePC",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -455,7 +462,7 @@ public partial class ParkWindow : Window
 
         try
         {
-            TxtStatus.Text = $"Récupération du dernier rapport de {machine.Name}…";
+            TxtStatus.Text = Lang.T($"Récupération du dernier rapport de {machine.Name}…", $"Fetching the last report from {machine.Name}…");
             using var listReq = SignedRequest(machine, HttpMethod.Get, "/api/reports");
             using var listResp = await Http.SendAsync(listReq);
             listResp.EnsureSuccessStatusCode();
@@ -463,17 +470,17 @@ public partial class ParkWindow : Window
             var first = doc.RootElement.EnumerateArray().FirstOrDefault();
             if (first.ValueKind != JsonValueKind.Object)
             {
-                TxtStatus.Text = $"{machine.Name} : aucun rapport partagé (lancer un scan sur cette machine).";
+                TxtStatus.Text = Lang.T($"{machine.Name} : aucun rapport partagé (lancer un scan sur cette machine).", $"{machine.Name}: no shared report (run a scan on that machine).");
                 return;
             }
             var name = first.GetProperty("name").GetString()!;
 
             await DownloadAndOpenReportAsync(machine, name);
-            TxtStatus.Text = $"Rapport {name} de {machine.Name} ouvert.";
+            TxtStatus.Text = Lang.T($"Rapport {name} de {machine.Name} ouvert.", $"Report {name} from {machine.Name} opened.");
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = $"Échec : {ex.Message}";
+            TxtStatus.Text = Lang.T($"Échec : {ex.Message}", $"Failed: {ex.Message}");
         }
     }
 }

@@ -118,7 +118,7 @@ public static class NvmeSmartReader
             {
                 // Sans élévation, l'ouverture du disque physique est refusée : c'est
                 // attendu et non bloquant (le service et l'interface sont élevés).
-                errors?.Add($"SMART NVMe (disque {physicalDriveIndex}) : accès refusé (erreur {Marshal.GetLastWin32Error()}).");
+                errors?.Add(Lang.T($"SMART NVMe (disque {physicalDriveIndex}) : accès refusé (erreur {Marshal.GetLastWin32Error()}).", $"SMART NVMe (disk {physicalDriveIndex}): access denied (error {Marshal.GetLastWin32Error()})"));
                 return null;
             }
 
@@ -156,7 +156,7 @@ public static class NvmeSmartReader
         }
         catch (Exception ex)
         {
-            errors?.Add($"SMART NVMe (disque {physicalDriveIndex}) : {ex.Message}");
+            errors?.Add(Lang.T($"SMART NVMe (disque {physicalDriveIndex}) : {ex.Message}", $"NVMe SMART (disk {physicalDriveIndex}): {ex.Message}"));
             return null;
         }
     }
@@ -199,13 +199,13 @@ public static class NvmeSmartReader
     {
         if (flags == 0) return "";
         var parts = new List<string>();
-        if ((flags & 0x01) != 0) parts.Add("réserve de blocs sous le seuil critique");
-        if ((flags & 0x02) != 0) parts.Add("température hors plage de fonctionnement");
-        if ((flags & 0x04) != 0) parts.Add("fiabilité dégradée par usure ou erreurs");
-        if ((flags & 0x08) != 0) parts.Add("disque passé en LECTURE SEULE");
-        if ((flags & 0x10) != 0) parts.Add("sauvegarde de la mémoire volatile défaillante");
-        if ((flags & 0x20) != 0) parts.Add("mémoire persistante en lecture seule");
-        return parts.Count > 0 ? string.Join(" ; ", parts) : $"drapeau inconnu (0x{flags:X2})";
+        if ((flags & 0x01) != 0) parts.Add(Lang.T("réserve de blocs sous le seuil critique", "spare block reserve below the critical threshold"));
+        if ((flags & 0x02) != 0) parts.Add(Lang.T("température hors plage de fonctionnement", "temperature outside the operating range"));
+        if ((flags & 0x04) != 0) parts.Add(Lang.T("fiabilité dégradée par usure ou erreurs", "reliability degraded by wear or errors"));
+        if ((flags & 0x08) != 0) parts.Add(Lang.T("disque passé en LECTURE SEULE", "drive switched to READ-ONLY"));
+        if ((flags & 0x10) != 0) parts.Add(Lang.T("sauvegarde de la mémoire volatile défaillante", "volatile memory backup failing"));
+        if ((flags & 0x20) != 0) parts.Add(Lang.T("mémoire persistante en lecture seule", "persistent memory in read-only mode"));
+        return parts.Count > 0 ? string.Join(Lang.T(" ; ", "; "), parts) : Lang.T($"drapeau inconnu (0x{flags:X2})", $"unknown flag (0x{flags:X2})");
     }
 
     // ------------------------------------------------------------------

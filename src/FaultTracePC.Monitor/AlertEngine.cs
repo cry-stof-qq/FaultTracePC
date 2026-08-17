@@ -1,4 +1,4 @@
-using System.Management;
+﻿using System.Management;
 using System.Text;
 using System.Text.Json;
 using FaultTracePC.Core;
@@ -31,21 +31,11 @@ public sealed class AlertEngine
         var alerts = new List<PreventiveAlert>();
         if (!_settings.Enabled) return alerts;
 
-        Check(alerts, "cpu_temp", s.CpuTemp, _settings.CpuTempWarn, _settings.CpuTempCrit,
-            v => $"Température du processeur élevée : {v:0} °C",
-            v => $"Le CPU dépasse {v:0} °C de façon soutenue. Au-delà de ~95 °C, le processeur se bride puis la machine peut s'éteindre brutalement pour se protéger.",
-            "Vérifier la ventilation : dépoussiérer radiateur et ventilateurs, contrôler leur rotation, renouveler la pâte thermique si la machine a plus de 3-4 ans. Fermer les applications qui chargent le CPU pour tester.");
+        Check(alerts, "cpu_temp", s.CpuTemp, _settings.CpuTempWarn, _settings.CpuTempCrit);
 
-        Check(alerts, "gpu_temp", s.GpuTemp, _settings.GpuTempWarn, _settings.GpuTempCrit,
-            v => $"Température de la carte graphique élevée : {v:0} °C",
-            v => $"Le GPU dépasse {v:0} °C de façon soutenue — risque d'écran noir, de réinitialisation du pilote (TDR) ou d'arrêt brutal.",
-            "Dépoussiérer la carte et le flux d'air du boîtier ; vérifier la courbe de ventilation ; retirer tout overclocking.");
+        Check(alerts, "gpu_temp", s.GpuTemp, _settings.GpuTempWarn, _settings.GpuTempCrit);
 
-        Check(alerts, "commit", s.CommitPct, _settings.CommitWarn, _settings.CommitCrit,
-            v => $"Mémoire virtuelle presque saturée : {v:0} %",
-            v => $"La mémoire engagée (RAM + fichier d'échange) atteint {v:0} %. À saturation, Windows gèle, les applications plantent et des écrans bleus mémoire peuvent survenir."
-                 + (s.TopProcesses is not null ? $" Processus dominants : {s.TopProcesses}." : ""),
-            "Fermer les applications les plus gourmandes ; si la virtualisation (vmmem/WSL/Docker) est en tête, lui fixer une limite via %USERPROFILE%\\.wslconfig ([wsl2] puis memory=8GB), puis « wsl --shutdown ».");
+        Check(alerts, "commit", s.CommitPct, _settings.CommitWarn, _settings.CommitCrit, s.TopProcesses);
 
         return alerts;
     }
@@ -56,30 +46,22 @@ public sealed class AlertEngine
         if (!_settings.Enabled) return null;
 
         if (providerAndId.Contains("WHEA-Logger", StringComparison.OrdinalIgnoreCase))
-            return Emit("whea", "crit", "Erreur matérielle signalée par le processeur (WHEA)",
-                "Le matériel vient de signaler une erreur corrigée ou fatale. Répétées, ces erreurs annoncent une défaillance CPU, mémoire, carte mère ou alimentation.",
-                "Vérifier températures et alimentation, retirer tout overclocking/XMP, mettre à jour le BIOS. Si les erreurs persistent, faire tester le matériel.", null);
+            return Emit("whea", "crit", null, null);
 
         // Resource-Exhaustion-Detector 2004 : Windows lui-même constate que la mémoire
         // virtuelle est épuisée et nomme les processus responsables. Signal en or.
         if (providerAndId.Contains("Resource-Exhaustion-Detector", StringComparison.OrdinalIgnoreCase))
-            return Emit("exhaustion", "crit", "Mémoire épuisée — Windows a manqué de mémoire virtuelle",
-                "Windows signale l'épuisement de la mémoire virtuelle : " + Shorten(message, 200),
-                "Fermer le programme le plus gourmand cité ci-dessus. Si c'est la virtualisation (vmmem/WSL/Docker), lui fixer une limite via %USERPROFILE%\\.wslconfig ([wsl2] puis memory=8GB) et exécuter « wsl --shutdown ». Vérifier aussi que le fichier d'échange est géré automatiquement.", null);
+            return Emit("exhaustion", "crit", null, Shorten(message, 200));
 
         // Kernel-Power 41 : la machine s'est éteinte sans arrêt propre lors de la session précédente.
         if (providerAndId.Contains("Kernel-Power", StringComparison.OrdinalIgnoreCase))
-            return Emit("power41", "crit", "Arrêt brutal détecté (coupure sans arrêt propre)",
-                "Le système s'est éteint ou a redémarré sans arrêt propre. Causes typiques : alimentation défaillante, surchauffe déclenchant la protection, ou blocage matériel complet.",
-                "Vérifier les températures en charge et le branchement électrique ; si cela se répète, tester une autre alimentation. Le journal de la boîte noire montre les relevés juste avant la coupure.", null);
+            return Emit("power41", "crit", null, null);
 
         if (providerAndId.StartsWith("disk#", StringComparison.OrdinalIgnoreCase) ||
             providerAndId.StartsWith("stornvme#", StringComparison.OrdinalIgnoreCase) ||
             providerAndId.StartsWith("storahci#", StringComparison.OrdinalIgnoreCase) ||
             providerAndId.StartsWith("Ntfs#", StringComparison.OrdinalIgnoreCase))
-            return Emit("disk_event", "warn", "Erreur disque signalée par Windows",
-                "Windows vient d'enregistrer une erreur d'entrée/sortie sur un disque : " + Shorten(message, 160),
-                "Sauvegarder les données importantes sans attendre, vérifier la santé SMART du disque et ses câbles, mettre à jour le firmware du SSD.", null);
+            return Emit("disk_event", "warn", null, Shorten(message, 160));
 
         return null;
     }
@@ -99,13 +81,15 @@ public sealed class AlertEngine
             foreach (ManagementObject mo in searcher.Get())
             {
                 var name = mo["FriendlyName"]?.ToString() ?? "disque";
-                var health = Convert.ToInt32(mo["HealthStatus"] ?? 0);
-                if (health is 1 or 2) // 1 = Warning, 2 = Unhealthy
+                // Même table de correspondance que le scan, dans le Core. Valeur
+                // absente → 5 (« Unknown »), donc aucune alerte : on ne réveille
+                // personne sur une mesure qui n'a pas eu lieu.
+                var health = DiskHealthInfo.FromWmi(Convert.ToUInt16(mo["HealthStatus"] ?? (ushort)5));
+                if (health.IsDegraded())
                 {
-                    var a = Emit($"disk_health_{name}", health == 2 ? "crit" : "warn",
-                        $"Disque en mauvaise santé : {name}",
-                        $"Windows signale l'état « {(health == 2 ? "défaillant" : "avertissement")} » pour ce disque. Une panne de disque fait perdre les données ET rend la machine non démarrable.",
-                        "SAUVEGARDER immédiatement les données, puis prévoir le remplacement du disque. Vérifier le rapport SMART complet pour confirmation.", null);
+                    // Le niveau porte l'état : AlertCatalog le relit pour refabriquer
+                    // la phrase. Le modèle du disque, lui, est dans l'identifiant.
+                    var a = Emit($"disk_health_{name}", health == DiskHealth.Failing ? "crit" : "warn", null, null);
                     if (a is not null) alerts.Add(a);
                 }
             }
@@ -118,8 +102,7 @@ public sealed class AlertEngine
     // ------------------------------------------------------------------
 
     private void Check(List<PreventiveAlert> alerts, string ruleId, double? value,
-        double warn, double crit,
-        Func<double, string> title, Func<double, string> details, string reco)
+        double warn, double crit, string? extract = null)
     {
         if (value is not { } v) return;
 
@@ -134,12 +117,12 @@ public sealed class AlertEngine
         if (streak < _settings.ConsecutiveSamples) return;
 
         var level = v >= crit ? "crit" : "warn";
-        var alert = Emit(ruleId, level, title(v), details(v), reco, v);
+        var alert = Emit(ruleId, level, v, extract);
         if (alert is not null) alerts.Add(alert);
     }
 
     /// <summary>Crée l'alerte si le délai anti-répétition est écoulé, sinon retourne null.</summary>
-    private PreventiveAlert? Emit(string ruleId, string level, string title, string details, string reco, double? value)
+    private PreventiveAlert? Emit(string ruleId, string level, double? value, string? extract)
     {
         if (_lastEmitted.TryGetValue(ruleId, out var last) &&
             DateTime.Now - last < TimeSpan.FromMinutes(_settings.RepeatMinutes))
@@ -151,11 +134,16 @@ public sealed class AlertEngine
             Time = DateTime.Now,
             RuleId = ruleId,
             Level = level,
-            Title = title,
-            Details = details,
-            Recommendation = reco,
             Value = value,
+            Extract = extract,
         };
+
+        // Le texte est posé par la MÊME table que celle du lecteur. On l'écrit
+        // quand même dans le fichier : un journal qu'un humain ouvre au bloc-notes
+        // doit rester lisible, et une version future qui ne connaîtrait plus la
+        // règle retombera dessus.
+        AlertCatalog.Localize(alert);
+
         Append(alert);
         return alert;
     }

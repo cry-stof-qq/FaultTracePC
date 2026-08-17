@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
@@ -91,27 +91,28 @@ public partial class MonitorWindow : Window
 
             LvLive.ItemsSource = recent.Select(e => new LiveRow
             {
-                Heure = e.Time.ToString("dd/MM HH:mm:ss"),
+                Heure = Lang.ShortDateSecond(e.Time),
                 Cpu = e.Kind == "s" ? Pct(e.CpuLoad) : "",
                 TempCpu = e.Kind == "s" ? Temp(e.CpuTemp) : "",
                 TempGpu = e.Kind == "s" ? Temp(e.GpuTemp) : "",
                 Ram = e.Kind == "s" ? Pct(e.MemPct) : "",
                 Info = e.Kind switch
                 {
-                    "e" => $"⚠ ÉVÉNEMENT {e.EventCategory} — {e.EventMessage}",
+                    "e" => Lang.T($"⚠ ÉVÉNEMENT {e.EventCategory} — {e.EventMessage}", $"⚠ EVENT {e.EventCategory} — {e.EventMessage}"),
                     "b" => e.PreviousEndedAbruptly == true
-                        ? "▶ Démarrage de la surveillance — la session précédente s'était terminée BRUTALEMENT"
-                        : "▶ Démarrage de la surveillance",
-                    "x" => "⏹ Arrêt propre de la surveillance",
-                    _ => e.TopProcesses is not null ? $"Top : {e.TopProcesses}" : "",
+                        ? Lang.T("▶ Démarrage de la surveillance — la session précédente s'était terminée BRUTALEMENT", "▶ Monitoring started — the previous session had ended ABRUPTLY")
+                        : Lang.T("▶ Démarrage de la surveillance", "▶ Monitoring started"),
+                    "x" => Lang.T("⏹ Arrêt propre de la surveillance", "⏹ Monitoring stopped cleanly"),
+                    _ => e.TopProcesses is not null ? Lang.T($"Top : {e.TopProcesses}", $"Top: {e.TopProcesses}") : "",
                 },
             }).ToList();
 
             var lastSample = recent.FirstOrDefault(e => e.Kind == "s");
             var active = lastSample is not null && DateTime.Now - lastSample.Time < TimeSpan.FromMinutes(2);
             TxtLiveStatus.Text = lastSample is null
-                ? "Aucun relevé trouvé — le service de surveillance est-il installé et démarré (bouton 📡) ?"
-                : $"{(active ? "🟢 Service actif" : "🔴 Service arrêté ou en retard")} — dernier relevé : {lastSample.Time:HH:mm:ss} — rafraîchissement automatique toutes les 5 s";
+                ? Lang.T("Aucun relevé trouvé — le service de surveillance est-il installé et démarré (bouton 📡) ?", "No reading found — is the monitoring service installed and started (📡 button)?")
+                : Lang.T($"{(active ? "🟢 Service actif" : "🔴 Service arrêté ou en retard")} — dernier relevé : {lastSample.Time:HH:mm:ss} — rafraîchissement automatique toutes les 5 s",
+                         $"{(active ? "🟢 Service running" : "🔴 Service stopped or lagging")} — last reading: {lastSample.Time:HH:mm:ss} — automatic refresh every 5 s");
 
             // Capteur CPU absent ? On l'explique au lieu de laisser des tirets mystérieux.
             var samples = recent.Where(e => e.Kind == "s").Take(20).ToList();
@@ -120,7 +121,7 @@ public partial class MonitorWindow : Window
         }
         catch (Exception ex)
         {
-            TxtLiveStatus.Text = "Erreur de lecture du journal : " + ex.Message;
+            TxtLiveStatus.Text = Lang.T("Erreur de lecture du journal : ", "Log read error: ") + ex.Message;
         }
     }
 
@@ -170,7 +171,7 @@ public partial class MonitorWindow : Window
 
         if (_chartSamples.Count < 2)
         {
-            AddText("Pas encore assez de relevés sur cette période — laisse la surveillance tourner quelques minutes.",
+            AddText(Lang.T("Pas encore assez de relevés sur cette période — laisse la surveillance tourner quelques minutes.", "Not enough readings over this period yet — let the monitoring run for a few minutes."),
                 12, 12, System.Windows.Media.Brushes.Gray);
             return;
         }
@@ -210,8 +211,8 @@ public partial class MonitorWindow : Window
             });
             AddText($"{v:0}", 6, y - 9, System.Windows.Media.Brushes.Gray, 11);
         }
-        AddText(_chartStart.ToString("dd/MM HH:mm"), padL, padT + plotH + 4, System.Windows.Media.Brushes.Gray, 11);
-        var endLabel = _chartEnd.ToString("dd/MM HH:mm");
+        AddText(Lang.ShortDateMinute(_chartStart), padL, padT + plotH + 4, System.Windows.Media.Brushes.Gray, 11);
+        var endLabel = Lang.ShortDateMinute(_chartEnd);
         AddText(endLabel, padL + plotW - endLabel.Length * 6.5, padT + plotH + 4, System.Windows.Media.Brushes.Gray, 11);
 
         // Repères verticaux des incidents (événements et alertes)
@@ -234,9 +235,9 @@ public partial class MonitorWindow : Window
         DrawSeries(GpuVal, SeriesGpu, X, Y);
         DrawSeries(s => s.MemPct, SeriesMem, X, Y);
 
-        TxtChartInfo.Text = $"{_chartSamples.Count} relevés du {_chartStart:dd/MM HH:mm} au {_chartEnd:dd/MM HH:mm}" +
-                            (_chartEvents.Count > 0 ? $" · {_chartEvents.Count} incident(s) en repères pointillés" : "") +
-                            " · survole pour lire les valeurs.";
+        TxtChartInfo.Text = Lang.T($"{_chartSamples.Count} relevés du {_chartStart:dd/MM HH:mm} au {_chartEnd:dd/MM HH:mm}", $"{_chartSamples.Count} readings from {_chartStart:MM-dd HH:mm} to {_chartEnd:MM-dd HH:mm}") +
+                            (_chartEvents.Count > 0 ? Lang.T($" · {_chartEvents.Count} incident(s) en repères pointillés", $" · {_chartEvents.Count} incident(s) as dotted markers") : "") +
+                            Lang.T(" · survole pour lire les valeurs.", " · hover to read the values.");
     }
 
     private void DrawSeries(Func<FlightSample, double?> selector,
@@ -281,13 +282,13 @@ public partial class MonitorWindow : Window
         var target = _chartStart.AddSeconds(ratio * (_chartEnd - _chartStart).TotalSeconds);
 
         var s = _chartSamples.OrderBy(x => Math.Abs((x.Time - target).TotalSeconds)).First();
-        TxtChartInfo.Text = $"{s.Time:dd/MM HH:mm:ss}  ·  CPU {Pct(s.CpuLoad)} % / {Temp(s.CpuTemp)}  ·  " +
-                            $"GPU {Temp(s.GpuTemp)}  ·  Mémoire {Pct(s.MemPct)} %  ·  Mém. virtuelle {Pct(s.CommitPct)} %" +
+        TxtChartInfo.Text = Lang.T($"{Lang.ShortDateSecond(s.Time)}  ·  CPU {Pct(s.CpuLoad)} % / {Temp(s.CpuTemp)}  ·  ", $"{Lang.ShortDateSecond(s.Time)}  ·  CPU {Pct(s.CpuLoad)}% / {Temp(s.CpuTemp)}  ·  ") +
+                            Lang.T($"GPU {Temp(s.GpuTemp)}  ·  Mémoire {Pct(s.MemPct)} %  ·  Mém. virtuelle {Pct(s.CommitPct)} %", $"GPU {Temp(s.GpuTemp)}  ·  Memory {Pct(s.MemPct)}%  ·  Virtual mem. {Pct(s.CommitPct)}%") +
                             (s.TopProcesses is not null ? $"  ·  {s.TopProcesses}" : "");
     }
 
     private void ChartCanvas_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) =>
-        TxtChartInfo.Text = $"{_chartSamples.Count} relevés · survole la courbe pour lire les valeurs.";
+        TxtChartInfo.Text = Lang.T($"{_chartSamples.Count} relevés · survole la courbe pour lire les valeurs.", $"{_chartSamples.Count} readings · hover the curve to read the values.");
 
     // ------------------------------------------------------------------
     // Onglet « Historique » (agrégation par heure)
@@ -309,7 +310,7 @@ public partial class MonitorWindow : Window
                     var s = g.Where(x => x.Kind == "s").ToList();
                     return new HistRow
                     {
-                        Periode = g.Key.ToString("dd/MM HH") + " h",
+                        Periode = Lang.ShortDateHour(g.Key) + " h",
                         CpuMoy = s.Count == 0 ? "—" : Pct(s.Average(x => x.CpuLoad ?? 0)),
                         CpuMax = s.Count == 0 ? "—" : Pct(s.Max(x => x.CpuLoad ?? 0)),
                         TempCpuMax = s.Count == 0 ? "—" : Temp(MaxOrNull(s, x => x.CpuTemp)),
@@ -322,11 +323,13 @@ public partial class MonitorWindow : Window
                 .ToList();
 
             LvHist.ItemsSource = rows;
-            TxtHistStatus.Text = $"{entries.Count(x => x.Kind == "s")} relevés, {entries.Count(x => x.Kind == "e")} événement(s) sur {days} jour(s).";
+            TxtHistStatus.Text = Lang.T(
+                $"{entries.Count(x => x.Kind == "s")} relevés, {entries.Count(x => x.Kind == "e")} événement(s) sur {days} jour(s).",
+                $"{entries.Count(x => x.Kind == "s")} readings, {entries.Count(x => x.Kind == "e")} event(s) over {days} day(s).");
         }
         catch (Exception ex)
         {
-            TxtHistStatus.Text = "Erreur : " + ex.Message;
+            TxtHistStatus.Text = Lang.T("Erreur : ", "Error: ") + ex.Message;
         }
     }
 
@@ -345,7 +348,7 @@ public partial class MonitorWindow : Window
         try
         {
             var files = JournalFiles(2).ToList();
-            TxtRawPath.Text = files.Count > 0 ? Path.GetDirectoryName(files[^1]) : "Aucun fichier journal.";
+            TxtRawPath.Text = files.Count > 0 ? Path.GetDirectoryName(files[^1]) : Lang.T("Aucun fichier journal.", "No log file.");
             var lines = new List<string>();
             foreach (var f in files)
             {
@@ -359,7 +362,7 @@ public partial class MonitorWindow : Window
         }
         catch (Exception ex)
         {
-            TxtRaw.Text = "Erreur de lecture : " + ex.Message;
+            TxtRaw.Text = Lang.T("Erreur de lecture : ", "Read error: ") + ex.Message;
         }
     }
 

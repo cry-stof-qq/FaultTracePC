@@ -1,7 +1,8 @@
 <Window x:Class="FaultTracePC.App.RepairToolboxWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FaultTracePC — Boîte à outils de réparation"
+        xmlns:loc="clr-namespace:FaultTracePC.App"
+        Title="{x:Static loc:L.ToolTitle}"
         Icon="Assets/FaultTracePC.ico"
         Width="820" Height="640" MinWidth="700" MinHeight="540"
         WindowStartupLocation="CenterOwner" Background="#F4F6F9"
@@ -15,134 +16,134 @@
 
         <Border Grid.Row="0" Background="#182848" Padding="16,10">
             <TextBlock Foreground="White" FontSize="15" FontWeight="SemiBold"
-                       Text="🧰 Boîte à outils — chaque action s'exécute dans une fenêtre PowerShell visible"/>
+                       Text="{x:Static loc:L.ToolHeader}"/>
         </Border>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="14,8">
             <StackPanel>
 
                 <!-- ============ Filet de sécurité ============ -->
-                <GroupBox Header=" Avant toute réparation " FontSize="13" Padding="8" Margin="0,4">
+                <GroupBox Header="{x:Static loc:L.ToolGrpBefore}" FontSize="13" Padding="8" Margin="0,4">
                     <StackPanel>
                         <TextBlock FontSize="12" Foreground="#44546A" TextWrapping="Wrap" Margin="0,0,0,8"
-                                   Text="Un point de restauration permet de revenir en arrière si une réparation tourne mal. C'est trente secondes, et ça rend tout le reste réversible."/>
+                                   Text="{x:Static loc:L.ToolBeforeText}"/>
                         <WrapPanel>
-                            <Button Content="💾 Créer un point de restauration" Padding="10,6" Margin="0,0,8,4"
+                            <Button Content="{x:Static loc:L.ToolRestorePoint}" Padding="10,6" Margin="0,0,8,4"
                                     FontWeight="SemiBold" Background="#2470B3" Foreground="White" BorderThickness="0"
                                     Click="BtnRestorePoint_Click"
-                                    ToolTip="Crée un point de restauration système nommé « FaultTracePC — avant réparation »."/>
-                            <Button Content="↩ Ouvrir la restauration du système" Padding="10,6" Margin="0,0,8,4"
+                                    ToolTip="{x:Static loc:L.ToolRestorePointTip}"/>
+                            <Button Content="{x:Static loc:L.ToolOpenRestore}" Padding="10,6" Margin="0,0,8,4"
                                     Tag="rstrui" Click="BtnTool_Click"
-                                    ToolTip="Ouvre l'assistant Windows pour revenir à un point de restauration existant."/>
+                                    ToolTip="{x:Static loc:L.ToolOpenRestoreTip}"/>
                         </WrapPanel>
                     </StackPanel>
                 </GroupBox>
 
                 <!-- ============ Nettoyage (celui qui libère vraiment de la place) ============ -->
-                <GroupBox Header=" Libérer de l'espace disque " FontSize="13" Padding="8" Margin="0,8,0,4">
+                <GroupBox Header="{x:Static loc:L.ToolGrpSpace}" FontSize="13" Padding="8" Margin="0,8,0,4">
                     <StackPanel>
                         <TextBlock FontSize="12" Foreground="#44546A" TextWrapping="Wrap" Margin="0,0,0,8"
-                                   Text="Ces nettoyages récupèrent des gigaoctets réels — contrairement au « nettoyage de registre », qui ne libère rien et que Microsoft déconseille."/>
+                                   Text="{x:Static loc:L.ToolSpaceText}"/>
                         <WrapPanel>
-                            <Button Content="📊 Où est passée la place ?" Padding="10,6" Margin="0,0,8,6" Tag="diskusage" Click="BtnTool_Click"
-                                    ToolTip="Mesure l'espace occupé par les composants Windows, les temporaires, la corbeille et Windows.old."/>
-                            <Button Content="🧹 Purger les composants Windows obsolètes" Padding="10,6" Margin="0,0,8,6" Tag="componentcleanup" Click="BtnTool_Click"
-                                    ToolTip="DISM /StartComponentCleanup : supprime les anciennes versions des composants remplacés par les mises à jour. Récupère souvent 3 à 8 Go."/>
-                            <Button Content="🗑 Vider les fichiers temporaires" Padding="10,6" Margin="0,0,8,6" Tag="temp" Click="BtnTool_Click"
-                                    ToolTip="Vide %TEMP% et le dossier Temp de Windows (les fichiers en cours d'utilisation sont ignorés)."/>
-                            <Button Content="🧰 Nettoyage de disque Windows" Padding="10,6" Margin="0,0,8,6" Tag="cleanmgr" Click="BtnTool_Click"
-                                    ToolTip="Ouvre l'outil intégré, avec les options système (Windows.old, anciennes mises à jour)."/>
+                            <Button Content="{x:Static loc:L.ToolWhereSpace}" Padding="10,6" Margin="0,0,8,6" Tag="diskusage" Click="BtnTool_Click"
+                                    ToolTip="{x:Static loc:L.ToolWhereSpaceTip}"/>
+                            <Button Content="{x:Static loc:L.ToolCleanComponents}" Padding="10,6" Margin="0,0,8,6" Tag="componentcleanup" Click="BtnTool_Click"
+                                    ToolTip="{x:Static loc:L.ToolCleanComponentsTip}"/>
+                            <Button Content="{x:Static loc:L.ToolCleanTemp}" Padding="10,6" Margin="0,0,8,6" Tag="temp" Click="BtnTool_Click"
+                                    ToolTip="{x:Static loc:L.ToolCleanTempTip}"/>
+                            <Button Content="{x:Static loc:L.ToolDiskCleanup}" Padding="10,6" Margin="0,0,8,6" Tag="cleanmgr" Click="BtnTool_Click"
+                                    ToolTip="{x:Static loc:L.ToolDiskCleanupTip}"/>
                         </WrapPanel>
                     </StackPanel>
                 </GroupBox>
 
                 <!-- ============ Démarrage, sécurité, réseau ============ -->
-                <GroupBox Header=" Démarrage, sécurité et réseau " FontSize="13" Padding="8" Margin="0,4">
+                <GroupBox Header="{x:Static loc:L.ToolGrpStartup}" FontSize="13" Padding="8" Margin="0,4">
                     <WrapPanel>
-                        <Button Content="🚀 Programmes lancés au démarrage" Padding="10,6" Margin="0,0,8,6" Tag="startup" Click="BtnTool_Click"
-                                ToolTip="Liste ce qui se lance au démarrage (registre, dossier Démarrage) — la vraie cause d'un PC lent à démarrer. Lecture seule."/>
-                        <Button Content="🛡 Analyse rapide Microsoft Defender" Padding="10,6" Margin="0,0,8,6" Tag="defenderquick" Click="BtnTool_Click"
-                                ToolTip="Start-MpScan -ScanType QuickScan : quelques minutes, sans redémarrage."/>
-                        <Button Content="🛡 Analyse complète (longue)" Padding="10,6" Margin="0,0,8,6" Tag="defenderfull" Click="BtnTool_Click"
-                                ToolTip="Analyse complète du système : peut durer plus d'une heure."/>
-                        <Button Content="📜 Menaces détectées récemment" Padding="10,6" Margin="0,0,8,6" Tag="defenderhistory" Click="BtnTool_Click"
-                                ToolTip="Historique des détections de Microsoft Defender et état de la protection."/>
-                        <Button Content="🌐 Réinitialiser la pile réseau" Padding="10,6" Margin="0,0,8,6" Tag="networkreset" Click="BtnTool_Click"
-                                ToolTip="netsh winsock reset + réinitialisation IP + vidage du cache DNS. Nécessite un redémarrage."/>
-                        <Button Content="🔋 Rapport de batterie détaillé" Padding="10,6" Margin="0,0,8,6" Tag="battery" Click="BtnTool_Click"
-                                ToolTip="powercfg /batteryreport : historique complet de capacité et d'autonomie."/>
-                        <Button Content="📈 Moniteur de ressources" Padding="10,6" Margin="0,0,8,6" Tag="resmon" Click="BtnTool_Click"
-                                ToolTip="Ouvre l'outil Windows : processeur, disque, réseau et mémoire par processus, en direct."/>
+                        <Button Content="{x:Static loc:L.ToolStartupApps}" Padding="10,6" Margin="0,0,8,6" Tag="startup" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolStartupAppsTip}"/>
+                        <Button Content="{x:Static loc:L.ToolQuickScan}" Padding="10,6" Margin="0,0,8,6" Tag="defenderquick" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolQuickScanTip}"/>
+                        <Button Content="{x:Static loc:L.ToolFullScan}" Padding="10,6" Margin="0,0,8,6" Tag="defenderfull" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolFullScanTip}"/>
+                        <Button Content="{x:Static loc:L.ToolThreats}" Padding="10,6" Margin="0,0,8,6" Tag="defenderhistory" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolThreatsTip}"/>
+                        <Button Content="{x:Static loc:L.ToolNetReset}" Padding="10,6" Margin="0,0,8,6" Tag="networkreset" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolNetResetTip}"/>
+                        <Button Content="{x:Static loc:L.ToolBatteryReport}" Padding="10,6" Margin="0,0,8,6" Tag="battery" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolBatteryReportTip}"/>
+                        <Button Content="{x:Static loc:L.ToolResMon}" Padding="10,6" Margin="0,0,8,6" Tag="resmon" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolResMonTip}"/>
                     </WrapPanel>
                 </GroupBox>
 
                 <!-- ============ Windows Update ============ -->
-                <GroupBox Header=" Mise à jour Windows qui s'est mal passée " FontSize="13" Padding="8" Margin="0,4">
+                <GroupBox Header="{x:Static loc:L.ToolGrpUpdate}" FontSize="13" Padding="8" Margin="0,4">
                     <StackPanel>
                         <TextBlock FontSize="12" Foreground="#44546A" TextWrapping="Wrap" Margin="0,0,0,8"
-                                   Text="Démarche recommandée : 1) désinstaller la mise à jour fautive ci-dessous · 2) si Windows Update lui-même est cassé, réinitialiser ses composants · 3) en dernier recours, la réparation sur place réinstalle Windows sans toucher à tes fichiers ni tes applications."/>
+                                   Text="{x:Static loc:L.ToolUpdateText}"/>
                         <ListView x:Name="LvUpdates" Height="150" BorderBrush="#DBE2EC" BorderThickness="1" FontSize="12">
                             <ListView.View>
                                 <GridView>
                                     <GridViewColumn Header="KB" Width="110" DisplayMemberBinding="{Binding Kb}"/>
-                                    <GridViewColumn Header="Type" Width="180" DisplayMemberBinding="{Binding Description}"/>
-                                    <GridViewColumn Header="Installée le" Width="110" DisplayMemberBinding="{Binding InstalledOn}"/>
+                                    <GridViewColumn Header="{x:Static loc:L.ToolColType}" Width="180" DisplayMemberBinding="{Binding Description}"/>
+                                    <GridViewColumn Header="{x:Static loc:L.ToolColInstalled}" Width="110" DisplayMemberBinding="{Binding InstalledOn}"/>
                                 </GridView>
                             </ListView.View>
                         </ListView>
                         <WrapPanel Margin="0,8,0,0">
-                            <Button Content="🔄 Actualiser la liste" Padding="10,6" Margin="0,0,8,4" Click="BtnLoadUpdates_Click"/>
-                            <Button Content="🗑 Désinstaller la mise à jour sélectionnée" Padding="10,6" Margin="0,0,8,4"
+                            <Button Content="{x:Static loc:L.ToolRefresh}" Padding="10,6" Margin="0,0,8,4" Click="BtnLoadUpdates_Click"/>
+                            <Button Content="{x:Static loc:L.ToolUninstallUpdate}" Padding="10,6" Margin="0,0,8,4"
                                     FontWeight="SemiBold" Click="BtnUninstallUpdate_Click"
-                                    ToolTip="wusa /uninstall /kb:… — Windows demandera un redémarrage. La mise à jour se réinstallera ensuite via Windows Update (bloque-la temporairement si besoin)."/>
-                            <Button Content="♻ Réinitialiser les composants Windows Update" Padding="10,6" Margin="0,0,8,4"
+                                    ToolTip="{x:Static loc:L.ToolUninstallUpdateTip}"/>
+                            <Button Content="{x:Static loc:L.ToolResetWu}" Padding="10,6" Margin="0,0,8,4"
                                     Tag="wureset" Click="BtnTool_Click"
-                                    ToolTip="Arrête les services, purge SoftwareDistribution et catroot2 (caches de téléchargement), redémarre les services : force Windows Update à retélécharger proprement — LA réparation classique d'une mise à jour corrompue."/>
-                            <Button Content="🩹 Réparation sur place (réinstaller Windows sans perte)" Padding="10,6" Margin="0,0,8,4"
+                                    ToolTip="{x:Static loc:L.ToolResetWuTip}"/>
+                            <Button Content="{x:Static loc:L.ToolInPlace}" Padding="10,6" Margin="0,0,8,4"
                                     Click="BtnInPlaceRepair_Click"
-                                    ToolTip="Ouvre Paramètres → Récupération : « Résoudre les problèmes à l'aide de Windows Update » réinstalle la même version de Windows en conservant fichiers et applications."/>
-                            <Button Content="⬇ Rechercher et installer les mises à jour (optionnelles et pilotes inclus)"
+                                    ToolTip="{x:Static loc:L.ToolInPlaceTip}"/>
+                            <Button Content="{x:Static loc:L.ToolFindUpdates}"
                                     Padding="10,6" Margin="0,0,8,4" FontWeight="SemiBold"
                                     Click="BtnWindowsUpdate_Click"
-                                    ToolTip="Ouvre la fenêtre de mise à jour : liste tout ce qui est disponible, y compris les mises à jour optionnelles et de pilotes que Windows cache, avec sélection à la carte. Jamais de redémarrage automatique."/>
+                                    ToolTip="{x:Static loc:L.ToolFindUpdatesTip}"/>
                         </WrapPanel>
                     </StackPanel>
                 </GroupBox>
 
                 <!-- ============ Réparations système ============ -->
-                <GroupBox Header=" Réparations système " FontSize="13" Padding="8" Margin="0,8,0,4">
+                <GroupBox Header="{x:Static loc:L.ToolGrpRepair}" FontSize="13" Padding="8" Margin="0,8,0,4">
                     <WrapPanel>
-                        <Button Content="🧪 sfc /scannow (fichiers système)" Padding="10,6" Margin="0,0,8,6" Tag="sfc" Click="BtnTool_Click"
-                                ToolTip="Vérifie et répare les fichiers système Windows (~10 min)."/>
-                        <Button Content="🔍 DISM — vérifier l'image Windows" Padding="10,6" Margin="0,0,8,6" Tag="dismscan" Click="BtnTool_Click"
-                                ToolTip="DISM /Online /Cleanup-Image /ScanHealth (~5 min, lecture seule)."/>
-                        <Button Content="🔧 DISM — réparer l'image Windows" Padding="10,6" Margin="0,0,8,6" Tag="dismrestore" Click="BtnTool_Click"
-                                ToolTip="DISM /Online /Cleanup-Image /RestoreHealth (~15 min, télécharge les fichiers sains — à faire AVANT sfc si sfc échoue)."/>
-                        <Button Content="💽 Vérifier le disque système (lecture seule)" Padding="10,6" Margin="0,0,8,6" Tag="chkdskscan" Click="BtnTool_Click"
-                                ToolTip="Repair-Volume -Scan sur C: — sans redémarrage."/>
-                        <Button Content="💽 Planifier chkdsk C: /f (au redémarrage)" Padding="10,6" Margin="0,0,8,6" Tag="chkdskfix" Click="BtnTool_Click"
-                                ToolTip="Répare le système de fichiers au prochain redémarrage."/>
-                        <Button Content="🧠 Diagnostic mémoire Windows (redémarre !)" Padding="10,6" Margin="0,0,8,6" Tag="mdsched" Click="BtnTool_Click"
-                                ToolTip="mdsched — le PC redémarre immédiatement pour tester la RAM."/>
-                        <Button Content="⚡ Rapport d'énergie (60 s)" Padding="10,6" Margin="0,0,8,6" Tag="energy" Click="BtnTool_Click"
-                                ToolTip="powercfg /energy — analyse alimentation/veille pendant 60 secondes."/>
-                        <Button Content="🌡 Santé des disques (SMART)" Padding="10,6" Margin="0,0,8,6" Tag="smart" Click="BtnTool_Click"
-                                ToolTip="Get-PhysicalDisk + compteurs de fiabilité (température, usure, erreurs)."/>
-                        <Button Content="🐞 Installer WinDbg (analyse des dumps)" Padding="10,6" Margin="0,0,8,6" Tag="windbg" Click="BtnTool_Click"
-                                ToolTip="Installe les outils de débogage Microsoft via winget. Sans eux, le code d'arrêt est lu mais le pilote fautif reste souvent non identifié. N'installe rien sans que tu aies cliqué."/>
-                        <Button Content="🔌 Alimentation des liens (réinitialisations de contrôleur)" Padding="10,6" Margin="0,0,8,6" Tag="linkpower" Click="BtnTool_Click"
-                                ToolTip="Affiche le réglage actuel de la gestion d'alimentation des liens PCI Express et des disques, puis ouvre le panneau pour le modifier. C'est la cause la plus fréquemment documentée des événements « réinitialisation au périphérique » (storahci 129). Ne modifie rien tout seul."/>
+                        <Button Content="{x:Static loc:L.ToolSfc}" Padding="10,6" Margin="0,0,8,6" Tag="sfc" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolSfcTip}"/>
+                        <Button Content="{x:Static loc:L.ToolDismScan}" Padding="10,6" Margin="0,0,8,6" Tag="dismscan" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolDismScanTip}"/>
+                        <Button Content="{x:Static loc:L.ToolDismRestore}" Padding="10,6" Margin="0,0,8,6" Tag="dismrestore" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolDismRestoreTip}"/>
+                        <Button Content="{x:Static loc:L.ToolCheckDisk}" Padding="10,6" Margin="0,0,8,6" Tag="chkdskscan" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolCheckDiskTip}"/>
+                        <Button Content="{x:Static loc:L.ToolChkdsk}" Padding="10,6" Margin="0,0,8,6" Tag="chkdskfix" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolChkdskTip}"/>
+                        <Button Content="{x:Static loc:L.ToolMemDiag}" Padding="10,6" Margin="0,0,8,6" Tag="mdsched" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolMemDiagTip}"/>
+                        <Button Content="{x:Static loc:L.ToolEnergy}" Padding="10,6" Margin="0,0,8,6" Tag="energy" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolEnergyTip}"/>
+                        <Button Content="{x:Static loc:L.ToolSmart}" Padding="10,6" Margin="0,0,8,6" Tag="smart" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolSmartTip}"/>
+                        <Button Content="{x:Static loc:L.ToolWinDbg}" Padding="10,6" Margin="0,0,8,6" Tag="windbg" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolWinDbgTip}"/>
+                        <Button Content="{x:Static loc:L.ToolLinkPower}" Padding="10,6" Margin="0,0,8,6" Tag="linkpower" Click="BtnTool_Click"
+                                ToolTip="{x:Static loc:L.ToolLinkPowerTip}"/>
                     </WrapPanel>
                 </GroupBox>
 
                 <!-- ============ Consoles Windows ============ -->
-                <GroupBox Header=" Consoles Windows utiles " FontSize="13" Padding="8" Margin="0,4">
+                <GroupBox Header="{x:Static loc:L.ToolGrpConsoles}" FontSize="13" Padding="8" Margin="0,4">
                     <WrapPanel>
-                        <Button Content="📊 Moniteur de fiabilité" Padding="10,6" Margin="0,0,8,6" Tag="reliability" Click="BtnTool_Click"/>
-                        <Button Content="📋 Observateur d'événements" Padding="10,6" Margin="0,0,8,6" Tag="eventvwr" Click="BtnTool_Click"/>
-                        <Button Content="🔄 Paramètres Windows Update" Padding="10,6" Margin="0,0,8,6" Tag="wusettings" Click="BtnTool_Click"/>
-                        <Button Content="💾 Gestion des disques" Padding="10,6" Margin="0,0,8,6" Tag="diskmgmt" Click="BtnTool_Click"/>
-                        <Button Content="🖥 Informations système" Padding="10,6" Margin="0,0,8,6" Tag="msinfo" Click="BtnTool_Click"/>
+                        <Button Content="{x:Static loc:L.ToolReliability}" Padding="10,6" Margin="0,0,8,6" Tag="reliability" Click="BtnTool_Click"/>
+                        <Button Content="{x:Static loc:L.ToolEventViewer}" Padding="10,6" Margin="0,0,8,6" Tag="eventvwr" Click="BtnTool_Click"/>
+                        <Button Content="{x:Static loc:L.ToolWuSettings}" Padding="10,6" Margin="0,0,8,6" Tag="wusettings" Click="BtnTool_Click"/>
+                        <Button Content="{x:Static loc:L.ToolDiskMgmt}" Padding="10,6" Margin="0,0,8,6" Tag="diskmgmt" Click="BtnTool_Click"/>
+                        <Button Content="{x:Static loc:L.ToolSysInfo}" Padding="10,6" Margin="0,0,8,6" Tag="msinfo" Click="BtnTool_Click"/>
                     </WrapPanel>
                 </GroupBox>
             </StackPanel>
@@ -150,7 +151,7 @@
 
         <Border Grid.Row="2" Background="#EDF1F6" Padding="14,8">
             <TextBlock x:Name="TxtStatus" FontSize="12" Foreground="#44546A"
-                       Text="Les actions qui modifient le système demandent confirmation. FaultTracePC étant administrateur, les fenêtres PowerShell le sont aussi."/>
+                       Text="{x:Static loc:L.ToolFooter}"/>
         </Border>
     </Grid>
 </Window>

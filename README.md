@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="assets/FaultTracePC.png" alt="FaultTracePC" width="120">
 
@@ -21,11 +21,11 @@ packages are produced by that same automated build — not from a workstation.
 
 ---
 
-> **Language notice.** The application interface and the generated reports are
-> currently **in French only**. This README is in English so you can judge
-> whether the tool is worth your time. An English version is planned —
-> if you want it, [open an issue](../../issues/new) saying so. That is how the
-> decision gets made.
+> **Language.** Since 1.3.0 the interface, the reports, the command line and the
+> generated repair script are available **in English and in French**. The language
+> follows your Windows display language on first run; a selector in the header
+> lets you override it, and `--lang fr|en|auto` does the same from the command
+> line. The **installer is still French-only** — that is a separate piece of work.
 
 ---
 
@@ -163,12 +163,16 @@ FaultTracePC never contacts the Internet on its own.
 
 | Format | For whom | How |
 |---|---|---|
-| **MSI** | Permanent install, GPO deployment | `msiexec /i FaultTracePC-1.2.3.msi` (or double-click) |
+| **MSI** | Permanent install, GPO deployment | `msiexec /i FaultTracePC-1.3.0.msi` (or double-click) |
 | **Portable (.zip)** | USB-stick troubleshooting, nothing to install | Unzip, run `FaultTracePC.exe` |
 
 Both are on the [Releases page](../../releases). No prerequisites: the .NET
 runtime is bundled. **Windows 10 or 11, 64-bit, administrator rights** (required
 to read dumps and full system logs).
+
+To set the language for a whole machine at deployment time:
+`msiexec /i FaultTracePC-1.3.0.msi FTPCLANG=en /qn`. It is a default — a user's
+own choice in the application still wins.
 
 Optional but recommended — symbolic dump analysis, which names the faulting
 driver, needs WinDbg:
@@ -200,7 +204,8 @@ FaultTracePC.Cli.exe --quiet --json --days 90 --output \\server\Diagnostics$
 
 ## Limits — stated honestly
 
-- **Interface and reports are in French only.** See the notice at the top.
+- **The installer is French-only.** The application and its reports are not —
+  see the note at the top.
 - **Without WinDbg**, the STOP code is read but the faulting driver often stays
   unidentified: the diagnosis is less precise, and the report lowers its stated
   confidence accordingly rather than hiding the gap.
@@ -233,7 +238,7 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 git clone https://github.com/cry-stof-qq/FaultTracePC.git
 cd FaultTracePC
 dotnet build
-dotnet test                                    # 120 tests
+dotnet test                                    # 250 tests
 dotnet run --project src\FaultTracePC.App
 ```
 
@@ -241,7 +246,7 @@ Produce the distributables:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.2.3
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.3.0
 ```
 
 ## Architecture

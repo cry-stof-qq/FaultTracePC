@@ -58,7 +58,7 @@ public sealed class EventLogCollector
         catch (EventLogNotFoundException) { /* journal absent : ignoré */ }
         catch (Exception ex)
         {
-            _errors.Add($"Journal {logName} ({category}) : {ex.Message}");
+            _errors.Add(Lang.T($"Journal {logName} ({category}) : {ex.Message}", $"Log {logName} ({category}): {ex.Message}"));
         }
     }
 

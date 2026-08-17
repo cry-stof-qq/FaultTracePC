@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="assets/FaultTracePC.png" alt="FaultTracePC" width="120">
 
@@ -7,7 +7,8 @@
 **Trouver la cause d'une panne Windows 10/11 — et savoir quoi faire ensuite.**
 
 Analyse des écrans bleus, boîte noire temps réel, alertes avant la panne,
-rapport lisible et aide à la réparation. Gratuit, en français, sans télémétrie.
+rapport lisible et aide à la réparation. Gratuit, en français et en anglais,
+sans télémétrie.
 
 [🇬🇧 English](README.md) · 🇫🇷 Français
 
@@ -147,12 +148,16 @@ clairement et ne bloque rien.
 
 | Format | Pour qui | Comment |
 |---|---|---|
-| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.2.3.msi` (ou double-clic) |
+| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.3.0.msi` (ou double-clic) |
 | **Portable (.zip)** | Dépannage sur clé USB, rien à installer | Décompresser, lancer `FaultTracePC.exe` |
 
 Les deux sont disponibles dans les [Releases](../../releases). Aucun prérequis :
 le runtime .NET est inclus. **Windows 10 ou 11, 64 bits, droits administrateur**
 (nécessaires pour lire les dumps et les journaux système).
+
+Pour imposer la langue à tout un poste au déploiement :
+`msiexec /i FaultTracePC-1.3.0.msi FTPCLANG=en /qn`. C'est un défaut — le choix
+qu'un utilisateur fait dans l'application reste prioritaire.
 
 Optionnel mais recommandé — l'analyse symbolique des dumps, qui nomme le pilote
 fautif, nécessite WinDbg :
@@ -177,8 +182,24 @@ FaultTracePC.Cli.exe --quiet --json --days 90 --output \\serveur\Diagnostics$
 # codes de sortie : 0 sain · 1 avertissements · 2 critique · 3 erreur
 ```
 
+## Langue
+
+Depuis la 1.3.0, l'interface, le rapport, la ligne de commande et le script de
+réparation existent **en français et en anglais**. Au premier lancement, le
+logiciel suit la langue d'affichage de la session Windows ; un sélecteur dans le
+bandeau permet d'imposer l'une ou l'autre, ou de revenir au choix automatique.
+Le réglage est retenu par utilisateur, dans `Documents\FaultTracePC\langue.txt`.
+En ligne de commande, `--lang fr|en|auto` prime sur tout le reste.
+
+Le changement de langue prend effet au redémarrage de l'application : les
+libellés de l'interface sont construits à l'ouverture de la fenêtre. Le logiciel
+le dit et propose de relancer, plutôt que d'afficher une interface à moitié
+traduite.
+
 ## Limites — dites honnêtement
 
+- **L'installateur reste en français.** L'application et ses rapports, non :
+  voir ci-dessus. La localisation de l'installateur WiX est un chantier distinct.
 - **Sans WinDbg**, le code STOP est lu mais le pilote fautif reste souvent non
   identifié : le diagnostic est alors moins précis (confiance abaissée en
   conséquence dans le rapport, jamais masquée).
@@ -209,7 +230,7 @@ Prérequis : [SDK .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0).
 git clone https://github.com/cry-stof-qq/FaultTracePC.git
 cd FaultTracePC
 dotnet build
-dotnet test                                    # 120 tests
+dotnet test                                    # 250 tests
 dotnet run --project src\FaultTracePC.App
 ```
 
@@ -217,7 +238,7 @@ Produire les distribuables :
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.2.3
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.3.0
 ```
 
 ## Architecture
