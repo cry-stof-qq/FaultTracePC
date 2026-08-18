@@ -18,7 +18,32 @@ namespace FaultTracePC.Cli;
 /// </summary>
 internal static class Program
 {
+    /// <summary>
+    /// Dernier filet. Le bloc protégé de <see cref="Run"/> ne couvre que l'analyse
+    /// elle-même : une exception levée avant lui — résolution de la langue, lecture
+    /// des arguments, réglage machine — refermait la console sans un mot, ce qui est
+    /// précisément le défaut signalé par un utilisateur en août 2026.
+    /// </summary>
     private static int Main(string[] args)
+    {
+        try { return Run(args); }
+        catch (Exception ex)
+        {
+            var chemin = ErrorLog.Write("cli", ex);
+            try
+            {
+                // Sur la sortie d'erreur, y compris sous --quiet : un plantage n'est
+                // pas une information qu'on a le droit de taire à un script.
+                Console.Error.WriteLine(Lang.T("ERREUR : ", "ERROR: ") + ex.Message);
+                if (chemin is not null)
+                    Console.Error.WriteLine(Lang.T($"Détail technique : {chemin}", $"Technical detail: {chemin}"));
+            }
+            catch { /* plus de console : le journal reste */ }
+            return 3;
+        }
+    }
+
+    private static int Run(string[] args)
     {
         // Sans cela, les accents sortent en charabia dans une console cmd.exe héritée.
         try { Console.OutputEncoding = Encoding.UTF8; } catch { }
@@ -131,8 +156,12 @@ internal static class Program
         }
         catch (Exception ex)
         {
+            // Le message seul ne suffit pas à diagnostiquer : la pile part au journal.
+            var chemin = ErrorLog.Write("cli scan", ex);
             Console.Error.WriteLine(Lang.T("ERREUR : ", "ERROR: ") + ex.Message);
             Console.Error.WriteLine(Lang.T("Vérifie que la commande est lancée en administrateur et que le dossier de sortie est accessible.", "Check that the command is run as administrator and that the output folder is reachable."));
+            if (chemin is not null)
+                Console.Error.WriteLine(Lang.T($"Détail technique : {chemin}", $"Technical detail: {chemin}"));
             return 3;
         }
     }

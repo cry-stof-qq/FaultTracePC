@@ -51,8 +51,12 @@ public static class ErrorLog
     /// <c>null</c> si l'écriture n'a pas abouti — auquel cas l'appelant doit le
     /// dire à l'utilisateur plutôt que de lui indiquer un fichier absent.
     /// </summary>
-    public static string? Write(string origin, Exception ex)
+    public static string? Write(string origin, Exception? ex)
     {
+        // Accepte null : AppDomain.UnhandledException livre un object, dont la
+        // conversion peut ne rien donner. Un appelant ne doit pas avoir à s'en
+        // soucier au milieu d'un chemin de panne.
+        if (ex is null) return null;
         try { return Write(origin, Describe(ex)); }
         catch { return null; }
     }
@@ -91,7 +95,7 @@ public static class ErrorLog
     }
 
     /// <summary>Type, message et pile, en remontant toutes les exceptions internes.</summary>
-    private static string Describe(Exception ex)
+    internal static string Describe(Exception ex)
     {
         var b = new StringBuilder();
         for (var e = ex; e is not null; e = e.InnerException)

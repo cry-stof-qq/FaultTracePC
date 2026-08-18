@@ -14,6 +14,18 @@ using Microsoft.Extensions.Hosting;
 // à lire et suivra donc la langue par défaut de la machine, sauf si le service
 // est installé avec « --lang ». Ses journaux et ses notifications sont les seuls
 // textes concernés.
+// Gardes d'abord. Ce service est le composant le plus difficile à observer : il
+// tourne sous SYSTEM, sans interface, souvent sans personne devant l'écran. Une
+// exception non rattrapée ne laissait jusqu'ici aucune trace exploitable.
+AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+    ErrorLog.Write("monitor", e.ExceptionObject as Exception);
+
+TaskScheduler.UnobservedTaskException += (_, e) =>
+{
+    ErrorLog.Write("monitor background task", e.Exception);
+    e.SetObserved();
+};
+
 Lang.Initialize(args);
 
 var builder = Host.CreateApplicationBuilder(args);
