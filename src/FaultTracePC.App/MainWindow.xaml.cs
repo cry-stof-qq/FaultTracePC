@@ -730,18 +730,51 @@ public partial class MainWindow : Window
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+        // LA STRATÉGIE D'EXÉCUTION AVANT DE LANCER QUOI QUE CE SOIT
+        //
+        // « -ExecutionPolicy Bypass » n'agit que sur la portée Process, la plus
+        // faible : une stratégie de groupe prime sur elle. Sur un poste où
+        // l'administrateur a fixé Restricted ou AllSigned, PowerShell refuse le
+        // fichier AVANT sa première ligne — la console s'ouvre et se referme
+        // aussitôt, sans que personne ait le temps de lire le refus. C'est le
+        // défaut signalé par un utilisateur en août 2026.
+        var politique = PowerShellPolicy.Read(TimeSpan.FromSeconds(8));
+        if (politique is { Blocked: true })
+        {
+            ErrorLog.Write("repair script blocked",
+                $"execution policy {politique.Scope}={politique.Policy} refuses {_lastRepairScriptPath}");
+
+            MessageBox.Show(this,
+                Lang.T($"La réparation ne peut pas démarrer : une stratégie de groupe interdit l'exécution de scripts sur ce poste ({politique.Scope} = {politique.Policy}).",
+                       $"The repair cannot start: a Group Policy forbids running scripts on this machine ({politique.Scope} = {politique.Policy}).")
+                + "\n\n"
+                + Lang.T("Ce réglage vient de l'administration du parc, et FaultTracePC ne le contourne pas — volontairement. Deux issues : demander l'autorisation des scripts locaux (RemoteSigned), ou lancer les réparations une par une depuis la boîte à outils, qui n'utilise pas de fichier de script.",
+                         "This setting comes from your fleet administration, and FaultTracePC does not work around it — deliberately. Two ways out: ask for local scripts to be allowed (RemoteSigned), or run the repairs one at a time from the toolbox, which uses no script file.")
+                + "\n\n"
+                + Lang.T("Script concerné :", "Script concerned:") + "\n" + _lastRepairScriptPath,
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         try
         {
             Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{_lastRepairScriptPath}\"",
+                // -NoExit : le script se termine déjà par « Appuyer sur Entrée pour
+                // fermer », mais cette ligne n'est jamais atteinte s'il est refusé
+                // ou s'il meurt à l'analyse. Seul l'hôte, qui traite -NoExit avant
+                // même de lire le fichier, peut garder la fenêtre ouverte pour
+                // montrer ce qui s'est passé.
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -NoExit -File \"{_lastRepairScriptPath}\"",
                 UseShellExecute = true,
             });
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, Lang.T($"Impossible de lancer le script ({ex.Message}).\nChemin : {_lastRepairScriptPath}", $"Could not start the script ({ex.Message}).\nPath: {_lastRepairScriptPath}"),
+            var journal = ErrorLog.Write("repair script start", ex);
+            MessageBox.Show(this, Lang.T($"Impossible de lancer le script ({ex.Message}).\nChemin : {_lastRepairScriptPath}", $"Could not start the script ({ex.Message}).\nPath: {_lastRepairScriptPath}")
+                + (journal is null ? "" : Lang.T($"\nDétail technique : {journal}", $"\nTechnical detail: {journal}")),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
