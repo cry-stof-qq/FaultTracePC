@@ -651,6 +651,24 @@ public partial class GuidedRepairWindow : Window
         var text = sb.ToString();
         foreach (var line in text.Split('\n').Select(l => l.Trim('\r', ' ')).Where(l => l.Length > 0).TakeLast(4))
             Log("  " + line);
+
+        // Le code de sortie était récupéré, mais presque aucun appelant ne le lit :
+        // une commande qui échouait passait inaperçue. On l'inscrit sans crier au
+        // loup — sfc et DISM renvoient légitimement des codes non nuls.
+        if (p.ExitCode != 0)
+            Log(Lang.T($"  (code de sortie {p.ExitCode})", $"  (exit code {p.ExitCode})"));
+
+        // Rien du tout ET un code non nul : c'est le seul cas où l'on peut affirmer
+        // que l'étape n'a pas eu lieu — interpréteur qui n'a pas démarré, commande
+        // refusée avant sa première ligne. Il mérite d'être nommé plutôt que de
+        // laisser croire à un examen concluant.
+        if (p.ExitCode != 0 && text.Trim().Length == 0)
+        {
+            ErrorLog.Write("hidden command produced nothing", $"exit={p.ExitCode} file={file} args={args}");
+            Log(Lang.T("  La commande n'a rien produit — elle n'a pas pu s'exécuter (stratégie de sécurité, droits insuffisants, ou outil absent).",
+                       "  The command produced nothing — it could not run (security policy, insufficient rights, or missing tool)."));
+        }
+
         return (p.ExitCode, text);
     }
 

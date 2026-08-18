@@ -25,21 +25,21 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 
 | # | Défaut | Cause | Difficulté |
 |---|---|---|---|
-| 1 | « Disque 0 **(aucune lettre)** » alors que C: est dessus | Le chemin WMI est reconstruit à la main ; `Disk #0, Partition #0` contient une **virgule**, qui sépare les paires clé-valeur dans un chemin d'objet. Correctif : lire `__RELPATH`, comme le fait déjà `RelatedReliabilityCounters` dix lignes plus bas | faible |
-| 2 | « (aucune lettre) » affiché comme un défaut | Un disque sans volume monté est normal. Sans lettres, ne rien écrire | triviale |
-| 3 | « …ne l'affichera donc pas Vu entre le… » et « …disque fixe.. » | Ponctuation doublée : la méthode renvoie une phrase déjà ponctuée que l'appelant ponctue à nouveau | triviale |
+| 1 | ~~« Disque 0 (aucune lettre) » alors que C: est dessus~~ | **fait en 1.2.3** : le code lit `__RELPATH` au lieu de reconstruire le chemin WMI à la main (`SystemInfoCollector.cs:292`) | — |
+| 2 | ~~« (aucune lettre) » affiché comme un défaut~~ | **fait en 1.2.3** : sans lettre on n'écrit rien (`HtmlReportGenerator.cs:570`) | — |
+| 3 | ~~Ponctuation doublée dans les conclusions sur les périphériques disparus~~ | **fait en 1.2.3** | — |
 
 ## 2. Dette technique repérée en conversation
 
 | # | Sujet | Pourquoi ça compte | Difficulté |
 |---|---|---|---|
-| 4 | `DateTime.TryParse` sans culture explicite (`ParkComparator.cs:241`, `TelemetryService.cs:269`) | Fonctionne aujourd'hui car les formats sont ISO. Casse le jour où une machine écrit et une autre relit | triviale |
+| 4 | ~~`DateTime.TryParse` sans culture explicite~~ | **fait en 1.2.3** : `InvariantCulture` explicite dans `ParkComparator.cs:247` et `TelemetryService.cs:291`. Reste un cas sans conséquence, `RepairToolboxWindow.xaml.cs:54`, qui ne sert qu'à trier un affichage | — |
 | 5 | ~~Analyse de la sortie de `sfc`~~ | **fait en 1.3.0** : les deux langues sont reconnues, et l'échec d'analyse est distingué du « rien trouvé » | — |
 | 6 | ~~`DISM /English`~~ | **fait en 1.3.0**, uniquement là où c'est le programme qui lit — pas dans la console visible de la boîte à outils | — |
 | 7 | Canal d'alerte inadapté au parc | La bulle de notification vit dans une session utilisateur. Machine réveillée en WoL sans session : l'alerte n'a aucun destinataire. Journal d'événements Windows + point d'accès de télémétrie | moyenne |
-| 8 | `Historique\` ne purge jamais | La boîte noire purge à 14 jours ; l'historique des scans, non. ~800 fichiers/an/machine, et chaque lecture énumère tout le dossier. **Attention** : la rétention devra être longue (90 jours et plus), la pente SMART en dépend | faible |
+| 8 | ~~`Historique\` ne purge jamais~~ | **fait en 1.2.3** : purge au-delà de 90 jours **et** des 10 analyses les plus récentes — les deux conditions, pour qu'une machine analysée une fois par an ne perde rien (`ScanHistory.cs:85`) | — |
 | 9 | ~~`DiskBrief.Health`~~ | **tranché en 1.3.0** : c'était bien une valeur française. Devenu une énumération ; les résumés écrits par la 1.2.x restent relus | — |
-| **30** | **Fraîcheur des données non signalée** | Remonté par un test sur une machine éteinte depuis des mois (1.1.0). Trois manques distincts : l'âge du fait le plus récent n'est jamais indiqué ; la couverture réelle non plus (« 30 jours analysés, dont 2 jours machine allumée ») ; et la comparaison n'a **aucun plancher de durée** — deux scans espacés de dix minutes produisent « Bon signe ». Les données existent déjà (dernier démarrage, durée d'allumage, horodatage des événements), elles ne sont pas exploitées | moyenne |
+| **30** | **Fraîcheur des données non signalée** | Remonté par un test sur une machine éteinte depuis des mois (1.1.0). Trois manques distincts : l'âge du fait le plus récent n'est jamais indiqué ; la couverture réelle non plus (« 30 jours analysés, dont 2 jours machine allumée ») ; et la comparaison n'avait **aucun plancher de durée** — ce dernier volet est **fait en 1.2.3** : trois paliers, refus de conclure en dessous de deux heures. Les deux premiers restent ouverts. Les données existent déjà (dernier démarrage, durée d'allumage, horodatage des événements), elles ne sont pas exploitées | moyenne |
 
 ## 3. Tes propositions validées, non faites
 

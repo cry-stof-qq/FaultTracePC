@@ -51,7 +51,7 @@ public partial class RepairToolboxWindow : Window
             }
             // Les plus récentes d'abord (la date QFE est au format américain ou vide).
             LvUpdates.ItemsSource = rows
-                .OrderByDescending(r => DateTime.TryParse(r.InstalledOn, out var d) ? d : DateTime.MinValue)
+                .OrderByDescending(r => DateInstallation(r.InstalledOn))
                 .ToList();
             TxtStatus.Text = Lang.T($"{rows.Count} mise(s) à jour listée(s) (correctifs CBS — les mises à jour du Store et pilotes n'apparaissent pas ici).", $"{rows.Count} update(s) listed (CBS hotfixes — Store updates and drivers do not appear here)");
         }
@@ -60,6 +60,21 @@ public partial class RepairToolboxWindow : Window
             TxtStatus.Text = Lang.T("Impossible de lister les mises à jour : ", "Could not list the updates: ") + ex.Message;
         }
     }
+
+
+    /// <summary>
+    /// <c>Win32_QuickFixEngineering.InstalledOn</c> est une chaîne dont le format
+    /// varie d'une machine à l'autre — parfois « M/d/yyyy » quelle que soit la
+    /// langue de Windows, parfois la culture du poste. On tente les deux plutôt
+    /// que d'en imposer une : forcer la culture invariante casserait le tri là où
+    /// il fonctionne aujourd'hui. Le résultat ne sert qu'à ordonner un affichage.
+    /// </summary>
+    private static DateTime DateInstallation(string brut) =>
+        DateTime.TryParse(brut, System.Globalization.CultureInfo.CurrentCulture,
+                          System.Globalization.DateTimeStyles.None, out var d)
+        || DateTime.TryParse(brut, System.Globalization.CultureInfo.InvariantCulture,
+                             System.Globalization.DateTimeStyles.None, out d)
+            ? d : DateTime.MinValue;
 
     private void BtnUninstallUpdate_Click(object sender, RoutedEventArgs e)
     {
