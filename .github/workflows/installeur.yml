@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-dotnet@v5
         with:
@@ -50,7 +50,7 @@ jobs:
       # distribué, il sert à prouver que la construction aboutit. Les vrais paquets
       # viennent du workflow de publication.
       - name: Conserver le MSI construit
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: msi-verification
           path: dist/*.msi

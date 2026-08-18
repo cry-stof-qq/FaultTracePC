@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-dotnet@v5
         with:
@@ -124,7 +124,7 @@ jobs:
       # fichier à encodage mixte sur la 1.2.2.
       - name: Déposer les fichiers sans publier (essai à blanc)
         if: github.event_name == 'workflow_dispatch' && !inputs.publier
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: essai-a-blanc-v${{ steps.v.outputs.version }}
           path: |
