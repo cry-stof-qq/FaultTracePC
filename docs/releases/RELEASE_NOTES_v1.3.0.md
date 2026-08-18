@@ -117,16 +117,3 @@ Les deux embarquent le runtime .NET : rien à installer au préalable. Le logici
 Les archives `Source code` sont produites automatiquement par GitHub : elles contiennent le code, pas le logiciel compilé.
 
 **L'interface et les rapports existent en français et en anglais.** La langue suit celle de la session Windows au premier lancement et se change dans le bandeau, à côté du `?`.
-
-## Sommes de contrôle (SHA-256)
-
-Ces fichiers ne sont pas signés numériquement. Vérifier l'empreinte est le seul moyen de s'assurer que le fichier téléchargé est bien celui publié ici :
-
-```powershell
-Get-FileHash FaultTracePC-1.3.0.msi -Algorithm SHA256
-```
-
-```
-f6a58fb20cd2bbe17f94d92c20c082ef4d59809dd07b5bfd19ad3fd805aab701  FaultTracePC-1.3.0.msi
-5da6d4923575d6552f60a92420f1cd30f6f747bc7e9d61c65bd5f100cc6f59fe  FaultTracePC-1.3.0-portable.zip
-```
