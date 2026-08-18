@@ -113,7 +113,7 @@ public partial class GuidedRepairWindow : Window
         if (RunningTools.BlockingLabel() is { } busy)
         {
             MessageBox.Show(this,
-                Lang.T($"Une réparation est déjà en cours :\n\n    {busy}\n\n", $"A repair is already running:") +
+                Lang.T($"Une réparation est déjà en cours :\n\n    {busy}\n\n", $"A repair is already running:\n\n    {busy}\n\n") +
                 Lang.T("L'assistant enchaîne plusieurs réparations qui ne peuvent pas cohabiter avec celle-ci. ", "The assistant chains several repairs that cannot coexist with this one. ") +
                 Lang.T("Attends qu'elle se termine, puis relance.", "Wait for it to finish, then start again."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
