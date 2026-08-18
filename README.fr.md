@@ -148,7 +148,7 @@ clairement et ne bloque rien.
 
 | Format | Pour qui | Comment |
 |---|---|---|
-| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.3.0.msi` (ou double-clic) |
+| **MSI** | Installation durable, déploiement par GPO | `msiexec /i FaultTracePC-1.3.1.msi` (ou double-clic) |
 | **Portable (.zip)** | Dépannage sur clé USB, rien à installer | Décompresser, lancer `FaultTracePC.exe` |
 
 Les deux sont disponibles dans les [Releases](../../releases). Aucun prérequis :
@@ -156,7 +156,7 @@ le runtime .NET est inclus. **Windows 10 ou 11, 64 bits, droits administrateur**
 (nécessaires pour lire les dumps et les journaux système).
 
 Pour imposer la langue à tout un poste au déploiement :
-`msiexec /i FaultTracePC-1.3.0.msi FTPCLANG=en /qn`. C'est un défaut — le choix
+`msiexec /i FaultTracePC-1.3.1.msi FTPCLANG=en /qn`. C'est un défaut — le choix
 qu'un utilisateur fait dans l'application reste prioritaire.
 
 Optionnel mais recommandé — l'analyse symbolique des dumps, qui nomme le pilote
@@ -238,7 +238,7 @@ Produire les distribuables :
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.3.0
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.3.1
 ```
 
 ## Architecture

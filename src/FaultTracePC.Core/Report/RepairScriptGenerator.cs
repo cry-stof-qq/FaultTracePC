@@ -274,7 +274,10 @@ public static class RepairScriptGenerator
         var bat = "@echo off\r\n"
                 + "rem FaultTracePC - lanceur du script de reparation (double-clic)\r\n"
                 + "rem Demande l'elevation administrateur (UAC) puis execute le .ps1 associe.\r\n"
-                + "powershell -NoProfile -Command \"Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"\"%~dp0" + ps1Name + "\"\"'\"\r\n";
+                // -NoExit : une strategie de groupe peut refuser le .ps1 avant sa
+                // premiere ligne. Sans cette option, la console se refermerait sur
+                // le refus sans que personne puisse le lire.
+                + "powershell -NoProfile -Command \"Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-File','\"\"%~dp0" + ps1Name + "\"\"'\"\r\n";
         // Encodage OEM/ASCII : les .bat n'aiment pas l'UTF-8 avec BOM (d'où l'absence d'accents ci-dessus).
         File.WriteAllText(batPath, bat, Encoding.ASCII);
         r.RepairLauncherPath = batPath;

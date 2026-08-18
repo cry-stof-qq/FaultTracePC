@@ -9,6 +9,7 @@
 | 1.2.2 | **publiée** — MSI + ZIP + sommes de contrôle |
 | 1.2.3 | **publiée** — release GitHub, 4 fichiers, sommes de contrôle |
 | 1.3.0 | **publiée** — release GitHub, MSI + ZIP, 250 tests verts |
+| 1.3.1 | correctifs — journal des pannes, stratégie d'exécution, 262 tests verts |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
@@ -94,15 +95,17 @@ Mon avis, à discuter.
 
 **33 — `actions/checkout@v5` et `actions/upload-artifact@v6`.** Calendrier GitHub vérifié le 17/08/2026 : Node 20 en fin de vie en avril 2026, runners passés à Node 24 par défaut le 16 juin 2026, retrait de Node 20 à l'automne 2026. Les actions en v4 tournent donc **déjà** sur Node 24 et les workflows sont verts : ce n'est pas une panne annoncée, c'est de l'hygiène. La raison de le faire tôt est `publication.yml`, lancé une fois par version — une casse s'y découvrirait au pire moment. Trois `checkout@v4` et deux `upload-artifact@v4` à passer en v5 et v6 (pas plus haut : v6 de checkout et v7 d'upload-artifact changent des comportements inutiles ici). `setup-dotnet@v5` est déjà en Node 24. Vérifier ensuite par un essai à blanc de la publication. *Difficulté : triviale.*
 
-**34 — L'assistant guidé se ferme sans un mot. PRIORITAIRE.** Retour d'usager du 17/08/2026, Windows 11 23H2 : au clic sur « Je ne sais pas ce que j'ai », **la console PowerShell s'ouvre et se referme aussitôt**, sans message, sans journal. Ni l'utilisateur ni nous ne pouvons rien en conclure — c'est le défaut à corriger, avant même sa cause. Trois manques distincts :
+**34 — La réparation ne démarrait pas sous stratégie de groupe. CAUSE TROUVÉE, CORRIGÉ EN 1.3.1.** Retour d'usager du 17/08/2026, Windows 11 23H2 : une console s'ouvrait et se refermait aussitôt, sans message. Ce n'était pas l'assistant guidé mais le bouton **« Lancer la réparation »** de la fenêtre principale — une capture d'écran l'a établi.
 
-- Aucun gestionnaire d'exception global dans l'application (ni `DispatcherUnhandledException`, ni `AppDomain.CurrentDomain.UnhandledException`), et aucun journal d'erreur. Une exception fait disparaître la fenêtre en silence.
-- Aucun contrôle des prérequis avant de lancer la première commande : présence de PowerShell, droits effectifs, stratégie d'exécution imposée par GPO (elle **prime sur** `-ExecutionPolicy Bypass`, piste principale sur une machine verrouillée), blocage antivirus.
-- Une commande qui échoue doit **nommer son échec à l'écran et laisser la fenêtre ouverte**. Règle posée par l'usager, et conforme au reste du logiciel : « il dit qu'il n'a pas su lire ».
+`BtnRepair_Click` lançait `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <script.ps1>` avec `UseShellExecute = true`. Or `-ExecutionPolicy Bypass` ne fixe que la portée **Process**, la plus faible : une stratégie de groupe (`MachinePolicy`, `UserPolicy`) prime sur elle. Sur un poste où l'administration a fixé `Restricted` ou `AllSigned`, PowerShell refuse le fichier avant sa première ligne, la console se referme, et — `Process.Start` ayant réussi — aucun `catch` ne se déclenche. Preuve interne : le script généré se termine par « Appuyer sur Entrée pour fermer » ; s'il ne s'affiche pas, la première ligne n'a jamais été lue.
 
-Objectif tenable : non pas que toutes les commandes passent — elles ne passeront jamais toutes, l'édition, les stratégies d'entreprise et les composants désactivés en décident — mais qu'**aucune ne fasse disparaître le logiciel**. Données encore manquantes sur ce cas : version du logiciel, entrée `.NET Runtime` / `Application Error` de l'Observateur d'événements, sortie de `FaultTracePC.Cli.exe` lancé en console. *Difficulté : faible pour le journal et le message, moyenne pour les prérequis.*
+Corrigé en 1.3.1 : contrôle préalable de la stratégie (`PowerShellPolicy`, qui ne regarde que les deux portées de groupe — `LocalMachine=Restricted` est le cas par défaut d'une machine saine et ne doit rien bloquer), message nommant la portée et la valeur, `-NoExit` sur le lancement et dans le `.bat` généré. **La stratégie n'est pas contournée**, décision validée : un outil qui désobéit à la stratégie du parc perd le droit d'y être déployé.
 
-**35 — Moitié anglaise écrasée dans `GuidedRepairWindow`.** `Lang.T($"Une réparation est déjà en cours :\n\n    {busy}\n\n", $"A repair is already running:")` — la version anglaise perd le nom de l'outil bloquant et les sauts de ligne. Le test de ratio ne l'attrape pas : 24 caractères contre 40 passent son seuil. À corriger, et à faire suivre d'une réflexion sur le seuil. *Difficulté : triviale.*
+Trois manques comblés au passage, qui valaient indépendamment de cette cause : gestionnaire d'exception global dans les trois exécutables, journal `%ProgramData%\FaultTracePC\erreurs.log`, et message d'échec qui laisse la fenêtre ouverte.
+
+**34 bis — Ce qui reste.** Dans l'assistant guidé, `RunHiddenAsync` récupère `p.ExitCode` mais presque tous les appelants l'ignorent (`var (_, output) = …`) : une commande qui échoue passe inaperçue. À ajouter : journaliser le code de sortie non nul sans crier au loup (`sfc` et `DISM` en renvoient légitimement), et nommer le cas « sortie vide **et** code non nul », signature d'un interpréteur bloqué. Priorité retombée : l'assistant lance ses commandes en `-Command` en ligne, qui **n'est pas** soumis à la stratégie d'exécution — c'est pourquoi lui fonctionnait. *Difficulté : faible.*
+
+**35 — Moitié anglaise écrasée dans `GuidedRepairWindow`. CORRIGÉ EN 1.3.1.** `Lang.T($"Une réparation est déjà en cours :\n\n    {busy}\n\n", $"A repair is already running:")` — la version anglaise perd le nom de l'outil bloquant et les sauts de ligne. Le test de ratio ne l'attrape pas : 24 caractères contre 40 passent son seuil. À corriger, et à faire suivre d'une réflexion sur le seuil. *Difficulté : triviale.*
 
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
