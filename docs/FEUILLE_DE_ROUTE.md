@@ -129,11 +129,43 @@ Points **12** et tout ce que la localisation **impose** : codes plutôt que phra
 
 *Pourquoi rien d'autre :* c'est la seule version du projet qui touche **chaque chaîne** du logiciel, et elle casse la compatibilité du protocole de parc. Si une régression apparaît, il faut pouvoir l'attribuer. Y ajouter de nouveaux diagnostics, c'est renoncer à savoir ce qui a cassé.
 
-### 1.4.0 — les fonctionnalités, écrites bilingues d'emblée
+### 1.4.0 — décidée le 18/08/2026
 
-Points **10, 11, 15, 13, 14, 7, 27, 29, 30**.
+**Thème unique : ce que l'utilisateur lit.** Points **16, 29, 30, 26**.
 
-*Pourquoi après :* chacune ajoute de la prose. Écrite avant la 1.3, il faut la traduire ensuite ; écrite après, elle naît dans les deux langues du premier coup.
+Le critère qui a tranché n'est pas la valeur des points mais **l'interruptibilité**. Un déploiement dans l'établissement est possible à la rentrée et la date n'appartient pas à l'auteur : le thème devait pouvoir s'arrêter net sans rien laisser à moitié construit. Ces quatre points sont indépendants les uns des autres — on s'arrête où on en est.
+
+Ordre proposé, du moins cher au plus délicat :
+
+1. **26 — bouton « installer WinDbg »**. Une ligne de code, et chaque diagnostic futur y gagne le nom du pilote fautif au lieu d'un anonyme. Il attend depuis quatre versions.
+2. **30 — fraîcheur des données.** L'âge du fait le plus récent, et la couverture réelle (« 30 jours analysés, dont 2 jours machine allumée »). Même famille de défaut que la console qui se refermait en silence : *le logiciel affirme plus qu'il ne sait*. Le plancher de comparaison, troisième volet de ce point, est déjà fait en 1.2.3.
+3. **29 — limiter ce que le mode simple affiche.** Critiques et premier avertissement ; le reste replié. La décision de ce qu'on masque est plus délicate que le code.
+4. **16 — hiérarchie du rapport pour un débutant.** Le plus vaste, et le seul sans plan écrit. À prendre en dernier, avec ce que les trois précédents auront appris.
+
+**Ce qu'on s'interdit d'y ajouter :** de nouveaux diagnostics. Le triage RAW (10), la pente SMART (11), le bloc winget (15) et l'espace disque (32) restent pour plus tard. Un logiciel qui vient de découvrir qu'il ne savait pas signaler ses propres pannes n'a pas besoin de surface supplémentaire.
+
+### Lot 0 de la 1.4 — la rupture de format, pendant qu'elle est gratuite
+
+**Décidé le 18/08/2026, sur proposition de l'auteur.** Le parc installé se compte aujourd'hui en quelques machines, toutes connues. C'est le seul moment où une rupture de compatibilité ne coûte rien, et cette fenêtre se referme le jour du premier déploiement réel.
+
+Code de compatibilité à retirer, recensé :
+
+- `DiskHealth.Parse` — la lecture tolérante des mots français écrits par la 1.2.x (`sain`, `dégradé`, `défaillant`) ;
+- `AlertCatalog` — le renoncement pour les alertes sans champ `Extract`, écrites avant la 1.3.0 ;
+- `ParkProtocol` — l'acceptation en réception de l'ancien format porteur de phrases.
+
+**Ce que ce lot ne fait PAS, et c'est une limite ferme : il n'efface aucune donnée de l'utilisateur.** Refuser de relire un fichier est un choix technique ; le supprimer en silence contredirait un logiciel qui a ajouté une section « Entretien effectué » en 1.2.3 précisément pour ne jamais effacer sans le dire. Les fichiers restent sur le disque, et le rapport annonce ce qu'il n'a pas relu, avec le nombre — « 3 analyses antérieures à la 1.4 ne sont pas relues, format différent ; elles restent dans le dossier Historique ».
+
+**Et l'ajout qui donne son sens au lot : estampiller les formats.** Si la compatibilité coûte cher aujourd'hui, c'est que les fichiers persistés — résumés d'historique, `alerts.json`, réponses du protocole de parc — **ne portent aucun numéro de version de format**. Chaque fichier écrit par la 1.4 en portera un, et toute lecture commencera par le vérifier. Sans cela, on refera ce débat à la 1.6, avec un parc déployé et plus aucune fenêtre pour le trancher.
+
+### Bloc parc — armé, à déclencher sur un mot
+
+Points **13, 14, 27, 7**. Non planifié, mais entièrement décidé : le jour où un déploiement d'établissement obtient une date, ce bloc passe devant la 1.4 sans rien réétudier.
+
+1. **27 — token dérivé** (secret maître + nom de machine). Supprime le problème à la racine : plus de liste de jetons à sauvegarder, la console recalcule. Règle du même coup le fait que `parc.json` vit dans `Documents`, donc par utilisateur, et se perd avec un profil reconstruit.
+2. **14 — ACL sur `remote.json`** (le fichier, pas le dossier, qui abrite aussi les rapports).
+3. **13 — `--configure-remote --generate-token`** en ligne de commande, sans quoi rien de tout cela ne se déploie par GPO.
+4. **7 — canal d'alerte adapté au parc.** La bulle de notification vit dans une session utilisateur : une machine réveillée en WoL sans session ouverte n'a aucun destinataire. Journal d'événements Windows plus point d'accès de télémétrie.
 
 ---
 
