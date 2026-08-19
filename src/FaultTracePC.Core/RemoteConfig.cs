@@ -52,6 +52,60 @@ public sealed class RemoteConfig
     public static string GenerateToken() =>
         Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
+    /// <summary>
+    /// Longueur minimale du secret maître.
+    ///
+    /// Ce n'est pas une coquetterie : un secret deviné ou forcé donne accès à
+    /// TOUT le parc d'un coup, puisque tous les jetons s'en déduisent. Une phrase
+    /// de passe retenue de tête n'est donc pas acceptable ici, et le refuser
+    /// franchement vaut mieux que l'accepter en espérant qu'elle soit bonne.
+    /// <see cref="GenerateMasterSecret"/> en produit un correct ; il se range dans
+    /// un gestionnaire de mots de passe, il n'a pas à être mémorisé.
+    /// </summary>
+    public const int MasterSecretMinLength = 32;
+
+    /// <summary>Secret maître de parc : 256 bits aléatoires, en hexadécimal.</summary>
+    public static string GenerateMasterSecret() =>
+        Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+    /// <summary>
+    /// Jeton d'un poste, DÉDUIT du secret maître et du nom de la machine.
+    ///
+    /// POURQUOI DÉDUIRE PLUTÔT QUE TIRER AU SORT
+    /// Jusqu'ici chaque poste tirait un jeton aléatoire, et la console gardait la
+    /// liste complète dans un fichier de son dossier Documents. Trois conséquences :
+    /// aucun export possible, la liste disparaît avec un profil Windows reconstruit,
+    /// et sur un poste dont le dossier Documents est redirigé, les jetons de tout le
+    /// parc atterrissent sur un partage réseau.
+    ///
+    /// Déduits, il n'y a plus de liste : la console recalcule le jeton de chaque
+    /// machine à partir d'un seul secret.
+    ///
+    /// CE QUE CELA DÉPLACE, ET QU'IL FAUT SAVOIR
+    /// Le secret maître devient le seul point sensible. Mais il ne remplace pas un
+    /// risque par un pire : le fichier d'aujourd'hui expose DÉJÀ tous les jetons
+    /// d'un coup, dans un dossier utilisateur redirigeable. Le secret, lui, ne vit
+    /// que sur la console — un poste ne le reçoit jamais, il ne reçoit que son
+    /// propre jeton dérivé.
+    ///
+    /// LE NOM EST NORMALISÉ
+    /// Windows rend le nom de machine tantôt en majuscules, tantôt tel qu'il a été
+    /// saisi. Une console qui écrirait « poste-01 » et un poste qui se nomme
+    /// « POSTE-01 » ne calculeraient pas le même jeton, et l'interrogation
+    /// échouerait sans que rien n'explique pourquoi.
+    /// </summary>
+    public static string DeriveToken(string masterSecret, string machineName)
+    {
+        var nom = (machineName ?? "").Trim().ToUpperInvariant();
+        if (nom.Length == 0)
+            throw new ArgumentException("machineName", nameof(machineName));
+        if (masterSecret is null || masterSecret.Trim().Length < MasterSecretMinLength)
+            throw new ArgumentException("masterSecret", nameof(masterSecret));
+
+        using var hmac = new HMACSHA256(System.Text.Encoding.UTF8.GetBytes(masterSecret.Trim()));
+        return Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(nom)));
+    }
+
     /// <summary>Plages autorisées : boucle locale + RFC 1918 (10/8, 172.16/12, 192.168/16).</summary>
     public static bool IsPrivateOrLoopback(IPAddress? address)
     {

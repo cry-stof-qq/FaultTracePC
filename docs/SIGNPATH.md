@@ -19,7 +19,7 @@ Source des conditions : <https://signpath.org/terms.html>
 | Fonctionnalité décrite sur la page de téléchargement | ✅ | Notes de version détaillées + <https://palisser.fr/spip.php?article30> (FR) et <https://palisser.fr/spip.php?article31> (EN) |
 | **Binaires construits depuis les sources de façon vérifiable** | ✅ | `.github/workflows/publication.yml` — construction par GitHub Actions à partir du commit désigné par le tag, aucune intervention manuelle |
 | Approbation manuelle de chaque signature | ✅ | Chaque publication part d'un tag posé à la main |
-| Authentification à deux facteurs sur le dépôt et sur SignPath | ⚠ **à confirmer** | Voir §3 |
+| Authentification à deux facteurs sur le dépôt et sur SignPath | ✅ GitHub (application d'authentification, confirmé le 19/08/2026) — SignPath à activer après création du compte | Voir §3 |
 | Séparation des rôles auteur / relecteur / approbateur | ⚠ **point faible** | Voir §2 |
 
 ## 2. Le point à aborder franchement : le mainteneur unique
@@ -42,10 +42,8 @@ Ne pas le cacher. Ce qui peut être avancé, et qui est vrai :
 
 ## 3. Ce qu'il reste à vérifier avant d'envoyer
 
-**L'authentification à deux facteurs du compte GitHub.**
-Aller sur <https://github.com/settings/security> — la section « Two-factor
-authentication » doit indiquer qu'elle est activée. Si ce n'est pas le cas,
-« Enable two-factor authentication » et conserver les codes de secours.
+~~**L'authentification à deux facteurs du compte GitHub.**~~ **Vérifiée le
+19/08/2026** : *Two-factor authentication → Authenticator app → Configured*.
 
 **L'authentification à deux facteurs du compte SignPath** se règle après la
 création du compte, au même endroit que le profil.
