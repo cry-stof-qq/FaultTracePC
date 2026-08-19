@@ -57,6 +57,11 @@ internal static class Program
         // un administrateur peut s'en servir à la main pour rattraper un poste.
         if (SetMachineLanguage(args) is { } codeSortie) return codeSortie;
 
+        // Configuration du mode parc : n'analyse rien non plus, et se déploie par
+        // GPO au même titre que le réglage de langue.
+        if (GenerateMasterSecret(args) is { } codeSecret) return codeSecret;
+        if (ConfigureRemote(args) is { } codeParc) return codeParc;
+
         var options = CliOptions.Parse(args);
         if (options.ShowHelp)
         {
@@ -213,6 +218,110 @@ internal static class Program
         return 0;
     }
 
+    /// <summary>
+    /// « --generate-master-secret » : produit un secret maître de parc et s'arrête.
+    ///
+    /// Il se range dans un gestionnaire de mots de passe. C'est le SEUL secret à
+    /// conserver : tous les jetons des postes s'en déduisent, et une console
+    /// reconstruite depuis zéro retrouve l'accès au parc entier avec lui seul.
+    /// </summary>
+    private static int? GenerateMasterSecret(string[] args)
+    {
+        if (!args.Any(a => a.Equals("--generate-master-secret", StringComparison.OrdinalIgnoreCase)))
+            return null;
+
+        Console.WriteLine(RemoteConfig.GenerateMasterSecret());
+        Console.Error.WriteLine(Lang.T(
+            "Conserve ce secret dans un gestionnaire de mots de passe. Il ne peut pas être retrouvé, et le perdre oblige à reconfigurer tous les postes.",
+            "Keep this secret in a password manager. It cannot be recovered, and losing it means reconfiguring every machine."));
+        return 0;
+    }
+
+    /// <summary>
+    /// « --configure-remote --master-secret &lt;secret|-&gt; [--port n] » : prépare un
+    /// poste pour le mode parc, sans interface, donc déployable par GPO.
+    ///
+    /// LE POSTE NE CONNAÎT JAMAIS LE SECRET MAÎTRE. Il reçoit sa valeur le temps
+    /// d'une commande, en déduit SON jeton, et n'écrit que celui-là. Un secret
+    /// laissé sur chaque poste offrirait le parc entier à qui ouvre un seul poste.
+    ///
+    /// Le secret peut être lu sur l'ENTRÉE STANDARD (valeur « - ») : passé en
+    /// argument, il est visible dans la liste des processus le temps de
+    /// l'exécution, ce qui est acceptable pour une commande manuelle et
+    /// déconseillé dans un script partagé.
+    /// </summary>
+    private static int? ConfigureRemote(string[] args)
+    {
+        if (!args.Any(a => a.Equals("--configure-remote", StringComparison.OrdinalIgnoreCase)))
+            return null;
+
+        var secret = Argument(args, "--master-secret");
+        if (secret == "-") secret = Console.In.ReadLine();
+
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            Console.Error.WriteLine(Lang.T("ERREUR : --configure-remote attend --master-secret <valeur> ou --master-secret - pour le lire sur l'entrée standard.",
+                                           "ERROR: --configure-remote expects --master-secret <value>, or --master-secret - to read it from standard input."));
+            return 3;
+        }
+
+        var port = int.TryParse(Argument(args, "--port"), out var p) ? p : 58620;
+        if (port is < 1024 or > 65535)
+        {
+            Console.Error.WriteLine(Lang.T("ERREUR : --port attend un nombre entre 1024 et 65535.",
+                                           "ERROR: --port expects a number between 1024 and 65535."));
+            return 3;
+        }
+
+        string jeton;
+        try
+        {
+            jeton = RemoteConfig.DeriveToken(secret, Environment.MachineName);
+        }
+        catch (ArgumentException)
+        {
+            Console.Error.WriteLine(Lang.T($"ERREUR : secret maître trop faible — {RemoteConfig.MasterSecretMinLength} caractères au minimum. Utilise --generate-master-secret.",
+                                           $"ERROR: master secret too weak — {RemoteConfig.MasterSecretMinLength} characters minimum. Use --generate-master-secret."));
+            return 3;
+        }
+
+        try
+        {
+            new RemoteConfig { Mode = "Client", Port = port, Token = jeton }.Save();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(Lang.T($"ERREUR : écriture impossible dans {RemoteConfig.ConfigPath} — {ex.Message}",
+                                           $"ERROR: cannot write to {RemoteConfig.ConfigPath} — {ex.Message}"));
+            return 3;
+        }
+
+        // Relecture plutôt que confiance : Save() peut réussir sur un disque plein
+        // sans que le contenu soit celui qu'on croit.
+        var relu = RemoteConfig.Load();
+        if (relu.Mode != "Client" || relu.Token != jeton || relu.Port != port)
+        {
+            Console.Error.WriteLine(Lang.T($"ERREUR : le fichier {RemoteConfig.ConfigPath} ne contient pas ce qui vient d'être écrit.",
+                                           $"ERROR: the file {RemoteConfig.ConfigPath} does not contain what was just written."));
+            return 3;
+        }
+
+        // Ni le secret ni le jeton ne sont affichés : le jeton se recalcule côté
+        // console, et l'écrire ici le déposerait dans les journaux de déploiement.
+        Console.WriteLine(Lang.T($"Mode parc activé sur {Environment.MachineName}, port {port}.",
+                                 $"Fleet mode enabled on {Environment.MachineName}, port {port}."));
+        Console.WriteLine(Lang.T("La console retrouvera ce poste avec le secret maître et son nom de machine — rien à recopier.",
+                                 "The console will find this machine again from the master secret and its machine name — nothing to copy."));
+        return 0;
+    }
+
+    /// <summary>Valeur suivant une option, ou null si l'option est absente ou terminale.</summary>
+    private static string? Argument(string[] args, string option)
+    {
+        var i = Array.FindIndex(args, a => a.Equals(option, StringComparison.OrdinalIgnoreCase));
+        return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+    }
+
     private static string Sanitize(string name) =>
         string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
 
@@ -241,6 +350,18 @@ internal static class Program
                                  puis quitte, sans rien analyser. Utilisé par l'installeur
                                  et pour un déploiement par GPO. Le choix propre à un
                                  utilisateur reste prioritaire.
+
+              --generate-master-secret
+                                 Produit un secret maître de parc, puis quitte. À ranger
+                                 dans un gestionnaire de mots de passe : c'est le seul
+                                 secret à conserver, tous les jetons s'en déduisent.
+              --configure-remote --master-secret <valeur|->  [--port <n>]
+                                 Prépare ce poste pour le mode parc, puis quitte. Le jeton
+                                 est DÉDUIT du secret et du nom de machine : rien à
+                                 recopier vers la console. Le secret n'est pas conservé
+                                 sur le poste. « - » le lit sur l'entrée standard, ce qui
+                                 évite de l'exposer dans la liste des processus.
+                                 Port par défaut : 58620.
               --quiet, -q        N'affiche rien (usage silencieux par GPO/tâche planifiée)
               --open             Ouvre le rapport à la fin (usage interactif)
               --help, -h, /?     Affiche cette aide
@@ -279,6 +400,17 @@ internal static class Program
                                  Writes the default language OF THE MACHINE (all accounts)
                                  then exits, analysing nothing. Used by the installer and
                                  for GPO deployment. A user's own choice still wins.
+
+              --generate-master-secret
+                                 Produces a fleet master secret, then exits. Keep it in a
+                                 password manager: it is the only secret to preserve, every
+                                 machine token is derived from it.
+              --configure-remote --master-secret <value|->  [--port <n>]
+                                 Prepares this machine for fleet mode, then exits. The token
+                                 is DERIVED from the secret and the machine name: nothing to
+                                 copy over to the console. The secret is not kept on the
+                                 machine. "-" reads it from standard input, which avoids
+                                 exposing it in the process list. Default port: 58620.
               --quiet, -q        Prints nothing (silent use from GPO/scheduled task)
               --open             Opens the report at the end (interactive use)
               --help, -h, /?     Shows this help
