@@ -97,6 +97,22 @@ public sealed class RulesEngine
             {
                 if (autre.Severity < gardee.Severity) gardee.Severity = autre.Severity;
                 if (autre.Confidence < gardee.Confidence) gardee.Confidence = autre.Confidence;
+
+                // ON N'EFFACE PAS CE QUE L'AUTRE CHEMIN AVAIT CONSTATÉ.
+                // Première version de ce code : la carte perdante disparaissait
+                // entièrement. Vérifié sur un rapport réel, le rapport y perdait le
+                // nombre d'occurrences relevées sur la période (3 événements, quand
+                // la carte gardée n'annonçait que 2 alertes) et le matériel nommé —
+                // ni l'un ni l'autre n'étant écrits ailleurs en mode simple. Un
+                // outil de diagnostic ne jette pas un fait qu'il a collecté, et
+                // sous-estimer une magnitude est pire que répéter une date.
+                if (!string.IsNullOrWhiteSpace(autre.Details)
+                    && !gardee.Details.Contains(autre.Details, StringComparison.Ordinal))
+                    gardee.Details = gardee.Details.TrimEnd() + " " + autre.Details.Trim();
+
+                if (string.IsNullOrWhiteSpace(gardee.Recommendation))
+                    gardee.Recommendation = autre.Recommendation;
+
                 findings.Remove(autre);
             }
 

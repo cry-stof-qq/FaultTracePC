@@ -79,6 +79,42 @@ public class FusionDoublonsTests
     }
 
     [Fact]
+    public void Rien_de_ce_qu_a_constate_l_autre_chemin_n_est_perdu()
+    {
+        // Première version de ce code : la carte perdante disparaissait entièrement.
+        // Vérifié sur un rapport réel, on y perdait le nombre d'occurrences relevées
+        // sur la période — 3 événements, quand la carte gardée n'annonçait que 2
+        // alertes — et le matériel nommé. Sous-estimer une magnitude est pire que
+        // répéter une date.
+        var findings = new List<Finding>
+        {
+            F("whea", Severity.Critical, Confidence.High, reco: "r", details: "Detecte 2 fois en direct."),
+            F("whea", Severity.Warning, Confidence.Medium, details: "3 erreurs sur la periode. CPU AMD Ryzen 7."),
+        };
+
+        RulesEngine.FusionnerLesDoublons(findings);
+
+        Assert.Single(findings);
+        Assert.Contains("3 erreurs sur la periode", findings[0].Details);
+        Assert.Contains("CPU AMD Ryzen 7", findings[0].Details);
+        Assert.Contains("Detecte 2 fois en direct", findings[0].Details);
+    }
+
+    [Fact]
+    public void Un_detail_deja_present_n_est_pas_recopie()
+    {
+        var findings = new List<Finding>
+        {
+            F("whea", Severity.Critical, Confidence.High, reco: "r", details: "Meme phrase exactement."),
+            F("whea", Severity.Warning, Confidence.Medium, details: "Meme phrase exactement."),
+        };
+
+        RulesEngine.FusionnerLesDoublons(findings);
+
+        Assert.Equal(1, findings[0].Details.Split("Meme phrase exactement").Length - 1);
+    }
+
+    [Fact]
     public void Les_conclusions_sans_identifiant_ne_sont_jamais_fusionnees()
     {
         // La grande majorité des conclusions n'ont pas de code. Les regrouper sur
