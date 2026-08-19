@@ -47,6 +47,16 @@ public sealed class RulesEngine
             });
         }
 
+        // Deux chemins peuvent rapporter le même fait : le journal de Windows et la
+        // surveillance temps réel. Le lecteur voyait alors deux problèmes là où il
+        // n'y en a qu'un, avec deux gravités contradictoires. Constaté sur un
+        // rapport réel du 19/08/2026 : « Erreurs matérielles WHEA détectées (3) »
+        // en avertissement, et « Alerte préventive répétée (2×) : erreur matérielle
+        // signalée par le processeur » en critique — même matériel, même dernière
+        // occurrence. Fait ICI, après toutes les règles : l'ordre dans lequel elles
+        // s'exécutent ne doit pas décider de ce qui survit.
+        FusionnerLesDoublons(r.Findings);
+
         // Tri : critiques d'abord, puis avertissements, puis infos.
         r.Findings = r.Findings
             .OrderBy(f => f.Severity)
@@ -54,6 +64,46 @@ public sealed class RulesEngine
             .ToList();
 
         ComputeVerdict(r);
+    }
+
+    /// <summary>
+    /// Fusionne les conclusions qui portent le MÊME identifiant de fait.
+    ///
+    /// La conclusion conservée est la plus utile au lecteur : celle qui porte une
+    /// recommandation, à défaut celle dont le détail est le plus long. Elle hérite
+    /// de la gravité et de la confiance les plus fortes des deux, puis annonce que
+    /// le fait vient de deux chemins indépendants — ce qui le confirme au lieu de
+    /// le dédoubler.
+    ///
+    /// PIÈGE À NE PAS REPRODUIRE : dans <see cref="Severity"/> comme dans
+    /// <see cref="Confidence"/>, la valeur la plus BASSE est la plus grave et la
+    /// plus sûre (Critical = 0, High = 0). Écrire « &gt; » ici dégraderait
+    /// silencieusement une conclusion critique en avertissement.
+    /// </summary>
+    internal static void FusionnerLesDoublons(List<Finding> findings)
+    {
+        var groupes = findings.Where(f => f.Code.Length > 0)
+                              .GroupBy(f => f.Code)
+                              .Where(g => g.Count() > 1)
+                              .ToList();
+
+        foreach (var groupe in groupes)
+        {
+            var gardee = groupe.OrderBy(f => string.IsNullOrEmpty(f.Recommendation) ? 1 : 0)
+                               .ThenByDescending(f => f.Details.Length)
+                               .First();
+
+            foreach (var autre in groupe.Where(f => !ReferenceEquals(f, gardee)))
+            {
+                if (autre.Severity < gardee.Severity) gardee.Severity = autre.Severity;
+                if (autre.Confidence < gardee.Confidence) gardee.Confidence = autre.Confidence;
+                findings.Remove(autre);
+            }
+
+            gardee.Details += Lang.T(
+                " Ce fait a été signalé par deux chemins indépendants — le journal de Windows et la surveillance temps réel — ce qui le confirme.",
+                " This fact was reported through two independent paths — the Windows log and real-time monitoring — which confirms it.");
+        }
     }
 
     // ------------------------------------------------------------------
@@ -203,6 +253,9 @@ public sealed class RulesEngine
             Severity = fatal || whea.Count >= 5 ? Severity.Critical : Severity.Warning,
             Confidence = fatal ? Confidence.High : Confidence.Medium,
             Category = FaultCategory.Hardware,
+            // Même identifiant de fait que la règle d'alerte « whea » : les deux
+            // rapportent la même erreur, vue par deux chemins. Voir FusionnerLesDoublons.
+            Code = "whea",
             Title = Lang.T($"Erreurs matérielles WHEA détectées ({whea.Count})", $"Hardware errors reported by the CPU (WHEA) — {whea.Count}"),
             Details = Lang.T($"Le processeur a signalé {whea.Count} erreur(s) matérielle(s) (WHEA-Logger) sur la période.", $"The processor reported {whea.Count} hardware error(s) (WHEA-Logger) over the period.")
                       + (fatal ? Lang.T(" Un BSOD WHEA_UNCORRECTABLE_ERROR (0x124) confirme une erreur matérielle fatale.", " A WHEA_UNCORRECTABLE_ERROR (0x124) BSOD confirms a fatal hardware error.") : "")
@@ -418,6 +471,8 @@ public sealed class RulesEngine
             Severity = events.Count >= 2 ? Severity.Critical : Severity.Warning,
             Confidence = Confidence.High,
             Category = FaultCategory.Software,
+            // Même identifiant de fait que la règle d'alerte « exhaustion ».
+            Code = "exhaustion",
             Title = Lang.T($"Mémoire saturée : Windows a détecté l'épuisement de la mémoire virtuelle ({events.Count}×)", $"Memory exhausted: Windows detected virtual memory exhaustion ({events.Count}×)"),
             Details = Lang.T("Windows a diagnostiqué une pénurie de mémoire virtuelle (événement Resource-Exhaustion-Detector 2004). ", "Windows diagnosed a virtual memory shortage (Resource-Exhaustion-Detector event 2004). ")
                       + (culprits.Count > 0
@@ -568,6 +623,10 @@ public sealed class RulesEngine
             {
                 Severity = g.Any(a => a.Level == "crit") ? Severity.Critical : Severity.Warning,
                 Confidence = Confidence.High,
+                // L'identifiant de la règle EST l'identifiant du fait : c'est lui qui
+                // permet de reconnaître la même erreur rapportée par le journal de
+                // Windows. Voir FusionnerLesDoublons.
+                Code = g.Key,
                 Category = latest.RuleId switch
                 {
                     "cpu_temp" or "gpu_temp" or "whea" or "power41" => FaultCategory.Hardware,
@@ -1007,6 +1066,8 @@ public sealed class RulesEngine
                          : Severity.Warning,
                 Confidence = storageBsods.Count > 0 ? Confidence.High : Confidence.Medium,
                 Category = FaultCategory.Storage,
+                // Même identifiant de fait que la règle d'alerte « disk_event ».
+                Code = "disk_event",
                 Title = Lang.T($"Erreurs disque répétées ({diskEvents.Count})", $"Repeated disk errors ({diskEvents.Count})"),
                 Details = Lang.T($"Sources : {string.Join(", ", bySource)}.", $"Sources: {string.Join(", ", bySource)}.")
                           + (storageBsods.Count > 0 ? Lang.T($" Corrélées à {storageBsods.Count} BSOD de type stockage.", $" Correlated with {storageBsods.Count} storage-type BSOD.") : "")
