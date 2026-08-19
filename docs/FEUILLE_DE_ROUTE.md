@@ -140,7 +140,16 @@ Ordre proposé, du moins cher au plus délicat :
 1. ~~**26 — bouton « installer WinDbg »**~~ — **déjà fait en 1.2.3**, constaté le 19/08/2026 en ouvrant le fichier. Retiré de la 1.4.
 2. ~~**30 — fraîcheur des données**~~ — **fait**. `Analysis/DataFreshness` relève l'âge du fait le plus récent, toutes sources confondues, et la couverture réelle de la période. Sans surveillance temps réel, la durée d'allumage est déclarée inconnue plutôt que déduite. Le plancher de comparaison, troisième volet, était déjà fait en 1.2.3.
 3. ~~**29 — limiter ce que le mode simple affiche**~~ — **fait**. `Analysis/FindingDisplay` : tout le critique visible sans exception, plus le premier avertissement ; le reste replié à partir de deux éléments, avec son compte annoncé. Les blocs repliés se rouvrent à l'impression, ce qui corrige au passage deux `<details>` préexistants absents des PDF.
-4. **16 — hiérarchie du rapport pour un débutant.** **Toujours sans plan, et volontairement.** Le rapport marque déjà neuf sections `tech`, masquées en mode simple ; après les points 29 et 30, un débutant voit le verdict, la comparaison, les conclusions triées et repliées, la réparation, l'entretien et les limitations. Il n'y a plus de défaut identifié derrière ce point — seulement une intuition. Écrire un plan de refonte sans avoir sous les yeux un rapport réel produit par la version courante reviendrait à inventer du travail. **Prochaine étape : lire un vrai rapport, pas redessiner de mémoire.**
+4. ~~**16 — hiérarchie du rapport pour un débutant**~~ — **fait, après recadrage**. Deux rapports réels du 19/08/2026 ont montré que le problème n'était pas la hiérarchie mais **la duplication** : la même erreur WHEA apparaissait deux fois, en avertissement depuis le journal de Windows et en critique depuis la surveillance — même matériel, même dernière occurrence, deux gravités contradictoires. `RulesEngine.FusionnerLesDoublons` tourne après toutes les règles et avant le tri ; trois identifiants de fait sont partagés entre les deux chemins (`whea`, `disk_event`, `exhaustion`). Le doublon devient un argument : le fait est confirmé par deux sources indépendantes.
+
+**Ce que la 1.4 a aussi corrigé, trouvé en chemin et jamais dans cette liste :**
+
+- **« 💡 Recommandation »** écrit en dur dans chaque conclusion du rapport anglais ;
+- **le libellé du bouton de bascule** réécrit en français par le script au clic, l'exemption `pas-de-traduction` du littéral l'ayant rendu invisible ;
+- **147 tailles en français** dans le rapport anglais (`Ko`, `Mo`, `Go`), plus le séparateur décimal — « 4,2 Go » se lit comme un séparateur de milliers pour un lecteur américain ;
+- **cinq lignes de cette feuille de route** données comme ouvertes alors qu'elles étaient faites en 1.2.3, plus le point 26 fait depuis quatre versions.
+
+Aucun de ces défauts n'a été trouvé en lisant une liste. Tous l'ont été en ouvrant un fichier ou un rapport réel.
 
 **Fuites de traduction trouvées pendant la 1.4**, hors périmètre mais corrigées : « 💡 Recommandation » écrit en dur dans chaque conclusion, et le libellé du bouton de bascule réécrit en français par le script au clic. Les deux échappaient aux trois signaux — mot isolé sans accent pour la première, littéral exempté en bloc pour la seconde. Une liste nominative de faux amis a été ajoutée au test de rendu anglais.
 
