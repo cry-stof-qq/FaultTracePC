@@ -153,11 +153,37 @@ public class RenduAnglaisTests
     [InlineData("Historique")]
     [InlineData("Entretien")]
     [InlineData("Limitations de")]
+    [InlineData("Masquer")]
+    [InlineData("Afficher")]
     public void Le_rapport_anglais_ne_contient_aucun_faux_ami(string motFrancais)
     {
         var html = EnAnglais(() => HtmlReportGenerator.Generate(RapportRiche()));
 
         Assert.DoesNotContain(motFrancais, html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Le_bouton_de_bascule_reste_anglais_apres_un_clic()
+    {
+        // Le script qui réécrit le libellé au clic est une CONSTANTE : il ne peut
+        // contenir aucun appel de traduction, et il portait donc les libellés
+        // français en dur. Le libellé initial étant correct, la fuite ne se voyait
+        // qu'après un clic — et aucun test ne clique. On vérifie donc les deux
+        // états là où ils vivent désormais, dans les données injectées au script.
+        var html = EnAnglais(() => HtmlReportGenerator.Generate(RapportRiche()));
+
+        Assert.Contains("Hide the technical detail", html, StringComparison.Ordinal);
+        Assert.Contains("Show the technical detail", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Le_meme_bouton_reste_francais_en_francais()
+    {
+        // Contrôle positif : sans lui, une injection cassée passerait pour une
+        // réussite dans le test ci-dessus.
+        var html = HtmlReportGenerator.Generate(RapportRiche());
+
+        Assert.Contains("Masquer les d", html, StringComparison.Ordinal);
     }
 
     [Fact]
