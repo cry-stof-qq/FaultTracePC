@@ -27,21 +27,36 @@ public class DiskHealthTests
         Assert.Equal(attendu, DiskHealthInfo.FromWmi((ushort)code));
     }
 
-    // --- Compatibilité avec les fichiers déjà écrits -----------------------
+    // --- Ce que le logiciel sait relire ------------------------------------
 
     [Theory]
-    [InlineData("Sain", DiskHealth.Healthy)]
-    [InlineData("Avertissement", DiskHealth.Warning)]
-    [InlineData("Défaillant", DiskHealth.Failing)]
-    [InlineData("Inconnu", DiskHealth.Unknown)]
     [InlineData("Healthy", DiskHealth.Healthy)]
+    [InlineData("Warning", DiskHealth.Warning)]
+    [InlineData("Failing", DiskHealth.Failing)]
     [InlineData("Unhealthy", DiskHealth.Failing)]
     [InlineData("", DiskHealth.NotReported)]
-    public void Anciens_libelles_relus(string ecrit, DiskHealth attendu)
+    public void Les_valeurs_ecrites_par_le_logiciel_se_relisent(string ecrit, DiskHealth attendu)
     {
         var json = $$"""{"Model":"Samsung SSD 980","Health":"{{ecrit}}"}""";
         var brief = JsonSerializer.Deserialize<ScanHistory.DiskBrief>(json)!;
         Assert.Equal(attendu, brief.Health);
+    }
+
+    [Theory]
+    [InlineData("Sain")]
+    [InlineData("Avertissement")]
+    [InlineData("Défaillant")]
+    [InlineData("Inconnu")]
+    public void Les_mots_francais_de_la_1_2_x_ne_sont_plus_compris_et_ne_valent_jamais_sain(string ancien)
+    {
+        // La reconnaissance à l'allure a été retirée en 1.4 : un fichier d'une
+        // version antérieure est refusé par son tampon de format, en amont. Ce qui
+        // compte ici, c'est qu'un mot devenu incompris ne dégénère PAS en « sain ».
+        var json = $$"""{"Model":"Samsung SSD 980","Health":"{{ancien}}"}""";
+        var brief = JsonSerializer.Deserialize<ScanHistory.DiskBrief>(json)!;
+
+        Assert.Equal(DiskHealth.Unknown, brief.Health);
+        Assert.NotEqual(DiskHealth.Healthy, brief.Health);
     }
 
     [Fact]
@@ -64,10 +79,17 @@ public class DiskHealthTests
     }
 
     [Fact]
-    public void Un_resume_ecrit_par_la_1_2_3_declenche_encore_l_alerte()
+    public void Un_resume_ecrit_par_la_1_2_3_est_refuse_entierement()
     {
-        // LA régression que cette énumération doit empêcher : pendant 90 jours,
-        // le scan précédent vient d'une version qui écrivait « Sain » en français.
+        // CE TEST A CHANGÉ DE CONTRAT EN 1.4, ET C'EST VOLONTAIRE.
+        //
+        // Il vérifiait que le mot français « Sain » d'un résumé 1.2.3 était encore
+        // compris, pour qu'un disque devenu défaillant déclenche quand même
+        // l'alerte. La protection ne passe plus par là : le résumé entier est
+        // refusé parce qu'il ne porte pas de tampon de format, et l'utilisateur
+        // l'apprend au lieu de comparer sur des champs à demi compris.
+        //
+        // C'est plus sûr, parce que cela ne dépend plus de deviner juste.
         var json = """
             {
               "GeneratedAt": "2026-08-01T10:00:00",
@@ -75,26 +97,10 @@ public class DiskHealthTests
               "Disks": [ { "Model": "Samsung SSD 980", "Health": "Sain", "WearPercent": 1 } ]
             }
             """;
-        var precedent = JsonSerializer.Deserialize<ScanHistory.ScanSummary>(json)!;
 
-        var actuel = new DiagnosticReport
-        {
-            GeneratedAt = new DateTime(2026, 8, 15, 10, 0, 0),
-            ScanPeriodDays = 30,
-            System = new SystemSnapshot
-            {
-                MachineName = "POSTE-01",
-                Disks = [new DiskInfo { Model = "Samsung SSD 980", Health = DiskHealth.Failing, WearPercent = 1 }],
-            },
-        };
-
-        var c = ScanHistory.Compare(actuel, precedent);
-        Assert.Equal("crit", c.HardwareSeverity);
-        Assert.Contains(c.HardwareConcerns, h => h.Message.Contains("état de santé"));
+        Assert.Null(ScanHistory.Lire(json));
+        Assert.NotNull(ScanHistory.NoteAncienFormat(1));
     }
-
-    // --- Classement --------------------------------------------------------
-
     [Fact]
     public void Un_etat_non_mesure_ne_se_classe_pas()
     {

@@ -54,23 +54,33 @@ public static class DiskHealthInfo
     };
 
     /// <summary>
-    /// Lecture TOLÉRANTE, pour les données déjà écrites sur les postes.
+    /// Lecture des seules valeurs que le logiciel écrit lui-même, plus le
+    /// vocabulaire de Windows.
     ///
-    /// L'historique est conservé 90 jours : pendant trois mois, un scan lira des
-    /// résumés produits par une version antérieure, où l'état était le mot
-    /// français affiché à l'époque. Une mise à jour par GPO remplace le logiciel,
-    /// jamais les fichiers qu'il a déjà écrits — refuser ces valeurs ferait
-    /// silencieusement disparaître toute comparaison d'un disque pendant trois mois.
+    /// CE QUI A ÉTÉ RETIRÉ EN 1.4, ET POURQUOI
+    /// Jusqu'ici, cette méthode reconnaissait aussi « Sain », « Avertissement » et
+    /// « Défaillant » — les mots français écrits par la 1.2.x. Depuis que les
+    /// résumés portent un tampon de format, un fichier d'une version antérieure
+    /// est refusé par <see cref="Report.ScanHistory.Lire"/> AVANT d'arriver ici :
+    /// ces entrées étaient devenues du code mort.
+    ///
+    /// Les garder aurait été pire qu'inutile. Deux mécanismes traiteraient le
+    /// même problème — le tampon, qui refuse franchement, et la reconnaissance à
+    /// l'allure, qui laisse passer en silence — et le plus faible masquerait le
+    /// plus sûr le jour où une valeur ancienne arriverait par un chemin qui ne
+    /// passe pas par le tampon.
+    ///
+    /// Une valeur non reconnue devient <see cref="DiskHealth.Unknown"/>, jamais
+    /// <see cref="DiskHealth.Healthy"/> : c'est la règle de fond du logiciel, une
+    /// mesure qu'on n'a pas su lire n'est pas un bon résultat.
     /// </summary>
     public static DiskHealth Parse(string? raw) => (raw ?? "").Trim().ToLowerInvariant() switch
     {
         "" => DiskHealth.NotReported,
         "notreported" => DiskHealth.NotReported,
-        "sain" or "healthy" or "ok" => DiskHealth.Healthy,
-        // pas-de-traduction : valeurs écrites par la 1.2.x, on les relit telles quelles.
-        "avertissement" or "warning" or "degraded" or "dégradé" or "degrade" => DiskHealth.Warning,
-        // pas-de-traduction : idem.
-        "défaillant" or "defaillant" or "failing" or "failed" or "unhealthy" => DiskHealth.Failing,
+        "healthy" or "ok" => DiskHealth.Healthy,
+        "warning" or "degraded" => DiskHealth.Warning,
+        "failing" or "failed" or "unhealthy" => DiskHealth.Failing,
         _ => DiskHealth.Unknown,
     };
 
