@@ -298,6 +298,36 @@ public static class RepairScriptGenerator
         _ => Lang.T("général", "general"),
     };
 
-    /// <summary>Échappe les apostrophes pour les chaînes PowerShell entre quotes simples.</summary>
-    private static string PsEscape(string s) => s.Replace("'", "''");
+    /// <summary>
+    /// Rend un texte sûr à l'intérieur d'une chaîne PowerShell entre quotes simples.
+    ///
+    /// L'APOSTROPHE DROITE NE SUFFIT PAS, ET ÇA A CASSÉ UN SCRIPT EN VRAI.
+    /// Le 19/08/2026, sur le PC d'un tiers, le script généré n'a pas démarré du
+    /// tout : erreur d'analyse, aucune réparation exécutée. En cause, la
+    /// description d'un pilote Intel — « Pilote v2 I2C d’E/S série Intel(R) ».
+    ///
+    /// Ce « ’ » est U+2019, pas l'apostrophe droite. Or la documentation de
+    /// PowerShell est explicite : « PowerShell treats smart quotation marks, also
+    /// called typographic or curly quotes, AS NORMAL QUOTATION MARKS for strings ».
+    /// La chaîne se terminait donc à « d’ », et la fin de la ligne était lue comme
+    /// du code — puis l'apostrophe finale ouvrait une nouvelle chaîne qui avalait
+    /// la ligne suivante.
+    ///
+    /// Aucun contrôle ne pouvait le voir : le générateur produisait un texte
+    /// parfaitement valide en C#, et le défaut n'existait qu'aux yeux de
+    /// l'interpréteur qui le relit. Le déclencheur — une description de pilote
+    /// française contenant une apostrophe — est très fréquent.
+    ///
+    /// On ramène donc toute la famille des guillemets simples typographiques à
+    /// l'apostrophe droite AVANT de doubler. Le texte affiché y perd sa
+    /// typographie ; dans une console PowerShell, la différence est invisible, et
+    /// un script qui démarre vaut mieux qu'une apostrophe élégante.
+    /// </summary>
+    internal static string PsEscape(string s) =>
+        (s ?? "")
+            .Replace('\u2018', '\'')   // ‘ guillemet-apostrophe culbuté
+            .Replace('\u2019', '\'')   // ’ guillemet-apostrophe — le coupable
+            .Replace('\u201B', '\'')   // ‛ guillemet-apostrophe culbuté réfléchi
+            .Replace('\u2032', '\'')   // ′ prime, que PowerShell traite aussi comme une apostrophe
+            .Replace("'", "''");
 }

@@ -10,7 +10,7 @@
 
     <AssemblyName>FaultTracePC.Cli</AssemblyName>
     <RootNamespace>FaultTracePC.Cli</RootNamespace>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <Product>FaultTracePC CLI</Product>
     <Description>Diagnostic FaultTracePC en ligne de commande (déploiement de parc)</Description>
 

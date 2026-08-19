@@ -1,6 +1,6 @@
 ﻿# FaultTracePC — feuille de route
 
-État au 17/08/2026. Document de travail, pas un engagement.
+État au 19/08/2026. Document de travail, pas un engagement.
 
 ## Où on en est
 
@@ -10,7 +10,8 @@
 | 1.2.3 | **publiée** — release GitHub, 4 fichiers, sommes de contrôle |
 | 1.3.0 | **publiée** — release GitHub, MSI + ZIP, 250 tests verts |
 | 1.3.1 | **publiée** — journal des pannes, stratégie d'exécution, 262 tests verts |
-| 1.4.0 | ce que l'utilisateur lit — fraîcheur, déduplication, repli, tampon de format |
+| 1.4.0 | **publiée** — ce que l'utilisateur lit : fraîcheur, déduplication, repli, tampon de format |
+| 1.4.1 | correctif — apostrophe typographique dans le script de réparation (point 37) |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
@@ -127,6 +128,16 @@ La stratégie n'est toujours pas contournée : elle refuse le `.ps1`, on affiche
 **À traiter en même temps :** la boîte à outils lance `-NoExit -Command` et a donc le même comportement. Les corriger séparément laisserait deux comportements différents à deux boutons qui se ressemblent.
 
 **Minuteur de fermeture automatique : écarté, et pas par paresse.** Il résout un problème douteux — une fenêtre terminée et laissée ouverte ne coûte rien — et en crée un vrai : fermer pendant que quelqu'un lit le résultat, ou pendant qu'une réparation tourne encore. Un `chkdsk` sur un disque abîmé dépasse largement l'heure. Si l'idée revenait, la seule forme acceptable serait un décompte visible déclenché **après** la fin du script et annulable à la moindre touche — ce que l'enrobage rend inutile. *Difficulté : faible.*
+
+**37 — L'apostrophe typographique cassait le script de réparation. CORRIGÉ EN 1.4.1.** Constaté le 19/08/2026 sur le PC d'un ami, à partir des trois fichiers produits par la 1.4.0. Le script généré contenait la ligne `Write-Host '  - iaLPSS2_I2C.sys — Pilote v2 I2C d'E/S série Intel(R)'` : le `’` du nom de pilote, recopié tel quel depuis la base des pilotes, **fermait la chaîne** au milieu de la phrase et tout ce qui suivait devenait de la syntaxe invalide.
+
+Ce n'est pas une régression de la 1.4.0 : `PsEscape` n'a jamais traité que l'apostrophe droite `'`, depuis sa première ligne. Ce que la 1.4.0 a changé, c'est la **visibilité** — `-NoExit` a laissé la fenêtre ouverte assez longtemps pour que l'erreur se lise au lieu de disparaître.
+
+Pourquoi rien ne l'a vu : le C# est parfaitement valide, le compilateur n'a rien à dire, les tests de traduction ne regardent pas les chaînes produites à l'exécution, et l'apostrophe typographique est **correcte** dans un nom de pilote français. Le défaut n'existe que pour le second interprète, celui qui relit le texte. Documentation Microsoft, vérifiée : « PowerShell treats smart quotation marks, also called typographic or curly quotes, as normal quotation marks for strings. »
+
+Corrigé en 1.4.1 : `PsEscape` ramène U+2018, U+2019, U+201B et U+2032 sur l'apostrophe droite **avant** de la doubler. Deux tests verrouillent le résultat — un jeu de cas sur les quatre caractères, et un test qui relit chaque ligne d'un script réellement engendré comme le ferait PowerShell — délimiteur ouvrant, doublage, accent grave, commentaires — pour qu'une ligne laissant une chaîne ouverte échoue même si le caractère fautif est un autre. La boîte à outils n'était pas touchée : elle lance ses commandes en `-Command` en ligne, sans passer par le script.
+
+**La leçon, la même que le point 36 :** un texte que le logiciel écrit pour qu'un autre programme le relise n'est pas du texte, c'est du code — et il faut le tester en le relisant, pas en relisant celui qui l'écrit.
 
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
