@@ -76,6 +76,12 @@ public static class HtmlReportGenerator
         sb.Append($"<img src=\"{Branding.LogoDataUri}\" alt=\"FaultTracePC\" width=\"48\" height=\"48\">");
         sb.Append(Lang.T("<h1>FaultTracePC — Rapport de diagnostic</h1></div>", "<h1>FaultTracePC — Diagnostic report</h1></div>"));
         sb.Append(Lang.T($"<p class=\"sub\">Machine <strong>{H(r.System.MachineName)}</strong> · {H(r.System.Os.Caption)} {H(r.System.Os.DisplayVersion)} (build {H(r.System.Os.BuildNumber)}) · généré le {r.GeneratedAt:dd/MM/yyyy à HH:mm} · période : {r.ScanPeriodDays} jours</p>", $"<p class=\"sub\">Machine <strong>{H(r.System.MachineName)}</strong> · {H(r.System.Os.Caption)} {H(r.System.Os.DisplayVersion)} (build {H(r.System.Os.BuildNumber)}) · generated on {r.GeneratedAt:yyyy-MM-dd HH:mm} · period: {r.ScanPeriodDays} days</p>"));
+        // Fraîcheur : un rapport daté d'aujourd'hui laisse croire qu'il décrit
+        // aujourd'hui. Sur une machine éteinte depuis des mois, il décrit un passé
+        // lointain, et rien à la lecture ne permettait de s'en apercevoir.
+        sb.Append("<p class=\"sub small\">")
+          .Append(H(Analysis.DataFreshness.Sentence(Analysis.DataFreshness.Of(r), r.GeneratedAt)))
+          .Append("</p>");
         sb.Append(Lang.T("<button id=\"mode-toggle\" class=\"btn2\" type=\"button\">🔎 Afficher les détails techniques (mode complet)</button>", "<button id=\"mode-toggle\" class=\"btn2\" type=\"button\">🔎 Show the technical detail (full mode)</button>"));
         sb.Append("</header>");
     }

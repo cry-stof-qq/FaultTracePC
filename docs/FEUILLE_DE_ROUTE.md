@@ -85,7 +85,7 @@ Une réserve honnête : les conditions mentionnent aussi qu'un programme exécut
 
 Mon avis, à discuter.
 
-**26 — Un bouton « installer WinDbg » dans la boîte à outils.** WinDbg conditionne la précision de **toute** analyse de dump : sans lui, le code STOP est lu mais le pilote fautif reste souvent anonyme. Aujourd'hui, l'information vit dans une **infobulle**, et l'utilisateur doit taper `winget install Microsoft.WinDbg` lui-même. C'est le meilleur rapport valeur/effort de toute cette liste : une ligne de code pour améliorer chaque diagnostic futur. *Difficulté : triviale.*
+**26 — ~~Un bouton « installer WinDbg » dans la boîte à outils~~. FAIT EN 1.2.3**, constaté le 19/08/2026. Le bouton existe (`L.ToolWinDbg`, `RepairToolboxWindow.xaml:132`), son action aussi (`case "windbg"`, installation par `winget install --id Microsoft.WinDbg`), et `MainWindow.ProposerWinDbg` le propose après une analyse ayant trouvé des fichiers d'incident sans pouvoir les exploiter. La ligne est restée ouverte trois versions, et je l'ai recommandée deux fois comme « le meilleur rapport valeur/effort de la liste » alors qu'elle était faite.
 
 **27 — `parc.json` vit dans `Documents`, donc par utilisateur, et contient les tokens de tout le parc.** Deux conséquences : aucun export/import, donc un profil Windows reconstruit efface la configuration du parc ; et sur un réseau d'établissement, un dossier Documents redirigé met ces tokens sur un partage. Le **token dérivé** (secret maître + nom de machine) supprime le problème à la racine : plus de liste à sauvegarder, la console recalcule. *Difficulté : moyenne.*
 
@@ -137,7 +137,7 @@ Le critère qui a tranché n'est pas la valeur des points mais **l'interruptibil
 
 Ordre proposé, du moins cher au plus délicat :
 
-1. **26 — bouton « installer WinDbg »**. Une ligne de code, et chaque diagnostic futur y gagne le nom du pilote fautif au lieu d'un anonyme. Il attend depuis quatre versions.
+1. ~~**26 — bouton « installer WinDbg »**~~ — **déjà fait en 1.2.3**, constaté le 19/08/2026 en ouvrant le fichier. Retiré de la 1.4.
 2. **30 — fraîcheur des données.** L'âge du fait le plus récent, et la couverture réelle (« 30 jours analysés, dont 2 jours machine allumée »). Même famille de défaut que la console qui se refermait en silence : *le logiciel affirme plus qu'il ne sait*. Le plancher de comparaison, troisième volet de ce point, est déjà fait en 1.2.3.
 3. **29 — limiter ce que le mode simple affiche.** Critiques et premier avertissement ; le reste replié. La décision de ce qu'on masque est plus délicate que le code.
 4. **16 — hiérarchie du rapport pour un débutant.** Le plus vaste, et le seul sans plan écrit. À prendre en dernier, avec ce que les trois précédents auront appris.
