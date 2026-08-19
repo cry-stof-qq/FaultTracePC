@@ -177,8 +177,28 @@ public static class HtmlReportGenerator
             + "Le niveau de confiance est honnête : « faible » signale une piste à vérifier, pas une certitude.</p>",
             "<p class=\"explain\">What FaultTracePC found, ordered from most to least serious. Each card explains the problem in plain words and says what to do. "
             + "The confidence level is honest: “low” marks a lead to check, not a certainty.</p>"));
-        foreach (var f in r.Findings)
+        // Tout le critique reste visible ; le reste se replie quand il y en a assez
+        // pour que cacher aide plus que gêner. Voir Analysis.FindingDisplay.
+        var split = Analysis.FindingDisplay.Split(r.Findings);
+        foreach (var f in split.Visibles) FindingCard(sb, f);
+
+        if (split.Repliees.Count > 0)
         {
+            sb.Append("<details class=\"fold\"><summary>")
+              .Append(H(Analysis.FindingDisplay.FoldLabel(split.Repliees)))
+              .Append("</summary>");
+            foreach (var f in split.Repliees) FindingCard(sb, f);
+            sb.Append("</details>");
+        }
+        sb.Append("</section>");
+    }
+
+    /// <summary>
+    /// Une carte de conclusion. Extraite de la boucle parce qu'elle est rendue à
+    /// deux endroits désormais : dans la liste visible et dans le bloc replié.
+    /// </summary>
+    private static void FindingCard(StringBuilder sb, Finding f)
+    {
             var (cls, label) = f.Severity switch
             {
                 Severity.Critical => ("crit", Lang.T("Critique", "Critical")),
@@ -209,8 +229,6 @@ public static class HtmlReportGenerator
             if (ToolboxHint(f.Category) is { } hint)
                 sb.Append(Lang.T($"<p class=\"toolhint\"><span class=\"toollabel\">🧰 Dans FaultTracePC</span> bouton <strong>🧰 Outils</strong>, puis : {H(hint)}</p>", $"<p class=\"toolhint\"><span class=\"toollabel\">🧰 In FaultTracePC</span> button <strong>🧰 Tools</strong>, then: {H(hint)}</p>"));
             sb.Append("</div>");
-        }
-        sb.Append("</section>");
     }
 
     /// <summary>
@@ -861,6 +879,14 @@ public static class HtmlReportGenerator
     // pas-de-traduction : du JavaScript, aucun texte affiché.
     private const string FilterJs = """
         (function(){
+          // Impression et export PDF : tout ce qui est replié se rouvre, puis
+          // reprend son état. Un document transmis à un réparateur ne doit pas être
+          // amputé sans que son destinataire le sache. Fait ici EN PLUS de la règle
+          // CSS : le rendu d'un <details> fermé à l'impression dépend du moteur.
+          const folds = () => document.querySelectorAll('details');
+          addEventListener('beforeprint', () => folds().forEach(d => { d.dataset.o = d.open ? '1' : ''; d.open = true; }));
+          addEventListener('afterprint', () => folds().forEach(d => { d.open = d.dataset.o === '1'; }));
+
           const t = document.getElementById('mode-toggle');
           if (t) t.addEventListener('click', () => {
             const simple = document.body.classList.toggle('simple');
@@ -961,7 +987,15 @@ public static class HtmlReportGenerator
         .btn2{margin-top:12px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:inherit}
         .btn2:hover{background:rgba(255,255,255,.22)}
         body.simple section.tech{display:none}
+        .fold{margin:0 0 18px}
+        .fold>summary{cursor:pointer;font-weight:600;color:#2A78D6;padding:8px 0;list-style:revert}
+        .fold>summary:hover{text-decoration:underline}
         @media print{
+          /* Un PDF transmis à un réparateur ne doit pas être amputé : tout ce qui
+             est replié à l'écran se rouvre à l'impression. La règle CSS et le
+             gestionnaire beforeprint font double emploi VOLONTAIREMENT — le
+             comportement d'un <details> fermé à l'impression dépend du moteur. */
+          details>*{display:block!important}
           /* Un rapport imprimé ou exporté en PDF ne doit pas couper une conclusion
              en deux : chaque carte reste d'un seul tenant, et le bouton de bascule
              n'a évidemment aucun sens sur papier. */
