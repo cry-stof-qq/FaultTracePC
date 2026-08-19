@@ -1435,11 +1435,26 @@ public sealed class RulesEngine
         : Lang.T(" Barrettes installées : ", " Modules fitted: ") + string.Join(Lang.T(" ; ", "; "),
             r.System.RamModules.Select(m => $"{m.DeviceLocator} {m.Manufacturer} {m.PartNumber} ({FormatBytes(m.CapacityBytes)})")) + ".";
 
+    /// <summary>
+    /// Taille lisible, unité et séparateur décimal suivant la langue du rapport.
+    ///
+    /// Constaté sur un rapport réel du 19/08/2026 : la version anglaise affichait
+    /// 147 tailles en « Ko », « Mo » et « Go ». Ni accent, ni mot outil, ni
+    /// typographie française — aucun des trois signaux du test de traduction ne
+    /// pouvait voir des unités de deux lettres.
+    ///
+    /// Le séparateur compte autant que l'unité : « 4,2 Go » dans un document
+    /// anglais se lit mal, et un lecteur américain peut prendre la virgule pour un
+    /// séparateur de milliers — soit dix fois la valeur réelle. C'est le même
+    /// raisonnement qui avait fait écarter le jj/mm/aaaa britannique en 1.3.0.
+    /// </summary>
     internal static string FormatBytes(ulong bytes)
     {
-        string[] units = ["o", "Ko", "Mo", "Go", "To"];
+        string[] units = Lang.IsFrench
+            ? ["o", "Ko", "Mo", "Go", "To"]
+            : ["B", "KB", "MB", "GB", "TB"];
         double v = bytes; int u = 0;
         while (v >= 1024 && u < units.Length - 1) { v /= 1024; u++; }
-        return $"{v:0.#} {units[u]}";
+        return v.ToString("0.#", Lang.Culture) + " " + units[u];
     }
 }

@@ -187,6 +187,28 @@ public class RenduAnglaisTests
     }
 
     [Fact]
+    public void Le_rapport_anglais_n_affiche_aucune_unite_francaise()
+    {
+        // Constaté sur un rapport réel : 147 tailles en Ko, Mo et Go dans la
+        // version anglaise. Une unité de deux lettres est invisible pour les trois
+        // signaux du contrôle général — il faut la chercher nommément, précédée
+        // d'un chiffre pour ne pas confondre avec un mot.
+        var html = EnAnglais(() => HtmlReportGenerator.Generate(RapportRiche()));
+
+        Assert.DoesNotMatch(@"\d\s*(Ko|Mo|Go|To)\b", html);
+    }
+
+    [Fact]
+    public void Le_rapport_francais_affiche_bien_des_unites_francaises()
+    {
+        // Contrôle positif : sans lui, le test ci-dessus passerait sur un rapport
+        // n'affichant aucune taille.
+        var html = HtmlReportGenerator.Generate(RapportRiche());
+
+        Assert.Matches(@"\d\s*(o|Ko|Mo|Go)\b", html);
+    }
+
+    [Fact]
     public void Le_controle_des_faux_amis_n_est_pas_vide()
     {
         // Contrôle positif : sans lui, la théorie ci-dessus passerait aussi bien
