@@ -195,7 +195,13 @@ public static class HtmlReportGenerator
             sb.Append($"<span class=\"conf\">{CategoryLabel(f.Category)} · {conf}</span></div>");
             sb.Append($"<h3>{H(f.Title)}</h3><p>{H(f.Details)}</p>");
             if (!string.IsNullOrEmpty(f.Recommendation))
-                sb.Append($"<p class=\"reco\"><span class=\"recolabel\">💡 Recommandation</span> {H(f.Recommendation)}</p>");
+                // « Recommandation » et « Recommendation » ne diffèrent que d'une
+                // lettre : aucun des trois signaux du test de traduction ne pouvait
+                // voir cette fuite — ni accent, ni trois mots outils, ni espace avant
+                // une ponctuation. Elle a vécu dans le rapport anglais jusqu'en 1.4.
+                sb.Append("<p class=\"reco\"><span class=\"recolabel\">")
+                  .Append(Lang.T("💡 Recommandation", "💡 Recommendation"))
+                  .Append($"</span> {H(f.Recommendation)}</p>");
 
             // Le rapport conseillait des actions sans jamais dire qu'un bouton les
             // exécute : le mot « Outils » n'apparaissait nulle part. Un lecteur qui

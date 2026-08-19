@@ -131,6 +131,46 @@ public class RenduAnglaisTests
             $"{fautes.Count} passage(s) français dans le rapport anglais :\n  " + string.Join("\n  ", fautes));
     }
 
+    /// <summary>
+    /// Les faux amis, que les trois signaux ne peuvent pas voir.
+    ///
+    /// La détection repose sur un accent, trois mots outils français distincts, ou
+    /// l'espace avant une ponctuation. Un mot français isolé, sans accent, et dont
+    /// la forme anglaise ne diffère que d'une lettre, échappe aux trois — et c'est
+    /// exactement ce qui est arrivé à « 💡 Recommandation », resté en français dans
+    /// le rapport anglais jusqu'à la 1.4.
+    ///
+    /// Cette liste est volontairement courte et nominative : elle ne remplace pas
+    /// la détection générale, elle bouche les trous qu'on lui connaît.
+    /// </summary>
+    /// Chaque entrée doit être un mot que l'anglais N'A PAS. « Conclusions »,
+    /// « Surveillance », « Information » et « Analyse » en sont aussi — les mettre
+    /// ici produirait un échec le jour où une phrase anglaise parfaitement correcte
+    /// les emploie.
+    [Theory]
+    [InlineData("Recommandation")]
+    [InlineData("Avertissement")]
+    [InlineData("Historique")]
+    [InlineData("Entretien")]
+    [InlineData("Limitations de")]
+    public void Le_rapport_anglais_ne_contient_aucun_faux_ami(string motFrancais)
+    {
+        var html = EnAnglais(() => HtmlReportGenerator.Generate(RapportRiche()));
+
+        Assert.DoesNotContain(motFrancais, html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Le_controle_des_faux_amis_n_est_pas_vide()
+    {
+        // Contrôle positif : sans lui, la théorie ci-dessus passerait aussi bien
+        // sur un rapport qui n'affiche aucune recommandation. Un test qui ne peut
+        // pas échouer ne protège rien.
+        var html = EnAnglais(() => HtmlReportGenerator.Generate(RapportRiche()));
+
+        Assert.Contains("Recommendation", html, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Le_script_de_reparation_anglais_ne_laisse_passer_aucune_phrase_francaise()
     {
