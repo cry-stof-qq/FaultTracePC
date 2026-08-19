@@ -138,9 +138,11 @@ Le critère qui a tranché n'est pas la valeur des points mais **l'interruptibil
 Ordre proposé, du moins cher au plus délicat :
 
 1. ~~**26 — bouton « installer WinDbg »**~~ — **déjà fait en 1.2.3**, constaté le 19/08/2026 en ouvrant le fichier. Retiré de la 1.4.
-2. **30 — fraîcheur des données.** L'âge du fait le plus récent, et la couverture réelle (« 30 jours analysés, dont 2 jours machine allumée »). Même famille de défaut que la console qui se refermait en silence : *le logiciel affirme plus qu'il ne sait*. Le plancher de comparaison, troisième volet de ce point, est déjà fait en 1.2.3.
-3. **29 — limiter ce que le mode simple affiche.** Critiques et premier avertissement ; le reste replié. La décision de ce qu'on masque est plus délicate que le code.
-4. **16 — hiérarchie du rapport pour un débutant.** Le plus vaste, et le seul sans plan écrit. À prendre en dernier, avec ce que les trois précédents auront appris.
+2. ~~**30 — fraîcheur des données**~~ — **fait**. `Analysis/DataFreshness` relève l'âge du fait le plus récent, toutes sources confondues, et la couverture réelle de la période. Sans surveillance temps réel, la durée d'allumage est déclarée inconnue plutôt que déduite. Le plancher de comparaison, troisième volet, était déjà fait en 1.2.3.
+3. ~~**29 — limiter ce que le mode simple affiche**~~ — **fait**. `Analysis/FindingDisplay` : tout le critique visible sans exception, plus le premier avertissement ; le reste replié à partir de deux éléments, avec son compte annoncé. Les blocs repliés se rouvrent à l'impression, ce qui corrige au passage deux `<details>` préexistants absents des PDF.
+4. **16 — hiérarchie du rapport pour un débutant.** **Toujours sans plan, et volontairement.** Le rapport marque déjà neuf sections `tech`, masquées en mode simple ; après les points 29 et 30, un débutant voit le verdict, la comparaison, les conclusions triées et repliées, la réparation, l'entretien et les limitations. Il n'y a plus de défaut identifié derrière ce point — seulement une intuition. Écrire un plan de refonte sans avoir sous les yeux un rapport réel produit par la version courante reviendrait à inventer du travail. **Prochaine étape : lire un vrai rapport, pas redessiner de mémoire.**
+
+**Fuites de traduction trouvées pendant la 1.4**, hors périmètre mais corrigées : « 💡 Recommandation » écrit en dur dans chaque conclusion, et le libellé du bouton de bascule réécrit en français par le script au clic. Les deux échappaient aux trois signaux — mot isolé sans accent pour la première, littéral exempté en bloc pour la seconde. Une liste nominative de faux amis a été ajoutée au test de rendu anglais.
 
 **Ce qu'on s'interdit d'y ajouter :** de nouveaux diagnostics. Le triage RAW (10), la pente SMART (11), le bloc winget (15) et l'espace disque (32) restent pour plus tard. Un logiciel qui vient de découvrir qu'il ne savait pas signaler ses propres pannes n'a pas besoin de surface supplémentaire.
 
