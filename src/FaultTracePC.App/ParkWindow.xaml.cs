@@ -204,6 +204,7 @@ public partial class ParkWindow : Window
             // les relevés temps réel disent l'état, pas l'inventaire.
             TxtStatus.Text = Lang.T("Récupération des résumés d'analyse pour la comparaison…", "Fetching the analysis summaries for the comparison…");
             var summaries = new List<Core.Analysis.ParkComparator.MachineSummary>();
+            var ignoresFormat = 0;
             foreach (var m in _machines)
             {
                 try
@@ -212,8 +213,14 @@ public partial class ParkWindow : Window
                     using var resp = await Http.SendAsync(req);
                     if (!resp.IsSuccessStatusCode) continue;
                     var json = await resp.Content.ReadAsStringAsync();
-                    if (JsonSerializer.Deserialize<Core.Report.ScanHistory.ScanSummary>(json) is { } sum)
+                    // Lire() plutôt qu'une désérialisation directe : un poste resté
+                    // en 1.3 renvoie un résumé sans tampon de format. Le lire comme
+                    // s'il était à jour produirait une comparaison fausse, ce qui est
+                    // pire qu'un poste absent du tableau.
+                    if (Core.Report.ScanHistory.Lire(json) is { } sum)
                         summaries.Add(new Core.Analysis.ParkComparator.MachineSummary(m.Name, sum));
+                    else
+                        ignoresFormat++;
                 }
                 catch { /* poste injoignable ou jamais analysé : il sort simplement de la comparaison */ }
             }
@@ -221,7 +228,11 @@ public partial class ParkWindow : Window
             var comparison = Core.Analysis.ParkComparator.Analyze(summaries);
             var path = ParkReportGenerator.WriteToDisk(lines, comparison);
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-            TxtStatus.Text = Lang.T($"Rapport du parc généré : {path}", $"Fleet report generated: {path}");
+            TxtStatus.Text = Lang.T($"Rapport du parc généré : {path}", $"Fleet report generated: {path}")
+                + (ignoresFormat > 0
+                    ? Lang.T($" — {ignoresFormat} poste(s) écarté(s) : résumé produit par une version antérieure, à mettre à jour.",
+                             $" — {ignoresFormat} machine(s) left out: summary produced by an earlier version, to be updated.")
+                    : "");
         }
         catch (Exception ex)
         {

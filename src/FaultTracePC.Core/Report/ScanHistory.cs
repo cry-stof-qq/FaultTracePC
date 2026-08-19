@@ -17,8 +17,29 @@ public static class ScanHistory
     // Résumé persisté (volontairement compact : l'essentiel pour comparer)
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// Version du format de ces fichiers.
+    ///
+    /// POURQUOI CE NUMÉRO EXISTE
+    /// Jusqu'à la 1.3 incluse, aucun fichier persisté ne disait de quel format il
+    /// était. Chaque évolution obligeait donc à écrire du code qui reconnaît les
+    /// anciennes écritures à leur allure — un mot français ici, un champ absent
+    /// là — et ce code ne s'enlève jamais. Un fichier qui annonce son format se
+    /// refuse proprement au lieu d'être mal compris.
+    ///
+    /// Un résumé écrit avant la 1.4 n'a pas ce champ : il vaut alors 0, et se
+    /// distingue sans ambiguïté. Un résumé écrit par une version PLUS RÉCENTE
+    /// portera un numéro supérieur, et sera refusé de la même façon — cette
+    /// version-ci ne saurait pas le lire correctement.
+    /// </summary>
+    public const int FormatActuel = 2;
+
     public sealed class ScanSummary
     {
+        /// <summary>Voir <see cref="FormatActuel"/>. Absent (donc 0) sur tout fichier écrit avant la 1.4.</summary>
+        [JsonPropertyName("format")]
+        public int Format { get; set; }
+
         public DateTime GeneratedAt { get; set; }
         public int ScanPeriodDays { get; set; }
         public List<BsodBrief> Bsods { get; set; } = new();
@@ -58,6 +79,7 @@ public static class ScanHistory
         var os = r.System.Os;
         return new ScanSummary
         {
+            Format = FormatActuel,
             GeneratedAt = r.GeneratedAt,
             ScanPeriodDays = r.ScanPeriodDays,
             Bsods = r.Bsods.Select(b => new BsodBrief { Time = b.TimeLocal, Code = b.BugCheckCode, Driver = b.SuspectDriver }).ToList(),
@@ -155,6 +177,38 @@ public static class ScanHistory
     }
 
     /// <summary>
+    /// Désérialise un résumé et REFUSE tout ce qui n'est pas au format courant.
+    ///
+    /// C'est la seule porte d'entrée en lecture, y compris pour un résumé reçu
+    /// d'une autre machine par le mode parc : un poste resté en 1.3 envoie un
+    /// résumé sans tampon, et le lire comme s'il était à jour donnerait une
+    /// comparaison fausse plutôt qu'une absence de comparaison.
+    ///
+    /// Renvoie null aussi bien pour un JSON illisible que pour un format
+    /// étranger. L'appelant qui a besoin de distinguer les deux compte les
+    /// refus lui-même.
+    /// </summary>
+    public static ScanSummary? Lire(string json)
+    {
+        try
+        {
+            var s = JsonSerializer.Deserialize<ScanSummary>(json, JsonOpts);
+            return s is null || s.Format != FormatActuel ? null : s;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Phrase annonçant les résumés qu'on n'a pas relus. Les fichiers ne sont
+    /// PAS supprimés : refuser de relire est un choix technique, effacer les
+    /// données de quelqu'un en serait un autre, et celui-là ne se prend pas en
+    /// silence.
+    /// </summary>
+    internal static string? NoteAncienFormat(int nombre) => nombre <= 0 ? null : Lang.T(
+        $"Historique : {nombre} analyse(s) enregistrée(s) par une version antérieure n'ont pas été relues — leur format a changé. Les fichiers restent dans le dossier Historique, rien n'a été supprimé.",
+        $"History: {nombre} analysis(es) recorded by an earlier version were not read back — their format has changed. The files remain in the Historique folder, nothing has been deleted.");
+
+    /// <summary>
     /// Résumé du dernier scan de cette machine, ou null si elle n'a jamais été
     /// analysée. C'est ce que le mode parc rapatrie pour comparer les postes entre
     /// eux : il contient déjà versions de pilotes, crashs, disques et conclusions
@@ -169,18 +223,23 @@ public static class ScanHistory
             {
                 try
                 {
-                    if (JsonSerializer.Deserialize<ScanSummary>(File.ReadAllText(file), JsonOpts) is { } s) return s;
+                    if (Lire(File.ReadAllText(file)) is { } s) return s;
                 }
-                catch { /* fichier corrompu : on essaie le précédent */ }
+                catch { /* fichier illisible ou format étranger : on essaie le précédent */ }
             }
         }
         catch { /* historique illisible */ }
         return null;
     }
 
-    /// <summary>Charge le résumé du scan le plus récent AVANT le scan courant.</summary>
-    public static ScanSummary? LoadPrevious(DateTime before, List<string> errors)
+    /// <summary>
+    /// Charge le résumé du scan le plus récent AVANT le scan courant.
+    /// <paramref name="ignoresAncienFormat"/> compte les fichiers écartés parce
+    /// qu'ils ne portent pas le format courant — l'utilisateur doit l'apprendre.
+    /// </summary>
+    public static ScanSummary? LoadPrevious(DateTime before, List<string> errors, out int ignoresAncienFormat)
     {
+        ignoresAncienFormat = 0;
         try
         {
             if (!Directory.Exists(HistoryDir)) return null;
@@ -188,10 +247,17 @@ public static class ScanHistory
             {
                 try
                 {
-                    var s = JsonSerializer.Deserialize<ScanSummary>(File.ReadAllText(file), JsonOpts);
-                    if (s is not null && s.GeneratedAt < before.AddMinutes(-1)) return s;
+                    var brut = File.ReadAllText(file);
+                    if (Lire(brut) is { } s)
+                    {
+                        if (s.GeneratedAt < before.AddMinutes(-1)) return s;
+                        continue;
+                    }
+                    // Un JSON valide mais sans le bon tampon est un ancien fichier,
+                    // pas un fichier corrompu : les deux ne se racontent pas pareil.
+                    if (brut.TrimStart().StartsWith('{')) ignoresAncienFormat++;
                 }
-                catch { /* fichier corrompu : on passe au précédent */ }
+                catch { /* fichier illisible : on passe au précédent */ }
             }
         }
         catch (Exception ex) { errors.Add(Lang.T($"Historique des scans (lecture) : {ex.Message}",
@@ -205,7 +271,8 @@ public static class ScanHistory
 
     public static ScanComparison? CompareWithPrevious(DiagnosticReport r, List<string> errors)
     {
-        var prev = LoadPrevious(r.GeneratedAt, errors);
+        var prev = LoadPrevious(r.GeneratedAt, errors, out var ignores);
+        if (NoteAncienFormat(ignores) is { } note) r.Notes.Add(note);
         if (prev is null) return null;
         return Compare(r, prev);
     }
