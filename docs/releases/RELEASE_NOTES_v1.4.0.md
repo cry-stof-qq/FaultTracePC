@@ -73,7 +73,7 @@ Une liste nominative de faux amis a été ajoutée au contrôle de traduction, p
 
 ## Vérification
 
-**Environ 315 tests.** Les plus utiles ne vérifient pas ce qui marche, mais ce qui pourrait faussement rassurer :
+**315 tests.** Les plus utiles ne vérifient pas ce qui marche, mais ce qui pourrait faussement rassurer :
 
 - aucune conclusion critique ne se retrouve jamais dans le bloc replié ;
 - dans les échelles de gravité et de confiance, la valeur la plus basse est la plus forte : une comparaison à l'envers dégraderait silencieusement une conclusion critique, et un test l'interdit ;
