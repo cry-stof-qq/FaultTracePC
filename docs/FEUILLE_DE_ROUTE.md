@@ -9,7 +9,8 @@
 | 1.2.2 | **publiée** — MSI + ZIP + sommes de contrôle |
 | 1.2.3 | **publiée** — release GitHub, 4 fichiers, sommes de contrôle |
 | 1.3.0 | **publiée** — release GitHub, MSI + ZIP, 250 tests verts |
-| 1.3.1 | correctifs — journal des pannes, stratégie d'exécution, 262 tests verts |
+| 1.3.1 | **publiée** — journal des pannes, stratégie d'exécution, 262 tests verts |
+| 1.4.0 | ce que l'utilisateur lit — fraîcheur, déduplication, repli, tampon de format |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
