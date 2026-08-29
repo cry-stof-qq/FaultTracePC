@@ -742,7 +742,7 @@ public partial class GuidedRepairWindow : Window
             Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"-NoProfile -ExecutionPolicy Bypass -NoExit -Command \"{command}\"",
+                Arguments = PowerShellLauncher.ArgumentsForCommand(command, L.PsClose),
                 UseShellExecute = true,
             });
         }

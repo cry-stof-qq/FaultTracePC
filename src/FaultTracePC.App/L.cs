@@ -310,6 +310,8 @@ public static class L
     public static string NetMachineTip => Lang.T(
         "Le nom à inscrire dans la console de parc. C’est lui qui entre dans le calcul du jeton : un autre libellé ferait refuser l’interrogation.",
         "The name to enter in the fleet console. It is what goes into the token computation: any other label would get the query refused.");
+    public static string PsClose => Lang.T("Appuyer sur Entrée pour fermer cette fenêtre",
+                                          "Press Enter to close this window");
     public static string NetApply => Lang.T("Appliquer", "Apply");
     public static string NetTokenPresent => Lang.T(
         "Un jeton est en place sur cette machine — laisser le champ vide le conserve.",

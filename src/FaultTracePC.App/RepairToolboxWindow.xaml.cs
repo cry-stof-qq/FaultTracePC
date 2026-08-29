@@ -380,7 +380,7 @@ public partial class RepairToolboxWindow : Window
             var started = Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"-NoProfile -ExecutionPolicy Bypass -NoExit -Command \"{command.Replace("\"", "\\\"")}\"",
+                Arguments = PowerShellLauncher.ArgumentsForCommand(command, L.PsClose),
                 UseShellExecute = true,
             });
 

@@ -761,12 +761,10 @@ public partial class MainWindow : Window
             Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                // -NoExit : le script se termine déjà par « Appuyer sur Entrée pour
-                // fermer », mais cette ligne n'est jamais atteinte s'il est refusé
-                // ou s'il meurt à l'analyse. Seul l'hôte, qui traite -NoExit avant
-                // même de lire le fichier, peut garder la fenêtre ouverte pour
-                // montrer ce qui s'est passé.
-                Arguments = $"-NoProfile -ExecutionPolicy Bypass -NoExit -File \"{_lastRepairScriptPath}\"",
+                // Enrobage plutôt que -NoExit : la pause est garantie par un
+                // « finally » quand le script ne va pas au bout, et la fenêtre se
+                // ferme vraiment quand il y va. Voir PowerShellLauncher.
+                Arguments = PowerShellLauncher.ArgumentsForScript(_lastRepairScriptPath, L.PsClose),
                 UseShellExecute = true,
             });
         }

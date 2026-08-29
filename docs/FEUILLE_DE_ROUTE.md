@@ -109,7 +109,7 @@ Trois manques comblés au passage, qui valaient indépendamment de cette cause :
 
 **35 — Moitié anglaise écrasée dans `GuidedRepairWindow`. CORRIGÉ EN 1.3.1.** `Lang.T($"Une réparation est déjà en cours :\n\n    {busy}\n\n", $"A repair is already running:")` — la version anglaise perd le nom de l'outil bloquant et les sauts de ligne. Le test de ratio ne l'attrape pas : 24 caractères contre 40 passent son seuil. À corriger, et à faire suivre d'une réflexion sur le seuil. *Difficulté : triviale.*
 
-**36 — Les fenêtres PowerShell ne se ferment plus jamais toutes seules.** Remonté par l'auteur le 19/08/2026 en testant l'application, et c'est un effet de bord de la 1.3.1.
+**36 — ~~Les fenêtres PowerShell ne se ferment plus jamais toutes seules~~. FAIT pour les trois boutons ; le lanceur `.bat` reste.** Remonté par l'auteur le 19/08/2026 en testant l'application, et c'est un effet de bord de la 1.3.1.
 
 `-NoExit` a été ajouté pour qu'une fenêtre ne s'évapore plus quand une stratégie de groupe refuse le script avant sa première ligne. Effet non voulu : **la fenêtre ne se referme plus jamais d'elle-même**, alors que le script généré se termine par « Appuyer sur Entrée pour fermer ». Appuyer sur Entrée dépose l'utilisateur sur une invite PowerShell. **Le logiciel écrit une phrase qui n'est plus vraie** — exactement la classe de défaut qu'il corrige ailleurs.
 
@@ -126,6 +126,12 @@ Trois propriétés, et c'est leur combinaison qui règle le problème :
 La stratégie n'est toujours pas contournée : elle refuse le `.ps1`, on affiche son refus au lieu de le laisser passer en un clin d'œil.
 
 **À traiter en même temps :** la boîte à outils lance `-NoExit -Command` et a donc le même comportement. Les corriger séparément laisserait deux comportements différents à deux boutons qui se ressemblent.
+
+**Fait le 29/08/2026 : `Core/PowerShellLauncher`,** appelé par les trois boutons — « Lancer la réparation », la boîte à outils et l'assistant guidé. Six tests vérifient la ligne d'arguments produite, dont un chemin contenant `O'Brien` et sa variante à apostrophe typographique : le lanceur retombait sinon exactement dans le défaut de la 1.4.1, dans l'autre sens.
+
+**Une chose que le plan écrit ci-dessus n'avait pas vue :** le script engendré porte DÉJÀ sa propre invite « Appuyer sur Entrée pour fermer ». Un `finally` qui met en pause sans condition aurait donc obligé à appuyer **deux fois** sur Entrée. La pause du lanceur est conditionnée à un drapeau `$fini` posé seulement si l'exécution va au bout : la fenêtre ne retient l'utilisateur que lorsqu'il y a quelque chose à lire. Les commandes de la boîte à outils, elles, n'ont pas d'invite à elles et gardent une pause inconditionnelle.
+
+**Ce qui reste : le lanceur `.bat`** engendré à côté du `.ps1` porte encore `-NoExit`, à l'intérieur d'un `Start-Process -Verb RunAs -ArgumentList`. Le convertir demande trois niveaux de citation imbriqués (cmd, puis PowerShell, puis la liste d'arguments) que je ne peux pas éprouver depuis une machine sans Windows : à faire avec un double-clic réel pour vérifier.
 
 **Minuteur de fermeture automatique : écarté, et pas par paresse.** Il résout un problème douteux — une fenêtre terminée et laissée ouverte ne coûte rien — et en crée un vrai : fermer pendant que quelqu'un lit le résultat, ou pendant qu'une réparation tourne encore. Un `chkdsk` sur un disque abîmé dépasse largement l'heure. Si l'idée revenait, la seule forme acceptable serait un décompte visible déclenché **après** la fin du script et annulable à la moindre touche — ce que l'enrobage rend inutile. *Difficulté : faible.*
 
