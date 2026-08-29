@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FaultTracePC.Core\FaultTracePC.Core.csproj" />
+    <!-- La ligne de commande se déploie par GPO : son analyse d'arguments est testée. -->
+    <ProjectReference Include="..\..\src\FaultTracePC.Cli\FaultTracePC.Cli.csproj" />
   </ItemGroup>
 
 </Project>

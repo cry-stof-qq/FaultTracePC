@@ -432,7 +432,13 @@ internal static class Program
             """);
     }
 
-    private sealed class CliOptions
+    /// <summary>
+    /// Interne, et non privée : le projet de tests exerce cette analyse
+    /// d'arguments. Une ligne de commande mal comprise se déploie par GPO sur
+    /// tout un parc — c'est le dernier endroit où l'on peut se permettre de
+    /// deviner.
+    /// </summary>
+    internal sealed class CliOptions
     {
         public int Days { get; private set; } = 30;
         public string? OutputDir { get; private set; }
@@ -456,9 +462,11 @@ internal static class Program
                     case "--days" or "-d" when i + 1 < args.Length && int.TryParse(args[i + 1], out var d):
                         o.Days = Math.Clamp(d, 1, 90); i++; break;
                     case "--days" or "-d":
-                        o.Error = Lang.T("valeur invalide ou manquante pour --days (entier entre 1 et 90)", "invalid or missing value for --days (integer between 1 and 90)"); break;
+                        o.Error ??= Lang.T("valeur invalide ou manquante pour --days (entier entre 1 et 90)", "invalid or missing value for --days (integer between 1 and 90)"); break;
                     case "--output" or "-o" when i + 1 < args.Length:
                         o.OutputDir = args[++i]; break;
+                    case "--output" or "-o":
+                        o.Error ??= Lang.T("valeur manquante pour --output (un dossier)", "missing value for --output (a folder)"); break;
                     // La langue est résolue par Lang.Initialize avant même cette
                     // analyse ; ces deux cas existent uniquement pour que la VALEUR
                     // qui suit « --lang » ne soit pas prise pour un argument à part.
@@ -471,6 +479,16 @@ internal static class Program
                     case "--quiet" or "-q": o.Quiet = true; break;
                     case "--open": o.Open = true; break;
                     case "--help" or "-h" or "/?": o.ShowHelp = true; break;
+
+                    // DÉFAUT CONSTATÉ LE 29/08/2026 : sans ce cas, une option
+                    // inconnue était ignorée EN SILENCE et le programme lançait
+                    // une analyse complète de trente jours — en rendant 0, donc
+                    // en annonçant un succès. Une faute de frappe dans un script
+                    // GPO (« --configure-remot ») aurait analysé tout un parc au
+                    // lieu de le configurer, sans que rien ne le signale.
+                    default:
+                        o.Error ??= Lang.T($"option inconnue : {args[i]}", $"unknown option: {args[i]}");
+                        break;
                 }
             }
             return o;

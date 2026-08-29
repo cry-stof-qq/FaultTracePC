@@ -23,4 +23,9 @@
     <ProjectReference Include="..\FaultTracePC.Core\FaultTracePC.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Le projet de tests exerce l'analyse de la ligne de commande. -->
+    <InternalsVisibleTo Include="FaultTracePC.Tests" />
+  </ItemGroup>
+
 </Project>
