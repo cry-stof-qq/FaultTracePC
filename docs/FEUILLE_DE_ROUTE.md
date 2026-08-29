@@ -51,7 +51,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 11 | **Pente SMART sur N scans** plutôt que le seul écart avec le précédent | validé |
 | 12 | **Localisation FR/EN**, détection par session utilisateur, sélecteur dans l'application | **fait en 1.3.0** |
 | 13 | ~~`--configure-remote --generate-token` en ligne de commande~~ | **fait** — `--generate-master-secret` et `--configure-remote --master-secret <valeur\|->`, secret lisible sur l'entrée standard, fichier relu après écriture, ni secret ni jeton affichés (constaté dans `Cli/Program.cs` le 29/08/2026) |
-| 14 | **ACL sur `remote.json`** (fichier, pas dossier — le dossier abrite aussi les rapports et le journal d'alertes) | validé |
+| 14 | ~~**ACL sur `remote.json`**~~ | **fait** — `FileProtection` : héritage coupé, accès réduit à SYSTEM et Administrateurs par SID, échec journalisé dans `erreurs.log` ; 4 tests posent et relisent l'ACL réelle |
 | 15 | **Bloc winget** : section du rapport + boutons « tout mettre à jour » / choix par logiciel | validé sur le principe |
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
 
@@ -210,7 +210,7 @@ Code de compatibilité à retirer, recensé — puis **révisé à l'examen du c
 Points **13, 14, 27, 7**. Non planifié, mais entièrement décidé : le jour où un déploiement d'établissement obtient une date, ce bloc passe devant la 1.4 sans rien réétudier.
 
 1. **27 — token dérivé** (secret maître + nom de machine). Supprime le problème à la racine : plus de liste de jetons à sauvegarder, la console recalcule. Règle du même coup le fait que `parc.json` vit dans `Documents`, donc par utilisateur, et se perd avec un profil reconstruit.
-2. **14 — ACL sur `remote.json`** (le fichier, pas le dossier, qui abrite aussi les rapports).
+2. ~~**14 — ACL sur `remote.json`**~~ — **fait**. Aucune contrepartie à peser : les trois lecteurs du fichier sont le service (LocalSystem) et les deux exécutables, dont le manifeste porte `requireAdministrator`.
 3. ~~**13 — `--configure-remote --generate-token`** en ligne de commande~~ — **fait**, et sous une meilleure forme : le poste dérive son jeton du secret maître au lieu d'en tirer un au sort.
 4. **7 — canal d'alerte adapté au parc.** La bulle de notification vit dans une session utilisateur : une machine réveillée en WoL sans session ouverte n'a aucun destinataire. Journal d'événements Windows plus point d'accès de télémétrie.
 

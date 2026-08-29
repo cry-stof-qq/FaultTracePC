@@ -20,21 +20,35 @@
                        FontSize="15" FontWeight="SemiBold"/>
         </Border>
 
-        <!-- Ajout d'une machine -->
+        <!-- Secret maître + ajout d'une machine -->
         <Border Grid.Row="1" Padding="14,10" Background="#EDF1F6">
+          <StackPanel>
+            <WrapPanel VerticalAlignment="Center" Margin="0,0,0,8">
+                <TextBlock Text="{x:Static loc:L.ParkSecretLabel}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <PasswordBox x:Name="PwdSecret" Width="260" VerticalAlignment="Center"
+                             FontFamily="Consolas" FontSize="11"
+                             ToolTip="{x:Static loc:L.ParkSecretTip}"/>
+                <Button Content="{x:Static loc:L.ParkSecretSave}" Padding="12,5" Margin="8,0,0,0" Click="BtnSecretSave_Click"/>
+                <Button Content="{x:Static loc:L.ParkSecretForget}" Padding="12,5" Margin="8,0,0,0" Click="BtnSecretForget_Click"/>
+                <TextBlock x:Name="TxtSecretEtat" VerticalAlignment="Center" Margin="12,0,0,0"
+                           FontSize="12" Foreground="#44546A"/>
+            </WrapPanel>
             <WrapPanel VerticalAlignment="Center">
                 <TextBlock Text="{x:Static loc:L.ParkName}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <TextBox x:Name="TxtName" Width="120" VerticalAlignment="Center"/>
+                <TextBox x:Name="TxtName" Width="120" VerticalAlignment="Center"
+                         ToolTip="{x:Static loc:L.ParkNameTip}"/>
                 <TextBlock Text="{x:Static loc:L.ParkHost}" VerticalAlignment="Center" Margin="12,0,4,0"/>
                 <TextBox x:Name="TxtHost" Width="140" VerticalAlignment="Center"/>
                 <TextBlock Text="{x:Static loc:L.ParkPort}" VerticalAlignment="Center" Margin="12,0,4,0"/>
                 <TextBox x:Name="TxtPort" Width="60" Text="58620" VerticalAlignment="Center"/>
                 <TextBlock Text="{x:Static loc:L.ParkToken}" VerticalAlignment="Center" Margin="12,0,4,0"/>
-                <TextBox x:Name="TxtToken" Width="200" VerticalAlignment="Center" FontFamily="Consolas" FontSize="11"/>
+                <TextBox x:Name="TxtToken" Width="200" VerticalAlignment="Center" FontFamily="Consolas" FontSize="11"
+                         ToolTip="{x:Static loc:L.ParkTokenTip}"/>
                 <Button Content="{x:Static loc:L.ParkAdd}" Padding="12,5" Margin="12,0,0,0" Click="BtnAdd_Click"/>
                 <Button Content="{x:Static loc:L.ParkRemove}" Padding="12,5" Margin="8,0,0,0" Click="BtnRemove_Click"/>
                 <Button Content="{x:Static loc:L.ParkRefreshAll}" Padding="12,5" Margin="8,0,0,0" FontWeight="SemiBold" Click="BtnRefresh_Click"/>
             </WrapPanel>
+          </StackPanel>
         </Border>
 
         <ListView x:Name="LvMachines" Grid.Row="2" Margin="10" BorderThickness="1" BorderBrush="#DBE2EC" FontSize="12">

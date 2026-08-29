@@ -1,4 +1,4 @@
-﻿using FaultTracePC.Core;
+using FaultTracePC.Core;
 
 namespace FaultTracePC.App;
 
@@ -315,7 +315,19 @@ public static class L
     public static string ParkName => Lang.T("Nom :", "Name:");
     public static string ParkHost => Lang.T("Hôte/IP :", "Host/IP:");
     public static string ParkPort => Lang.T("Port :", "Port:");
-    public static string ParkToken => Lang.T("Token :", "Token:");
+    public static string ParkToken => Lang.T("Jeton (facultatif) :", "Token (optional):");
+    public static string ParkTokenTip => Lang.T(
+        "À laisser vide : le jeton se déduit du secret maître et du nom Windows du poste. Ne le remplir que pour un poste configuré avant la 1.5, qui porte encore un jeton tiré au sort.",
+        "Leave empty: the token is derived from the master secret and the machine’s Windows name. Fill it in only for a machine configured before 1.5, which still carries a randomly drawn token.");
+    public static string ParkNameTip => Lang.T(
+        "Le NOM WINDOWS du poste, celui que renvoie « hostname ». C’est lui qui sert à calculer le jeton : un libellé de fantaisie ferait refuser l’interrogation.",
+        "The machine’s WINDOWS NAME, the one “hostname” returns. It is what the token is computed from: a friendly label would get the query refused.");
+    public static string ParkSecretLabel => Lang.T("🔑 Secret maître :", "🔑 Master secret:");
+    public static string ParkSecretSave => Lang.T("Enregistrer", "Save");
+    public static string ParkSecretForget => Lang.T("Oublier", "Forget");
+    public static string ParkSecretTip => Lang.T(
+        "Le secret de parc produit par « FaultTracePC.Cli.exe --generate-master-secret ». Il est chiffré par Windows pour ton compte et ne quitte pas cette machine ; les postes ne le reçoivent jamais.",
+        "The fleet secret produced by “FaultTracePC.Cli.exe --generate-master-secret”. Windows encrypts it for your account and it never leaves this machine; the client machines never receive it.");
     public static string ParkAdd => Lang.T("➕ Ajouter", "➕ Add");
     public static string ParkRemove => Lang.T("🗑 Retirer la sélection", "🗑 Remove the selection");
     public static string ParkRefreshAll => Lang.T("🔄 Actualiser tout", "🔄 Refresh all");

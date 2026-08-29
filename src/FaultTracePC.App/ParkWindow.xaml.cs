@@ -24,11 +24,86 @@ public partial class ParkWindow : Window
 
     private List<ParkMachine> _machines = new();
 
+    /// <summary>
+    /// Secret maître du parc, en mémoire le temps de la session. Il ne sert qu'à
+    /// RECALCULER les jetons : il n'est jamais envoyé, et aucun poste ne le connaît.
+    /// </summary>
+    private string? _secretMaitre;
+
     public ParkWindow()
     {
         InitializeComponent();
+        _secretMaitre = ParkSecret.Load();
+        MajEtatSecret();
         LoadMachines();
         if (_machines.Count > 0) _ = RefreshAllAsync();
+    }
+
+    // ------------------------------------------------------------------
+    // Secret maître
+    // ------------------------------------------------------------------
+
+    private void MajEtatSecret() =>
+        TxtSecretEtat.Text = _secretMaitre is null
+            ? Lang.T("aucun secret enregistré — les postes sans jeton ne seront pas interrogés.",
+                     "no secret stored — machines without a token will not be queried.")
+            : Lang.T("secret enregistré sur cette machine, chiffré pour ta session.",
+                     "secret stored on this machine, encrypted for your session.");
+
+    private void BtnSecretSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ParkSecret.Save(PwdSecret.Password, out var erreur))
+        {
+            MessageBox.Show(this, erreur, "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        _secretMaitre = PwdSecret.Password.Trim();
+        PwdSecret.Clear();          // il n'a plus rien à faire à l'écran
+        MajEtatSecret();
+        if (_machines.Count > 0) _ = RefreshAllAsync();
+    }
+
+    private void BtnSecretForget_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this,
+                Lang.T("Oublier le secret maître sur cette machine ?\n\n", "Forget the master secret on this machine?\n\n") +
+                Lang.T("Les postes ne sont pas touchés : ils gardent leur jeton. C'est cette console qui cessera de savoir le recalculer, jusqu'à ce que tu ressaisisses le secret.",
+                       "The client machines are untouched: they keep their token. It is this console that will stop being able to recompute it, until you enter the secret again."),
+                Lang.T("FaultTracePC — oublier le secret", "FaultTracePC — forget the secret"),
+                MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+            return;
+
+        if (!ParkSecret.Forget(out var erreur))
+        {
+            MessageBox.Show(this, erreur, "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        _secretMaitre = null;
+        MajEtatSecret();
+    }
+
+    /// <summary>
+    /// Jeton d'une machine : celui qui est inscrit s'il y en a un — dérogation
+    /// pour les postes configurés avant le secret maître —, sinon celui qu'on
+    /// déduit. Null quand ni l'un ni l'autre n'est disponible : l'appelant doit
+    /// alors le DIRE, pas signer avec une chaîne vide.
+    /// </summary>
+    private string? JetonDe(ParkMachine m) => RemoteConfig.TokenFor(m.Token, _secretMaitre, m.Name);
+
+    /// <summary>
+    /// Vrai — et l'explique dans la barre d'état — quand le jeton de cette machine
+    /// ne peut être ni lu ni recalculé. Les actions qui suivent doivent renoncer :
+    /// une requête non signée ne rapporterait qu'un « refusé » incompréhensible.
+    /// </summary>
+    private bool SansJeton(ParkMachine m)
+    {
+        if (JetonDe(m) is not null) return false;
+
+        TxtStatus.Text = Lang.T($"{m.Name} : ni jeton inscrit, ni secret maître — renseigne le secret en haut de cette fenêtre.",
+                                $"{m.Name}: no stored token and no master secret — enter the secret at the top of this window.");
+        return true;
     }
 
     // ------------------------------------------------------------------
@@ -37,9 +112,18 @@ public partial class ParkWindow : Window
 
     public sealed class ParkMachine
     {
+        /// <summary>Nom WINDOWS du poste : c'est de lui que le jeton se déduit.</summary>
         public string Name { get; set; } = "";
+
         public string Host { get; set; } = "";
         public int Port { get; set; } = 58620;
+
+        /// <summary>
+        /// Jeton inscrit à la main. FACULTATIF depuis le secret maître : il ne
+        /// subsiste que pour les postes configurés avant, qui portent encore un
+        /// jeton tiré au sort. Vide, le jeton est recalculé à chaque interrogation
+        /// et il n'y a plus de liste de secrets à garder dans Documents.
+        /// </summary>
         public string Token { get; set; } = "";
     }
 
@@ -74,21 +158,56 @@ public partial class ParkWindow : Window
 
     private void BtnAdd_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(TxtHost.Text) || string.IsNullOrWhiteSpace(TxtToken.Text))
+        if (string.IsNullOrWhiteSpace(TxtHost.Text))
         {
-            MessageBox.Show(this, Lang.T("Hôte et token sont obligatoires (le token s'obtient sur la machine cliente, fenêtre 🌐 Mode réseau).", "Host and token are required (the token is obtained on the client machine, 🌐 Network mode window)."),
+            MessageBox.Show(this, Lang.T("L'hôte (nom réseau ou adresse IP) est obligatoire.", "The host (network name or IP address) is required."),
                 "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+
+        var jetonSaisi = TxtToken.Text.Trim();
+        var derive = jetonSaisi.Length == 0;
+
+        // Sans jeton inscrit, il faut de quoi le calculer. Refuser ici plutôt que
+        // d'ajouter une machine qui répondrait « refusé » sans que rien ne dise
+        // pourquoi.
+        if (derive && string.IsNullOrWhiteSpace(_secretMaitre))
+        {
+            MessageBox.Show(this,
+                Lang.T("Renseigne d'abord le secret maître en haut de cette fenêtre, ou colle le jeton du poste.\n\n", "Enter the master secret at the top of this window first, or paste the machine's token.\n\n") +
+                Lang.T("Le secret maître se produit une seule fois, avec « FaultTracePC.Cli.exe --generate-master-secret », et sert pour tout le parc.", "The master secret is produced once, with “FaultTracePC.Cli.exe --generate-master-secret”, and serves the whole fleet."),
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // Le nom entre dans le calcul du jeton : il ne peut pas être deviné à
+        // partir de l'adresse, qui est souvent numérique.
+        if (derive && string.IsNullOrWhiteSpace(TxtName.Text))
+        {
+            MessageBox.Show(this,
+                Lang.T("Le nom est obligatoire quand le jeton est déduit : c'est le NOM WINDOWS du poste qui entre dans le calcul.\n\n", "The name is required when the token is derived: it is the machine's WINDOWS NAME that goes into the computation.\n\n") +
+                Lang.T("Sur le poste, la commande « hostname » le donne.", "On the machine, the “hostname” command gives it."),
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var nom = string.IsNullOrWhiteSpace(TxtName.Text) ? TxtHost.Text.Trim() : TxtName.Text.Trim();
+
         _machines.Add(new ParkMachine
         {
-            Name = string.IsNullOrWhiteSpace(TxtName.Text) ? TxtHost.Text : TxtName.Text.Trim(),
+            Name = nom,
             Host = TxtHost.Text.Trim(),
             Port = int.TryParse(TxtPort.Text, out var p) && p is >= 1024 and <= 65535 ? p : 58620,
-            Token = TxtToken.Text.Trim(),
+            Token = jetonSaisi,
         });
         SaveMachines();
         TxtName.Clear(); TxtHost.Clear(); TxtToken.Clear();
+
+        TxtStatus.Text = derive
+            ? Lang.T($"« {nom} » ajoutée, jeton déduit du secret maître. Un « refusé » signifierait que ce n'est pas son nom Windows exact.",
+                     $"“{nom}” added, token derived from the master secret. A “refused” would mean this is not its exact Windows name.")
+            : Lang.T($"« {nom} » ajoutée avec le jeton inscrit.", $"“{nom}” added with the stored token.");
+
         _ = RefreshAllAsync();
     }
 
@@ -210,6 +329,7 @@ public partial class ParkWindow : Window
                 try
                 {
                     using var req = SignedRequest(m, HttpMethod.Get, "/api/summary");
+                    if (req is null) continue;
                     using var resp = await Http.SendAsync(req);
                     if (!resp.IsSuccessStatusCode) continue;
                     var json = await resp.Content.ReadAsStringAsync();
@@ -256,25 +376,35 @@ public partial class ParkWindow : Window
     /// Construit une requête signée : le token sert de clé HMAC et ne quitte
     /// jamais cette machine — seule la signature circule.
     /// </summary>
-    private static HttpRequestMessage SignedRequest(ParkMachine m, HttpMethod method, string path, string query = "")
+    private HttpRequestMessage? SignedRequest(ParkMachine m, HttpMethod method, string path, string query = "")
     {
+        if (JetonDe(m) is not { } jeton) return null;
+
         var host = m.Host.Trim().Trim('/');
         var url = $"http://{host}:{m.Port}{path}" + (query.Length > 0 ? "?" + query : "");
         var req = new HttpRequestMessage(method, url);
-        foreach (var (name, value) in RemoteConfig.BuildAuthHeaders(m.Token, method.Method, path, query))
+        foreach (var (name, value) in RemoteConfig.BuildAuthHeaders(jeton, method.Method, path, query))
             req.Headers.Add(name, value);
         return req;
     }
 
-    private static async Task<QueryResult> QueryAsync(ParkMachine m)
+    private async Task<QueryResult> QueryAsync(ParkMachine m)
     {
+        // Ni jeton inscrit ni secret maître : le dire franchement. Signer avec une
+        // chaîne vide produirait un « refusé » que personne ne saurait interpréter.
+        if (SignedRequest(m, HttpMethod.Get, "/api/status") is not { } premiere)
+            return new(m, false, false, null,
+                Lang.T("secret maître absent", "master secret missing"));
+
         try
         {
-            using var req = SignedRequest(m, HttpMethod.Get, "/api/status");
+            using var req = premiere;
             using var resp = await Http.SendAsync(req);
             if (!resp.IsSuccessStatusCode)
                 return new(m, false, false, null, resp.StatusCode == System.Net.HttpStatusCode.Forbidden
-                    ? Lang.T("refusé (token ou horloge décalée ?)", "refused (token or clock skew?)") : $"HTTP {(int)resp.StatusCode}");
+                    // Le nom entre dans le calcul du jeton : un libellé de fantaisie
+                    // à la place du nom Windows produit exactement ce refus.
+                    ? Lang.T("refusé (jeton, nom Windows ou horloge décalée ?)", "refused (token, Windows name or clock skew?)") : $"HTTP {(int)resp.StatusCode}");
 
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
             bool active = doc.RootElement.TryGetProperty("active", out var a) && a.GetBoolean();
@@ -293,6 +423,7 @@ public partial class ParkWindow : Window
             try
             {
                 using var alertReq = SignedRequest(m, HttpMethod.Get, "/api/alerts", "days=7");
+                if (alertReq is null) throw new InvalidOperationException();
                 using var alertResp = await Http.SendAsync(alertReq);
                 if (alertResp.IsSuccessStatusCode)
                     alerts = JsonSerializer.Deserialize<List<PreventiveAlert>>(
@@ -402,11 +533,13 @@ public partial class ParkWindow : Window
                 "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
+        if (SansJeton(machine)) return;
+
         BtnRemoteScan.IsEnabled = false;
         try
         {
             TxtStatus.Text = Lang.T($"🩺 Diagnostic en cours sur {machine.Name}… (plusieurs minutes possibles, ne pas fermer cette fenêtre)", $"🩺 Diagnosis running on {machine.Name}… (may take several minutes, do not close this window)");
-            using var req = SignedRequest(machine, HttpMethod.Post, "/api/scan", "days=30");
+            using var req = SignedRequest(machine, HttpMethod.Post, "/api/scan", "days=30")!;
             using var resp = await ScanHttp.SendAsync(req);
 
             if ((int)resp.StatusCode == 429)
@@ -447,8 +580,10 @@ public partial class ParkWindow : Window
 
     private async Task DownloadAndOpenReportAsync(ParkMachine machine, string name)
     {
+        if (SansJeton(machine)) return;
+
         var query = $"name={Uri.EscapeDataString(name)}";
-        using var dlReq = SignedRequest(machine, HttpMethod.Get, "/api/reports/download", query);
+        using var dlReq = SignedRequest(machine, HttpMethod.Get, "/api/reports/download", query)!;
         // Client à long délai : un rapport volumineux sur une liaison lente
         // dépasserait les 4 secondes du client d'interrogation d'état.
         using var dlResp = await ScanHttp.SendAsync(dlReq);
@@ -470,11 +605,12 @@ public partial class ParkWindow : Window
         }
         var machine = _machines.FirstOrDefault(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
         if (machine is null) return;
+        if (SansJeton(machine)) return;
 
         try
         {
             TxtStatus.Text = Lang.T($"Récupération du dernier rapport de {machine.Name}…", $"Fetching the last report from {machine.Name}…");
-            using var listReq = SignedRequest(machine, HttpMethod.Get, "/api/reports");
+            using var listReq = SignedRequest(machine, HttpMethod.Get, "/api/reports")!;
             using var listResp = await Http.SendAsync(listReq);
             listResp.EnsureSuccessStatusCode();
             using var doc = JsonDocument.Parse(await listResp.Content.ReadAsStringAsync());

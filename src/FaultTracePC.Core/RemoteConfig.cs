@@ -121,6 +121,28 @@ public sealed class RemoteConfig
         return Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(nom)));
     }
 
+    /// <summary>
+    /// Jeton à employer pour une machine du parc.
+    ///
+    /// Règle : un jeton INSCRIT l'emporte — c'est la dérogation qui laisse vivre
+    /// les postes configurés avant le secret maître, avec leur jeton tiré au sort.
+    /// Sinon on le déduit. Null quand ni l'un ni l'autre n'est possible, et c'est
+    /// un résultat, pas une panne : l'appelant doit le DIRE à l'utilisateur plutôt
+    /// que de signer sa requête avec une chaîne vide, qui reviendrait avec un
+    /// « refusé » que personne ne saurait interpréter.
+    ///
+    /// Cette règle vit ici, et non dans la fenêtre de la console, pour qu'un test
+    /// puisse l'exercer : le projet WPF n'est pas compilé par « dotnet test ».
+    /// </summary>
+    public static string? TokenFor(string? jetonInscrit, string? masterSecret, string machineName)
+    {
+        if (!string.IsNullOrWhiteSpace(jetonInscrit)) return jetonInscrit.Trim();
+        if (string.IsNullOrWhiteSpace(masterSecret)) return null;
+
+        try { return DeriveToken(masterSecret, machineName); }
+        catch (ArgumentException) { return null; }
+    }
+
     /// <summary>Plages autorisées : boucle locale + RFC 1918 (10/8, 172.16/12, 192.168/16).</summary>
     public static bool IsPrivateOrLoopback(IPAddress? address)
     {

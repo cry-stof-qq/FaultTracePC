@@ -83,6 +83,50 @@ public class JetonDeriveTests
         Assert.Throws<ArgumentException>(() => RemoteConfig.DeriveToken(Secret, mauvais));
     }
 
+    // ==================================================================
+    // Choix du jeton côté console : inscrit d'abord, déduit ensuite.
+    // La console est du WPF, que « dotnet test » ne compile pas — la règle
+    // vit donc dans Core, et c'est ici qu'elle est vérifiée.
+    // ==================================================================
+
+    [Fact]
+    public void Un_jeton_inscrit_l_emporte_sur_la_derivation()
+    {
+        // La dérogation des postes déployés avant le secret maître : tant que
+        // leur jeton tiré au sort est inscrit, c'est lui qu'on emploie.
+        var inscrit = RemoteConfig.GenerateToken();
+
+        Assert.Equal(inscrit, RemoteConfig.TokenFor(inscrit, Secret, "POSTE-01"));
+        Assert.NotEqual(RemoteConfig.DeriveToken(Secret, "POSTE-01"), inscrit);
+    }
+
+    [Fact]
+    public void Sans_jeton_inscrit_le_jeton_est_deduit()
+    {
+        Assert.Equal(RemoteConfig.DeriveToken(Secret, "POSTE-01"),
+                     RemoteConfig.TokenFor("", Secret, "POSTE-01"));
+        Assert.Equal(RemoteConfig.DeriveToken(Secret, "POSTE-01"),
+                     RemoteConfig.TokenFor(null, Secret, "poste-01"));
+    }
+
+    [Theory]
+    [InlineData(null, null)]        // ni jeton ni secret
+    [InlineData("", "  ")]          // un secret réduit à des espaces n'est pas un secret
+    [InlineData(null, "trop court")]
+    public void Sans_de_quoi_calculer_on_renvoie_null_sans_lever(string? inscrit, string? secret)
+    {
+        // Null est un RÉSULTAT : la console doit pouvoir l'afficher. Une exception
+        // remonterait dans un gestionnaire de clic et deviendrait un message
+        // d'erreur générique, qui n'apprendrait rien à personne.
+        Assert.Null(RemoteConfig.TokenFor(inscrit, secret, "POSTE-01"));
+    }
+
+    [Fact]
+    public void Un_nom_vide_ne_produit_pas_de_jeton_bancal()
+    {
+        Assert.Null(RemoteConfig.TokenFor(null, Secret, "   "));
+    }
+
     [Fact]
     public void Le_secret_maitre_genere_est_solide_et_jamais_deux_fois_le_meme()
     {
