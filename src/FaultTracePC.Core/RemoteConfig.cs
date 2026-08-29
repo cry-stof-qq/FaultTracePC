@@ -46,7 +46,22 @@ public sealed class RemoteConfig
     {
         Directory.CreateDirectory(BaseDir);
         File.WriteAllText(ConfigPath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+
+        // Le fichier porte le jeton de CETTE machine, et les permissions par défaut
+        // de ProgramData laissent le groupe Utilisateurs lire ce qui s'y trouve.
+        // L'échec n'interrompt pas l'enregistrement — une configuration écrite mais
+        // mal protégée vaut mieux qu'une configuration perdue —, mais il laisse une
+        // trace : personne ne doit croire le fichier protégé sans l'avoir vérifié.
+        if (!FileProtection.RestrictToSystemAndAdministrators(ConfigPath, out var erreur))
+            ErrorLog.Write("RemoteConfig.Save/ACL", erreur);
     }
+
+    /// <summary>
+    /// Vrai si <see cref="ConfigPath"/> est effectivement réservé à SYSTEM et aux
+    /// Administrateurs. Se relit sur le disque : on ne suppose pas qu'un appel
+    /// passé a réussi, et une main humaine a pu rouvrir le fichier depuis.
+    /// </summary>
+    public static bool ConfigEstProtegee => FileProtection.IsRestricted(ConfigPath);
 
     /// <summary>Génère un token aléatoire de 256 bits (hexadécimal).</summary>
     public static string GenerateToken() =>
