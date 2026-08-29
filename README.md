@@ -163,7 +163,7 @@ FaultTracePC never contacts the Internet on its own.
 
 | Format | For whom | How |
 |---|---|---|
-| **MSI** | Permanent install, GPO deployment | `msiexec /i FaultTracePC-1.4.1.msi` (or double-click) |
+| **MSI** | Permanent install, GPO deployment | `msiexec /i FaultTracePC-1.5.0.msi` (or double-click) |
 | **Portable (.zip)** | USB-stick troubleshooting, nothing to install | Unzip, run `FaultTracePC.exe` |
 
 Both are on the [Releases page](../../releases). No prerequisites: the .NET
@@ -171,7 +171,7 @@ runtime is bundled. **Windows 10 or 11, 64-bit, administrator rights** (required
 to read dumps and full system logs).
 
 To set the language for a whole machine at deployment time:
-`msiexec /i FaultTracePC-1.4.1.msi FTPCLANG=en /qn`. It is a default — a user's
+`msiexec /i FaultTracePC-1.5.0.msi FTPCLANG=en /qn`. It is a default — a user's
 own choice in the application still wins.
 
 Optional but recommended — symbolic dump analysis, which names the faulting
@@ -246,7 +246,7 @@ Produce the distributables:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\publish.ps1 -Zip
-powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.4.1
+powershell -ExecutionPolicy Bypass -File installer\build-msi.ps1 -Version 1.5.0
 ```
 
 ## Architecture

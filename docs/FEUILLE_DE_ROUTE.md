@@ -1,6 +1,6 @@
 ﻿# FaultTracePC — feuille de route
 
-État au 19/08/2026. Document de travail, pas un engagement.
+État au 29/08/2026. Document de travail, pas un engagement.
 
 ## Où on en est
 
@@ -11,7 +11,8 @@
 | 1.3.0 | **publiée** — release GitHub, MSI + ZIP, 250 tests verts |
 | 1.3.1 | **publiée** — journal des pannes, stratégie d'exécution, 262 tests verts |
 | 1.4.0 | **publiée** — ce que l'utilisateur lit : fraîcheur, déduplication, repli, tampon de format |
-| 1.4.1 | correctif — apostrophe typographique dans le script de réparation (point 37) |
+| 1.4.1 | **publiée** — apostrophe typographique dans le script de réparation (point 37) |
+| 1.5.0 | thème unique **le parc** — secret maître et jeton dérivé (13, 14, 27), plus le point 36 et le refus des options inconnues |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
