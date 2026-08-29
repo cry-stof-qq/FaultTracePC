@@ -302,10 +302,27 @@ public static class L
         "Client — cette machine publie sa télémétrie et ses rapports en LECTURE SEULE",
         "Client — this machine publishes its telemetry and reports READ-ONLY");
     public static string NetPort => Lang.T("Port TCP :", "TCP port:");
-    public static string NetToken => Lang.T("Token :", "Token:");
-    public static string NetGenerate => Lang.T("Générer", "Generate");
-    public static string NetCopy => Lang.T("Copier", "Copy");
+    public static string NetSecret => Lang.T("🔑 Secret maître :", "🔑 Master secret:");
+    public static string NetSecretTip => Lang.T(
+        "Le secret de parc, produit une seule fois par « FaultTracePC.Cli.exe --generate-master-secret ». Cette machine s’en sert pour calculer SON jeton, puis l’oublie : elle ne l’enregistre nulle part.",
+        "The fleet secret, produced once by “FaultTracePC.Cli.exe --generate-master-secret”. This machine uses it to compute ITS token, then forgets it: it is stored nowhere.");
+    public static string NetMachine => Lang.T("Nom Windows :", "Windows name:");
+    public static string NetMachineTip => Lang.T(
+        "Le nom à inscrire dans la console de parc. C’est lui qui entre dans le calcul du jeton : un autre libellé ferait refuser l’interrogation.",
+        "The name to enter in the fleet console. It is what goes into the token computation: any other label would get the query refused.");
     public static string NetApply => Lang.T("Appliquer", "Apply");
+    public static string NetTokenPresent => Lang.T(
+        "Un jeton est en place sur cette machine — laisser le champ vide le conserve.",
+        "A token is in place on this machine — leaving the field empty keeps it.");
+    public static string NetTokenAbsent => Lang.T(
+        "Aucun jeton sur cette machine : le secret maître est nécessaire pour en calculer un.",
+        "No token on this machine: the master secret is needed to compute one.");
+    public static string NetFileProtected => Lang.T(
+        "remote.json est réservé à SYSTEM et aux administrateurs.",
+        "remote.json is restricted to SYSTEM and administrators.");
+    public static string NetFileOpen => Lang.T(
+        "⚠ remote.json n’est pas encore protégé — il le sera au prochain « Appliquer ».",
+        "⚠ remote.json is not protected yet — it will be at the next “Apply”.");
     public static string NetClose => Lang.T("Fermer", "Close");
 
     // ---------------------------------------------------------------- console de parc
@@ -439,6 +456,6 @@ public static class L
         " the clocks of both machines must be within 5 minutes of each other.");
     public static string NetMasterTitle => Lang.T("Côté machine « maître » :", "On the “master” machine:");
     public static string NetMasterBody => Lang.T(
-        " ouvre la console 🖥 Parc, ajoute cette machine avec son nom d'hôte (ou IP), le port et ce token.",
-        " open the 🖥 Fleet console, add this machine with its host name (or IP), the port and this token.");
+        " ouvre la console 🖥 Parc, saisis-y le même secret maître, puis ajoute cette machine avec son nom Windows, son hôte (ou IP) et le port. Le jeton n'a plus à être recopié : la console le recalcule.",
+        " open the 🖥 Fleet console, enter the same master secret there, then add this machine with its Windows name, its host (or IP) and the port. The token no longer has to be copied: the console recomputes it.");
 }

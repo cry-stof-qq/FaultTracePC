@@ -63,7 +63,15 @@ public sealed class RemoteConfig
     /// </summary>
     public static bool ConfigEstProtegee => FileProtection.IsRestricted(ConfigPath);
 
-    /// <summary>Génère un token aléatoire de 256 bits (hexadécimal).</summary>
+    /// <summary>
+    /// Génère un token aléatoire de 256 bits (hexadécimal).
+    ///
+    /// PLUS AUCUN CHEMIN DE CONFIGURATION NE L'APPELLE : un poste tire désormais
+    /// son jeton du secret maître (<see cref="DeriveToken"/>), sans quoi la console
+    /// ne saurait pas le recalculer. Conservé pour ce qu'il reste de jetons posés
+    /// avant — et pour les tests, qui en fabriquent un afin de vérifier que la
+    /// dérogation l'emporte bien sur la dérivation.
+    /// </summary>
     public static string GenerateToken() =>
         Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 

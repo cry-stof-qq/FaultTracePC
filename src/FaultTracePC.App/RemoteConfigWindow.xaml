@@ -34,19 +34,27 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static loc:L.NetPort}" VerticalAlignment="Center" Margin="0,0,8,8"/>
             <TextBox x:Name="TxtPort" Grid.Row="0" Grid.Column="1" Width="90" HorizontalAlignment="Left"
                      VerticalAlignment="Center" Margin="0,0,0,8"/>
 
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static loc:L.NetToken}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <TextBox x:Name="TxtToken" Grid.Row="1" Grid.Column="1" IsReadOnly="True" FontFamily="Consolas"
-                     FontSize="11" VerticalAlignment="Center" TextWrapping="Wrap"/>
-            <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
-                <Button Content="{x:Static loc:L.NetGenerate}" Padding="10,4" Click="BtnGenerate_Click"/>
-                <Button Content="{x:Static loc:L.NetCopy}" Padding="10,4" Margin="6,0,0,0" Click="BtnCopyToken_Click"/>
-            </StackPanel>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static loc:L.NetMachine}" VerticalAlignment="Center" Margin="0,0,8,8"/>
+            <TextBox x:Name="TxtMachine" Grid.Row="1" Grid.Column="1" IsReadOnly="True" FontFamily="Consolas"
+                     FontSize="12" FontWeight="SemiBold" BorderThickness="0" Background="Transparent"
+                     VerticalAlignment="Center" Margin="0,0,0,8"
+                     ToolTip="{x:Static loc:L.NetMachineTip}"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static loc:L.NetSecret}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <PasswordBox x:Name="PwdSecret" Grid.Row="2" Grid.Column="1" FontFamily="Consolas"
+                         FontSize="11" VerticalAlignment="Center"
+                         ToolTip="{x:Static loc:L.NetSecretTip}"/>
+
+            <TextBlock x:Name="TxtEtat" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" TextWrapping="Wrap"
+                       FontSize="11" Foreground="#44546A" Margin="0,6,0,0"/>
         </Grid>
 
         <Border Grid.Row="3" Background="#FFFBE9" BorderBrush="#E8D9A0" BorderThickness="1" CornerRadius="8"
