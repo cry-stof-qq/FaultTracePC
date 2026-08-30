@@ -82,6 +82,36 @@ public class ScriptReparationTests
             + string.Join(", ", fautives.Select(f => f.Ligne + " → " + f.Texte.Trim())));
     }
 
+    [Fact]
+    public void Le_script_cite_son_propre_nom_de_fichier()
+    {
+        // DÉFAUT CONSTATÉ LE 30/08/2026 en relisant un script réel : l'en-tête
+        // proposait « -File .\\Reparation_PC.ps1 », un fichier qui n'existe pas —
+        // le nom porte la date et l'heure. La commande donnée en exemple échouait
+        // telle quelle. Même classe de défaut que « Appuyer sur Entrée pour
+        // fermer » : le logiciel écrivait une phrase fausse.
+        var r = RapportAvecPiloteHostile();
+
+        var script = RepairScriptGenerator.Generate(r);
+
+        Assert.Contains(RepairScriptGenerator.NomDuScript(r), script);
+        Assert.DoesNotContain("-File .\\Reparation_PC.ps1", script);
+    }
+
+    [Fact]
+    public void Le_filet_de_securite_exige_un_point_de_restauration_recent()
+    {
+        // Get-ComputerRestorePoint rend le dernier point CONNU, pas celui qu'on
+        // vient de créer. Sans contrôle de fraîcheur, le script annonçait comme
+        // filet de sécurité un point vieux de plusieurs semaines.
+        var script = RepairScriptGenerator.Generate(RapportAvecPiloteHostile());
+
+        Assert.Contains("$rpFrais", script);
+        Assert.Contains("TotalMinutes -lt 15", script);
+        // Et il ne se tait pas sur le point ancien : il le date.
+        Assert.Contains("le plus récent date du", script);
+    }
+
     /// <summary>
     /// Vrai si la ligne se termine alors qu'une chaîne est encore ouverte.
     ///

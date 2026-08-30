@@ -45,7 +45,11 @@ public static class RepairScriptGenerator
         sb.AppendLine(Lang.T("   - Rien d'irréversible n'est lancé sans votre accord.", "   - Nothing irreversible runs without your agreement."));
         sb.AppendLine();
         sb.AppendLine(Lang.T("  Lancement : clic droit > Exécuter avec PowerShell, ou :", "  To run: right-click > Run with PowerShell, or:"));
-        sb.AppendLine("    powershell -ExecutionPolicy Bypass -File .\\" + "Reparation_PC.ps1");
+        // DÉFAUT CONSTATÉ LE 30/08/2026 en relisant un script réel : cette ligne
+        // nommait « Reparation_PC.ps1 », un fichier qui n'existe pas — le nom porte
+        // la date et l'heure. La commande donnée en exemple échouait donc telle
+        // quelle. Une seule formule sert maintenant à l'écrire et à le nommer.
+        sb.AppendLine("    powershell -ExecutionPolicy Bypass -File .\\" + NomDuScript(r));
         sb.AppendLine("#>");
         sb.AppendLine();
         sb.AppendLine("$ErrorActionPreference = 'Continue'");
@@ -74,11 +78,24 @@ public static class RepairScriptGenerator
         sb.AppendLine("try { Checkpoint-Computer -Description 'FaultTracePC - avant reparation' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop }");
         sb.AppendLine("catch { $srErr = $_.Exception.Message }");
         sb.AppendLine("$rp = Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Select-Object -Last 1");
-        sb.AppendLine("if (-not $srErr -and $rp) {");
+        // DÉFAUT CONSTATÉ LE 30/08/2026 : le script se contentait de « il existe un
+        // point de restauration ». Or Get-ComputerRestorePoint rend le dernier
+        // point CONNU, pas celui qu'on vient de créer — et Checkpoint-Computer peut
+        // ne rien faire sans lever d'erreur. Le script annonçait donc un filet de
+        // sécurité vieux de plusieurs semaines comme s'il venait d'être tendu.
+        // On exige maintenant qu'il soit RÉCENT.
+        sb.AppendLine("$rpDate = $null");
+        sb.AppendLine("if ($rp) { $rpDate = $rp.ConvertToDateTime($rp.CreationTime) }");
+        sb.AppendLine("$rpFrais = ($null -ne $rpDate) -and (((Get-Date) - $rpDate).TotalMinutes -lt 15)");
+        sb.AppendLine("if (-not $srErr -and $rpFrais) {");
         sb.AppendLine(Lang.T("    Write-Host ('Point de restauration disponible : #{0} — {1} ({2})' -f $rp.SequenceNumber, $rp.Description, $rp.ConvertToDateTime($rp.CreationTime)) -ForegroundColor Green", "    Write-Host ('Restore point available: #{0} — {1} ({2})' -f $rp.SequenceNumber, $rp.Description, $rp.ConvertToDateTime($rp.CreationTime)) -ForegroundColor Green"));
         sb.AppendLine("} else {");
         sb.AppendLine(Lang.T("    Write-Host 'AUCUN point de restauration n''a pu être créé : les étapes suivantes ne seront PAS annulables.' -ForegroundColor Yellow", "    Write-Host 'NO restore point could be created: the following steps will NOT be reversible.' -ForegroundColor Yellow"));
         sb.AppendLine(Lang.T("    if ($srErr) { Write-Host ('  Motif : ' + $srErr) -ForegroundColor Yellow }", "    if ($srErr) { Write-Host ('  Reason: ' + $srErr) -ForegroundColor Yellow }"));
+        // Un point ANCIEN existe peut-être : le dire, sans le faire passer pour un
+        // filet tendu aujourd'hui. Il reste utilisable, mais il ramènerait la
+        // machine à un état bien antérieur.
+        sb.AppendLine(Lang.T("    if ($rpDate) { Write-Host ('  Le point de restauration le plus récent date du ' + $rpDate + \" : il ne protège PAS des étapes qui suivent.\") -ForegroundColor Yellow }", "    if ($rpDate) { Write-Host ('  The most recent restore point dates from ' + $rpDate + \": it does NOT protect the steps below.\") -ForegroundColor Yellow }"));
         sb.AppendLine(Lang.T("    Write-Host '  Cause la plus fréquente : la protection du système est désactivée sur ce PC.' -ForegroundColor Yellow", "    Write-Host '  Most common cause: System Protection is turned off on this PC.' -ForegroundColor Yellow"));
         sb.AppendLine(Lang.T("    Write-Host ('  Pour l''activer : Enable-ComputerRestore -Drive ' + $srDrive + '   (ou Panneau de configuration > Système > Protection du système)')", "    Write-Host ('  To turn it on: Enable-ComputerRestore -Drive ' + $srDrive + '   (or Control Panel > System > System Protection)')"));
         sb.AppendLine(Lang.T("    if (-not (Ask 'Continuer SANS filet de sécurité ?')) { Stop-Transcript | Out-Null; exit }", "    if (-not (Ask 'Continue WITHOUT a safety net?')) { Stop-Transcript | Out-Null; exit }"));
@@ -258,19 +275,31 @@ public static class RepairScriptGenerator
     ///    aucun réglage système n'est modifié) ;
     ///  - droits admin : auto-élévation via Start-Process -Verb RunAs (invite UAC classique).
     /// </summary>
+    /// <summary>
+    /// Nom du fichier tel que <see cref="WriteToDisk"/> l'écrira. Il est aussi cité
+    /// dans l'en-tête du script : deux formules auraient fini par diverger, et
+    /// c'est déjà arrivé.
+    /// </summary>
+    internal static string NomDuScript(DiagnosticReport r) =>
+        $"Reparation_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.ps1";
+
+    /// <summary>Nom du lanceur .bat, construit sur la même base.</summary>
+    internal static string NomDuLanceur(DiagnosticReport r) =>
+        $"Reparation_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.bat";
+
     public static string? WriteToDisk(DiagnosticReport r)
     {
         if (!IsRepairable(r)) return null;
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC");
         Directory.CreateDirectory(dir);
 
-        var ps1Name = $"Reparation_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.ps1";
+        var ps1Name = NomDuScript(r);
         var ps1Path = Path.Combine(dir, ps1Name);
         // BOM UTF-8 indispensable pour que PowerShell 5.1 affiche correctement les accents.
         File.WriteAllText(ps1Path, Generate(r), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
         r.RepairScriptPath = ps1Path;
 
-        var batPath = Path.Combine(dir, $"Reparation_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.bat");
+        var batPath = Path.Combine(dir, NomDuLanceur(r));
         var bat = "@echo off\r\n"
                 + "rem FaultTracePC - lanceur du script de reparation (double-clic)\r\n"
                 + "rem Demande l'elevation administrateur (UAC) puis execute le .ps1 associe.\r\n"

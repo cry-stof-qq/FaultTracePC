@@ -1,4 +1,5 @@
 using FaultTracePC.Core;
+using FaultTracePC.Core.Analysis;
 using Xunit;
 
 namespace FaultTracePC.Tests;
@@ -54,6 +55,74 @@ public class AlertCatalogTests
             Assert.Contains("Processor temperature", a.Title);
             Assert.Contains("92", a.Title);
             Assert.DoesNotContain("Température", a.Details);
+        });
+    }
+
+    [Fact]
+    public void Une_alerte_whea_ecrite_en_anglais_se_relit_en_francais()
+    {
+        // CAS RÉEL, rapport du 29/08/2026 sur la machine de l'auteur : la carte
+        // critique la plus grave du rapport FRANÇAIS était intégralement en
+        // ANGLAIS — titre, détail et recommandation. Le service de surveillance
+        // tourne sous le compte SYSTEM, dont la langue n'est pas celle de
+        // l'utilisateur : il avait écrit l'alerte en anglais dans alerts.json.
+        //
+        // Rien dans cette alerte n'est pourtant irrécupérable : la règle « whea »
+        // se refabrique sans le moindre extrait conservé.
+        var a = new PreventiveAlert
+        {
+            Time = new DateTime(2026, 8, 18, 20, 4, 0),
+            RuleId = "whea",
+            Level = "crit",
+            Title = "Hardware error reported by the processor (WHEA)",
+            Details = "The hardware has just reported a corrected or fatal error.",
+            Recommendation = "Check temperatures and power supply, remove any overclocking/XMP.",
+        };
+
+        EnLangue(AppLanguage.French, () =>
+        {
+            Assert.True(AlertCatalog.Localize(a));
+            Assert.Contains("Erreur matérielle signalée", a.Title);
+            Assert.DoesNotContain("Hardware error", a.Title);
+            Assert.DoesNotContain("The hardware", a.Details);
+            Assert.DoesNotContain("Check temperatures", a.Recommendation);
+        });
+    }
+
+    [Fact]
+    public void La_carte_d_alerte_repetee_ne_melange_pas_deux_langues()
+    {
+        // Le moteur de règles fabrique « ⚠ Alerte préventive répétée (2×) : … »
+        // AUTOUR du texte de l'alerte. Si ce texte n'a pas été refabriqué, la
+        // carte est moitié française, moitié anglaise : c'est exactement ce
+        // qu'affichait le rapport réel.
+        var r = new DiagnosticReport
+        {
+            ScanPeriodDays = 30,
+            System = new SystemSnapshot { MachineName = "TEST-PC" },
+        };
+        foreach (var t in new[] { new DateTime(2026, 8, 18, 20, 4, 0), new DateTime(2026, 8, 24, 13, 10, 0) })
+            r.Flight.Alerts.Add(new PreventiveAlert
+            {
+                Time = t,
+                RuleId = "whea",
+                Level = "crit",
+                Title = "Hardware error reported by the processor (WHEA)",
+                Details = "The hardware has just reported a corrected or fatal error.",
+                Recommendation = "Check temperatures and power supply.",
+            });
+
+        EnLangue(AppLanguage.French, () =>
+        {
+            AlertCatalog.LocalizeAll(r.Flight.Alerts);   // ce que fait le lecteur du journal
+            new RulesEngine().Analyze(r);
+
+            var carte = r.Findings.FirstOrDefault(f => f.Code == "whea");
+            Assert.NotNull(carte);
+            Assert.Contains("Alerte préventive répétée", carte!.Title);
+            Assert.DoesNotContain("Hardware error", carte.Title);
+            Assert.DoesNotContain("The hardware", carte.Details);
+            Assert.DoesNotContain("Check temperatures", carte.Recommendation);
         });
     }
 
