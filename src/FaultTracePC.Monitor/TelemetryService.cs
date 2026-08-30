@@ -51,28 +51,98 @@ public sealed class TelemetryService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Intervalle de relecture de <c>remote.json</c>. Trente secondes : assez court
+    /// pour qu'un déploiement par stratégie de groupe n'ait pas l'air en panne,
+    /// assez long pour que la lecture d'un petit fichier local ne compte pas.
+    /// </summary>
+    private static readonly TimeSpan RelectureConfig = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// LE SERVICE NE RENONCE PLUS.
+    ///
+    /// Avant, la configuration était lue UNE fois au démarrage : mode Local, le
+    /// service se terminait et ne relisait plus jamais rien. Or l'ordre d'un
+    /// déploiement par stratégie de groupe est exactement celui qui déclenche ce
+    /// cas : le MSI installe et démarre le service alors que <c>remote.json</c>
+    /// n'existe pas encore, PUIS le script d'ouverture lance
+    /// « --configure-remote ». La machine se retrouvait configurée, la commande
+    /// rendait 0, et rien ne répondait — jusqu'au redémarrage suivant. C'est-à-dire
+    /// : rien ne marche le jour où l'on déploie et où l'on teste, et tout marche
+    /// le lendemain, quand on a déjà conclu que c'était cassé.
+    ///
+    /// Désormais le service boucle : il relit, écoute quand il doit écouter, et
+    /// repart sur de nouvelles bases dès que le mode, le port ou le jeton change.
+    /// Un port occupé n'est plus définitif non plus — il sera retenté.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var cfg = RemoteConfig.Load();
-        if (!string.Equals(cfg.Mode, "Client", StringComparison.OrdinalIgnoreCase) ||
-            string.IsNullOrEmpty(cfg.Token))
-            return; // mode Local : rien d'exposé, le service de télémétrie s'endort.
-
-        using var listener = new HttpListener();
-        listener.Prefixes.Add($"http://+:{cfg.Port}/");
-        try { listener.Start(); }
-        catch { return; } // port occupé ou interdit : on n'expose rien plutôt que mal.
-
-        await using var stopRegistration = stoppingToken.Register(() => { try { listener.Stop(); } catch { } });
-
         while (!stoppingToken.IsCancellationRequested)
         {
-            HttpListenerContext ctx;
-            try { ctx = await listener.GetContextAsync(); }
-            catch { break; } // listener arrêté
+            var cfg = RemoteConfig.Load();
 
-            _ = Task.Run(() => Handle(ctx, cfg), stoppingToken);
+            // Mode Local, ou pas encore de jeton : rien n'est exposé, mais on
+            // repassera. C'est toute la différence avec l'ancien « return ».
+            if (!cfg.ModeClientActif)
+            {
+                await Patienter(stoppingToken);
+                continue;
+            }
+
+            using var listener = new HttpListener();
+            listener.Prefixes.Add($"http://+:{cfg.Port}/");
+            try { listener.Start(); }
+            catch
+            {
+                // Port occupé ou interdit : on n'expose rien plutôt que mal, et on
+                // retentera — la cause est souvent temporaire (service en cours
+                // d'arrêt, règle de pare-feu pas encore appliquée).
+                await Patienter(stoppingToken);
+                continue;
+            }
+
+            using var arret = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            await using var stopRegistration = arret.Token.Register(() => { try { listener.Stop(); } catch { } });
+
+            var surveillance = SurveillerLaConfiguration(cfg, arret);
+
+            while (!arret.IsCancellationRequested)
+            {
+                HttpListenerContext ctx;
+                try { ctx = await listener.GetContextAsync(); }
+                catch { break; } // listener arrêté : configuration changée, ou service en fin de vie
+
+                _ = Task.Run(() => Handle(ctx, cfg), stoppingToken);
+            }
+
+            arret.Cancel();
+            try { await surveillance; } catch { }
         }
+    }
+
+    /// <summary>
+    /// Surveille la configuration pendant que l'API écoute et coupe l'écoute dès
+    /// qu'elle change. Comparaison sur le SENS — mode, port, jeton — et non sur la
+    /// date du fichier : réécrire le même contenu ne doit pas couper les
+    /// connexions en cours.
+    /// </summary>
+    private static async Task SurveillerLaConfiguration(RemoteConfig actuelle, CancellationTokenSource arret)
+    {
+        while (!arret.IsCancellationRequested)
+        {
+            try { await Task.Delay(RelectureConfig, arret.Token); }
+            catch (OperationCanceledException) { return; }
+
+            if (!actuelle.MemeExpositionQue(RemoteConfig.Load()))
+                arret.Cancel();
+        }
+    }
+
+    /// <summary>Attend l'intervalle de relecture, sans lever à l'arrêt du service.</summary>
+    private static async Task Patienter(CancellationToken stoppingToken)
+    {
+        try { await Task.Delay(RelectureConfig, stoppingToken); }
+        catch (OperationCanceledException) { }
     }
 
     private static void Handle(HttpListenerContext ctx, RemoteConfig cfg)

@@ -314,6 +314,11 @@ internal static class Program
                                  $"Fleet mode enabled on {Environment.MachineName}, port {port}."));
         Console.WriteLine(Lang.T("La console retrouvera ce poste avec le secret maître et son nom de machine — rien à recopier.",
                                  "The console will find this machine again from the master secret and its machine name — nothing to copy."));
+        // Dit parce que c'est la question que se pose l'administrateur juste après,
+        // et parce que la réponse a changé : le service relit sa configuration au
+        // lieu d'avoir renoncé au démarrage.
+        Console.WriteLine(Lang.T("Si le service de surveillance est installé, il prend cette configuration en compte dans les 30 secondes, sans redémarrage.",
+                                 "If the monitoring service is installed, it picks this configuration up within 30 seconds, with no restart."));
         return 0;
     }
 

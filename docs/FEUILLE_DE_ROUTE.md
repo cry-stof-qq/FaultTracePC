@@ -158,6 +158,20 @@ Deux tests écrits pour reproduire — l'un sur `AlertCatalog.Localize`, l'autre
 
 *Ce que ça laisse : deux tests de non-régression qui n'existaient pas, et une leçon — avant de chercher un défaut dans le code, vérifier avec quel binaire le fichier a été produit.*
 
+**40 — Le service renonçait au démarrage, ce qui condamnait le déploiement par GPO. CORRIGÉ.** Trouvé le 30/08/2026 en déroulant la séquence réelle d'un déploiement, pas en lisant une liste.
+
+`TelemetryService.ExecuteAsync` lisait `remote.json` **une seule fois** et faisait `return` si le mode n'était pas « Client » : la tâche se terminait et ne relisait plus jamais rien. Or l'ordre d'un déploiement par stratégie de groupe est précisément celui qui déclenche ce cas :
+
+1. le MSI installe et démarre le service — `remote.json` n'existe pas encore, donc mode Local, donc la télémétrie s'arrête définitivement ;
+2. le script d'ouverture lance `--configure-remote --master-secret -`, qui écrit la configuration ;
+3. rien ne redémarre le service.
+
+Le poste était configuré, la commande rendait 0, **et rien ne répondait** — jusqu'au redémarrage suivant. Autrement dit : rien ne marche le jour où l'on déploie et où l'on teste, tout marche le lendemain, quand on a déjà conclu que c'était cassé. La fenêtre « Mode réseau » ne connaissait pas ce défaut parce qu'elle redéploie le service juste après avoir enregistré ; `MonitorServiceManager` vit dans le projet WPF, et la ligne de commande — celle qui est faite pour la GPO — n'y a pas accès.
+
+Corrigé en faisant **boucler** le service : il relit la configuration toutes les 30 secondes, écoute quand il doit écouter, et repart sur de nouvelles bases dès que le mode, le port ou le jeton change. Un port occupé n'est plus définitif non plus : il est retenté. La comparaison porte sur le SENS — mode effectif, port, jeton — et non sur la date du fichier, pour qu'un script qui réécrit le même contenu ne coupe pas les connexions en cours. La ligne de commande annonce désormais le délai à l'administrateur, au lieu de le laisser deviner.
+
+**Ce que ça change pour la rentrée :** l'ordre des opérations n'a plus d'importance. Installer puis configurer, ou l'inverse, aboutit au même résultat en moins d'une minute.
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---

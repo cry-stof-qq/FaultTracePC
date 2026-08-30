@@ -64,6 +64,28 @@ public sealed class RemoteConfig
     public static bool ConfigEstProtegee => FileProtection.IsRestricted(ConfigPath);
 
     /// <summary>
+    /// Vrai si cette configuration doit faire écouter l'API.
+    ///
+    /// Le jeton vide compte autant que le mode : un poste installé par MSI mais
+    /// pas encore configuré n'a rien à protéger, et exposer un port sans clé
+    /// serait le pire des deux mondes.
+    /// </summary>
+    public bool ModeClientActif =>
+        string.Equals(Mode, "Client", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Token);
+
+    /// <summary>
+    /// Vrai si l'autre configuration expose EXACTEMENT la même chose : même mode
+    /// effectif, même port, même jeton. Sert au service à savoir s'il doit
+    /// repartir sur de nouvelles bases — réécrire le fichier à l'identique ne doit
+    /// pas couper les connexions en cours.
+    /// </summary>
+    public bool MemeExpositionQue(RemoteConfig? autre) =>
+        autre is not null
+        && ModeClientActif == autre.ModeClientActif
+        && Port == autre.Port
+        && string.Equals(Token, autre.Token, StringComparison.Ordinal);
+
+    /// <summary>
     /// Génère un token aléatoire de 256 bits (hexadécimal).
     ///
     /// PLUS AUCUN CHEMIN DE CONFIGURATION NE L'APPELLE : un poste tire désormais
