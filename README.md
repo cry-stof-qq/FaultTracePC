@@ -174,6 +174,10 @@ To set the language for a whole machine at deployment time:
 `msiexec /i FaultTracePC-1.5.0.msi FTPCLANG=en /qn`. It is a default — a user's
 own choice in the application still wins.
 
+**Deploying to several machines:** the full procedure — master secret,
+headless configuration, firewall, the checks to run on the day and the known
+limits — is in [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md) (in French).
+
 Optional but recommended — symbolic dump analysis, which names the faulting
 driver, needs WinDbg:
 

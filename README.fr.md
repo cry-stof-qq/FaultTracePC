@@ -159,6 +159,10 @@ Pour imposer la langue à tout un poste au déploiement :
 `msiexec /i FaultTracePC-1.5.0.msi FTPCLANG=en /qn`. C'est un défaut — le choix
 qu'un utilisateur fait dans l'application reste prioritaire.
 
+**Déploiement sur plusieurs postes :** la procédure complète — secret maître,
+configuration sans interface, pare-feu, vérifications à faire le jour même et
+limites connues — est dans [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md).
+
 Optionnel mais recommandé — l'analyse symbolique des dumps, qui nomme le pilote
 fautif, nécessite WinDbg :
 
