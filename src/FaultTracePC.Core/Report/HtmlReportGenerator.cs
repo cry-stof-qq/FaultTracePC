@@ -9,6 +9,49 @@ namespace FaultTracePC.Core.Report;
 /// </summary>
 public static class HtmlReportGenerator
 {
+    /// <summary>
+    /// Nom de fichier d'un rapport — UNE seule formule pour les trois écrivains :
+    /// application, ligne de commande et service.
+    ///
+    /// LE DÉFAUT QU'ELLE SUPPRIME, constaté le 30/08/2026 sur un rapport réel :
+    /// la ligne de commande écrivait « Diagnostic_TECH-INFO-2025_… » et
+    /// l'application « Diagnostic_PC_… », un reliquat d'avant que le nom de
+    /// machine existe. Deux familles de noms pour la même chose dans le même
+    /// dossier — et, sur un partage où plusieurs postes déposent leurs rapports,
+    /// deux machines analysant à la même minute s'écrasaient l'une l'autre.
+    /// </summary>
+    public static string NomDuRapport(DiagnosticReport r) =>
+        $"Diagnostic_{NomDeMachineSur(r.System?.MachineName)}_{r.GeneratedAt:yyyy-MM-dd_HHmm}.html";
+
+    /// <summary>
+    /// Nom de machine réduit à ce que <see cref="EstUnNomDeRapport"/> accepte :
+    /// lettres, chiffres, tiret et tiret bas. Tout le reste devient un tiret bas.
+    /// L'invariant compte plus que l'esthétique : un nom que nous produisons doit
+    /// toujours passer notre propre contrôle, sinon la console ne pourrait plus
+    /// télécharger le rapport d'une machine au nom exotique.
+    /// </summary>
+    public static string NomDeMachineSur(string? machineName)
+    {
+        var brut = string.IsNullOrWhiteSpace(machineName) ? Environment.MachineName : machineName.Trim();
+        var propre = string.Concat(brut.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '_'));
+        return propre.Length == 0 ? "PC" : propre;
+    }
+
+    /// <summary>
+    /// Contrôle du nom réclamé par la console avant de servir un fichier.
+    ///
+    /// C'est d'abord un garde-fou de sécurité : il n'accepte ni point, ni
+    /// séparateur de chemin, ni deux-points, donc aucune traversée de répertoire.
+    /// Il accepte les DEUX formes, l'ancienne « Diagnostic_PC_… » et la nouvelle
+    /// qui porte le nom de machine — sans quoi les rapports déjà déposés dans le
+    /// dossier partagé deviendraient invisibles du jour au lendemain.
+    /// </summary>
+    public static bool EstUnNomDeRapport(string? nom) =>
+        nom is not null && NomDeRapportRx.IsMatch(nom);
+
+    private static readonly System.Text.RegularExpressions.Regex NomDeRapportRx =
+        new(@"^Diagnostic_[\w\-]+\.html$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
     public static string Generate(DiagnosticReport r)
     {
         var sb = new StringBuilder(64 * 1024);
@@ -56,7 +99,7 @@ public static class HtmlReportGenerator
 
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC");
         Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, $"Diagnostic_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.html");
+        var path = Path.Combine(dir, NomDuRapport(r));
         File.WriteAllText(path, Generate(r), Encoding.UTF8);
 
         // Copie vers le dossier partagé (servi par l'API du mode Client) — best effort.

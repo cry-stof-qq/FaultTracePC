@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using FaultTracePC.Core;
 using FaultTracePC.Core.Report;
 using Microsoft.Extensions.Hosting;
@@ -27,7 +26,6 @@ namespace FaultTracePC.Monitor;
 /// </summary>
 public sealed class TelemetryService : BackgroundService
 {
-    private static readonly Regex ReportNameRx = new(@"^Diagnostic_PC_[\w\-]+\.html$", RegexOptions.Compiled);
 
     /// <summary>Un seul diagnostic à la fois : un scan est coûteux, on refuse les rafales (429).</summary>
     private static readonly SemaphoreSlim ScanLock = new(1, 1);
@@ -151,7 +149,10 @@ public sealed class TelemetryService : BackgroundService
                     var dir = RemoteConfig.SharedReportsDir;
                     var list = !Directory.Exists(dir)
                         ? new List<object>()
-                        : Directory.EnumerateFiles(dir, "Diagnostic_PC_*.html")
+                        // « Diagnostic_* » et non « Diagnostic_PC_* » : depuis la
+                        // 1.5.0 le nom porte celui de la machine. Le motif large
+                        // continue de lister les rapports déposés avant.
+                        : Directory.EnumerateFiles(dir, "Diagnostic_*.html")
                             .OrderByDescending(File.GetLastWriteTime)
                             .Take(30)
                             .Select(f => (object)new { name = Path.GetFileName(f), sizeKb = new FileInfo(f).Length / 1024, date = File.GetLastWriteTime(f) })
@@ -178,7 +179,7 @@ public sealed class TelemetryService : BackgroundService
                         Directory.CreateDirectory(RemoteConfig.SharedReportsDir);
                         // Script de réparation d'abord : le rapport y fait référence.
                         try { RepairScriptGenerator.WriteToDisk(report); } catch { }
-                        var name = $"Diagnostic_PC_{report.GeneratedAt:yyyy-MM-dd_HHmm}.html";
+                        var name = HtmlReportGenerator.NomDuRapport(report);
                         File.WriteAllText(Path.Combine(RemoteConfig.SharedReportsDir, name),
                             HtmlReportGenerator.Generate(report), Encoding.UTF8);
 
@@ -212,7 +213,7 @@ public sealed class TelemetryService : BackgroundService
                     var name = ctx.Request.QueryString["name"] ?? "";
                     var path = Path.Combine(RemoteConfig.SharedReportsDir, name);
                     // Anti-traversée de chemin : nom strictement conforme, fichier existant dans le dossier partagé.
-                    if (!ReportNameRx.IsMatch(name) || !File.Exists(path)) { NotFound(ctx); return; }
+                    if (!HtmlReportGenerator.EstUnNomDeRapport(name) || !File.Exists(path)) { NotFound(ctx); return; }
                     Raw(ctx, "text/html; charset=utf-8", File.ReadAllText(path));
                     break;
                 }

@@ -146,6 +146,18 @@ Corrigé en 1.4.1 : `PsEscape` ramène U+2018, U+2019, U+201B et U+2032 sur l'ap
 
 **La leçon, la même que le point 36 :** un texte que le logiciel écrit pour qu'un autre programme le relise n'est pas du texte, c'est du code — et il faut le tester en le relisant, pas en relisant celui qui l'écrit.
 
+**38 — Deux conventions de nom de rapport. CORRIGÉ.** Trouvé le 30/08/2026 en relisant un rapport réel — pas le contenu du rapport, son **nom de fichier** : `Diagnostic_PC_2026-08-30_0907.html` sur une machine appelée `TECH-INFO-2025`.
+
+La ligne de commande écrivait `Diagnostic_<MACHINE>_<date>.html`, avec ce commentaire : « nom incluant la machine, indispensable quand tout un parc écrit dans le même partage réseau ». L'application et le service, eux, étaient restés à `Diagnostic_PC_<date>.html`, reliquat d'avant que le nom de machine existe. Deux familles de noms dans le même dossier — et, sur un partage où plusieurs postes déposent leurs rapports, deux machines analysant à la même minute s'écrasent l'une l'autre.
+
+Corrigé en alignant les trois écrivains sur une formule unique, `HtmlReportGenerator.NomDuRapport`. Le contrôle de nom du service — un garde-fou anti-traversée de répertoire — a été élargi **en même temps** et accepte les deux formes : rendre invisibles les rapports déjà déposés aurait effacé l'historique d'un parc du jour au lendemain. L'invariant est testé : *ce que le logiciel produit doit passer le contrôle qu'il applique lui-même*, y compris pour une machine nommée `SALLE-3/POSTE-1`.
+
+**39 — Une carte critique en anglais dans un rapport français. FAUSSE ALERTE, mais instructive.** Le rapport du 29/08 affichait sa conclusion la plus grave — l'alerte WHEA — intégralement en anglais, titre, détail et recommandation, dans un rapport par ailleurs français. Cause supposée : le service tourne sous SYSTEM, dont la langue n'est pas celle de l'utilisateur, et il avait écrit l'alerte en anglais dans `alerts.json`.
+
+Deux tests écrits pour reproduire — l'un sur `AlertCatalog.Localize`, l'autre sur la carte complète fabriquée par le moteur de règles — sont **verts du premier coup** : le code actuel refabrique bien le texte. Le rapport fautif venait d'un exécutable antérieur (`dist\` figé au 17/08). Un rapport régénéré avec la 1.5.0 sur la même machine, avec les mêmes alertes, est intégralement français.
+
+*Ce que ça laisse : deux tests de non-régression qui n'existaient pas, et une leçon — avant de chercher un défaut dans le code, vérifier avec quel binaire le fichier a été produit.*
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---

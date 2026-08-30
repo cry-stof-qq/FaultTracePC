@@ -99,8 +99,10 @@ internal static class Program
             Directory.CreateDirectory(outputDir);
 
             // Nom incluant la machine : indispensable quand tout un parc écrit
-            // dans le même partage réseau.
-            var baseName = $"Diagnostic_{Sanitize(Environment.MachineName)}_{report.GeneratedAt:yyyy-MM-dd_HHmm}";
+            // dans le même partage réseau. La formule vit dans HtmlReportGenerator,
+            // parce que l'application et le service écrivent les mêmes fichiers —
+            // et écrivaient, jusqu'à la 1.5.0, sous un autre nom.
+            var baseName = Path.GetFileNameWithoutExtension(HtmlReportGenerator.NomDuRapport(report));
             var htmlPath = Path.Combine(outputDir, baseName + ".html");
             // Génère d'abord le script de réparation : sans lui, le rapport n'aurait
             // pas sa section « Aide à la réparation ».
@@ -321,9 +323,6 @@ internal static class Program
         var i = Array.FindIndex(args, a => a.Equals(option, StringComparison.OrdinalIgnoreCase));
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
     }
-
-    private static string Sanitize(string name) =>
-        string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
 
     private static void PrintHelp()
     {
