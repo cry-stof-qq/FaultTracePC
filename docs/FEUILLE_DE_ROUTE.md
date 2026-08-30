@@ -155,7 +155,9 @@ Corrigé en alignant les trois écrivains sur une formule unique, `HtmlReportGen
 
 **39 — Une carte critique en anglais dans un rapport français. FAUSSE ALERTE, mais instructive.** Le rapport du 29/08 affichait sa conclusion la plus grave — l'alerte WHEA — intégralement en anglais, titre, détail et recommandation, dans un rapport par ailleurs français. Cause supposée : le service tourne sous SYSTEM, dont la langue n'est pas celle de l'utilisateur, et il avait écrit l'alerte en anglais dans `alerts.json`.
 
-Deux tests écrits pour reproduire — l'un sur `AlertCatalog.Localize`, l'autre sur la carte complète fabriquée par le moteur de règles — sont **verts du premier coup** : le code actuel refabrique bien le texte. Le rapport fautif venait d'un exécutable antérieur (`dist\` figé au 17/08). Un rapport régénéré avec la 1.5.0 sur la même machine, avec les mêmes alertes, est intégralement français.
+Deux tests écrits pour reproduire — l'un sur `AlertCatalog.Localize`, l'autre sur la carte complète fabriquée par le moteur de règles — sont **verts du premier coup** : le code actuel refabrique bien le texte. Un rapport régénéré avec la 1.5.0 sur la même machine, avec les mêmes alertes, est intégralement français.
+
+**Conclusion corrigée le 30/08/2026.** J'avais attribué l'anglais à un exécutable antérieur (`dist\` figé au 17/08). Le point 45 donne une explication plus vraisemblable, et qui ne dépend d'aucune supposition : le service tourne sous SYSTEM, dont la langue est celle du système et non celle de l'utilisateur — c'est **lui** qui avait écrit cette alerte en anglais dans `alerts.jsonl`. Les deux observations restent cohérentes : le fichier contenait de l'anglais, la relecture par une session française l'a refabriqué. La leçon d'origine tient toujours, mais elle s'accompagne d'une seconde : *une explication qui ferme un dossier n'est pas forcément la bonne — celle-ci a tenu vingt-quatre heures.*
 
 *Ce que ça laisse : deux tests de non-régression qui n'existaient pas, et une leçon — avant de chercher un défaut dans le code, vérifier avec quel binaire le fichier a été produit.*
 
@@ -204,6 +206,18 @@ Piste : la console archive ce qu'elle collecte, dans son dossier à elle, par ma
 **La décision de conception à ne pas rater** : l'intégration doit vivre **sur la console, pas sur les postes**. Vingt machines portant chacune un jeton d'API GLPI, ce sont vingt secrets à protéger, à renouveler et à corriger le jour où l'API change. La console collecte déjà l'état de tout le parc, elle est unique, et elle sait déjà chiffrer un secret pour son seul propriétaire.
 
 GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, une API « haut niveau » v2. **À vérifier sur la version réellement installée avant d'écrire quoi que ce soit** — c'est le genre de détail qui change d'une version à l'autre. *Difficulté : moyenne. Aucune urgence.*
+
+**45 — Un rapport distant sort dans la langue de la machine cible, pas dans celle de l'administrateur. À FAIRE, candidat 1.5.2.** Constaté par l'auteur le 30/08/2026 : diagnostic lancé depuis la console vers sa propre machine, dont la session est française — rapport en anglais.
+
+`/api/scan` ne rapatrie pas des données : il déclenche l'analyse sur la machine cible, et **c'est le service qui écrit le HTML**. Or ce service tourne sous SYSTEM, et la langue se résout ainsi : option de ligne de commande, puis préférence utilisateur (`Documents\...\langue.txt`, que SYSTEM n'a pas), puis réglage machine (`ProgramData\FaultTracePC\langue.txt`, absent par défaut), puis langue d'affichage de la session — celle du système, pas celle de l'administrateur. Un Windows installé en anglais auquel un utilisateur a ajouté le français **pour son compte** produit donc des rapports anglais.
+
+**C'est une incohérence avec un principe que le projet applique déjà ailleurs :** dans `ParkProtocol.Sentence`, la phrase est construite « chez celui qui lit, donc dans SA langue ». Le rapport distant, lui, est écrit dans la langue de celui qui l'exécute.
+
+**Correctif retenu :** la console joint sa langue à la requête (`/api/scan?days=30&lang=fr`) et le service génère dans cette langue. Purement additif — un poste resté en 1.5.1 ignore le paramètre et se comporte comme aujourd'hui.
+
+**Le piège à ne pas manquer en l'écrivant :** `Lang.Apply` est global au processus et le service traite ses requêtes en parallèle. Deux consoles de langues différentes se marcheraient dessus. Ce n'est sûr que parce que `/api/scan` est **déjà sérialisé par `ScanLock`** : la langue doit être appliquée **à l'intérieur** de ce verrou et restaurée ensuite. Écrit naïvement, c'est une bombe à retardement qu'aucun test existant ne verrait.
+
+**Contournement en attendant**, à faire sur chaque poste : `FaultTracePC.Cli.exe --set-machine-lang fr` **puis `Restart-Service FaultTracePCMonitor`** — contrairement à `remote.json`, la langue n'est lue qu'au démarrage du service. Au déploiement, `FTPCLANG=fr` fait la même chose d'emblée.
 
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
