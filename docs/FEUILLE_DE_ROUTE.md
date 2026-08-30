@@ -40,7 +40,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 4 | ~~`DateTime.TryParse` sans culture explicite~~ | **fait en 1.2.3** : `InvariantCulture` explicite dans `ParkComparator.cs:247` et `TelemetryService.cs:291`. Reste un cas sans conséquence, `RepairToolboxWindow.xaml.cs:54`, qui ne sert qu'à trier un affichage | — |
 | 5 | ~~Analyse de la sortie de `sfc`~~ | **fait en 1.3.0** : les deux langues sont reconnues, et l'échec d'analyse est distingué du « rien trouvé » | — |
 | 6 | ~~`DISM /English`~~ | **fait en 1.3.0**, uniquement là où c'est le programme qui lit — pas dans la console visible de la boîte à outils | — |
-| 7 | Canal d'alerte inadapté au parc | La bulle de notification vit dans une session utilisateur. Machine réveillée en WoL sans session : l'alerte n'a aucun destinataire. Journal d'événements Windows + point d'accès de télémétrie | moyenne |
+| 7 | ~~Canal d'alerte inadapté au parc~~ | **fermé le 30/08/2026** — la justification était fausse (voir point 42) et l'auteur ne veut pas d'un canal de plus | — |
 | 8 | ~~`Historique\` ne purge jamais~~ | **fait en 1.2.3** : purge au-delà de 90 jours **et** des 10 analyses les plus récentes — les deux conditions, pour qu'une machine analysée une fois par an ne perde rien (`ScanHistory.cs:85`) | — |
 | 9 | ~~`DiskBrief.Health`~~ | **tranché en 1.3.0** : c'était bien une valeur française. Devenu une énumération ; les résumés écrits par la 1.2.x restent relus | — |
 | **30** | **Fraîcheur des données non signalée** | Remonté par un test sur une machine éteinte depuis des mois (1.1.0). Trois manques distincts : l'âge du fait le plus récent n'est jamais indiqué ; la couverture réelle non plus (« 30 jours analysés, dont 2 jours machine allumée ») ; et la comparaison n'avait **aucun plancher de durée** — ce dernier volet est **fait en 1.2.3** : trois paliers, refus de conclure en dessous de deux heures. Les deux premiers restent ouverts. Les données existent déjà (dernier démarrage, durée d'allumage, horodatage des événements), elles ne sont pas exploitées | moyenne |
@@ -181,6 +181,30 @@ Deux manques distincts, et seul le premier est comblé.
 
 **La révocation par poste, elle, n'existe pas.** La dérivation est déterministe : recalculer le jeton d'une machine redonne exactement le même. Invalider le jeton d'un seul poste — divulgué, ou machine sortie du parc — oblige donc à changer le secret de TOUT le parc, ou à inscrire un jeton aléatoire à la main pour cette machine. C'est le prix de « plus de liste à conserver », et il n'avait pas été nommé au moment de la décision. Pistes : un compteur de version par machine entrant dans la dérivation (`HMAC(secret, NOM|génération)`), ou une liste de révocation côté console. *Difficulté : moyenne. À traiter avant qu'un vrai parc soit déployé, pas après.*
 
+**42 — Le point 7 était fondé sur un fait faux. FERMÉ le 30/08/2026, après discussion.** Sa justification disait : « une machine réveillée sans session ouverte n'a aucun destinataire pour ses alertes ». C'est inexact, et l'inexactitude a survécu trois versions parce que personne n'était allé lire le code.
+
+Ce qui se passe réellement : le service **écrit** chaque alerte dans `Flight\alerts.jsonl`, avec écriture forcée sur le disque, comme la boîte noire. Elle est donc durable et survit au redémarrage. Trois chemins la ramènent ensuite à un humain — la bulle de la barre des tâches (si l'application est ouverte), la console de parc à chaque actualisation (`/api/alerts?days=7`), et le rapport de parc. **Rien n'est perdu. Rien n'est poussé.** Ce qui manquait n'était pas la conservation mais le fait de venir chercher l'administrateur.
+
+Or les alertes concernées — température soutenue, disque qui se dégrade, WHEA répétées, coupures brutales — ont une constante de temps de plusieurs jours ou semaines. Le scénario qui fait mal n'est pas « l'alerte est arrivée trop tard », c'est « personne n'a ouvert la console pendant trois semaines ». C'est une question d'habitude, pas de canal.
+
+**Décision de l'auteur, le 30/08/2026 :** « rien de plus, j'ouvre la console. » Le point est donc fermé plutôt que reporté — un point ouvert qu'on ne veut pas faire pollue une liste et se fait re-proposer indéfiniment.
+
+**Écarté au passage :** écrire dans le journal d'événements Windows n'aurait rien changé. L'établissement dispose de GLPI, qui est un outil d'inventaire et de tickets — **son agent ne collecte pas les journaux d'événements**. Les alertes y seraient tombées dans un journal que rien ne ramasse.
+
+**43 — Les alertes disparaissent avec le poste. À traiter avant un vrai déploiement.** Trouvé en fermant le point 7, et plus sérieux que lui.
+
+Les alertes vivent **sur la machine**, dans `ProgramData\FaultTracePC\Flight\alerts.jsonl`. Un poste réimagé — opération routinière en établissement, souvent pendant les vacances — repart avec un journal vide. La console les collecte à chaque actualisation mais **ne les conserve pas** : elle les affiche et les oublie.
+
+Conséquence concrète : on peut perdre la preuve qu'une machine chauffait depuis six mois, précisément au moment où elle servirait à justifier son remplacement. C'est aussi ce qui empêche toute vue dans la durée — « ce poste alerte trois fois plus que les autres » est une phrase que la console ne peut pas dire aujourd'hui.
+
+Piste : la console archive ce qu'elle collecte, dans son dossier à elle, par machine et par règle. Rien à changer sur les postes. *Difficulté : faible à moyenne.*
+
+**44 — Publier l'état du parc dans GLPI. Choix de stratégie, pas correction.** L'établissement utilise déjà GLPI pour son inventaire et ses tickets. Y déposer l'état de santé de chaque poste — ou ouvrir un ticket quand un disque commence à lâcher — mettrait l'information là où l'administrateur regarde déjà, au lieu de lui demander d'ouvrir un outil de plus.
+
+**La décision de conception à ne pas rater** : l'intégration doit vivre **sur la console, pas sur les postes**. Vingt machines portant chacune un jeton d'API GLPI, ce sont vingt secrets à protéger, à renouveler et à corriger le jour où l'API change. La console collecte déjà l'état de tout le parc, elle est unique, et elle sait déjà chiffrer un secret pour son seul propriétaire.
+
+GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, une API « haut niveau » v2. **À vérifier sur la version réellement installée avant d'écrire quoi que ce soit** — c'est le genre de détail qui change d'une version à l'autre. *Difficulté : moyenne. Aucune urgence.*
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---
@@ -247,16 +271,18 @@ Code de compatibilité à retirer, recensé — puis **révisé à l'examen du c
 
 **Et l'ajout qui donne son sens au lot : estampiller les formats.** Si la compatibilité coûte cher aujourd'hui, c'est que les fichiers persistés — résumés d'historique, `alerts.json`, réponses du protocole de parc — **ne portent aucun numéro de version de format**. Chaque fichier écrit par la 1.4 en portera un, et toute lecture commencera par le vérifier. Sans cela, on refera ce débat à la 1.6, avec un parc déployé et plus aucune fenêtre pour le trancher.
 
-### Bloc parc — armé, à déclencher sur un mot
+### Bloc parc — TERMINÉ le 30/08/2026
 
-Points **13, 14, 27, 7**. Non planifié, mais entièrement décidé : le jour où un déploiement d'établissement obtient une date, ce bloc passe devant la 1.4 sans rien réétudier.
+Points **13, 14, 27, 7**. Armé en août « à déclencher sur un mot », déclenché le 29, livré en 1.5.0 et 1.5.1, et **éprouvé sur deux vraies machines la veille de la rentrée** : paquet réinstallable, service qui prend sa configuration sans redémarrage, règle de pare-feu posée par la ligne de commande, console qui trouve un poste par son seul nom Windows.
+
+Trois des quatre points ont été faits ; le quatrième a été **fermé** parce qu'il reposait sur un fait faux (point 42). Ce qui reste du sujet « parc » n'est pas dans ce bloc : c'est l'archivage des alertes (43) et la question GLPI (44).
 
 1. ~~**27 — token dérivé**~~ — **fait**. `RemoteConfig.TokenFor` : jeton inscrit prioritaire (dérogation pour les postes déployés avant), sinon dérivé, null quand aucun calcul n'est possible — et la console le DIT au lieu de signer avec une chaîne vide. Le secret maître vit chiffré par DPAPI dans `%LOCALAPPDATA%`, que les profils itinérants ne déplacent pas. La fenêtre « Mode réseau » du poste client dérive elle aussi, et n'affiche plus de jeton à recopier.
 
     **Ce qui reste à surveiller :** le jeton se calcule à partir du **nom Windows**. Le champ « Nom » de la console servait de libellé libre — un libellé de fantaisie produit un `403` muet. D'où : nom obligatoire quand le jeton est déduit, infobulle renvoyant à `hostname`, et message de refus nommant les trois causes (jeton, nom, horloge).
 2. ~~**14 — ACL sur `remote.json`**~~ — **fait**. Aucune contrepartie à peser : les trois lecteurs du fichier sont le service (LocalSystem) et les deux exécutables, dont le manifeste porte `requireAdministrator`.
 3. ~~**13 — `--configure-remote --generate-token`** en ligne de commande~~ — **fait**, et sous une meilleure forme : le poste dérive son jeton du secret maître au lieu d'en tirer un au sort.
-4. **7 — canal d'alerte adapté au parc.** La bulle de notification vit dans une session utilisateur : une machine réveillée en WoL sans session ouverte n'a aucun destinataire. Journal d'événements Windows plus point d'accès de télémétrie.
+4. ~~**7 — canal d'alerte adapté au parc**~~ — **fermé**, voir point 42. Le bloc parc est donc terminé.
 
 ---
 
