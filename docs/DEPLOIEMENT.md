@@ -218,7 +218,13 @@ La migration se fait poste par poste.
 | Le service tourne | `Get-Service FaultTracePCMonitor` | `Running` |
 | La configuration est écrite | `Get-Content C:\ProgramData\FaultTracePC\remote.json` | `"Mode": "Client"`, le port choisi, un jeton |
 | Le fichier est protégé | `Get-Acl C:\ProgramData\FaultTracePC\remote.json \| Format-List` | SYSTEM et Administrateurs uniquement, héritage désactivé |
-| Le port écoute | `Get-NetTCPConnection -LocalPort 58620 -State Listen` | une ligne |
+| Le port écoute | `netsh http show servicestate \| Select-String 58620` | le préfixe `http://+:58620/` |
+
+**`Get-NetTCPConnection` n'est pas le bon outil ici** : le service passe par
+`HttpListener`, donc la réservation appartient à HTTP.SYS au niveau du noyau et
+non à un socket ordinaire du processus. Et il faut laisser passer les trente
+secondes de relecture avant de conclure quoi que ce soit. **La console qui
+répond reste la seule preuve qui compte.**
 
 ### Depuis la console
 
@@ -270,6 +276,56 @@ d'écrire au même endroit sans collision.
 
 Codes de sortie : **0** machine saine, **1** avertissements, **2** critique,
 **3** erreur d'exécution. Une option inconnue rend **3** et refuse de continuer.
+
+---
+
+## 6 bis. Perdre ou changer le secret maître
+
+C'est le seul scénario catastrophique de cette architecture. Il mérite d'être lu
+**avant** d'en avoir besoin.
+
+### Où il se trouve
+
+| Quoi | Où | Survit à la désinstallation |
+|---|---|---|
+| Le secret maître (console) | `%LOCALAPPDATA%\FaultTracePC\parc.secret`, chiffré par Windows pour ce compte | oui — c'est une donnée utilisateur |
+| Le jeton d'un poste | `C:\ProgramData\FaultTracePC\remote.json` | oui — c'est une donnée machine |
+
+Désinstaller puis réinstaller ne remet donc **rien** à zéro : un installateur
+n'efface pas les données de l'utilisateur.
+
+### Le récupérer, s'il est encore sur la console
+
+Le fichier est chiffré pour **ce compte, sur cette machine** : son propriétaire
+peut donc le relire. Dans **Windows PowerShell 5.1** (`powershell.exe`) :
+
+```powershell
+Add-Type -AssemblyName System.Security
+$blob  = [IO.File]::ReadAllBytes("$env:LOCALAPPDATA\FaultTracePC\parc.secret")
+$ent   = [Text.Encoding]::UTF8.GetBytes('FaultTracePC.parc.v1')
+$clair = [Security.Cryptography.ProtectedData]::Unprotect($blob, $ent, 'CurrentUser')
+[Text.Encoding]::UTF8.GetString($clair)
+```
+
+Le ranger aussitôt dans un gestionnaire de mots de passe, puis fermer la console
+— il reste sinon dans son historique. Aucun poste n'est à reconfigurer.
+
+### Le changer, dans l'ordre
+
+1. **Console** : fenêtre 🖥 Parc, bouton **Oublier**.
+2. `FaultTracePC.Cli.exe --generate-master-secret`, rangé cette fois.
+3. **Chaque poste déjà configuré** : `--configure-remote --master-secret -` avec
+   le nouveau secret. Un poste oublié devient injoignable et la console dira
+   `refusé` — rien n'est cassé sur lui, il attend un jeton qu'on ne calcule plus.
+4. **Console** : coller le nouveau secret, Enregistrer.
+
+### Ce qu'on ne peut pas faire aujourd'hui
+
+**Changer le jeton d'un seul poste.** La dérivation est déterministe : recalculer
+redonne le même jeton. Pour invalider celui d'une machine — jeton divulgué,
+poste sorti du parc — il faut soit changer le secret de tout le parc, soit
+inscrire à la main un jeton aléatoire pour cette machine dans la console. Une
+révocation par poste reste à concevoir.
 
 ---
 

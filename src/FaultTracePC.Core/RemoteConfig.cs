@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FaultTracePC.Core;
 
@@ -69,7 +70,13 @@ public sealed class RemoteConfig
     /// Le jeton vide compte autant que le mode : un poste installé par MSI mais
     /// pas encore configuré n'a rien à protéger, et exposer un port sans clé
     /// serait le pire des deux mondes.
+    ///
+    /// JsonIgnore n'est pas décoratif : sans lui, cette propriété CALCULÉE partait
+    /// dans remote.json — constaté le 30/08/2026 sur une machine réelle. Elle y
+    /// était inoffensive (aucun setter, donc ignorée à la relecture) mais le
+    /// fichier portait un champ redondant capable de contredire les trois autres.
     /// </summary>
+    [JsonIgnore]
     public bool ModeClientActif =>
         string.Equals(Mode, "Client", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Token);
 

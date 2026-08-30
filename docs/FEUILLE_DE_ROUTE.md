@@ -173,6 +173,14 @@ Corrigé en faisant **boucler** le service : il relit la configuration toutes le
 
 **Ce que ça change pour la rentrée :** l'ordre des opérations n'a plus d'importance. Installer puis configurer, ou l'inverse, aboutit au même résultat en moins d'une minute.
 
+**41 — Perdre le secret maître : aucune procédure, et aucune révocation par poste.** Rencontré le 30/08/2026 par l'auteur, la veille d'une rentrée, avec deux machines — le meilleur moment possible.
+
+Deux manques distincts, et seul le premier est comblé.
+
+**La procédure de perte** n'existait nulle part : ni message du logiciel disant où le secret est rangé, ni commande de réinitialisation, ni mention dans la documentation. Le secret était pourtant récupérable — chiffré par DPAPI pour le compte de l'administrateur, sur sa machine, donc déchiffrable par lui. Écrit depuis dans `DEPLOIEMENT.md` § 6 bis : où il vit, comment le relire, comment le changer dans le bon ordre.
+
+**La révocation par poste, elle, n'existe pas.** La dérivation est déterministe : recalculer le jeton d'une machine redonne exactement le même. Invalider le jeton d'un seul poste — divulgué, ou machine sortie du parc — oblige donc à changer le secret de TOUT le parc, ou à inscrire un jeton aléatoire à la main pour cette machine. C'est le prix de « plus de liste à conserver », et il n'avait pas été nommé au moment de la décision. Pistes : un compteur de version par machine entrant dans la dérivation (`HMAC(secret, NOM|génération)`), ou une liste de révocation côté console. *Difficulté : moyenne. À traiter avant qu'un vrai parc soit déployé, pas après.*
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---

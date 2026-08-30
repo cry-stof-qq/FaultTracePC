@@ -23,6 +23,24 @@ public class ExpositionReseauTests
         new() { Mode = mode, Token = token, Port = port };
 
     [Fact]
+    public void Le_fichier_ne_porte_que_les_trois_champs_qui_font_foi()
+    {
+        // DÉFAUT CONSTATÉ LE 30/08/2026 dans le remote.json d'une machine réelle :
+        // « ModeClientActif », propriété CALCULÉE, était sérialisée dans le
+        // fichier. Inoffensive à la relecture — pas de setter — mais un champ
+        // redondant capable de contredire les autres n'a rien à faire dans un
+        // fichier qu'un administrateur peut ouvrir et modifier.
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new RemoteConfig { Mode = "Client", Port = 58620, Token = "ABCDEF" });
+
+        Assert.Contains("\"Mode\"", json);
+        Assert.Contains("\"Port\"", json);
+        Assert.Contains("\"Token\"", json);
+        Assert.DoesNotContain("ModeClientActif", json);
+        Assert.DoesNotContain("ConfigEstProtegee", json);
+    }
+
+    [Fact]
     public void Le_mode_client_avec_un_jeton_expose()
     {
         Assert.True(Cfg("Client", "ABCDEF").ModeClientActif);
