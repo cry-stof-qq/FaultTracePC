@@ -32,7 +32,16 @@
                         Manufacturer="Cry-stof" />
 
     <!-- Une nouvelle version remplace proprement l'ancienne. -->
-    <MajorUpgrade DowngradeErrorMessage="Une version plus récente de FaultTracePC est déjà installée." />
+    <!-- AllowSameVersionUpgrades : sans cette option, WiX ne reconnaît comme mise à
+         jour qu'une version STRICTEMENT inférieure. Le ProductCode étant régénéré à
+         chaque compilation, réinstaller le même numéro par-dessus lui-même était
+         refusé par l'erreur 1638 — « une autre version de ce produit est déjà
+         installée ». Constaté le 30/08/2026 en préparant un déploiement : avec
+         « /qn », l'échec est de surcroît totalement silencieux.
+         Un déploiement n'est jamais linéaire — poste repris, script relancé — donc
+         le paquet doit savoir se remplacer lui-même. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="Une version plus récente de FaultTracePC est déjà installée." />
     <MediaTemplate EmbedCab="yes" />
 
     <Property Id="ARPNOREPAIR" Value="1" />

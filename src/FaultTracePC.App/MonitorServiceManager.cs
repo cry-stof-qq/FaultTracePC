@@ -210,30 +210,12 @@ public static class MonitorServiceManager
     // en plus du double contrôle IP+token effectué par le service lui-même).
     // ------------------------------------------------------------------
 
-    private const string FirewallRuleName = "FaultTracePC Telemetry";
+    // La règle elle-même vit dans Core (FirewallRule) : la ligne de commande en a
+    // besoin pour les déploiements sans interface, et deux copies du même netsh
+    // auraient fini par diverger.
+    public static void EnsureFirewallRule(int port) => FirewallRule.Poser(port, out _);
 
-    public static void EnsureFirewallRule(int port)
-    {
-        RunNetsh($"advfirewall firewall delete rule name=\"{FirewallRuleName}\"");
-        RunNetsh($"advfirewall firewall add rule name=\"{FirewallRuleName}\" dir=in action=allow protocol=TCP localport={port} " +
-                 "remoteip=127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16");
-    }
-
-    public static void RemoveFirewallRule() =>
-        RunNetsh($"advfirewall firewall delete rule name=\"{FirewallRuleName}\"");
-
-    private static void RunNetsh(string args)
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("netsh.exe", args)
-            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-            using var p = Process.Start(psi)!;
-            p.StandardOutput.ReadToEnd();
-            p.WaitForExit(10000);
-        }
-        catch { /* best effort — le service refuse de toute façon les IP non privées */ }
-    }
+    public static void RemoveFirewallRule() => FirewallRule.Retirer(out _);
 
     private static (int ExitCode, string Output) RunSc(string args)
     {

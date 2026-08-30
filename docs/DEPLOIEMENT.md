@@ -1,6 +1,6 @@
 # Déployer FaultTracePC sur un parc
 
-État au 30/08/2026, valable à partir de la **1.5.0**. Ce document décrit ce que
+État au 30/08/2026, valable à partir de la **1.5.1**. Ce document décrit ce que
 le logiciel fait réellement — pas ce qu'il devrait faire. Les limites connues
 sont à la fin, et elles sont nommées.
 
@@ -47,7 +47,7 @@ postes. Le divulguer donne accès à tout le parc.
 
 ### Le paquet
 
-`FaultTracePC-1.5.0.msi`, à déposer sur un partage lisible par les ordinateurs du
+`FaultTracePC-1.5.1.msi`, à déposer sur un partage lisible par les ordinateurs du
 domaine (droit *Lecture* pour `Ordinateurs du domaine`, pas seulement pour les
 utilisateurs — l'installation se fait sous le compte machine).
 
@@ -61,16 +61,16 @@ Le paquet s'installe **par machine**, dans `%ProgramFiles%\FaultTracePC`. Il se
 déploie donc en **« Attribué à l'ordinateur »**.
 
 ```
-msiexec /i FaultTracePC-1.5.0.msi /qn
+msiexec /i FaultTracePC-1.5.1.msi /qn
 ```
 
 Variantes utiles :
 
 | Besoin | Commande |
 |---|---|
-| Sans raccourci sur le Bureau | `msiexec /i FaultTracePC-1.5.0.msi /qn ADDLOCAL=Main` |
-| Avec raccourci | `msiexec /i FaultTracePC-1.5.0.msi /qn ADDLOCAL=Main,DesktopShortcutFeature` |
-| Imposer l'anglais au parc | `msiexec /i FaultTracePC-1.5.0.msi FTPCLANG=en /qn` |
+| Sans raccourci sur le Bureau | `msiexec /i FaultTracePC-1.5.1.msi /qn ADDLOCAL=Main` |
+| Avec raccourci | `msiexec /i FaultTracePC-1.5.1.msi /qn ADDLOCAL=Main,DesktopShortcutFeature` |
+| Imposer l'anglais au parc | `msiexec /i FaultTracePC-1.5.1.msi FTPCLANG=en /qn` |
 
 `FTPCLANG` accepte `fr`, `en` ou `auto`, et écrit
 `C:\ProgramData\FaultTracePC\langue.txt`. C'est un **défaut**, pas une
@@ -79,6 +79,41 @@ son choix. Sur une machine déjà installée, `FaultTracePC.Cli.exe
 --set-machine-lang en` produit le même résultat.
 
 En mode silencieux, rien n'est lancé à la fin de l'installation.
+
+**Ne jamais faire confiance à `/qn` sans lire son code de sortie.** L'option
+supprime toute interface, **y compris les messages d'erreur** : une installation
+qui échoue ne dit rien du tout. Constaté le 30/08/2026 sur un poste où le paquet
+n'a rien installé sans que rien ne le signale.
+
+```powershell
+$p = Start-Process msiexec -ArgumentList '/i','FaultTracePC-1.5.1.msi','/qn','/l*v','C:\Windows\Temp\ftpc-install.log' -Wait -PassThru
+if ($p.ExitCode -notin 0,3010) { throw "FaultTracePC : installation echouee ($($p.ExitCode))" }
+```
+
+| Code | Sens | Quoi faire |
+|---|---|---|
+| `0` | installé | — |
+| `3010` | installé, redémarrage demandé | rien d'urgent, le service démarrera au redémarrage |
+| `1638` | **une autre version est déjà installée** | voir ci-dessous |
+| `1603` | échec général | lire le journal `/l*v` |
+
+**Le cas `1638`.** Le `ProductCode` est régénéré à chaque compilation, et une
+mise à jour n'est reconnue que pour une version **strictement inférieure** :
+réinstaller le MÊME numéro de version par-dessus lui-même est donc refusé. Il
+faut désinstaller d'abord :
+
+```powershell
+Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*, HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* |
+  Where-Object DisplayName -like 'FaultTracePC*' | Select-Object DisplayName, DisplayVersion, PSChildName
+msiexec /x "{PSChildName affiché}" /qn
+```
+
+Ne pas employer `Get-CimInstance Win32_Product` pour cette recherche : cette
+classe déclenche une reconfiguration de chaque produit installé sur la machine.
+
+Une version **supérieure** remplace proprement l'ancienne, sans désinstallation
+préalable : mettre le parc à jour consiste bien à remplacer le paquet dans la
+stratégie.
 
 L'installation enregistre et démarre le service **`FaultTracePCMonitor`**, sous le
 compte système, en démarrage automatique. La désinstallation l'arrête et le
@@ -105,18 +140,31 @@ if ($LASTEXITCODE -ne 0) { Write-EventLog -LogName Application -Source 'Applicat
 Le fichier du secret doit être lisible par les **ordinateurs** du domaine et par
 personne d'autre. C'est le point le plus sensible de la procédure.
 
-**L'ordre n'a pas d'importance.** Depuis la 1.5.0, le service relit sa
+**L'ordre n'a pas d'importance.** Depuis la 1.5.1, le service relit sa
 configuration toutes les 30 secondes : installer puis configurer, ou l'inverse,
 aboutit au même résultat en moins d'une minute, sans redémarrage. *(Avant la
-1.5.0, un poste configuré après l'installation restait injoignable jusqu'au
+1.5.1, un poste configuré après l'installation restait injoignable jusqu'au
 redémarrage suivant, sans qu'aucun message ne le signale.)*
 
 ### Ouvrir le pare-feu
 
-**Cette étape n'est faite ni par le MSI, ni par la ligne de commande.** Elle doit
-être poussée par stratégie de groupe — ce qui est de toute façon la pratique
-recommandée en domaine, une règle locale pouvant être ignorée selon la
-configuration du profil de domaine.
+Depuis la 1.5.1, `--configure-remote` **pose la règle lui-même** et dit ce qu'il a
+fait :
+
+```
+Règle de pare-feu posée sur le port 58620, limitée aux adresses privées.
+```
+
+S'il n'y parvient pas, il l'écrit sur la sortie d'erreur sans faire échouer la
+configuration — un poste dont le pare-feu est géré ailleurs fonctionne très bien
+— mais il le dit : *« le poste écoutera sans être joignable tant que le port ne
+sera pas ouvert »*.
+
+**En domaine, cette règle locale peut être ignorée** selon la configuration du
+profil de domaine (« appliquer les règles de pare-feu locales »). La règle doit
+alors être poussée par stratégie de groupe, et l'option `--no-firewall` évite
+d'en poser une inutile. C'est le cas d'un établissement ; la création locale est
+un **secours** pour les parcs hors domaine.
 
 La règle à créer, en entrée :
 
@@ -127,7 +175,7 @@ La règle à créer, en entrée :
 | Adresses distantes | 127.0.0.1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 |
 | Action | Autoriser |
 
-L'équivalent local, pour un essai hors domaine :
+La même chose à la main, pour un essai immédiat :
 
 ```
 netsh advfirewall firewall add rule name="FaultTracePC" dir=in action=allow protocol=TCP localport=58620 remoteip=127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
@@ -155,7 +203,7 @@ l'administrateur. Aucun mode particulier à activer.
 « Salle 3 poste 1 » — produit un jeton faux et un refus sans autre explication.
 C'est l'erreur la plus facile à commettre.
 
-Les postes configurés avant la 1.5.0, qui portent un jeton tiré au hasard,
+Les postes configurés avant la 1.5.1, qui portent un jeton tiré au hasard,
 continuent de fonctionner : un jeton inscrit à la main l'emporte sur le calcul.
 La migration se fait poste par poste.
 
@@ -231,7 +279,7 @@ Codes de sortie : **0** machine saine, **1** avertissements, **2** critique,
   Rien n'est désinstallé sur le poste, son historique n'est pas touché.
 - **Repasser un poste en local** : fenêtre 🌐 *Mode réseau*, cocher **Local**,
   Appliquer. Le service cesse d'écouter dans les 30 secondes.
-- **Désinstaller** : `msiexec /x FaultTracePC-1.5.0.msi /qn`. Le service est
+- **Désinstaller** : `msiexec /x FaultTracePC-1.5.1.msi /qn`. Le service est
   arrêté et supprimé. Les rapports et l'historique restent dans les Documents de
   l'utilisateur — le logiciel n'efface aucune donnée qu'il n'a pas créée pour
   lui-même.
@@ -242,8 +290,10 @@ Codes de sortie : **0** machine saine, **1** avertissements, **2** critique,
 
 Elles sont écrites ici parce qu'un déploiement se prépare avec la vérité.
 
-- **Le pare-feu n'est ouvert par rien d'automatique** en déploiement par GPO
-  (§ 2). C'est l'oubli qui fait qu'un parc entier paraît injoignable.
+- **La règle de pare-feu locale peut être ignorée en domaine** (§ 2). Sur un
+  parc d'établissement, c'est la stratégie de groupe qui doit ouvrir le port ;
+  la règle posée par `--configure-remote` est un secours pour les parcs hors
+  domaine. C'est l'oubli qui fait qu'un parc entier paraît injoignable.
 - **Les alertes préventives n'ont pas de destinataire sur une machine sans
   session ouverte.** La notification est une bulle Windows, qui vit dans une
   session utilisateur. Une machine réveillée à distance, ou en attente devant

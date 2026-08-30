@@ -308,6 +308,32 @@ internal static class Program
             return 3;
         }
 
+        // PARE-FEU — le trou constaté le 30/08/2026 en écrivant la procédure de
+        // déploiement : ni le MSI ni cette commande ne posaient la règle entrante.
+        // Un parc déployé par GPO se retrouvait avec des postes qui écoutent et
+        // que rien ne peut joindre. En domaine, la règle se pousse par stratégie
+        // de groupe et celle-ci peut être ignorée : d'où « --no-firewall », et
+        // d'où un message qui DIT ce qui a été fait plutôt que de le supposer.
+        if (args.Any(a => a.Equals("--no-firewall", StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.WriteLine(Lang.T("Règle de pare-feu non touchée (--no-firewall) : la stratégie de groupe doit l'ouvrir.",
+                                     "Firewall rule left untouched (--no-firewall): Group Policy must open it."));
+        }
+        else if (FirewallRule.Poser(port, out var erreurPareFeu))
+        {
+            Console.WriteLine(Lang.T($"Règle de pare-feu posée sur le port {port}, limitée aux adresses privées.",
+                                     $"Firewall rule added on port {port}, restricted to private addresses."));
+        }
+        else
+        {
+            // Pas une erreur fatale : la configuration est écrite et un poste dont
+            // le pare-feu est géré ailleurs fonctionnera très bien.
+            Console.Error.WriteLine(Lang.T($"AVERTISSEMENT : règle de pare-feu non posée — {erreurPareFeu}",
+                                           $"WARNING: firewall rule not added — {erreurPareFeu}"));
+            Console.Error.WriteLine(Lang.T("Le poste écoutera sans être joignable tant que le port ne sera pas ouvert.",
+                                           "The machine will listen without being reachable until the port is opened."));
+        }
+
         // Ni le secret ni le jeton ne sont affichés : le jeton se recalcule côté
         // console, et l'écrire ici le déposerait dans les journaux de déploiement.
         Console.WriteLine(Lang.T($"Mode parc activé sur {Environment.MachineName}, port {port}.",
@@ -359,7 +385,7 @@ internal static class Program
                                  Produit un secret maître de parc, puis quitte. À ranger
                                  dans un gestionnaire de mots de passe : c'est le seul
                                  secret à conserver, tous les jetons s'en déduisent.
-              --configure-remote --master-secret <valeur|->  [--port <n>]
+              --configure-remote --master-secret <valeur|->  [--port <n>] [--no-firewall]
                                  Prépare ce poste pour le mode parc, puis quitte. Le jeton
                                  est DÉDUIT du secret et du nom de machine : rien à
                                  recopier vers la console. Le secret n'est pas conservé
@@ -409,7 +435,7 @@ internal static class Program
                                  Produces a fleet master secret, then exits. Keep it in a
                                  password manager: it is the only secret to preserve, every
                                  machine token is derived from it.
-              --configure-remote --master-secret <value|->  [--port <n>]
+              --configure-remote --master-secret <value|->  [--port <n>] [--no-firewall]
                                  Prepares this machine for fleet mode, then exits. The token
                                  is DERIVED from the secret and the machine name: nothing to
                                  copy over to the console. The secret is not kept on the
