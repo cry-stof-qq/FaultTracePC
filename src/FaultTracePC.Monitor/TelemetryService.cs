@@ -305,15 +305,29 @@ public sealed class TelemetryService : BackgroundService
     {
         var recent = ReadFlightLines(2).ToList();
         FlightSample? last = null;
+        string? topRecent = null;
         foreach (var l in recent)
         {
             try
             {
                 var e = JsonSerializer.Deserialize<FlightSample>(l.Raw);
-                if (e?.Kind == "s") last = e;
+                if (e?.Kind != "s") continue;
+                last = e;
+                if (!string.IsNullOrEmpty(e.TopProcesses)) topRecent = e.TopProcesses;
             }
             catch { }
         }
+
+        // DÉFAUT CONSTATÉ LE 31/08/2026 dans la console : la colonne « Top
+        // processus » était vide deux fois sur trois, sans raison visible.
+        // La boîte noire ne relève les processus qu'un échantillon sur trois —
+        // toutes les 30 s, pour ne pas grossir le journal ni réveiller le disque
+        // inutilement — et /api/status renvoie le DERNIER échantillon, qui n'en
+        // porte donc généralement pas. On complète avec le relevé le plus récent
+        // qui en contienne un : au pire 30 secondes d'âge, ce qui ne change rien
+        // à la question posée (« qui charge cette machine ? ») et vaut infiniment
+        // mieux qu'une colonne vide que personne ne sait interpréter.
+        if (last is not null && string.IsNullOrEmpty(last.TopProcesses)) last.TopProcesses = topRecent;
         return new
         {
             machine = Environment.MachineName,

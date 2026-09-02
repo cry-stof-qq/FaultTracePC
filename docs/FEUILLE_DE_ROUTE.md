@@ -219,6 +219,20 @@ GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, 
 
 **Contournement en attendant**, à faire sur chaque poste : `FaultTracePC.Cli.exe --set-machine-lang fr` **puis `Restart-Service FaultTracePCMonitor`** — contrairement à `remote.json`, la langue n'est lue qu'au démarrage du service. Au déploiement, `FTPCLANG=fr` fait la même chose d'emblée.
 
+**46 — « Voir en temps réel pourquoi ça coupe » : le besoin est bon, la réponse n'est pas l'actualisation automatique.** Demandé par l'auteur le 31/08/2026 en découvrant que la console n'actualise que sur clic.
+
+**Pourquoi le direct ne répondrait pas à la question.** Au moment de la coupure, la machine s'arrête et le réseau avec elle : la console ne verrait rien de plus. Une actualisation toutes les deux secondes afficherait une valeur vieille de deux secondes, puis « injoignable ». Elle donnerait l'**illusion** d'une réponse — exactement le genre de fonctionnalité qui rassure sans informer.
+
+**Ce qui répond déjà à la question**, et c'est la raison d'être de la boîte noire : le service relève un échantillon toutes les 10 s et l'écrit **avec écriture forcée sur le disque**. Les dernières secondes avant la coupure survivent donc à la coupure. Le moteur de règles les exploite (`AnalyzeFlightRecorder`) et le rapport écrit la phrase — « le processeur était à 97 °C juste avant l'arrêt ». La réponse existe : elle arrive après, parce que c'est le seul moment où elle peut arriver.
+
+**Ce qui manque vraiment, et qui est à moitié construit :** le point d'accès **`/api/flight?minutes=60` existe dans le service et n'est appelé par personne**. La console ne sait donc pas montrer la boîte noire d'une machine distante. C'est ça, la fonctionnalité à écrire : après une coupure, sélectionner le poste et voir ce qu'il a enregistré dans ses dernières minutes — températures, charge, mémoire — sans avoir à s'y rendre ni à relancer une analyse complète.
+
+**Limite à énoncer dans l'interface** : 10 secondes entre deux relevés. Pour une surchauffe, qui monte en minutes, c'est largement suffisant. Pour un pic de charge instantané, on peut passer à côté. Le dire vaut mieux que laisser croire à un enregistrement continu.
+
+**L'actualisation automatique reste souhaitable** — mais comme confort, pas comme réponse : une case « actualiser toutes les N secondes », désactivée par défaut, en sachant qu'interroger vingt postes en boucle a un coût réseau. *Difficulté : faible pour l'actualisation, moyenne pour la vue boîte noire distante.*
+
+**47 — Colonne « Top processus » vide deux fois sur trois. CORRIGÉ.** Constaté dans la console le 31/08/2026. La boîte noire ne relève les processus qu'un échantillon sur trois — toutes les 30 s, pour ne pas grossir le journal — et `/api/status` renvoie le **dernier** échantillon, qui n'en porte donc généralement pas. La colonne se remplissait au hasard, ce qui est pire qu'une colonne toujours vide : on ne sait pas si l'information manque ou si la machine n'a rien à signaler. `BuildStatus` complète désormais avec le relevé le plus récent qui en contienne un — au pire 30 secondes d'âge, sans conséquence pour la question posée.
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---
