@@ -287,6 +287,51 @@ public static class RepairScriptGenerator
     internal static string NomDuLanceur(DiagnosticReport r) =>
         $"Reparation_PC_{r.GeneratedAt:yyyy-MM-dd_HHmm}.bat";
 
+    /// <summary>
+    /// Invite du lanceur. SANS ACCENT, volontairement : le .bat est écrit en
+    /// ASCII et un « é » y deviendrait un « ? ». Un test le vérifie dans les
+    /// deux langues, pour que personne ne « corrige » l'orthographe ici.
+    /// </summary>
+    internal static string PauseLanceur =>
+        Lang.T("Appuyer sur Entree pour fermer", "Press Enter to close");
+
+    /// <summary>
+    /// Contenu du lanceur .bat.
+    ///
+    /// POURQUOI UN ENROBAGE, ET PLUS <c>-NoExit -File</c> (point 36, reste)
+    /// La 1.3.1 avait ajouté <c>-NoExit</c> pour qu'une console ne s'évapore pas
+    /// quand une stratégie de groupe refuse le .ps1 avant sa première ligne.
+    /// Effet non voulu : la fenêtre ne se refermait alors PLUS JAMAIS, alors que
+    /// le script se termine par sa propre invite « Appuyer sur Entrée pour
+    /// fermer ». Les trois boutons de l'application ont été corrigés en 1.5.0 par
+    /// <see cref="PowerShellLauncher"/> ; ce lanceur-ci était resté en arrière.
+    ///
+    /// <c>-Command</c> en ligne n'est PAS soumis à la stratégie d'exécution :
+    /// l'enrobage démarre donc toujours, le <c>catch</c> affiche le refus, et le
+    /// <c>finally</c> ne retient la fenêtre QUE si le script n'est pas allé au
+    /// bout — sans quoi il faudrait appuyer deux fois sur Entrée.
+    ///
+    /// LIMITE CONNUE, inchangée depuis la 1.3.1 : le chemin est inséré tel quel
+    /// via <c>%~dp0</c>, qui n'est connu qu'à l'exécution. Un dossier utilisateur
+    /// contenant une apostrophe couperait le littéral PowerShell. C'est le défaut
+    /// de la 1.4.1, dans un endroit où on ne peut pas l'échapper à l'avance.
+    /// </summary>
+    internal static string Lanceur(string ps1Name, string pause) =>
+        "@echo off\r\n"
+        // Ces lignes sont lues par l'utilisateur qui ouvre le .bat : elles suivent
+        // donc la langue du rapport, comme tout le reste. Sans accent, le fichier
+        // etant ecrit en ASCII.
+        + Lang.T("rem FaultTracePC - lanceur du script de reparation (double-clic)\r\n",
+                 "rem FaultTracePC - repair script launcher (double-click)\r\n")
+        + Lang.T("rem Demande l'elevation administrateur (UAC) puis execute le .ps1 associe.\r\n",
+                 "rem Asks for administrator elevation (UAC), then runs the matching .ps1.\r\n")
+        + Lang.T("rem La fenetre ne reste ouverte que si le script n'est pas alle au bout.\r\n",
+                 "rem The window stays open only if the script did not run to completion.\r\n")
+        + "powershell -NoProfile -Command \"Start-Process powershell -Verb RunAs -ArgumentList "
+        + "'-NoProfile','-ExecutionPolicy','Bypass','-Command',"
+        + "'& { $fini = $false; try { & ''%~dp0" + ps1Name + "''; $fini = $true } "
+        + "catch { Write-Host $_ } finally { if (-not $fini) { Read-Host ''" + pause + "'' } } }'\"\r\n";
+
     public static string? WriteToDisk(DiagnosticReport r)
     {
         if (!IsRepairable(r)) return null;
@@ -300,15 +345,9 @@ public static class RepairScriptGenerator
         r.RepairScriptPath = ps1Path;
 
         var batPath = Path.Combine(dir, NomDuLanceur(r));
-        var bat = "@echo off\r\n"
-                + "rem FaultTracePC - lanceur du script de reparation (double-clic)\r\n"
-                + "rem Demande l'elevation administrateur (UAC) puis execute le .ps1 associe.\r\n"
-                // -NoExit : une strategie de groupe peut refuser le .ps1 avant sa
-                // premiere ligne. Sans cette option, la console se refermerait sur
-                // le refus sans que personne puisse le lire.
-                + "powershell -NoProfile -Command \"Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-NoExit','-File','\"\"%~dp0" + ps1Name + "\"\"'\"\r\n";
-        // Encodage OEM/ASCII : les .bat n'aiment pas l'UTF-8 avec BOM (d'où l'absence d'accents ci-dessus).
-        File.WriteAllText(batPath, bat, Encoding.ASCII);
+        // Encodage ASCII : les .bat n'aiment pas l'UTF-8 avec BOM — d'où un
+        // contenu sans le moindre accent, garanti par un test.
+        File.WriteAllText(batPath, Lanceur(ps1Name, PauseLanceur), Encoding.ASCII);
         r.RepairLauncherPath = batPath;
 
         return ps1Path;

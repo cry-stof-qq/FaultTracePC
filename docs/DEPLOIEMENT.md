@@ -1,6 +1,6 @@
 # Déployer FaultTracePC sur un parc
 
-État au 30/08/2026, valable à partir de la **1.5.1**. Ce document décrit ce que
+État au 05/09/2026, valable à partir de la **1.5.1**. Ce document décrit ce que
 le logiciel fait réellement — pas ce qu'il devrait faire. Les limites connues
 sont à la fin, et elles sont nommées.
 
@@ -342,7 +342,7 @@ révocation par poste reste à concevoir.
 
 ---
 
-## 8. Limites connues, au 30/08/2026
+## 8. Limites connues, au 05/09/2026
 
 Elles sont écrites ici parce qu'un déploiement se prépare avec la vérité.
 
@@ -362,8 +362,10 @@ Elles sont écrites ici parce qu'un déploiement se prépare avec la vérité.
 - **Certains antivirus réagissent** à un outil qui lit les fichiers d'incident et
   interroge le matériel à bas niveau. Prévoir l'exclusion du dossier
   d'installation plutôt que la désactivation de l'antivirus.
-- **Le lanceur `.bat`** du script de réparation garde une fenêtre ouverte
-  indéfiniment. Les trois boutons de l'application, eux, ont été corrigés.
+- ~~**Le lanceur `.bat`** du script de réparation garde une fenêtre ouverte
+  indéfiniment.~~ **Corrigé en 1.5.2** : il emploie le même enrobage que les
+  trois boutons de l'application, et ne retient la fenêtre que lorsque le
+  script n'est pas allé au bout.
 
 ---
 

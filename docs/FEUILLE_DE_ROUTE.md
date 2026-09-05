@@ -1,6 +1,6 @@
 ﻿# FaultTracePC — feuille de route
 
-État au 29/08/2026. Document de travail, pas un engagement.
+État au 05/09/2026. Document de travail, pas un engagement.
 
 ## Où on en est
 
@@ -14,6 +14,7 @@
 | 1.4.1 | **publiée** — apostrophe typographique dans le script de réparation (point 37) |
 | 1.5.0 | **publiée** — thème unique **le parc** — secret maître et jeton dérivé (13, 14, 27), plus le point 36 et le refus des options inconnues |
 | 1.5.1 | correctif de déploiement — le paquet sait se remplacer lui-même, pare-feu posé par la ligne de commande, procédure écrite |
+| 1.5.2 | **en cours** — deux défauts constatés, sans nouvelle surface : la langue d'un rapport distant (point 45) et le lanceur `.bat` du script de réparation (point 36, moitié restante). 428 tests verts le 05/09/2026 |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
@@ -111,7 +112,8 @@ Trois manques comblés au passage, qui valaient indépendamment de cette cause :
 
 **35 — Moitié anglaise écrasée dans `GuidedRepairWindow`. CORRIGÉ EN 1.3.1.** `Lang.T($"Une réparation est déjà en cours :\n\n    {busy}\n\n", $"A repair is already running:")` — la version anglaise perd le nom de l'outil bloquant et les sauts de ligne. Le test de ratio ne l'attrape pas : 24 caractères contre 40 passent son seuil. À corriger, et à faire suivre d'une réflexion sur le seuil. *Difficulté : triviale.*
 
-**36 — ~~Les fenêtres PowerShell ne se ferment plus jamais toutes seules~~. FAIT pour les trois boutons ; le lanceur `.bat` reste.** Remonté par l'auteur le 19/08/2026 en testant l'application, et c'est un effet de bord de la 1.3.1.
+**36 — ~~Les fenêtres PowerShell ne se ferment plus jamais toutes seules~~. FAIT EN ENTIER — les trois boutons en 1.5.0, le lanceur `.bat` en 1.5.2.**
+*(05/09/2026)* Le `.bat` posé à côté du rapport gardait `-NoExit` et restait ouvert pour toujours, alors que le script se termine par sa propre invite : le même mensonge que le logiciel corrigeait ailleurs, à seize jours d'intervalle. Il passe au motif de `PowerShellLauncher` — `-Command` démarre même si la stratégie refuse le `.ps1`, le `catch` montre le refus, le `finally` ne retient la fenêtre que s'il y a quelque chose à lire. Le contenu est garanti ASCII par un test, dans les deux langues : le fichier s'écrit en ASCII et un seul accent y deviendrait un « ? », invite comprise. **Limite laissée en place et écrite dans le code :** le chemin arrive par `%~dp0`, connu seulement à l'exécution — un dossier utilisateur contenant une apostrophe couperait le littéral PowerShell. C'est le défaut de la 1.4.1, au seul endroit où on ne peut pas l'échapper d'avance. Remonté par l'auteur le 19/08/2026 en testant l'application, et c'est un effet de bord de la 1.3.1.
 
 `-NoExit` a été ajouté pour qu'une fenêtre ne s'évapore plus quand une stratégie de groupe refuse le script avant sa première ligne. Effet non voulu : **la fenêtre ne se referme plus jamais d'elle-même**, alors que le script généré se termine par « Appuyer sur Entrée pour fermer ». Appuyer sur Entrée dépose l'utilisateur sur une invite PowerShell. **Le logiciel écrit une phrase qui n'est plus vraie** — exactement la classe de défaut qu'il corrige ailleurs.
 
@@ -207,7 +209,8 @@ Piste : la console archive ce qu'elle collecte, dans son dossier à elle, par ma
 
 GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, une API « haut niveau » v2. **À vérifier sur la version réellement installée avant d'écrire quoi que ce soit** — c'est le genre de détail qui change d'une version à l'autre. *Difficulté : moyenne. Aucune urgence.*
 
-**45 — Un rapport distant sort dans la langue de la machine cible, pas dans celle de l'administrateur. À FAIRE, candidat 1.5.2.** Constaté par l'auteur le 30/08/2026 : diagnostic lancé depuis la console vers sa propre machine, dont la session est française — rapport en anglais.
+**45 — ~~Un rapport distant sort dans la langue de la machine cible, pas dans celle de l'administrateur~~. FAIT EN 1.5.2.**
+*(05/09/2026)* Corrigé exactement comme prévu ci-dessous, et le correctif tient en trois endroits : `Lang.FromCode` (« fr »/« en » → la langue ; `auto`, vide ou inconnu → **null**, c'est-à-dire « rien demandé » et non « français » — sans quoi une console ancienne imposerait le français à un parc anglophone), `ParkProtocol.ScanQuery` qui met la chaîne de requête en un seul endroit testable, et le service qui applique la langue **dans `ScanLock`** puis la rend au poste dans le `finally`. Deux vérifications faites avant d'écrire : la signature HMAC couvre la requête, donc ajouter `lang=` des deux côtés reste cohérent — l'oublier aurait fait refuser tous les scans distants ; et `Lang` n'est employé qu'à un seul autre endroit du service, donc le basculement temporaire n'a presque aucun rayon d'action. Constaté par l'auteur le 30/08/2026 : diagnostic lancé depuis la console vers sa propre machine, dont la session est française — rapport en anglais.
 
 `/api/scan` ne rapatrie pas des données : il déclenche l'analyse sur la machine cible, et **c'est le service qui écrit le HTML**. Or ce service tourne sous SYSTEM, et la langue se résout ainsi : option de ligne de commande, puis préférence utilisateur (`Documents\...\langue.txt`, que SYSTEM n'a pas), puis réglage machine (`ProgramData\FaultTracePC\langue.txt`, absent par défaut), puis langue d'affichage de la session — celle du système, pas celle de l'administrateur. Un Windows installé en anglais auquel un utilisateur a ajouté le français **pour son compte** produit donc des rapports anglais.
 
