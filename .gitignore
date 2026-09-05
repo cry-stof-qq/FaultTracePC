@@ -53,3 +53,10 @@ alerts.json
 
 # Corbeille locale : fichiers de test sortis du dossier de travail.
 _to_delete/
+
+# Dossier de travail des échanges avec Claude. Il contient le script de
+# déploiement — distribué à part, pas dans ce dépôt — mais surtout postes.csv
+# et Journal\, qui portent des noms de machines, des adresses MAC et des
+# adresses IP réelles. Rien de tout cela n'a sa place dans un dépôt public, et
+# un « git add . » les prenait jusqu'ici sans rien signaler.
+Claude outputs/
