@@ -92,6 +92,16 @@ public sealed class RemoteScanResult
 /// </summary>
 public static class ParkProtocol
 {
+    /// <summary>
+    /// Chaîne de requête de /api/scan. La langue y figure parce que le rapport
+    /// est écrit par le POSTE mais lu par l'ADMINISTRATEUR : sans elle, le
+    /// service — qui tourne sous SYSTEM — suit la langue par défaut de la
+    /// machine cible, ce qui donnait un rapport anglais demandé depuis une
+    /// console française. Un poste plus ancien ignore simplement le paramètre.
+    /// </summary>
+    public static string ScanQuery(int days, AppLanguage langue) =>
+        $"days={days}&lang={Lang.Code(langue)}";
+
     public static RemoteScanResult ReadScanResponse(string? json)
     {
         try

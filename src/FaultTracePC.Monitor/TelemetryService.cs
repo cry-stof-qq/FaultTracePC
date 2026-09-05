@@ -237,6 +237,22 @@ public sealed class TelemetryService : BackgroundService
                     // dans le dossier partagé. Ce n'est pas de l'exécution arbitraire :
                     // une seule action prédéfinie, en lecture seule sur le système.
                     if (!ScanLock.Wait(0)) { ctx.Response.StatusCode = 429; ctx.Response.Close(); break; }
+
+                    // POURQUOI LA LANGUE VOYAGE AVEC LA DEMANDE (point 45)
+                    // Ce service tourne sous le compte SYSTEM, dont la culture
+                    // d'interface est celle de la MACHINE et jamais celle de la
+                    // session de l'administrateur. Un diagnostic lancé depuis une
+                    // console française revenait donc en anglais, sans que rien
+                    // dans le rapport ne l'explique. La console dit maintenant
+                    // dans quelle langue elle veut lire. Elle ne dit rien ? Le
+                    // poste garde la sienne, et une console d'avant la 1.5.2
+                    // continue de fonctionner exactement comme avant.
+                    // Le changement est fait DANS le verrou : deux analyses ne
+                    // peuvent pas se marcher dessus, et hors analyse la langue du
+                    // service est intacte.
+                    var langueAvant = Lang.Current;
+                    if (Lang.FromCode(ctx.Request.QueryString["lang"]) is { } langueDemandee)
+                        Lang.Apply(langueDemandee);
                     try
                     {
                         int days = int.TryParse(ctx.Request.QueryString["days"], out var d) ? Math.Clamp(d, 1, 90) : 30;
@@ -274,7 +290,13 @@ public sealed class TelemetryService : BackgroundService
                     {
                         Json(ctx, new { ok = false, error = ex.Message });
                     }
-                    finally { ScanLock.Release(); }
+                    finally
+                    {
+                        // Le poste retrouve SA langue : la demande valait pour ce
+                        // rapport-là, pas pour le service.
+                        Lang.Apply(langueAvant);
+                        ScanLock.Release();
+                    }
                     break;
                 }
 

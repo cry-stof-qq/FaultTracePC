@@ -539,7 +539,7 @@ public partial class ParkWindow : Window
         try
         {
             TxtStatus.Text = Lang.T($"🩺 Diagnostic en cours sur {machine.Name}… (plusieurs minutes possibles, ne pas fermer cette fenêtre)", $"🩺 Diagnosis running on {machine.Name}… (may take several minutes, do not close this window)");
-            using var req = SignedRequest(machine, HttpMethod.Post, "/api/scan", "days=30")!;
+            using var req = SignedRequest(machine, HttpMethod.Post, "/api/scan", ParkProtocol.ScanQuery(30, Lang.Current))!;
             using var resp = await ScanHttp.SendAsync(req);
 
             if ((int)resp.StatusCode == 429)

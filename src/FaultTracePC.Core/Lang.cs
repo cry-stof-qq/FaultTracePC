@@ -130,6 +130,19 @@ public static class Lang
         _ => "auto",
     };
 
+    /// <summary>
+    /// « fr » ou « en » → la langue correspondante. « auto », vide ou inconnu → null,
+    /// c'est-à-dire « je ne demande rien », et non « français ». La nuance compte :
+    /// c'est elle qui laisse un poste garder sa propre langue quand la console ne
+    /// dit rien — le cas de toutes les consoles antérieures à la 1.5.2.
+    /// </summary>
+    public static AppLanguage? FromCode(string? code) => NormalizeCode(code) switch
+    {
+        "fr" => AppLanguage.French,
+        "en" => AppLanguage.English,
+        _ => null,
+    };
+
     /// <summary>Force la langue en cours d'exécution (sélecteur dans l'application). N'enregistre rien.</summary>
     public static void Apply(AppLanguage language)
     {

@@ -114,4 +114,29 @@ public class ParkProtocolTests
             Lang.Apply(initial);
         }
     }
+
+    [Fact]
+    public void La_demande_de_diagnostic_porte_la_langue_de_la_console()
+    {
+        // Le rapport est écrit par le poste et lu par l'administrateur. Sans
+        // cette langue, le service — qui tourne sous SYSTEM — suivait la langue
+        // par défaut de la machine cible : un diagnostic demandé depuis une
+        // console française revenait en anglais.
+        Assert.Equal("days=30&lang=fr", ParkProtocol.ScanQuery(30, AppLanguage.French));
+        Assert.Equal("days=90&lang=en", ParkProtocol.ScanQuery(90, AppLanguage.English));
+    }
+
+    [Fact]
+    public void Le_poste_relit_exactement_ce_que_la_console_a_ecrit()
+    {
+        // Aller-retour complet : ce que la console met dans l'URL doit être ce
+        // que le service en retire. Les deux moitiés du point 45 vivent dans
+        // deux projets différents ; c'est ici qu'elles se rencontrent.
+        foreach (var langue in new[] { AppLanguage.French, AppLanguage.English })
+        {
+            var query = ParkProtocol.ScanQuery(30, langue);
+            var code = query.Split("lang=")[1];
+            Assert.Equal(langue, Lang.FromCode(code));
+        }
+    }
 }

@@ -257,4 +257,29 @@ public class LangTests
             chemin, StringComparison.OrdinalIgnoreCase);
         Assert.NotEqual(Lang.PreferencePath, chemin);
     }
+
+    [Theory]
+    [InlineData("fr", AppLanguage.French)]
+    [InlineData("FR", AppLanguage.French)]
+    [InlineData("fr-FR", AppLanguage.French)]
+    [InlineData("francais", AppLanguage.French)]
+    [InlineData("en", AppLanguage.English)]
+    [InlineData("en-GB", AppLanguage.English)]
+    [InlineData("anglais", AppLanguage.English)]
+    public void Un_code_de_langue_reconnu_donne_la_langue(string code, AppLanguage attendu) =>
+        Assert.Equal(attendu, Lang.FromCode(code));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("auto")]
+    [InlineData("klingon")]
+    public void Aucune_demande_de_langue_ne_vaut_pas_francais(string? code)
+    {
+        // null signifie « la console n'a rien demandé » : le poste doit alors
+        // garder SA langue. Rendre French ici forcerait le français sur tout un
+        // parc anglophone dès qu'une console ancienne interroge un poste.
+        Assert.Null(Lang.FromCode(code));
+    }
 }
