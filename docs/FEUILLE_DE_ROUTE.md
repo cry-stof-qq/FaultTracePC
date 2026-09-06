@@ -236,6 +236,25 @@ GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, 
 
 **47 — Colonne « Top processus » vide deux fois sur trois. CORRIGÉ.** Constaté dans la console le 31/08/2026. La boîte noire ne relève les processus qu'un échantillon sur trois — toutes les 30 s, pour ne pas grossir le journal — et `/api/status` renvoie le **dernier** échantillon, qui n'en porte donc généralement pas. La colonne se remplissait au hasard, ce qui est pire qu'une colonne toujours vide : on ne sait pas si l'information manque ou si la machine n'a rien à signaler. `BuildStatus` complète désormais avec le relevé le plus récent qui en contienne un — au pire 30 secondes d'âge, sans conséquence pour la question posée.
 
+**48 — Une erreur WHEA de port PCIe est attribuée au processeur, et la recommandation envoie au mauvais endroit. À FAIRE, retenu pour la 1.6.0.** Constaté le 06/09/2026 sur `S2-00-32-2025`, premier poste installé à distance par le script de déploiement.
+
+Le rapport écrit : « Le processeur a signalé 27 erreur(s) matérielle(s) », et recommande températures, alimentation, retrait de l'overclocking/XMP, mise à jour du BIOS. Les 27 événements sont pourtant tous identiques et disent autre chose : `WHEA-Logger` **ID 17**, *erreur matérielle **corrigée***, `Composant : PCI Express Root Port`, `Source de l'erreur : Advanced Error Reporting (PCI Express)`. Le triplet `0x0:0x1:0x0` désigne le port racine du processeur, et derrière lui la carte graphique.
+
+Deux erreurs de lecture se cumulent :
+
+- **la source est confondue avec le rapporteur.** Sur Intel, les ports racines PCIe sont bien dans le paquet du processeur, donc « le processeur a signalé » n'est pas faux au sens strict. Mais pour celui qui lit, c'est trompeur : le fautif est un lien PCIe et son périphérique, pas un cœur ;
+- **la gravité est perdue.** L'ID 17 signale une erreur *corrigée* — le lien a récupéré, rien n'a été perdu. Le rapport la classe critique au même titre qu'une erreur fatale.
+
+Résultat concret : la recommandation fait retirer l'XMP et suspecter l'alimentation, quand la piste utile est le lien PCIe — génération négociée, gestion d'énergie du lien, pilote, contact du connecteur. C'est exactement le défaut que ce logiciel existe pour combattre : « le pilote fautif est `nvlddmkm.sys` », exact et inutile.
+
+**Correctif envisagé :** distinguer les sources WHEA (`Processor Core`, `Cache Hierarchy`, `Memory Controller`, `PCI Express Root Port`) et donner une recommandation par source, ainsi que distinguer corrigé (ID 17) de fatal. Le champ existe déjà dans le message de l'événement : il est lu, puis ignoré.
+
+**49 — Le message WHEA est tronqué juste avant l'information décisive. À FAIRE, retenu pour la 1.6.0.** Même rapport, même jour.
+
+Le tableau des événements affiche : `Bus principal :Appareil :Fonctio…`. Le triplet bus/appareil/fonction est coupé — et c'est la **seule** donnée qui permet d'agir, puisqu'elle nomme le lien fautif. Il a fallu retourner au journal d'événements de la machine pour l'obtenir, ce qui est précisément le travail que le logiciel prétend éviter.
+
+**Correctif envisagé :** pour les événements WHEA, extraire le triplet et le porter dans la conclusion — voire le traduire en nom d'appareil, `Get-PnpDevice` donnant l'emplacement sous la forme « Bus PCI 0, périphérique 1, fonction 0 ». La troncature à 600 caractères reste bonne pour le reste ; ici, ce qui compte est en fin de message.
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---
@@ -316,6 +335,12 @@ Trois des quatre points ont été faits ; le quatrième a été **fermé** parce
 4. ~~**7 — canal d'alerte adapté au parc**~~ — **fermé**, voir point 42. Le bloc parc est donc terminé.
 
 ---
+
+### 1.6.0 — points 48 et 49 retenus le 06/09/2026
+
+Thème : **une erreur matérielle doit dire de quel matériel il s'agit.** Les deux points viennent du même rapport, produit par le premier poste installé à distance par le script de déploiement — et ils se répondent : le 48 nomme la mauvaise pièce, le 49 coupe la donnée qui aurait permis de nommer la bonne.
+
+Ce qui reste à trancher : si les points **43** (la console doit archiver les alertes — les postes sont réinstallés) et **46** (voir à distance ce que la boîte noire a enregistré) rejoignent cette version, ou si la 1.6.0 se limite au couple 48/49 et reste petite.
 
 ## La question qui devrait décider de l'ordre
 
