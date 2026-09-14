@@ -255,6 +255,36 @@ Le tableau des événements affiche : `Bus principal :Appareil :Fonctio…`. Le 
 
 **Correctif envisagé :** pour les événements WHEA, extraire le triplet et le porter dans la conclusion — voire le traduire en nom d'appareil, `Get-PnpDevice` donnant l'emplacement sous la forme « Bus PCI 0, périphérique 1, fonction 0 ». La troncature à 600 caractères reste bonne pour le reste ; ici, ce qui compte est en fin de message.
 
+**50 — Les codes d'arrêt sont dans le journal, le logiciel ne les lit pas. À FAIRE, 1.6.0.** Constaté le 14/09/2026 sur `MLEAR-031-2024`, un poste élève.
+
+Le rapport annonce « Aucun BSOD détecté sur la période » et « Pas de panne critique ». La machine avait planté **quinze fois**. Les événements `Kernel-Power 41` portent un champ `BugcheckCode` renseigné à chaque fois : 0xEF, 0xC000021A, 0x1E, 0x7E, 0x7A. Le logiciel conclut à l'absence de plantage parce qu'il ne trouve **aucun fichier de vidage** — or aucun vidage n'avait pu être écrit. Il confond « je n'ai pas de trace » avec « il ne s'est rien passé ».
+
+Le `BugCheckCatalog` existe déjà et sait traduire ces codes. Il n'est alimenté que par les vidages ; il suffit de le nourrir aussi depuis l'événement 41.
+
+**Ce que ça apporte, et qui n'est pas qu'une correction d'affichage :** un `BugcheckCode` à **0** signifie qu'il n'y a PAS eu de plantage — la machine a perdu son alimentation, ou quelqu'un a tenu le bouton. Sur ce poste, cinq des vingt événements étaient de ce type. Dans un établissement, c'est la distinction qui compte : elle sépare « un élève a forcé l'extinction » de « Windows s'est planté », et les deux ne se réparent pas pareil. Aucun autre signal ne fait cette séparation. Mieux : l'ordre des dates la tranche dans l'autre sens. Sur cette machine, les coupures arrivent toujours APRÈS les plantages du même jour — les élèves subissaient la panne, ils ne la causaient pas.
+
+**51 — `volmgr` 161 et 46 ne sont pas des erreurs disque. À FAIRE, 1.6.0.** Même machine, même jour.
+
+Ces événements disent « la création du fichier de vidage a échoué ». Le logiciel les compte en « Erreurs disque répétées » et en fait le point le plus notable du rapport. C'est la **conséquence** du plantage prise pour sa cause — et sur ce poste, la vraie explication était ailleurs : un fichier d'échange de 2,4 Go pour 15,8 Go de mémoire, trop petit pour un vidage noyau.
+
+C'est une panne en soi, et c'est celle qui empêche de diagnostiquer toutes les autres. Elle mérite sa conclusion propre, avec les quatre vérifications qui la règlent : type de vidage, taille du fichier d'échange, espace libre, pilotes filtres.
+
+**52 — Un verdict ne peut pas dire « pas de panne critique » après avoir compté cinq arrêts inattendus. À FAIRE, 1.6.0.** Même rapport.
+
+Les catégories « Arrêt inattendu » et « Coupure (Kernel-Power 41) » existent dans le tableau des événements. Elles n'alimentent aucune conclusion et ne pèsent pas sur le verdict. Le rapport a donc rassuré sur une machine qui plantait toutes les semaines depuis quatre mois. **C'est le pire mode de défaillance possible pour cet outil** : se tromper est réparable, rassurer à tort ne l'est pas.
+
+**53 — Aucune section réseau. À FAIRE, 1.6.0.** Constaté le même jour, sur la même machine, pour une panne dont le rapport ne dit pas un mot : plus aucun réseau Wi-Fi visible.
+
+Trois faits, tous lisibles sans le moindre outil externe, donnaient le diagnostic en une ligne :
+
+- carte Wi-Fi présente, radio active, pilote chargé — mais **zéro profil enregistré**, ni par stratégie de groupe ni par l'utilisateur ;
+- Ethernet jamais connecté depuis la réinstallation du 13/05 : aucune stratégie de groupe reçue, donc aucun profil, donc pas de Wi-Fi — une boucle que seul un câble casse ;
+- consentement de localisation refusé pour la session (`HKCU\...\ConsentStore\location` à `Deny`). Depuis l'automne 2024, Windows exige ce consentement pour toute API qui énumère les réseaux ; sans lui, la liste est vide et `netsh` rend « accès refusé ».
+
+Le rapport, lui, a parlé de la batterie et de sept erreurs disque. Le tableau des pilotes signalait bien le pilote Wi-Fi comme « ancien (4 ans) » — sans que ça devienne jamais une conclusion.
+
+Une section réseau devrait porter : cartes présentes et leur état, pilote et son âge, profils Wi-Fi, dernière connexion au domaine, services `WlanSvc`/`Dhcp`/`Dnscache`, filtres NDIS tiers liés aux cartes. Dans un parc, « plus de réseau » est l'une des pannes les plus fréquentes, et c'est aujourd'hui le seul domaine dont le logiciel ne dit **rien**.
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---
@@ -336,11 +366,24 @@ Trois des quatre points ont été faits ; le quatrième a été **fermé** parce
 
 ---
 
-### 1.6.0 — points 48 et 49 retenus le 06/09/2026
+### 1.6.0 — points 48 à 53, arrêtés le 14/09/2026
 
-Thème : **une erreur matérielle doit dire de quel matériel il s'agit.** Les deux points viennent du même rapport, produit par le premier poste installé à distance par le script de déploiement — et ils se répondent : le 48 nomme la mauvaise pièce, le 49 coupe la donnée qui aurait permis de nommer la bonne.
+Thème : **un rapport doit nommer la panne qu'il a sous les yeux.**
 
-Ce qui reste à trancher : si les points **43** (la console doit archiver les alertes — les postes sont réinstallés) et **46** (voir à distance ce que la boîte noire a enregistré) rejoignent cette version, ou si la 1.6.0 se limite au couple 48/49 et reste petite.
+Six points, deux machines, une semaine. Ils disent la même chose sous six formes : *le logiciel collecte beaucoup plus qu'il ne conclut.* Le code d'arrêt était dans le journal de Windows. Le triplet PCIe était dans la boîte noire. L'âge du pilote Wi-Fi était dans le tableau des pilotes. Rien de tout cela n'est remonté jusqu'au verdict.
+
+| # | Ce qui manque | Constaté sur |
+|---|---|---|
+| 48 | une erreur WHEA de port PCIe est attribuée au processeur, et « corrigée » est classé critique | S2-00-32-2025, 06/09 |
+| 49 | le triplet bus/appareil/fonction est tronqué à l'écriture comme à l'affichage | S2-00-32-2025, 06/09 |
+| 50 | le `BugcheckCode` de l'événement 41 n'est pas lu — quinze plantages invisibles | MLEAR-031-2024, 14/09 |
+| 51 | l'échec d'écriture du vidage est compté comme une erreur disque | MLEAR-031-2024, 14/09 |
+| 52 | les arrêts inattendus ne pèsent pas sur le verdict | MLEAR-031-2024, 14/09 |
+| 53 | aucune section réseau | MLEAR-031-2024, 14/09 |
+
+Les points 48 à 52 sont des **corrections**, sur des données déjà collectées : rien à instrumenter, tout à relier. Le 53 est le seul ajout.
+
+Ce qui reste à trancher : si les points **43** (la console doit archiver les alertes — les postes sont réinstallés) et **46** (voir à distance ce que la boîte noire a enregistré) rejoignent cette version, ou si elle se limite à 48-53.
 
 ## La question qui devrait décider de l'ordre
 
