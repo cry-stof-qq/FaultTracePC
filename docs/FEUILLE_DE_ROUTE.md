@@ -285,6 +285,26 @@ Le rapport, lui, a parlé de la batterie et de sept erreurs disque. Le tableau d
 
 Une section réseau devrait porter : cartes présentes et leur état, pilote et son âge, profils Wi-Fi, dernière connexion au domaine, services `WlanSvc`/`Dhcp`/`Dnscache`, filtres NDIS tiers liés aux cartes. Dans un parc, « plus de réseau » est l'une des pannes les plus fréquentes, et c'est aujourd'hui le seul domaine dont le logiciel ne dit **rien**.
 
+**54 — « Ce logiciel n'est plus installé, problème sans objet » écrit à propos d'un composant de Windows. À FAIRE, 1.6.0.** Constaté le 14/09/2026 sur `PC-W10-11`, le poste qui est à l'origine de ce projet.
+
+Le rapport écrit : *« Application anciennement instable : **dwm.exe** (9 crashs) — ce logiciel ne figure plus parmi les programmes installés — problème probablement sans objet. »*
+
+`dwm.exe` est le gestionnaire de fenêtres de Windows. Il ne figure pas dans la liste des programmes installés parce qu'il n'est pas une application : c'est un composant du système. Il n'a jamais été désinstallé.
+
+Et le classement est doublement faux, parce que ces neuf plantages — module fautif `dwmcore.dll` — sont **la meilleure corroboration de la conclusion principale du même rapport** : le compositeur graphique meurt quand le pilote d'affichage meurt. Le logiciel a écarté sa pièce à conviction la plus solide.
+
+**Correctif :** une liste blanche de binaires système (`dwm.exe`, `explorer.exe`, `csrss.exe`, `svchost.exe`, `lsass.exe`, `winlogon.exe`, `services.exe`, `RuntimeBroker.exe`, `SearchHost.exe`…) pour lesquels l'absence dans les programmes installés ne signifie rien. Plus largement : **l'absence d'une entrée de désinstallation ne doit jamais, à elle seule, disqualifier un plantage constaté.** Un programme portable ou du Microsoft Store est dans le même cas.
+
+**55 — La version du pilote fautif n'est pas comparée d'une analyse à l'autre. À FAIRE, 1.6.0.** Même machine, trois rapports : 24/08 07 h 38, 24/08 12 h 41, 14/09.
+
+Le pilote mis en cause, `nvlddmkm.sys`, apparaît en `32.0.15.8216` dans le premier rapport et en `32.0.15.8278` dans le second, cinq heures plus tard. L'auteur avait mis le pilote à jour entre les deux. Quatre nouveaux écrans bleus portant **la même signature** sont survenus ensuite, après huit semaines de calme.
+
+Le logiciel dit bien « le problème PERSISTE : un nouveau crash avec la même signature ». Il ne dit pas la seule chose qui conclut le dossier : **le pilote accusé a été remplacé entre les deux analyses, et les plantages ont continué — ce n'est donc pas le pilote.**
+
+Les données sont déjà là : la version du pilote est enregistrée à chaque analyse, et la section « Pilotes mis à jour » les compare déjà. Il manque le rapprochement entre ce tableau et le pilote nommé par la conclusion.
+
+**Ce que ça change concrètement :** sans ce rapprochement, la recommandation reste « réinstaller le pilote proprement avec DDU » — c'est-à-dire refaire ce qui vient d'échouer. Avec, elle devient « le logiciel est hors de cause, regardez le matériel ». C'est la différence entre une boucle et un diagnostic.
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---
@@ -366,11 +386,11 @@ Trois des quatre points ont été faits ; le quatrième a été **fermé** parce
 
 ---
 
-### 1.6.0 — points 48 à 53, arrêtés le 14/09/2026
+### 1.6.0 — points 48 à 55, arrêtés le 14/09/2026
 
 Thème : **un rapport doit nommer la panne qu'il a sous les yeux.**
 
-Six points, deux machines, une semaine. Ils disent la même chose sous six formes : *le logiciel collecte beaucoup plus qu'il ne conclut.* Le code d'arrêt était dans le journal de Windows. Le triplet PCIe était dans la boîte noire. L'âge du pilote Wi-Fi était dans le tableau des pilotes. Rien de tout cela n'est remonté jusqu'au verdict.
+Huit points, trois machines, une semaine. Ils disent la même chose sous six formes : *le logiciel collecte beaucoup plus qu'il ne conclut.* Le code d'arrêt était dans le journal de Windows. Le triplet PCIe était dans la boîte noire. L'âge du pilote Wi-Fi était dans le tableau des pilotes. Rien de tout cela n'est remonté jusqu'au verdict.
 
 | # | Ce qui manque | Constaté sur |
 |---|---|---|
@@ -380,10 +400,12 @@ Six points, deux machines, une semaine. Ils disent la même chose sous six forme
 | 51 | l'échec d'écriture du vidage est compté comme une erreur disque | MLEAR-031-2024, 14/09 |
 | 52 | les arrêts inattendus ne pèsent pas sur le verdict | MLEAR-031-2024, 14/09 |
 | 53 | aucune section réseau | MLEAR-031-2024, 14/09 |
+| 54 | un composant de Windows déclaré « désinstallé, sans objet » | PC-W10-11, 14/09 |
+| 55 | la version du pilote fautif n'est pas comparée entre deux analyses | PC-W10-11, 14/09 |
 
-Les points 48 à 52 sont des **corrections**, sur des données déjà collectées : rien à instrumenter, tout à relier. Le 53 est le seul ajout.
+Les points 48 à 52, 54 et 55 sont des **corrections**, sur des données déjà collectées : rien à instrumenter, tout à relier. Le 53 est le seul ajout.
 
-Ce qui reste à trancher : si les points **43** (la console doit archiver les alertes — les postes sont réinstallés) et **46** (voir à distance ce que la boîte noire a enregistré) rejoignent cette version, ou si elle se limite à 48-53.
+Ce qui reste à trancher : si les points **43** (la console doit archiver les alertes — les postes sont réinstallés) et **46** (voir à distance ce que la boîte noire a enregistré) rejoignent cette version, ou si elle se limite à 48-55.
 
 ## La question qui devrait décider de l'ordre
 
