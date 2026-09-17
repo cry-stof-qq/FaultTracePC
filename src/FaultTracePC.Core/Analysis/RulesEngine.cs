@@ -26,6 +26,7 @@ public sealed class RulesEngine
         AnalyzeSmart(r);
         AnalyzeBattery(r);
         AnalyzeThermal(r);
+        AnalyzeEcritureVidage(r);
         AnalyzeStorage(r);
         AnalyzeGpu(r);
         AnalyzePowerLoss(r);
@@ -1056,9 +1057,64 @@ public sealed class RulesEngine
         return trouves;
     }
 
+    /// <summary>
+    /// Identifiants par lesquels volmgr signale un problème d'ÉCRITURE du vidage de
+    /// plantage — pas un défaut du disque. Microsoft attribue l'événement 46
+    /// (« Crash dump initialization failed ») à un fichier d'échange absent ou non
+    /// configuré, et recommande d'en terminer la configuration.
+    /// </summary>
+    private static readonly int[] IdsEcritureVidage = { 45, 46, 49, 161, 162 };
+
+    private static bool EstEcritureVidage(WinEvent e) =>
+        e.Provider.Equals("volmgr", StringComparison.OrdinalIgnoreCase)
+        && IdsEcritureVidage.Contains(e.EventId);
+
+    /// <summary>
+    /// Constaté le 14/09/2026 sur MLEAR-031-2024, puis le 17/09 sur PC-W10-11 : ces
+    /// messages étaient comptés parmi les « erreurs disque » et menaient à un contrôle
+    /// de disque. Ils disent en réalité que Windows n'a pas pu écrire le fichier qui
+    /// aurait permis de diagnostiquer les plantages — et c'est tout autre chose : le
+    /// disque va bien, mais les crashs ne laissent aucune trace exploitable.
+    /// </summary>
+    private static void AnalyzeEcritureVidage(DiagnosticReport r)
+    {
+        var events = r.Events.Where(EstEcritureVidage).ToList();
+        if (events.Count == 0) return;
+
+        var ids = events.GroupBy(e => e.EventId).OrderByDescending(g => g.Count())
+                        .Select(g => $"volmgr {g.Key} ×{g.Count()}").ToList();
+
+        // Des plantages sans fichier d'analyse : c'est la conséquence qui compte.
+        var sansVidage = r.Bsods.Count(b => string.IsNullOrEmpty(b.DumpPath));
+
+        var details = Lang.T(
+            $"Windows a signalé {events.Count} fois qu'il ne parvenait pas à préparer ou à écrire le fichier de diagnostic de plantage ({string.Join(", ", ids)}). CE NE SONT PAS DES ERREURS DE DISQUE : le disque n'est pas mis en cause, c'est la destination du vidage qui manque ou qui est trop petite.",
+            $"Windows reported {events.Count} times that it could not prepare or write the crash diagnostic file ({string.Join(", ", ids)}). THESE ARE NOT DISK ERRORS: the drive is not implicated — the destination for the dump is missing or too small.")
+            + Lang.T($" Fichier d'échange déclaré : {r.System.Os.PageFileInfo}.", $" Declared page file: {r.System.Os.PageFileInfo}.")
+            + (sansVidage > 0
+                ? Lang.T($" Conséquence directe : {sansVidage} écran(s) bleu(s) ne disposent d'aucun fichier d'analyse, leur cause restera indéterminée tant que ce réglage n'est pas corrigé.",
+                         $" Direct consequence: {sansVidage} blue screen(s) have no analysis file, and their cause will stay unknown until this setting is fixed.")
+                : "");
+
+        r.Findings.Add(new Finding
+        {
+            Severity = sansVidage > 0 ? Severity.Warning : Severity.Info,
+            Confidence = Confidence.High,
+            Category = FaultCategory.Software,
+            Title = Lang.T($"Le vidage de plantage n'a pas pu être écrit ({events.Count} événement(s) volmgr)", $"The crash dump could not be written ({events.Count} volmgr event(s))"),
+            Details = details,
+            Recommendation = Lang.T(
+                "Deux réglages, et aucun n'est risqué : activer les petits vidages mémoire (Paramètres système avancés → Démarrage et récupération → Écriture des informations de débogage → « Petit vidage mémoire »), et laisser le fichier d'échange géré automatiquement par Windows sur le disque système. Sans cela, chaque nouveau plantage sera aussi muet que les précédents.",
+                "Two settings, neither of them risky: enable small memory dumps (Advanced system settings → Startup and Recovery → Write debugging information → “Small memory dump”), and let Windows manage the page file automatically on the system drive. Without this, every new crash will be as silent as the last.")
+        });
+    }
+
     private static void AnalyzeStorage(DiagnosticReport r)
     {
-        var diskEvents = r.Events.Where(e => e.Category == EventCategory.DiskError).ToList();
+        // Point 51 : les événements d'écriture de vidage sortent du comptage. Les laisser
+        // ici gonflait le nombre d'« erreurs disque » avec des messages qui ne parlent
+        // pas du disque, et poussait vers un chkdsk là où il fallait un fichier d'échange.
+        var diskEvents = r.Events.Where(e => e.Category == EventCategory.DiskError && !EstEcritureVidage(e)).ToList();
         var badDisks = r.System.Disks.Where(d =>
             d.Health.IsDegraded() ||
             (!string.IsNullOrEmpty(d.WmiStatus) && !d.WmiStatus.Equals("OK", StringComparison.OrdinalIgnoreCase))).ToList();

@@ -140,7 +140,10 @@ public static class RepairScriptGenerator
             // Vérifications EXÉCUTÉES (pas seulement conseillées) : l'utilisateur voit
             // directement « déjà à jour » ou « mise à jour appliquée » — pas de conseil inutile.
             sb.AppendLine(Lang.T("Section 'Mises à jour des composants (vérification automatique)'", "Section 'Component updates (automatic check)'"));
-            sb.AppendLine("if (Get-Command wsl -ErrorAction SilentlyContinue) {");
+            // POINT 63, reste. « wsl --update » se lançait dès qu'une conclusion logicielle
+            // existait — y compris sur le poste d'une secrétaire qui n'a jamais vu WSL.
+            // On exige maintenant que la virtualisation TOURNE réellement sur la machine.
+            sb.AppendLine("if ((Get-Command wsl -ErrorAction SilentlyContinue) -and (Get-Process -Name vmmem, vmmemWSL -ErrorAction SilentlyContinue)) {");
             sb.AppendLine(Lang.T("    Write-Host 'Vérification/mise à jour de WSL (virtualisation) :'", "    Write-Host 'Checking/updating WSL (virtualisation):'"));
             sb.AppendLine("    wsl --update");
             sb.AppendLine("}");
