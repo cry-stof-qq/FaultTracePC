@@ -31,6 +31,7 @@ public sealed class RulesEngine
         AnalyzeGpu(r);
         AnalyzePowerLoss(r);
         AnalyzeAppCrashes(r);
+        AnalyzeArretsInattendus(r);
         AnalyzeServiceFailures(r);
         AnalyzeUpdateCorrelation(r);
         AnalyzeDiskSpace(r);
@@ -144,6 +145,38 @@ public sealed class RulesEngine
                 // Analyse symbolique (Phase 2) : le module fautif nommé par CDB fait foi.
                 SuspectDriver = d.FaultingModule,
                 Sources = { d.Kind == DumpKind.FullMemoryDump ? "MEMORY.DMP" : "Minidump" },
+            });
+        }
+
+        // POINT 50. Un Kernel-Power 41 porte un champ BugcheckCode. S'il n'est pas nul,
+        // il y a EU un écran bleu — même si aucun fichier de vidage n'a pu être écrit.
+        // Ne se fier qu'aux vidages revenait à confondre « je n'ai pas de trace » et
+        // « il ne s'est rien passé » : sur MLEAR-031-2024, le 14/09/2026, quinze
+        // plantages réels étaient annoncés comme « aucun BSOD détecté sur la période ».
+        //
+        // Le code est écrit en DÉCIMAL dans le XML de l'événement, contrairement au
+        // 1001 qui le donne en hexadécimal. Le confondre ferait nommer n'importe quoi.
+        var sourceKernelPower = Lang.T("Événement Kernel-Power 41", "Kernel-Power event 41");
+        foreach (var e in r.Events.Where(e => e.Category == EventCategory.PowerLoss))
+        {
+            if (!uint.TryParse(e.Extracted.GetValueOrDefault("BugcheckCode"), out var codeKp) || codeKp == 0) continue;
+
+            // L'événement 41 est journalisé au REDÉMARRAGE : il suit le plantage de
+            // quelques instants. On regroupe donc large plutôt que de compter double.
+            var deja = incidents.FirstOrDefault(i => Math.Abs((i.TimeLocal - e.TimeLocal).TotalMinutes) < 15);
+            if (deja is not null)
+            {
+                if (!deja.Sources.Contains(sourceKernelPower)) deja.Sources.Add(sourceKernelPower);
+                deja.BugCheckCode ??= codeKp;
+                continue;
+            }
+
+            incidents.Add(new BsodIncident
+            {
+                TimeLocal = e.TimeLocal,
+                BugCheckCode = codeKp,
+                BugCheckName = BugCheckCatalog.NameOf(codeKp),
+                Sources = { sourceKernelPower },
             });
         }
 
@@ -1697,6 +1730,44 @@ public sealed class RulesEngine
                 true);
     }
 
+    /// <summary>
+    /// Arrêts inattendus (EventLog 6008) restés SANS explication : ni écran bleu, ni
+    /// coupure franche déjà signalée. Ils étaient collectés, affichés dans le tableau
+    /// des événements… et n'alimentaient aucune conclusion. Le 14/09/2026, le rapport
+    /// de MLEAR-031-2024 a donc rassuré sur une machine qui plantait toutes les
+    /// semaines depuis quatre mois. C'est le pire mode de défaillance de cet outil :
+    /// se tromper est réparable, rassurer à tort ne l'est pas.
+    /// </summary>
+    private static List<WinEvent> ArretsInexpliques(DiagnosticReport r) =>
+        r.Events.Where(e => e.Category == EventCategory.UnexpectedShutdown
+                            && !r.Bsods.Any(b => Math.Abs((b.TimeLocal - e.TimeLocal).TotalMinutes) <= 15))
+                .OrderBy(e => e.TimeLocal)
+                .ToList();
+
+    private static void AnalyzeArretsInattendus(DiagnosticReport r)
+    {
+        var arrets = ArretsInexpliques(r);
+        if (arrets.Count == 0) return;
+
+        var dates = string.Join(", ", arrets.TakeLast(5).Select(e => Lang.T($"{e.TimeLocal:dd/MM à HH:mm}", $"{e.TimeLocal:yyyy-MM-dd HH:mm}")));
+
+        r.Findings.Add(new Finding
+        {
+            Severity = Severity.Warning,
+            Confidence = Confidence.High,
+            Category = FaultCategory.Power,
+            Title = Lang.T($"{arrets.Count} arrêt(s) inattendu(s) sans écran bleu associé", $"{arrets.Count} unexpected shutdown(s) with no matching blue screen"),
+            Details = Lang.T(
+                $"Windows a constaté au démarrage que l'arrêt précédent n'avait pas été propre (événement 6008), {arrets.Count} fois sur la période, sans qu'aucun écran bleu ne soit enregistré au même moment. Derniers cas : {dates}.",
+                $"At start-up Windows found that the previous shutdown had not been clean (event 6008), {arrets.Count} time(s) over the period, with no blue screen recorded at the same moment. Most recent: {dates}.")
+                + Lang.T(" Un arrêt de ce type n'est jamais normal : soit la machine a perdu son alimentation, soit quelqu'un a maintenu le bouton, soit elle s'est figée au point de ne plus rien pouvoir écrire.",
+                         " A shutdown of this kind is never normal: either the machine lost power, or someone held the button down, or it froze so hard it could no longer write anything."),
+            Recommendation = Lang.T(
+                "Commencer par établir si ces arrêts sont subis ou provoqués : demander aux utilisateurs du poste. Si personne ne force l'extinction, vérifier l'alimentation et les températures, puis s'assurer que les vidages de plantage sont bien activés — sans eux, ces arrêts resteront sans explication à chaque analyse.",
+                "Start by establishing whether these shutdowns are suffered or caused: ask the people who use the machine. If nobody forces the power off, check the power supply and the temperatures, then make sure crash dumps are enabled — without them these shutdowns will stay unexplained at every analysis.")
+        });
+    }
+
     private static void AnalyzeServiceFailures(DiagnosticReport r)
     {
         var fails = r.Events.Where(e => e.Category == EventCategory.ServiceFailure).ToList();
@@ -1756,14 +1827,36 @@ public sealed class RulesEngine
         if (critical.Count == 0)
         {
             var warnings = r.Findings.Where(f => f.Severity == Severity.Warning).ToList();
+            // POINT 52. Un verdict rassurant est irréversible : l'utilisateur referme le
+            // rapport. On compte donc d'abord les arrêts ANORMAUX — écrans bleus, et
+            // arrêts inattendus qu'aucun écran bleu n'explique — avant de prononcer quoi
+            // que ce soit de rassurant.
+            var arretsAnormaux = r.Bsods.Count + ArretsInexpliques(r).Count;
+
             if (warnings.Count == 0)
             {
-                r.Verdict = Lang.T("Système sain sur la période analysée : aucun crash ni signe de défaillance détecté.", "System healthy over the period analysed: no crash and no sign of failure detected.");
+                if (arretsAnormaux == 0)
+                {
+                    r.Verdict = Lang.T("Système sain sur la période analysée : aucun crash ni signe de défaillance détecté.", "System healthy over the period analysed: no crash and no sign of failure detected.");
+                    r.VerdictCategory = FaultCategory.None;
+                    return;
+                }
                 r.VerdictCategory = FaultCategory.None;
+                r.Verdict = Lang.T(
+                    $"La machine s'est arrêtée anormalement {arretsAnormaux} fois sur la période, sans qu'une cause ait pu être établie. Ce n'est pas un système sain : il manque des traces, pas des pannes.",
+                    $"The machine shut down abnormally {arretsAnormaux} time(s) over the period, with no cause established. This is not a healthy system: what is missing is evidence, not failures.");
                 return;
             }
+
             var w = warnings.First();
             r.VerdictCategory = w.Category;
+            if (arretsAnormaux > 0)
+            {
+                r.Verdict = Lang.T(
+                    $"Aucune cause unique ne se dégage, mais la machine s'est arrêtée anormalement {arretsAnormaux} fois sur la période — ce n'est pas une machine saine. Point le plus notable : {w.Title}.",
+                    $"No single cause stands out, but the machine shut down abnormally {arretsAnormaux} time(s) over the period — this is not a healthy machine. Most notable point: {w.Title}.");
+                return;
+            }
             r.Verdict = Lang.T($"Pas de panne critique, mais des points de vigilance — le plus notable : {w.Title}.", $"No critical failure, but some points to watch — the most notable: {w.Title}.");
             return;
         }
