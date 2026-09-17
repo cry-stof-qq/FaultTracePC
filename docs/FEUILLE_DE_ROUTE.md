@@ -15,6 +15,8 @@
 | 1.5.0 | **publiée** — thème unique **le parc** — secret maître et jeton dérivé (13, 14, 27), plus le point 36 et le refus des options inconnues |
 | 1.5.1 | correctif de déploiement — le paquet sait se remplacer lui-même, pare-feu posé par la ligne de commande, procédure écrite |
 | 1.5.2 | **publiée** — deux défauts constatés, sans nouvelle surface : la langue d'un rapport distant (point 45) et le lanceur `.bat` du script de réparation (point 36, moitié restante). 428 tests verts |
+| 1.6.0 | en cours — thème **un rapport doit nommer la panne qu'il a sous les yeux** — points 48 à 63 ; 56, 57 et 58 livrés le 17/09/2026 |
+| 1.7.0 | prévue — thème **le déploiement de parc entre dans le logiciel** — point 64, en quatre lots |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
@@ -305,6 +307,62 @@ Les données sont déjà là : la version du pilote est enregistrée à chaque a
 
 **Ce que ça change concrètement :** sans ce rapprochement, la recommandation reste « réinstaller le pilote proprement avec DDU » — c'est-à-dire refaire ce qui vient d'échouer. Avec, elle devient « le logiciel est hors de cause, regardez le matériel ». C'est la différence entre une boucle et un diagnostic.
 
+**56 — Les vidages « en direct » de Windows étaient listés, jamais exploités. FAIT le 17/09/2026.** Constaté sur `PC-W10-11`, rapport du 17/09 17 h 38.
+
+Le rapport affichait **178 fichiers de `C:\Windows\LiveKernelReports`** — nom, date, taille, code d'arrêt — dont **155 portant le code `0x141`**, le plus ancien du 16/06/2022. Il ne les comptait pas, n'en tirait aucune conclusion, et les nommait `BUGCODE_0x141`, un repli fabriqué qui ressemblait à s'y méprendre à un identifiant Microsoft.
+
+`0x141` est `VIDEO_ENGINE_TIMEOUT_DETECTED` : un moteur de la carte graphique n'a pas répondu, Windows l'a réinitialisé, aucun écran bleu n'est apparu. **C'est le journal de bord d'une carte qui se dégrade, et il ne passe jamais par le journal d'événements** — ces incidents n'existent que sous forme de fichier.
+
+**Correctif livré :** `AnalyzeGpu` compte désormais les gels (`0x141`, `0x117`, `0x119`, `0x193`) ; le catalogue nomme `0x141` et `0x144` ; le repli pour un code inconnu affiche le code brut plutôt qu'un nom d'allure officielle.
+
+**57 — « 0 réinitialisation » était écrit en présence de 155 réinitialisations. FAIT le 17/09/2026.** Même rapport, conséquence directe du 56.
+
+La carte de verdict annonçait *« Instabilité du pilote graphique (0 réinitialisation, 7 BSOD) »*. Le compteur ne regardait que les événements `Display 4101` du journal Windows. **Le logiciel imprimait la preuve du contraire quatre cents lignes plus bas dans le même document.**
+
+**Correctif livré :** le titre porte les trois comptages — gels du moteur, réinitialisations journalisées, écrans bleus — et la conclusion croise désormais les deux sources.
+
+**58 — Un gel suivi d'un écran bleu est une réinitialisation qui a ÉCHOUÉ : ce rapprochement n'était pas fait. FAIT le 17/09/2026.**
+
+Les deux séries existaient séparément. Les apparier donne la seule mesure qui distingue un pilote instable d'un matériel qui lâche : **la proportion de gels qui se terminent mal, et la date à laquelle elle bascule.** Sur `PC-W10-11` : environ 145 gels récupérés sans incident de 2022 à juin 2026, puis 10 gels sur 10 soldés par un écran bleu à partir du 1er juillet 2026.
+
+**Correctif livré :** appariement dans une fenêtre de dix minutes, datation de la bascule, disculpation du pilote quand le premier gel lui est antérieur, et mise hors de cause de la surchauffe **par la mesure de la boîte noire** au lieu de demander à l'utilisateur d'aller la prendre lui-même. La recommandation devient le test décisif et gratuit : retirer la carte, brancher l'écran sur la sortie de la carte mère, ou permuter avec un autre poste.
+
+**59 — Les plantages de `dwm.exe` sont une corroboration de la panne graphique, pas un problème logiciel séparé. À FAIRE, 1.6.0.** Même rapport.
+
+Onze plantages de `dwm.exe` via `dwmcore.dll`, classés « Application anciennement instable » et écartés au titre du point 54. Or le gestionnaire de fenêtres de Windows meurt **parce que** l'affichage meurt : c'est la meilleure confirmation de la panne, rangée dans la mauvaise colonne. Le point 54 corrige le « sans objet » ; celui-ci demande davantage — **rattacher le plantage d'un composant graphique de Windows à la conclusion graphique** au lieu d'en faire une ligne isolée.
+
+**60 — Une clé USB et un port de contrôleur comptés ensemble sous « erreurs disque ». À FAIRE, 1.6.0.** Même rapport.
+
+Douze événements agrégés en un seul chiffre : `volmgr` 162, `Ntfs` 55, `disk` 51, `storahci` 129, répartis entre une clé USB (`Generic Flash Disk`, E:), un volume F: et `\Device\RaidPort0`. La recommandation commence par la gestion d'alimentation des liens PCI Express et les câbles SATA — **deux conseils sans aucun sens pour une clé USB.** Il faut séparer par périphérique avant de conseiller quoi que ce soit.
+
+**61 — Deux dates différentes pour le même pilote, dans le même rapport. À FAIRE, 1.6.0.** Même rapport.
+
+`32.0.15.8278 du 08/07/2026` dans une carte, `32.0.15.8278 du 25/06/2026` dans une autre. L'une est la date du fichier `.sys`, l'autre celle du paquet INF ; les deux sont annoncées comme « le pilote du… ». Il faut nommer laquelle on affiche, ou n'en afficher qu'une.
+
+**62 — La boîte noire répète le même incident et masque le gel. À FAIRE, 1.6.0.** Même rapport.
+
+Trois tableaux identiques pour l'incident du 15/09 09 h 53, deux pour celui du 17/09 12 h 28. Et le tableau intitulé « dernières secondes avant l'incident de 12 h 29 » s'arrête à **12 h 27 min 26 s** — quatre-vingt-quatorze secondes avant. Ce trou n'est pas un défaut d'affichage : **c'est le gel lui-même**, l'échantillonneur ayant cessé de répondre en même temps que la machine. Il faut dédoublonner les incidents proches et **nommer le trou au lieu de le laisser passer pour une fin de tableau.**
+
+**63 — Le script de réparation raisonne par familles de problèmes, pas par mesures. À FAIRE, 1.6.0.** Script `Reparation_PC_2026-09-17_1738.ps1`.
+
+Le script est bien construit — point de restauration, confirmation O/N, rien d'irréversible sans accord. Mais il ignore ce que le rapport a mesuré : il désigne comme premiers suspects dix pilotes Trend Micro et AMD de 2021 alors que l'analyse WinDbg nomme `nvlddmkm.sys` dans cinq dumps sur cinq ; il demande de surveiller la température GPU au seuil de 85 °C alors que la boîte noire l'a mesurée pendant 94 h 32 à 67,7 °C maximum ; il propose `chkdsk C: /f` quand les erreurs portent sur une clé USB ; il lance `wsl --update` sur le poste d'une secrétaire.
+
+**Le principe à corriger tient en une phrase : le script doit être écrit à partir des mesures du rapport, pas à partir des catégories de panne détectées.**
+
+**64 — Déploiement de parc intégré au logiciel. À FAIRE, 1.7.0.** Demandé le 17/09/2026.
+
+Le déploiement se fait aujourd'hui par un script PowerShell distribué à part, publié sur palisser.fr. Il fonctionne, il a été éprouvé sur un parc réel, mais il vit en dehors du logiciel alors que celui-ci porte déjà `ParkWindow`, `ParkSecret`, `ParkProtocol`, `PowerShellPolicy` et `parc.json`.
+
+**Décisions arrêtées le 17/09/2026 :**
+
+- **Le logiciel pilote le script, il ne le remplace pas.** Le `.ps1` gagne un commutateur `-SortieJson` : sans lui, comportement inchangé pour qui le lance à la main ; avec lui, une ligne JSON par poste et par étape, écrite **dans un fichier en UTF-8** — pas sur la sortie standard, que PowerShell 5.1 décode avec la page de code de la console et transforme en charabia.
+- **La liste des postes se construit en C#**, en fusionnant trois sources dédoublonnées par nom de machine : `postes.csv`, une OU de l'Active Directory (via `DirectorySearcher` natif, pour ne pas exiger RSAT), et `parc.json`.
+- **Périmètre complet** : réveil réseau, installation, bascule en mode parc.
+- **Aucun mot de passe nulle part.** L'exécution se fait avec le ticket Kerberos du compte qui a lancé le logiciel.
+- **Garde-fous** : mode « vérifier seulement » qui ne modifie rien, aucune case cochée par défaut, confirmation par saisie du nombre de postes, plafond par exécution, journal horodaté, secret ni affiché ni journalisé, et **aucune action de désinstallation dans cet onglet**.
+
+**Découpage en quatre lots**, le risque à la fin sur une plomberie déjà éprouvée : **A** la liste seule, en lecture pure — **B** le mode « vérifier seulement », qui construit et prouve le canal JSON sur des opérations inoffensives — **C** le déploiement réel avec ses garde-fous — **D** le journal et la reprise des seuls postes en échec.
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---
@@ -386,11 +444,11 @@ Trois des quatre points ont été faits ; le quatrième a été **fermé** parce
 
 ---
 
-### 1.6.0 — points 48 à 55, arrêtés le 14/09/2026
+### 1.6.0 — points 48 à 63, arrêtés les 14 et 17/09/2026
 
 Thème : **un rapport doit nommer la panne qu'il a sous les yeux.**
 
-Huit points, trois machines, une semaine. Ils disent la même chose sous six formes : *le logiciel collecte beaucoup plus qu'il ne conclut.* Le code d'arrêt était dans le journal de Windows. Le triplet PCIe était dans la boîte noire. L'âge du pilote Wi-Fi était dans le tableau des pilotes. Rien de tout cela n'est remonté jusqu'au verdict.
+Seize points, trois machines, deux semaines. Ils disent tous la même chose : *le logiciel collecte beaucoup plus qu'il ne conclut.* Le code d'arrêt était dans le journal de Windows. Le triplet PCIe était dans la boîte noire. L'âge du pilote Wi-Fi était dans le tableau des pilotes. Rien de tout cela n'est remonté jusqu'au verdict.
 
 | # | Ce qui manque | Constaté sur |
 |---|---|---|
@@ -402,10 +460,28 @@ Huit points, trois machines, une semaine. Ils disent la même chose sous six for
 | 53 | aucune section réseau | MLEAR-031-2024, 14/09 |
 | 54 | un composant de Windows déclaré « désinstallé, sans objet » | PC-W10-11, 14/09 |
 | 55 | la version du pilote fautif n'est pas comparée entre deux analyses | PC-W10-11, 14/09 |
+| 56 ✔ | 178 vidages « en direct » listés, jamais exploités — dont 155 gels du moteur graphique | PC-W10-11, 17/09 |
+| 57 ✔ | « 0 réinitialisation » écrit en présence de 155 réinitialisations | PC-W10-11, 17/09 |
+| 58 ✔ | un gel suivi d'un écran bleu est une récupération ratée : rapprochement jamais fait | PC-W10-11, 17/09 |
+| 59 | les plantages de `dwm.exe` écartés au lieu d'être rattachés à la panne graphique | PC-W10-11, 17/09 |
+| 60 | une clé USB et un port de contrôleur comptés ensemble sous « erreurs disque » | PC-W10-11, 17/09 |
+| 61 | deux dates différentes pour le même pilote, dans le même rapport | PC-W10-11, 17/09 |
+| 62 | la boîte noire répète le même incident et laisse le gel passer pour une fin de tableau | PC-W10-11, 17/09 |
+| 63 | le script de réparation raisonne par familles de panne, pas par mesures | PC-W10-11, 17/09 |
 
-Les points 48 à 52, 54 et 55 sont des **corrections**, sur des données déjà collectées : rien à instrumenter, tout à relier. Le 53 est le seul ajout.
+Les lignes marquées ✔ sont **livrées** : commit `75c3f11` du 17/09/2026, 428 tests verts.
+
+Les points 48 à 52 et 54 à 63 sont des **corrections**, sur des données déjà collectées : rien à instrumenter, tout à relier. Le 53 est le seul ajout.
 
 Ce qui reste à trancher : si les points **43** (la console doit archiver les alertes — les postes sont réinstallés) et **46** (voir à distance ce que la boîte noire a enregistré) rejoignent cette version, ou si elle se limite à 48-55.
+
+### 1.7.0 — le déploiement de parc entre dans le logiciel
+
+Thème : **ce qu'on sait faire depuis un script, l'outil doit savoir le faire lui-même.**
+
+Un seul point, le **64**, mais en quatre lots livrables séparément : la liste des postes, la vérification sans modification, le déploiement réel, puis le journal et la reprise. Le script publié sur palisser.fr n'est pas abandonné — il devient le moteur, et reste utilisable seul.
+
+Cette version est volontairement tenue à l'écart de la 1.6.0 : son thème est l'action sur un parc, pas la qualité d'un rapport. Les mélanger aurait fait une version qui ne raconte rien.
 
 ## La question qui devrait décider de l'ordre
 
