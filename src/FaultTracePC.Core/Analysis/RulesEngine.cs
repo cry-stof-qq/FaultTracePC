@@ -292,30 +292,109 @@ public sealed class RulesEngine
         }
     }
 
+    /// <summary>
+    /// Identifiants WHEA dont la gravité est établie : 17 = erreur matérielle CORRIGÉE,
+    /// 18 = erreur matérielle FATALE. Les autres ne sont pas classés ici — on préfère
+    /// ne rien affirmer plutôt que de deviner la gravité d'un code qu'on n'a pas vérifié.
+    /// </summary>
+    private static readonly int[] WheaCorrige = { 17 };
+    private static readonly int[] WheaFatal = { 18 };
+
     private static void AnalyzeWhea(DiagnosticReport r)
     {
         var whea = r.Events.Where(e => e.Category == EventCategory.Whea).ToList();
         if (whea.Count == 0) return;
 
-        bool fatal = r.Bsods.Any(b => b.BugCheckCode == 0x124);
+        bool bsod124 = r.Bsods.Any(b => b.BugCheckCode == 0x124);
+        var corriges = whea.Where(e => WheaCorrige.Contains(e.EventId)).ToList();
+        var fatales = whea.Where(e => WheaFatal.Contains(e.EventId)).ToList();
+        bool tousCorriges = corriges.Count == whea.Count;
+
+        // POINT 48. Le composant est écrit dans l'événement ; il était lu, puis ignoré.
+        // « Le processeur a signalé N erreurs » n'est pas faux — sur Intel les ports
+        // racines PCIe sont dans le paquet du processeur — mais pour qui lit, c'est
+        // trompeur : le fautif est un lien et son périphérique, pas un cœur.
+        var composants = whea.Select(e => e.Extracted.GetValueOrDefault("Composant"))
+                             .Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
+        var triplets = whea.Select(e => e.Extracted.GetValueOrDefault("Bdf"))
+                           .Where(b => !string.IsNullOrEmpty(b)).Distinct().Take(3).ToList();
+
+        bool pcie = composants.Any(c => c!.Contains("PCI Express", StringComparison.OrdinalIgnoreCase));
+        bool coeur = composants.Any(c => c!.Contains("Processor Core", StringComparison.OrdinalIgnoreCase)
+                                      || c!.Contains("Cache Hierarchy", StringComparison.OrdinalIgnoreCase));
+        bool memoire = composants.Any(c => c!.Contains("Memory Controller", StringComparison.OrdinalIgnoreCase));
+
+        // Une erreur CORRIGÉE veut dire que le matériel a récupéré : rien n'a été perdu.
+        // La classer critique au même titre qu'une erreur fatale faisait paniquer pour
+        // un lien qui fonctionne — et détournait de la seule piste utile.
+        var severite = (fatales.Count > 0 || bsod124) ? Severity.Critical
+                     : tousCorriges ? Severity.Warning
+                     : whea.Count >= 5 ? Severity.Critical
+                     : Severity.Warning;
+
+        var quoi = pcie ? Lang.T("lien PCI Express", "PCI Express link")
+                 : memoire ? Lang.T("contrôleur mémoire", "memory controller")
+                 : coeur ? Lang.T("processeur", "processor")
+                 : Lang.T("matériel", "hardware");
+
+        var titre = tousCorriges
+            ? Lang.T($"{whea.Count} erreur(s) matérielle(s) CORRIGÉE(S) — {quoi}", $"{whea.Count} CORRECTED hardware error(s) — {quoi}")
+            : Lang.T($"Erreurs matérielles WHEA détectées ({whea.Count}) — {quoi}", $"Hardware errors reported by WHEA ({whea.Count}) — {quoi}");
+
+        var details = new List<string>();
+        details.Add(tousCorriges
+            ? Lang.T($"Windows a enregistré {whea.Count} erreur(s) matérielle(s) CORRIGÉE(S) (WHEA-Logger {string.Join(", ", whea.Select(e => e.EventId).Distinct().OrderBy(x => x))}) : le matériel a récupéré à chaque fois, aucune donnée n'a été perdue.",
+                     $"Windows recorded {whea.Count} CORRECTED hardware error(s) (WHEA-Logger {string.Join(", ", whea.Select(e => e.EventId).Distinct().OrderBy(x => x))}): the hardware recovered every time and no data was lost.")
+            : Lang.T($"Windows a enregistré {whea.Count} erreur(s) matérielle(s) (WHEA-Logger) sur la période.",
+                     $"Windows recorded {whea.Count} hardware error(s) (WHEA-Logger) over the period."));
+
+        if (composants.Count > 0)
+            details.Add(Lang.T($"Composant mis en cause : {string.Join(", ", composants!)}.", $"Component implicated: {string.Join(", ", composants!)}."));
+        if (triplets.Count > 0)
+            details.Add(Lang.T($"Lien concerné (bus:appareil:fonction) : {string.Join(", ", triplets!)}. C'est cette adresse qui désigne le périphérique fautif, pas le processeur qui la rapporte.",
+                               $"Link involved (bus:device:function): {string.Join(", ", triplets!)}. That address names the faulty device — not the processor reporting it."));
+        if (bsod124)
+            details.Add(Lang.T("Un écran bleu WHEA_UNCORRECTABLE_ERROR (0x124) confirme une erreur matérielle fatale.", "A WHEA_UNCORRECTABLE_ERROR (0x124) blue screen confirms a fatal hardware error."));
+        details.Add(Lang.T($"Dernier événement : {whea.Max(e => e.TimeLocal):dd/MM/yyyy HH:mm}.", $"Last event: {whea.Max(e => e.TimeLocal):yyyy-MM-dd HH:mm}."));
+        if (!pcie)
+            details.Add(Lang.T($"Matériel de la machine : CPU {r.System.Cpu.Name} · carte mère {r.System.Bios.BaseboardManufacturer} {r.System.Bios.BaseboardProduct} (BIOS {r.System.Bios.Version}).",
+                               $"Machine hardware: CPU {r.System.Cpu.Name} · motherboard {r.System.Bios.BaseboardManufacturer} {r.System.Bios.BaseboardProduct} (BIOS {r.System.Bios.Version})."));
+
+        string reco;
+        if (pcie && tousCorriges)
+            reco = Lang.T(
+                "Ce sont des erreurs de LIEN, pas de processeur : ni l'overclocking, ni la mémoire XMP, ni l'alimentation ne sont en cause ici. "
+                + "Dans l'ordre : réenfoncer la carte dans son connecteur après avoir débranché le secteur ; désactiver la gestion d'alimentation du lien "
+                + "(Options d'alimentation → Paramètres avancés → PCI Express → Gestion de l'alimentation de l'état de liaison → Désactivé) ; "
+                + "mettre à jour le pilote du périphérique concerné ; enfin, forcer une génération PCIe inférieure dans le BIOS. "
+                + "Mesurer le nombre d'erreurs par heure sous tension avant et après chaque étape : c'est le seul moyen de savoir laquelle a servi.",
+                "These are LINK errors, not processor errors: neither overclocking, nor XMP memory, nor the power supply is involved here. "
+                + "In order: reseat the card in its slot after unplugging the mains; turn off link state power management "
+                + "(Power Options → Advanced settings → PCI Express → Link State Power Management → Off); "
+                + "update the driver of the device concerned; finally, force a lower PCIe generation in the BIOS. "
+                + "Measure the number of errors per powered hour before and after each step: that is the only way to know which one helped.");
+        else if (memoire)
+            reco = Lang.T(
+                "Le contrôleur mémoire est mis en cause : retirer tout profil XMP/EXPO, tester les barrettes une par une avec MemTest86, et mettre à jour le BIOS.",
+                "The memory controller is implicated: remove any XMP/EXPO profile, test the sticks one at a time with MemTest86, and update the BIOS.");
+        else
+            reco = Lang.T(
+                "Vérifier les températures et la stabilité de l'alimentation ; retirer tout overclocking/XMP ; mettre à jour le BIOS. "
+                + "Des WHEA récurrentes pointent vers CPU, carte mère, alimentation ou RAM — à tester dans cet ordre.",
+                "Check temperatures and power supply stability; remove any overclocking/XMP; update the BIOS. "
+                + "Recurring WHEA errors point to the CPU, motherboard, power supply or RAM — test in that order.");
+
         r.Findings.Add(new Finding
         {
-            Severity = fatal || whea.Count >= 5 ? Severity.Critical : Severity.Warning,
-            Confidence = fatal ? Confidence.High : Confidence.Medium,
+            Severity = severite,
+            Confidence = (fatales.Count > 0 || bsod124) ? Confidence.High : Confidence.Medium,
             Category = FaultCategory.Hardware,
             // Même identifiant de fait que la règle d'alerte « whea » : les deux
             // rapportent la même erreur, vue par deux chemins. Voir FusionnerLesDoublons.
             Code = "whea",
-            Title = Lang.T($"Erreurs matérielles WHEA détectées ({whea.Count})", $"Hardware errors reported by the CPU (WHEA) — {whea.Count}"),
-            Details = Lang.T($"Le processeur a signalé {whea.Count} erreur(s) matérielle(s) (WHEA-Logger) sur la période.", $"The processor reported {whea.Count} hardware error(s) (WHEA-Logger) over the period.")
-                      + (fatal ? Lang.T(" Un BSOD WHEA_UNCORRECTABLE_ERROR (0x124) confirme une erreur matérielle fatale.", " A WHEA_UNCORRECTABLE_ERROR (0x124) BSOD confirms a fatal hardware error.") : "")
-                      + Lang.T($" Dernier événement : {whea.Max(e => e.TimeLocal):dd/MM/yyyy HH:mm}.", $" Last event: {whea.Max(e => e.TimeLocal):yyyy-MM-dd HH:mm}.")
-                      + Lang.T($" Matériel concerné : CPU {r.System.Cpu.Name} · carte mère {r.System.Bios.BaseboardManufacturer} {r.System.Bios.BaseboardProduct} (BIOS {r.System.Bios.Version}).", $" Hardware involved: CPU {r.System.Cpu.Name} · motherboard {r.System.Bios.BaseboardManufacturer} {r.System.Bios.BaseboardProduct} (BIOS {r.System.Bios.Version})."),
-            Recommendation = Lang.T(
-                "Vérifier les températures et la stabilité de l'alimentation ; retirer tout overclocking/XMP ; mettre à jour le BIOS. "
-                + "Des WHEA récurrentes pointent vers CPU, carte mère, alimentation ou RAM — à tester dans cet ordre.",
-                "Check temperatures and power supply stability; remove any overclocking/XMP; update the BIOS. "
-                + "Recurring WHEA errors point to the CPU, motherboard, power supply or RAM — test in that order.")
+            Title = titre,
+            Details = string.Join(" ", details),
+            Recommendation = reco
         });
     }
 

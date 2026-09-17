@@ -89,6 +89,26 @@ public sealed class EventLogCollector
     private static readonly Regex DumpPathRx = new(@"[A-Za-z]:\\[^\r\n""]+?\.(?:dmp|DMP)", RegexOptions.Compiled);
     private static readonly Regex BugcheckCodeXmlRx = new(@"BugcheckCode[""']>(\d+)<", RegexOptions.Compiled);
 
+    /// <summary>
+    /// Triplet bus:appareil:fonction d'un événement WHEA, par exemple « 0x0:0x1:0x0 ».
+    /// On le reconnaît à sa FORME et non au libellé qui le précède : celui-ci est
+    /// traduit par Windows, la forme ne l'est pas.
+    /// </summary>
+    private static readonly Regex WheaBdfRx = new(@"0x[0-9A-Fa-f]{1,4}:0x[0-9A-Fa-f]{1,4}:0x[0-9A-Fa-f]{1,4}", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Noms de composants WHEA. Windows traduit les étiquettes du message, mais pas
+    /// ces valeurs : elles viennent de la spécification et restent en anglais dans
+    /// un journal français. L'ordre compte — « PCI Express Root Port » doit être
+    /// testé avant « PCI Express Device », dont il contient le préfixe.
+    /// </summary>
+    private static readonly string[] ComposantsWhea =
+    {
+        "PCI Express Root Port", "PCI Express Endpoint", "PCI Express Device",
+        "Processor Core", "Cache Hierarchy", "Memory Controller",
+        "Platform Security Processor", "Generic Component",
+    };
+
     private static void ExtractDetails(EventRecord rec, WinEvent e, string message)
     {
         switch (e.Category)
@@ -109,6 +129,10 @@ public sealed class EventLogCollector
                 if (dump.Success) e.Extracted["DumpPath"] = dump.Value;
                 break;
             }
+            case EventCategory.Whea:
+                ExtraireWhea(e, message);
+                break;
+
             case EventCategory.PowerLoss:
             {
                 // Kernel-Power 41 : BugcheckCode=0 → coupure brute (pas de BSOD enregistré).
@@ -158,6 +182,25 @@ public sealed class EventLogCollector
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// POINT 49. Le triplet bus:appareil:fonction est la SEULE donnée qui nomme le lien
+    /// fautif, et il se trouve en FIN de message — donc après la coupe à 600 caractères
+    /// qui protège le reste du rapport. Il est extrait ici, sur le message COMPLET : le
+    /// 06/09/2026 il avait fallu retourner au journal de la machine pour l'obtenir,
+    /// exactement le travail que cet outil est censé éviter.
+    ///
+    /// Méthode à part, et non un bloc dans le switch : elle ne dépend que du texte,
+    /// donc elle se teste sans fabriquer un EventRecord.
+    /// </summary>
+    internal static void ExtraireWhea(WinEvent e, string message)
+    {
+        var bdf = WheaBdfRx.Match(message ?? "");
+        if (bdf.Success) e.Extracted["Bdf"] = bdf.Value;
+
+        var composant = ComposantsWhea.FirstOrDefault(c => (message ?? "").Contains(c, StringComparison.OrdinalIgnoreCase));
+        if (composant is not null) e.Extracted["Composant"] = composant;
     }
 
     private static string Truncate(string s, int max) =>
