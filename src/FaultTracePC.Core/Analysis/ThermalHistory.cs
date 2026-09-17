@@ -25,6 +25,14 @@ public sealed class ThermalHistory
     /// <summary>Au-delà de cet écart, on considère que la mesure a été interrompue.</summary>
     public static readonly TimeSpan MaxGap = TimeSpan.FromMinutes(2);
 
+    /// <summary>
+    /// Noms des deux capteurs suivis. Ce sont des IDENTIFIANTS : le moteur de règles
+    /// s'en sert pour retrouver le bilan du GPU. Les dupliquer en clair des deux côtés
+    /// exposait à ce qu'une correction d'un côté casse silencieusement l'autre.
+    /// </summary>
+    public const string CapteurCpu = "Processeur"; // pas-de-traduction : identifiant de capteur
+    public const string CapteurGpu = "Carte graphique"; // pas-de-traduction : identifiant de capteur
+
     private readonly string _sensor;
     private readonly double _warn;
     private readonly double _crit;

@@ -1263,27 +1263,130 @@ public sealed class RulesEngine
         || (d.Smart?.Source.Contains("NVMe", StringComparison.OrdinalIgnoreCase) ?? false)
         || d.InterfaceType.Contains("NVMe", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Codes que Windows écrit dans LiveKernelReports quand l'affichage se fige SANS
+    /// écran bleu : le moteur graphique n'a pas répondu, Windows l'a réinitialisé.
+    /// Ces gels ne laissent aucune trace dans le journal d'événements — ils n'existent
+    /// que sous forme de fichier .dmp. Les ignorer revenait à annoncer
+    /// « 0 réinitialisation » sur une machine qui en accumulait des dizaines.
+    /// </summary>
+    private static readonly uint[] CodesGelGpu = { 0x141, 0x117, 0x119, 0x193 };
+
+    /// <summary>Date de l'incident : celle de l'en-tête du dump si elle est lisible, sinon celle du fichier.</summary>
+    private static DateTime DateDump(DumpFileInfo d) => d.CrashTimeFromHeader ?? d.LastWriteTime;
+
     private static void AnalyzeGpu(DiagnosticReport r)
     {
         var tdr = r.Events.Where(e => e.Category == EventCategory.Tdr).ToList();
-        var gpuBsods = r.Bsods.Where(b => b.BugCheckCode is 0x116 or 0x117 or 0x119 or 0xEA).ToList();
-        if (tdr.Count == 0 && gpuBsods.Count == 0) return;
+        var gpuBsods = r.Bsods.Where(b => b.BugCheckCode is 0x116 or 0x117 or 0x119 or 0xEA)
+                              .OrderBy(b => b.TimeLocal).ToList();
+
+        var gels = r.Dumps.Where(d => d.Kind == DumpKind.LiveKernelReport
+                                      && d.BugCheckCode.HasValue
+                                      && CodesGelGpu.Contains(d.BugCheckCode.Value))
+                          .OrderBy(DateDump).ToList();
+
+        if (tdr.Count == 0 && gpuBsods.Count == 0 && gels.Count == 0) return;
 
         var drivers = tdr.Select(e => e.Extracted.GetValueOrDefault("Driver"))
                          .Where(d => !string.IsNullOrWhiteSpace(d)).Distinct().ToList();
 
+        // Un gel suivi de près par un écran bleu vidéo, c'est une réinitialisation qui a
+        // ÉCHOUÉ. La proportion de gels qui échouent, et la date à laquelle elle a basculé,
+        // séparent un pilote instable (échecs dispersés) d'un matériel qui lâche
+        // (échecs rares au début, systématiques à la fin).
+        var gelsRates = gels.Where(g => gpuBsods.Any(b => (b.TimeLocal - DateDump(g)).TotalMinutes is >= -2 and <= 10)).ToList();
+
+        var recos = new List<string>();
+        var faits = new List<string>();
+
+        if (gels.Count > 0)
+        {
+            faits.Add(Lang.T(
+                $"{gels.Count} gel(s) du moteur graphique enregistrés par Windows sans écran bleu, du {DateDump(gels[0]):dd/MM/yyyy} au {DateDump(gels[^1]):dd/MM/yyyy}. Ces gels n'apparaissent pas dans le journal d'événements : ils ne sont visibles que dans C:\\Windows\\LiveKernelReports.",
+                $"{gels.Count} graphics engine hang(s) recorded by Windows with no blue screen, from {DateDump(gels[0]):yyyy-MM-dd} to {DateDump(gels[^1]):yyyy-MM-dd}. These hangs leave no trace in the event log: they exist only in C:\\Windows\\LiveKernelReports."));
+        }
+
+        bool materielDesigne = false;
+
+        if (gelsRates.Count > 0 && gels.Count >= 3)
+        {
+            var premierRate = gelsRates.Min(DateDump);
+            var gelsAvant = gels.Count(g => DateDump(g) < premierRate);
+            faits.Add(Lang.T(
+                $"{gelsRates.Count} de ces gels se sont soldés par un écran bleu, le premier le {premierRate:dd/MM/yyyy}. Les {gelsAvant} gel(s) antérieurs avaient tous été récupérés sans plantage : la réinitialisation du processeur graphique échoue désormais là où elle réussissait.",
+                $"{gelsRates.Count} of those hangs ended in a blue screen, the first on {premierRate:yyyy-MM-dd}. The {gelsAvant} earlier hang(s) were all recovered without a crash: resetting the graphics processor now fails where it used to succeed."));
+            if (gelsAvant >= 5)
+            {
+                materielDesigne = true;
+                recos.Add(Lang.T(
+                    "Le symptôme est ancien et s'aggrave : ce profil désigne la CARTE, pas le pilote. Test décisif, sans rien acheter : retirer la carte graphique et brancher l'écran sur la sortie vidéo de la carte mère si le processeur en possède une, ou permuter la carte avec celle d'un autre poste. Si les gels cessent, la carte est à remplacer.",
+                    "The symptom is long-standing and getting worse: this profile points at the CARD, not the driver. Decisive test, at no cost: remove the graphics card and plug the monitor into the motherboard's video output if the processor has one, or swap the card with another machine's. If the hangs stop, the card must be replaced."));
+            }
+        }
+
+        // Le pilote ne peut pas être responsable d'un symptôme apparu avant son installation.
+        if (gels.Count >= 5)
+        {
+            var premierGel = DateDump(gels[0]);
+            var pilotesPosterieurs = r.System.Gpus
+                .Where(g => g.DriverDate.HasValue && g.DriverDate.Value > premierGel)
+                .ToList();
+            if (pilotesPosterieurs.Count > 0 && pilotesPosterieurs.Count == r.System.Gpus.Count)
+            {
+                materielDesigne = true;
+                faits.Add(Lang.T(
+                    $"Le premier gel date du {premierGel:dd/MM/yyyy}, soit AVANT l'installation du pilote actuellement en place ({string.Join(" ; ", pilotesPosterieurs.Select(g => $"{g.DriverVersion} du {g.DriverDate:dd/MM/yyyy}"))}). Le pilote installé aujourd'hui ne peut donc pas avoir causé un symptôme qui lui est antérieur.",
+                    $"The first hang dates from {premierGel:yyyy-MM-dd}, i.e. BEFORE the currently installed driver ({string.Join(" ; ", pilotesPosterieurs.Select(g => $"{g.DriverVersion} dated {g.DriverDate:yyyy-MM-dd}"))}). The driver in place today therefore cannot have caused a symptom that predates it."));
+            }
+        }
+
+        // La température mesurée dit si la piste « surchauffe » tient encore. Recommander
+        // de surveiller une température que la boîte noire a déjà mesurée pendant des
+        // jours, c'est faire refaire à l'utilisateur le travail que le logiciel a fait.
+        var thermiqueGpu = r.Flight.Thermal.FirstOrDefault(t => t.Sensor == ThermalHistory.CapteurGpu && t.HasData);
+        if (thermiqueGpu is not null && thermiqueGpu.AboveWarn <= TimeSpan.Zero && thermiqueGpu.MaxC.HasValue)
+        {
+            faits.Add(Lang.T(
+                $"La surchauffe est écartée par la mesure : maximum {thermiqueGpu.MaxC:0.#} °C sur {ThermalHistory.Humanize(thermiqueGpu.Observed)} de relevés, jamais au-dessus du seuil d'alerte de {thermiqueGpu.WarnThreshold:0} °C.",
+                $"Overheating is ruled out by measurement: peak {thermiqueGpu.MaxC:0.#} °C over {ThermalHistory.Humanize(thermiqueGpu.Observed)} of readings, never above the {thermiqueGpu.WarnThreshold:0} °C warning threshold."));
+        }
+
+        if (!materielDesigne)
+        {
+            recos.Add(Lang.T(
+                "Désinstallation propre du pilote (DDU en mode sans échec) puis installation de la dernière version stable ; surveiller la température GPU en charge ; tester sans overclocking.",
+                "Clean driver removal (DDU in safe mode) then install the latest stable version; watch the GPU temperature under load; test without overclocking."));
+        }
+        else if (recos.Count == 0)
+        {
+            // Le matériel est désigné par l'antériorité du symptôme, sans qu'une escalade
+            // ait été mesurée : on ne laisse pas la conclusion sans consigne pour autant.
+            recos.Add(Lang.T(
+                "Tester la machine sans la carte graphique — écran branché sur la sortie vidéo de la carte mère si le processeur en possède une — ou permuter la carte avec celle d'un autre poste. C'est le seul test qui sépare la carte du reste, et il ne coûte rien.",
+                "Test the machine without the graphics card — monitor plugged into the motherboard's video output if the processor has one — or swap the card with another machine's. It is the only test that separates the card from everything else, and it costs nothing."));
+        }
+
+        var titre = Lang.T(
+            $"Instabilité graphique : {gels.Count} gel(s) du moteur, {tdr.Count} réinitialisation(s) journalisée(s), {gpuBsods.Count} écran(s) bleu(s)",
+            $"Graphics instability: {gels.Count} engine hang(s), {tdr.Count} logged reset(s), {gpuBsods.Count} blue screen(s)");
+
+        var details = Lang.T(
+            $"Le pilote d'affichage a cessé de répondre{(drivers.Count > 0 ? $" — pilote : {string.Join(", ", drivers!)}" : "")}.",
+            $"The display driver stopped responding{(drivers.Count > 0 ? $" — driver: {string.Join(", ", drivers!)}" : "")}.")
+            + (r.System.Gpus.Count > 0
+                ? Lang.T($" Matériel concerné : {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (pilote {g.DriverVersion} du {g.DriverDate:dd/MM/yyyy})"))}.", $" Hardware involved: {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (driver {g.DriverVersion} dated {g.DriverDate:yyyy-MM-dd})"))}.")
+                : "")
+            + (faits.Count > 0 ? " " + string.Join(" ", faits) : "");
+
         r.Findings.Add(new Finding
         {
-            Severity = gpuBsods.Count > 0 ? Severity.Critical : Severity.Warning,
-            Confidence = (tdr.Count + gpuBsods.Count) >= 3 ? Confidence.High : Confidence.Medium,
+            Severity = gpuBsods.Count > 0 || materielDesigne ? Severity.Critical : Severity.Warning,
+            Confidence = (tdr.Count + gpuBsods.Count + gels.Count) >= 3 ? Confidence.High : Confidence.Medium,
             Category = FaultCategory.GpuDriver,
-            Title = Lang.T($"Instabilité du pilote graphique ({tdr.Count} réinitialisation(s), {gpuBsods.Count} BSOD)", $"Display driver instability ({tdr.Count} reset(s), {gpuBsods.Count} BSOD)"),
-            Details = Lang.T($"Le pilote d'affichage a cessé de répondre puis a été récupéré (TDR){(drivers.Count > 0 ? $" — pilote : {string.Join(", ", drivers!)}" : "")}.", $"The display driver stopped responding and was recovered (TDR){(drivers.Count > 0 ? $" — driver: {string.Join(", ", drivers!)}" : "")}.")
-                      + Lang.T(" Des TDR répétés indiquent pilote GPU instable, surchauffe GPU ou carte défaillante.", " Repeated TDRs indicate an unstable GPU driver, GPU overheating or a failing card.")
-                      + (r.System.Gpus.Count > 0
-                          ? Lang.T($" Matériel concerné : {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (pilote {g.DriverVersion} du {g.DriverDate:dd/MM/yyyy})"))}.", $" Hardware involved: {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (driver {g.DriverVersion} dated {g.DriverDate:yyyy-MM-dd})"))}.")
-                          : ""),
-            Recommendation = Lang.T("Désinstallation propre du pilote (DDU en mode sans échec) puis installation de la dernière version stable ; surveiller la température GPU en charge ; tester sans overclocking.", "Clean driver removal (DDU in safe mode) then install the latest stable version; watch the GPU temperature under load; test without overclocking.")
+            Title = titre,
+            Details = details,
+            Recommendation = string.Join(" ", recos)
         });
     }
 

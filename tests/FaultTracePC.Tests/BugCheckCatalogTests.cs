@@ -54,8 +54,13 @@ public class BugCheckCatalogTests
             Assert.Equal("DPC_WATCHDOG_VIOLATION", BugCheckCatalog.NameOf(0x133));
             Lang.Apply(AppLanguage.French);
             Assert.Equal("DPC_WATCHDOG_VIOLATION", BugCheckCatalog.NameOf(0x133));
-            // Code absent du catalogue : même forme dans les deux langues.
-            Assert.Equal("BUGCODE_0xABCDEF", BugCheckCatalog.NameOf(0xABCDEF));
+            // Code absent du catalogue : le code brut, même forme dans les deux langues.
+            // Surtout pas un nom fabriqué qui ressemblerait à un identifiant Microsoft.
+            Assert.Equal("0x00ABCDEF", BugCheckCatalog.NameOf(0xABCDEF));
+            Assert.DoesNotContain("BUGCODE", BugCheckCatalog.NameOf(0xABCDEF));
+            // Les codes de vidage « en direct » doivent être nommés, pas laissés au repli.
+            Assert.Equal("VIDEO_ENGINE_TIMEOUT_DETECTED", BugCheckCatalog.NameOf(0x141));
+            Assert.Equal("BUGCODE_USB3_DRIVER", BugCheckCatalog.NameOf(0x144));
         }
         finally
         {

@@ -39,8 +39,8 @@ public sealed class FlightJournalCollector
             // Bilan thermique : on cumule au fil de la lecture, sans second passage
             // sur des journaux qui peuvent peser plusieurs dizaines de mégaoctets.
             var thresholds = AlertSettings.Load();
-            var cpuThermal = new Analysis.ThermalHistory("Processeur", thresholds.CpuTempWarn, thresholds.CpuTempCrit);
-            var gpuThermal = new Analysis.ThermalHistory("Carte graphique", thresholds.GpuTempWarn, thresholds.GpuTempCrit);
+            var cpuThermal = new Analysis.ThermalHistory(Analysis.ThermalHistory.CapteurCpu, thresholds.CpuTempWarn, thresholds.CpuTempCrit);
+            var gpuThermal = new Analysis.ThermalHistory(Analysis.ThermalHistory.CapteurGpu, thresholds.GpuTempWarn, thresholds.GpuTempCrit);
 
             var targets = crashTimes.Distinct().OrderBy(t => t).ToList();
             var window = new Queue<FlightSample>(WindowSize + 1);

@@ -38,7 +38,10 @@ public static class BugCheckCatalog
         Entries.TryGetValue(code, out var e) ? e : null;
 
     public static string NameOf(uint code) =>
-        Lookup(code)?.Name ?? $"BUGCODE_0x{code:X}";
+        // Repli : on affiche le code brut, pas un nom fabriqué. « BUGCODE_0x141 »
+        // ressemblait à s'y méprendre à un nom officiel Microsoft et donnait à croire
+        // que le code avait été identifié, alors qu'il manquait simplement au catalogue.
+        Lookup(code)?.Name ?? $"0x{code:X8}";
 
     public static readonly IReadOnlyDictionary<uint, BugCheckEntry> Entries = new Dictionary<uint, BugCheckEntry>
     {
@@ -132,6 +135,20 @@ public static class BugCheckCatalog
             "Internal video scheduler error — GPU driver.",
             "Installation propre du pilote graphique.",
             "Clean reinstall of the display driver."),
+        // Vidage « en direct » : Windows l'écrit SANS écran bleu, quand un moteur
+        // d'affichage a cessé de répondre et a pu être réinitialisé. Ces fichiers ne
+        // laissent aucune trace dans le journal d'événements : sans les compter, une
+        // carte qui se fige plusieurs fois par semaine passe pour parfaitement saine.
+        [0x141] = new("VIDEO_ENGINE_TIMEOUT_DETECTED", FaultCategory.GpuDriver,
+            "Un moteur de la carte graphique n'a pas répondu dans le temps imparti. Windows l'a réinitialisé sans écran bleu — l'écran a pu clignoter ou noircir une seconde.",
+            "One of the graphics card's engines failed to respond in time. Windows reset it without a blue screen — the display may have flickered or gone black for a second.",
+            "Isolé, c'est bénin. Répété, c'est le premier signe d'une carte qui se dégrade : comparer le nombre de gels d'une analyse à l'autre, et vérifier s'ils se terminent de plus en plus souvent par un écran bleu.",
+            "On its own this is harmless. Repeated, it is the first sign of a card that is degrading: compare the number of hangs from one scan to the next, and check whether they increasingly end in a blue screen."),
+        [0x144] = new("BUGCODE_USB3_DRIVER", FaultCategory.Driver,
+            "Le contrôleur USB 3 a cessé de répondre. Windows l'a réinitialisé sans écran bleu — un périphérique USB a pu se déconnecter brièvement.",
+            "The USB 3 controller stopped responding. Windows reset it without a blue screen — a USB device may have briefly disconnected.",
+            "Souvent un périphérique ou un câble USB en cause plutôt que la machine : débrancher les périphériques un par un pour identifier le fautif ; mettre à jour les pilotes chipset.",
+            "Often a USB device or cable rather than the machine: unplug the devices one at a time to find the culprit; update the chipset drivers."),
         [0x124] = new("WHEA_UNCORRECTABLE_ERROR", FaultCategory.Hardware,
             "Erreur matérielle fatale remontée par le processeur (WHEA) — CPU, carte mère, alimentation, surchauffe ou overclocking instable.",
             "Fatal hardware error reported by the processor (WHEA) — CPU, motherboard, power supply, overheating or unstable overclocking.",
