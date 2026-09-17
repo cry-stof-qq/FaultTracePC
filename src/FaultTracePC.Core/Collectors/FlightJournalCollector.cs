@@ -21,6 +21,31 @@ public sealed class FlightJournalCollector
 
     public FlightJournalCollector(List<string> errors) => _errors = errors;
 
+    /// <summary>Deux instants plus proches que cela désignent le même incident.</summary>
+    private static readonly TimeSpan MemeIncident = TimeSpan.FromMinutes(3);
+
+    /// <summary>
+    /// Un seul plantage arrive ici plusieurs fois : l'en-tête du vidage, l'événement
+    /// Kernel-Power et la date du fichier ne donnent pas la même seconde. Sans
+    /// regroupement, le rapport affichait deux ou trois fois le MÊME tableau
+    /// d'échantillons sous des titres à une minute d'écart — on croyait à des incidents
+    /// distincts là où il n'y en avait qu'un.
+    ///
+    /// On garde l'instant le PLUS TARDIF de chaque groupe : c'est celui qui est le plus
+    /// proche de l'arrêt réel, donc celui dont la fenêtre d'échantillons est la plus complète.
+    /// </summary>
+    internal static List<DateTime> Regrouper(IReadOnlyCollection<DateTime> instants)
+    {
+        var tries = instants.Distinct().OrderBy(t => t).ToList();
+        var groupes = new List<DateTime>();
+        foreach (var t in tries)
+        {
+            if (groupes.Count > 0 && t - groupes[^1] <= MemeIncident) groupes[^1] = t;
+            else groupes.Add(t);
+        }
+        return groupes;
+    }
+
     public FlightInfo Collect(IReadOnlyCollection<DateTime> crashTimes, int days)
     {
         var info = new FlightInfo();
@@ -42,7 +67,7 @@ public sealed class FlightJournalCollector
             var cpuThermal = new Analysis.ThermalHistory(Analysis.ThermalHistory.CapteurCpu, thresholds.CpuTempWarn, thresholds.CpuTempCrit);
             var gpuThermal = new Analysis.ThermalHistory(Analysis.ThermalHistory.CapteurGpu, thresholds.GpuTempWarn, thresholds.GpuTempCrit);
 
-            var targets = crashTimes.Distinct().OrderBy(t => t).ToList();
+            var targets = Regrouper(crashTimes);
             var window = new Queue<FlightSample>(WindowSize + 1);
             var contexts = new Dictionary<DateTime, FlightCrashContext>();
 

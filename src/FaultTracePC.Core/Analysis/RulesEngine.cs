@@ -361,7 +361,11 @@ public sealed class RulesEngine
             var inv = Collectors.DriverCollector.FindBySysName(r.System.Drivers, g.Key);
             var invInfo = inv is null ? ""
                 : Lang.T($" Pilote installé : {inv.DisplayName} — {inv.CompanyName} v{inv.FileVersion}", $" Installed driver: {inv.DisplayName} — {inv.CompanyName} v{inv.FileVersion}")
-                  + (inv.FileDate is { } fd ? Lang.T($" du {fd:dd/MM/yyyy}", $" dated {fd:yyyy-MM-dd}") : "") + ".";
+                  // Deux dates coexistent pour un même pilote : celle du FICHIER .sys et
+                  // celle du PAQUET déclaré par Windows. Les afficher toutes deux comme
+                  // « le pilote du … » donnait deux dates contradictoires dans le même
+                  // rapport. On dit désormais laquelle on montre.
+                  + (inv.FileDate is { } fd ? Lang.T($" (fichier du {fd:dd/MM/yyyy})", $" (file dated {fd:yyyy-MM-dd})") : "") + ".";
             bool isMicrosoft = inv?.IsMicrosoft ?? false;
 
             // Le pilote a-t-il été mis à jour APRÈS le dernier crash ? Si oui, le correctif
@@ -1336,8 +1340,8 @@ public sealed class RulesEngine
             {
                 materielDesigne = true;
                 faits.Add(Lang.T(
-                    $"Le premier gel date du {premierGel:dd/MM/yyyy}, soit AVANT l'installation du pilote actuellement en place ({string.Join(" ; ", pilotesPosterieurs.Select(g => $"{g.DriverVersion} du {g.DriverDate:dd/MM/yyyy}"))}). Le pilote installé aujourd'hui ne peut donc pas avoir causé un symptôme qui lui est antérieur.",
-                    $"The first hang dates from {premierGel:yyyy-MM-dd}, i.e. BEFORE the currently installed driver ({string.Join(" ; ", pilotesPosterieurs.Select(g => $"{g.DriverVersion} dated {g.DriverDate:yyyy-MM-dd}"))}). The driver in place today therefore cannot have caused a symptom that predates it."));
+                    $"Le premier gel date du {premierGel:dd/MM/yyyy}, soit AVANT l'installation du pilote actuellement en place ({string.Join(" ; ", pilotesPosterieurs.Select(g => $"{g.DriverVersion}, paquet du {g.DriverDate:dd/MM/yyyy}"))}). Le pilote installé aujourd'hui ne peut donc pas avoir causé un symptôme qui lui est antérieur.",
+                    $"The first hang dates from {premierGel:yyyy-MM-dd}, i.e. BEFORE the currently installed driver ({string.Join(" ; ", pilotesPosterieurs.Select(g => $"{g.DriverVersion}, package dated {g.DriverDate:yyyy-MM-dd}"))}). The driver in place today therefore cannot have caused a symptom that predates it."));
             }
         }
 
@@ -1375,7 +1379,7 @@ public sealed class RulesEngine
             $"Le pilote d'affichage a cessé de répondre{(drivers.Count > 0 ? $" — pilote : {string.Join(", ", drivers!)}" : "")}.",
             $"The display driver stopped responding{(drivers.Count > 0 ? $" — driver: {string.Join(", ", drivers!)}" : "")}.")
             + (r.System.Gpus.Count > 0
-                ? Lang.T($" Matériel concerné : {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (pilote {g.DriverVersion} du {g.DriverDate:dd/MM/yyyy})"))}.", $" Hardware involved: {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (driver {g.DriverVersion} dated {g.DriverDate:yyyy-MM-dd})"))}.")
+                ? Lang.T($" Matériel concerné : {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (pilote {g.DriverVersion}, paquet du {g.DriverDate:dd/MM/yyyy})"))}.", $" Hardware involved: {string.Join(" ; ", r.System.Gpus.Select(g => $"{g.Name} (driver {g.DriverVersion}, package dated {g.DriverDate:yyyy-MM-dd})"))}.")
                 : "")
             + (faits.Count > 0 ? " " + string.Join(" ", faits) : "");
 

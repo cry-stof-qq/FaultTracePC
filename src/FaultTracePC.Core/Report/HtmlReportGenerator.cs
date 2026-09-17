@@ -473,6 +473,12 @@ public static class HtmlReportGenerator
         foreach (var ctx in f.Contexts.Take(6))
         {
             sb.Append(Lang.T($"<h4 class=\"ctxtitle\">Dernières secondes avant l'incident du {ctx.CrashTime:dd/MM/yyyy HH:mm}</h4>", $"<h4 class=\"ctxtitle\">Last seconds before the incident of {ctx.CrashTime:yyyy-MM-dd HH:mm}</h4>"));
+            // Un tableau qui s'arrête bien avant l'heure annoncée passe pour une fin de
+            // tableau. C'est en réalité l'échantillonneur qui a cessé de répondre en même
+            // temps que la machine : ce silence est une mesure, il doit être écrit.
+            if (ctx.SilenceBefore is { } silence && silence.TotalSeconds >= 20)
+                sb.Append(Lang.T($"<p class=\"small\">Aucun relevé pendant les <strong>{silence.TotalSeconds:0} secondes</strong> qui précèdent l'incident : la surveillance elle-même a cessé de répondre. Ce silence fait partie du constat.</p>",
+                                 $"<p class=\"small\">No readings for the <strong>{silence.TotalSeconds:0} seconds</strong> leading up to the incident: the monitoring itself stopped responding. That silence is part of the finding.</p>"));
             sb.Append(Lang.T("<table><thead><tr><th>Heure</th><th>CPU %</th><th>Temp. CPU</th><th>Temp. GPU</th><th>RAM %</th><th>Mém. virtuelle %</th><th>Plus gros processus</th></tr></thead><tbody>", "<table><thead><tr><th>Time</th><th>CPU %</th><th>CPU temp.</th><th>GPU temp.</th><th>RAM %</th><th>Virtual mem. %</th><th>Largest processes</th></tr></thead><tbody>"));
             foreach (var s in ctx.Samples)
             {
@@ -628,7 +634,9 @@ public static class HtmlReportGenerator
         Card(sb, Lang.T("Cartes graphiques", "Graphics cards"),
             s.Gpus.Count == 0 ? Lang.T("aucune détectée", "none detected")
             : string.Join("<br>", s.Gpus.Select(g =>
-                Lang.T($"{H(g.Name)} — pilote {H(g.DriverVersion)} du ", $"{H(g.Name)} — driver {H(g.DriverVersion)} dated ")
+                // « paquet du » et non « du » : la date du paquet INF n'est pas celle du
+                // fichier .sys, que la conclusion sur le pilote fautif affiche par ailleurs.
+                Lang.T($"{H(g.Name)} — pilote {H(g.DriverVersion)}, paquet du ", $"{H(g.Name)} — driver {H(g.DriverVersion)}, package dated ")
                 + (g.DriverDate is { } dateGpu ? Lang.Date(dateGpu) : "—"))));
 
         Card(sb, Lang.T("Disques physiques", "Physical drives"),

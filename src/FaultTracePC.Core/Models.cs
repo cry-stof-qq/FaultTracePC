@@ -437,6 +437,14 @@ public sealed class FlightCrashContext
     public DateTime CrashTime { get; set; }
     public string Trigger { get; set; } = "";
     public List<FlightSample> Samples { get; set; } = new();
+
+    /// <summary>
+    /// Temps écoulé entre le dernier relevé et l'heure de l'incident. Un écart de
+    /// plusieurs dizaines de secondes n'est pas un trou dans les données : c'est la
+    /// machine qui a cessé de répondre avant de tomber, et c'est une mesure en soi.
+    /// </summary>
+    public TimeSpan? SilenceBefore =>
+        Samples.Count == 0 ? null : CrashTime - Samples[^1].Time;
 }
 
 /// <summary>
