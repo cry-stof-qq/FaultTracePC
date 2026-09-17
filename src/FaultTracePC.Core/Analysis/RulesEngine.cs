@@ -1027,6 +1027,35 @@ public sealed class RulesEngine
         }
     }
 
+    /// <summary>
+    /// Support amovible (clé USB, disque externe, lecteur de cartes) ?
+    ///
+    /// La distinction n'est pas cosmétique : sur une clé USB, les conseils habituels
+    /// — gestion d'alimentation du lien PCI Express, câble SATA, firmware du SSD —
+    /// n'ont aucun sens. Les servir quand même envoie l'utilisateur démonter une
+    /// machine saine pour un support qu'il suffisait de remplacer.
+    /// </summary>
+    private static bool EstAmovible(DiskInfo d) =>
+        d.InterfaceType.Contains("USB", StringComparison.OrdinalIgnoreCase)
+        || d.InterfaceType.Contains("1394", StringComparison.OrdinalIgnoreCase)
+        || d.Model.Contains("USB Device", StringComparison.OrdinalIgnoreCase)
+        || d.Model.Contains("Flash Disk", StringComparison.OrdinalIgnoreCase)
+        || d.Model.Contains("Card Reader", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Disques de la machine réellement mis en cause par les événements cités.</summary>
+    private static List<DiskInfo> DisquesMisEnCause(List<(string Device, int Count)> devices, List<DiskInfo> inventaire)
+    {
+        var trouves = new List<DiskInfo>();
+        foreach (var (device, _) in devices)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(device, @"Harddisk(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!m.Success || !int.TryParse(m.Groups[1].Value, out var idx)) continue;
+            var d = inventaire.FirstOrDefault(x => x.Index == idx);
+            if (d is not null && !trouves.Contains(d)) trouves.Add(d);
+        }
+        return trouves;
+    }
+
     private static void AnalyzeStorage(DiagnosticReport r)
     {
         var diskEvents = r.Events.Where(e => e.Category == EventCategory.DiskError).ToList();
@@ -1062,6 +1091,15 @@ public sealed class RulesEngine
                 .Select(g => $"{g.Key} ×{g.Count()}").ToList();
 
             var devices = DevicesCited(diskEvents);
+
+            // Point 60 : séparer AVANT de conseiller. Douze erreurs réparties entre une
+            // clé USB, un volume et un port de contrôleur ne demandent pas les mêmes
+            // gestes, et un chiffre unique le cachait.
+            var misEnCause = DisquesMisEnCause(devices, r.System.Disks);
+            var amovibles = misEnCause.Where(EstAmovible).ToList();
+            var fixesMisEnCause = misEnCause.Where(d => !EstAmovible(d)).ToList();
+            bool queDeLAmovible = amovibles.Count > 0 && fixesMisEnCause.Count == 0;
+
             var resets = diskEvents.Count(e => e.EventId == 129);
             var paging = diskEvents.Count(e => e.Provider.Equals("disk", StringComparison.OrdinalIgnoreCase) && e.EventId == 51);
 
@@ -1083,6 +1121,9 @@ public sealed class RulesEngine
             {
                 Severity = storageBsods.Count > 0 ? Severity.Critical
                          : tousAbsents ? Severity.Info
+                         // Une clé USB fatiguée n'est pas un avertissement sur la machine :
+                         // elle se remplace pour trois euros et n'annonce aucune panne du poste.
+                         : queDeLAmovible ? Severity.Info
                          : Severity.Warning,
                 Confidence = storageBsods.Count > 0 ? Confidence.High : Confidence.Medium,
                 Category = FaultCategory.Storage,
@@ -1094,8 +1135,12 @@ public sealed class RulesEngine
                           + " " + DescribeDevices(devices, r.System.Disks, diskEvents)
                           + (resets > 0 ? Lang.T($" {resets} de ces événements sont des réinitialisations de contrôleur (ID 129) : l'opération a été retentée, pas perdue.", $" {resets} of those events are controller resets (ID 129): the operation was retried, not lost.") : "")
                           + (paging > 0 ? Lang.T($" {paging} concernent une opération de pagination (disk 51) — Windows lisait ou écrivait le fichier d'échange.", $" {paging} concern a paging operation (disk 51) — Windows was reading from or writing to the page file.") : "")
-                          + (tousAbsents ? Lang.T(" Aucun disque actuellement monté sur cette machine n'est mis en cause : ces erreurs concernent uniquement des supports qui ne sont plus connectés.", " No drive currently mounted on this machine is implicated: these errors concern only media that are no longer connected.") : ""),
-                Recommendation = StorageAdvice(r.System.Disks, devices, resets, paging, tousAbsents)
+                          + (tousAbsents ? Lang.T(" Aucun disque actuellement monté sur cette machine n'est mis en cause : ces erreurs concernent uniquement des supports qui ne sont plus connectés.", " No drive currently mounted on this machine is implicated: these errors concern only media that are no longer connected.") : "")
+                          + (amovibles.Count > 0
+                              ? Lang.T($" {(queDeLAmovible ? "Tous les disques mis en cause sont des supports AMOVIBLES" : "Une partie des disques mis en cause sont des supports AMOVIBLES")} ({string.Join(", ", amovibles.Select(d => d.Model))}) : sur ce type de support, ni la gestion d'alimentation du lien, ni un câble SATA, ni le firmware d'un SSD ne sont en jeu.",
+                                       $" {(queDeLAmovible ? "Every disk implicated is REMOVABLE media" : "Some of the disks implicated are REMOVABLE media")} ({string.Join(", ", amovibles.Select(d => d.Model))}): on that kind of medium, neither link power management, nor a SATA cable, nor SSD firmware is involved.")
+                              : ""),
+                Recommendation = StorageAdvice(r.System.Disks, devices, resets, paging, tousAbsents, amovibles, fixesMisEnCause)
             });
         }
     }
@@ -1206,9 +1251,14 @@ public sealed class RulesEngine
     /// seul disque est un NVMe lui fait chercher un câble qui n'existe pas.
     /// </summary>
     private static string StorageAdvice(
-        List<DiskInfo> inventory, List<(string Device, int Count)> devices, int resets, int paging, bool tousAbsents)
+        List<DiskInfo> inventory, List<(string Device, int Count)> devices, int resets, int paging, bool tousAbsents,
+        List<DiskInfo> amovibles, List<DiskInfo> fixesMisEnCause)
     {
-        bool anySata = inventory.Any(d => !IsNvme(d));
+        // Un conseil ne vaut que pour le matériel qu'il vise. Si les seuls disques mis
+        // en cause sont amovibles, les gestes machine — lien PCI Express, câble SATA,
+        // firmware SSD — ne s'appliquent à rien de ce qui a produit ces erreurs.
+        bool queDeLAmovible = amovibles.Count > 0 && fixesMisEnCause.Count == 0;
+        bool anySata = !queDeLAmovible && inventory.Any(d => !IsNvme(d));
         bool unknownDevice = devices.Any(d =>
         {
             var hd = System.Text.RegularExpressions.Regex.Match(d.Device, @"Harddisk(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -1228,9 +1278,16 @@ public sealed class RulesEngine
 
         var steps = new List<string>();
 
+        if (amovibles.Count > 0)
+            steps.Add(Lang.T(
+                $"Traiter d'abord le support amovible mis en cause ({string.Join(", ", amovibles.Select(d => d.Model))}) : le tester sur une autre machine, en recopier le contenu, et le remplacer s'il recommence. "
+                + "Une clé ou un disque externe fatigué produit exactement ces erreurs sans que la machine y soit pour quoi que ce soit.",
+                $"Deal first with the removable medium implicated ({string.Join(", ", amovibles.Select(d => d.Model))}): test it on another machine, copy its contents off, and replace it if it recurs. "
+                + "A worn USB stick or external drive produces exactly these errors without the machine being at fault."));
+
         // La cause la plus fréquemment documentée des réinitialisations de contrôleur
         // n'est ni un disque mourant ni un câble : c'est la mise en veille du lien.
-        if (resets > 0)
+        if (resets > 0 && !queDeLAmovible)
             steps.Add(Lang.T(
                 "Commencer par la gestion d'alimentation des liens, cause la plus fréquemment documentée de ces réinitialisations : "
                 + "Options d'alimentation → Modifier les paramètres avancés → PCI Express → Gestion de l'alimentation à l'état de liaison → Désactivé, "
@@ -1252,7 +1309,8 @@ public sealed class RulesEngine
         if (anySata)
             steps.Add(Lang.T("Sur les disques SATA, vérifier le câble de données et l'alimentation — une erreur de liaison se prend souvent pour un disque en fin de vie.", "On SATA drives, check the data cable and the power connector — a link error is often mistaken for a dying drive."));
 
-        steps.Add(Lang.T("Mettre à jour le firmware du SSD et les pilotes de contrôleur de stockage du fabricant.", "Update the SSD firmware and the manufacturer's storage controller drivers."));
+        if (!queDeLAmovible)
+            steps.Add(Lang.T("Mettre à jour le firmware du SSD et les pilotes de contrôleur de stockage du fabricant.", "Update the SSD firmware and the manufacturer's storage controller drivers."));
         steps.Add(Lang.T("Surveiller l'ÉVOLUTION des compteurs SMART d'une analyse à l'autre : c'est la progression qui annonce une panne, pas la valeur atteinte.", "Watch the TREND of the SMART counters from one analysis to the next: it is the progression that announces a failure, not the value reached."));
 
         return string.Join(" ", steps.Select((s, i) => $"{i + 1}. {s}"));
