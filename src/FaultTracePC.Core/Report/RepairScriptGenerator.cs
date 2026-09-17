@@ -111,6 +111,28 @@ public static class RepairScriptGenerator
         sb.AppendLine(Lang.T("Write-Host ('Mémoire libre : {0:N1} Go' -f ((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1MB))", "Write-Host ('Free memory: {0:N1} GB' -f ((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1MB))"));
         sb.AppendLine();
 
+        // ------------------------------------- ce que le diagnostic a réellement trouvé
+        // POINT 63. Le script raisonnait par FAMILLES de panne : il proposait les mêmes
+        // gestes à toutes les machines d'une même catégorie, sans jamais reprendre ce
+        // que le rapport avait mesuré sur CELLE-CI. On a vu le résultat le 17/09/2026 :
+        // dix pilotes de 2021 présentés comme « premiers suspects » alors que l'analyse
+        // symbolique nommait nvlddmkm.sys dans cinq dumps sur cinq, et une consigne de
+        // surveiller une température déjà mesurée pendant 94 heures.
+        // Le script commence donc par rappeler les conclusions, avec leur recommandation.
+        var conclusions = r.Findings.Where(f => f.Severity != Severity.Info).ToList();
+        if (conclusions.Count > 0)
+        {
+            sb.AppendLine(Lang.T("Section 'Ce que le diagnostic a trouvé sur CETTE machine'", "Section 'What the diagnosis found on THIS machine'"));
+            foreach (var f in conclusions)
+            {
+                sb.AppendLine($"Write-Host '  - {PsEscape(UneLigne(f.Title))}' -ForegroundColor Yellow");
+                if (!string.IsNullOrWhiteSpace(f.Recommendation))
+                    sb.AppendLine($"Write-Host '      {PsEscape(UneLigne(f.Recommendation))}'");
+            }
+            sb.AppendLine(Lang.T("Write-Host 'Les sections qui suivent complètent ces conclusions ; elles ne les remplacent pas.' -ForegroundColor Gray", "Write-Host 'The sections below complement these conclusions; they do not replace them.' -ForegroundColor Gray"));
+            sb.AppendLine();
+        }
+
         // --------------------------------------- intégrité système (logiciel)
         if (cats.Contains(FaultCategory.Software) || cats.Contains(FaultCategory.WindowsUpdate) ||
             cats.Contains(FaultCategory.Driver) || hasBsod)
@@ -192,11 +214,40 @@ public static class RepairScriptGenerator
         {
             sb.AppendLine(Lang.T("Section 'Pilote graphique'", "Section 'Display driver'"));
             sb.AppendLine("Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, DriverDate | Format-Table -AutoSize");
-            sb.AppendLine(Lang.T("Write-Host 'Procédure recommandée (manuelle) :' -ForegroundColor Yellow", "Write-Host 'Recommended procedure (manual):' -ForegroundColor Yellow"));
-            sb.AppendLine(Lang.T("Write-Host '  1. Télécharger le dernier pilote (NVIDIA/AMD/Intel) ET l''outil DDU (Display Driver Uninstaller).'", "Write-Host '  1. Download the latest driver (NVIDIA/AMD/Intel) AND the DDU tool (Display Driver Uninstaller).'"));
-            sb.AppendLine(Lang.T("Write-Host '  2. Mode sans échec > DDU > « Nettoyer et redémarrer ».'", "Write-Host '  2. Safe mode > DDU > “Clean and restart”.'"));
-            sb.AppendLine(Lang.T("Write-Host '  3. Installer le pilote téléchargé, SANS les logiciels annexes.'", "Write-Host '  3. Install the downloaded driver, WITHOUT the extra software.'"));
-            sb.AppendLine(Lang.T("Write-Host '  4. Surveiller la température GPU en charge (HWiNFO) : au-delà de ~85 °C soutenu, dépoussiérer/ventiler.'", "Write-Host '  4. Watch the GPU temperature under load (HWiNFO): above ~85 °C sustained, clear the dust and improve airflow.'"));
+
+            // La température a DÉJÀ été mesurée par la boîte noire, parfois pendant des
+            // jours. Demander à l'utilisateur d'aller la relever avec un autre outil,
+            // c'est lui faire refaire le travail — et laisser croire que la question
+            // reste ouverte alors qu'elle est tranchée.
+            var thermiqueGpu = r.Flight.Thermal.FirstOrDefault(t => t.Sensor == Analysis.ThermalHistory.CapteurGpu && t.HasData);
+            if (thermiqueGpu?.MaxC is { } maxGpu)
+            {
+                // Apostrophes simples : PsEscape les doublera pour PowerShell. Les doubler
+                // ici aussi les ferait apparaître en double à l'écran.
+                var mesure = thermiqueGpu.AboveWarn <= TimeSpan.Zero
+                    ? Lang.T($"Température GPU déjà mesurée par FaultTracePC : maximum {maxGpu:0.#} °C sur {Analysis.ThermalHistory.Humanize(thermiqueGpu.Observed)} de relevés, jamais au-dessus du seuil d'alerte. La surchauffe est écartée : inutile de la vérifier à nouveau.",
+                             $"GPU temperature already measured by FaultTracePC: peak {maxGpu:0.#} °C over {Analysis.ThermalHistory.Humanize(thermiqueGpu.Observed)} of readings, never above the warning threshold. Overheating is ruled out; no need to check it again.")
+                    : Lang.T($"Température GPU mesurée par FaultTracePC : maximum {maxGpu:0.#} °C, dont {Analysis.ThermalHistory.Humanize(thermiqueGpu.AboveWarn)} au-dessus du seuil d'alerte. Dépoussiérer et vérifier la ventilation.",
+                             $"GPU temperature measured by FaultTracePC: peak {maxGpu:0.#} °C, of which {Analysis.ThermalHistory.Humanize(thermiqueGpu.AboveWarn)} above the warning threshold. Clear the dust and check the airflow.");
+                sb.AppendLine($"Write-Host '{PsEscape(UneLigne(mesure))}' -ForegroundColor Yellow");
+            }
+
+            // La conclusion graphique du rapport sait si c'est le pilote ou la carte qui
+            // est en cause. Réimprimer une procédure DDU par-dessus reviendrait à
+            // conseiller de refaire ce qui vient d'échouer.
+            var conclusionGpu = r.Findings.FirstOrDefault(f => f.Category == FaultCategory.GpuDriver && f.Severity != Severity.Info);
+            if (conclusionGpu is not null && !string.IsNullOrWhiteSpace(conclusionGpu.Recommendation))
+            {
+                sb.AppendLine(Lang.T("Write-Host 'Consigne issue du diagnostic de cette machine :' -ForegroundColor Yellow", "Write-Host 'Instruction taken from this machine''s diagnosis:' -ForegroundColor Yellow"));
+                sb.AppendLine($"Write-Host '  {PsEscape(UneLigne(conclusionGpu.Recommendation))}'");
+            }
+            else
+            {
+                sb.AppendLine(Lang.T("Write-Host 'Procédure recommandée (manuelle) :' -ForegroundColor Yellow", "Write-Host 'Recommended procedure (manual):' -ForegroundColor Yellow"));
+                sb.AppendLine(Lang.T("Write-Host '  1. Télécharger le dernier pilote (NVIDIA/AMD/Intel) ET l''outil DDU (Display Driver Uninstaller).'", "Write-Host '  1. Download the latest driver (NVIDIA/AMD/Intel) AND the DDU tool (Display Driver Uninstaller).'"));
+                sb.AppendLine(Lang.T("Write-Host '  2. Mode sans échec > DDU > « Nettoyer et redémarrer ».'", "Write-Host '  2. Safe mode > DDU > “Clean and restart”.'"));
+                sb.AppendLine(Lang.T("Write-Host '  3. Installer le pilote téléchargé, SANS les logiciels annexes.'", "Write-Host '  3. Install the downloaded driver, WITHOUT the extra software.'"));
+            }
             sb.AppendLine();
         }
 
@@ -204,13 +255,35 @@ public static class RepairScriptGenerator
         if (cats.Contains(FaultCategory.Driver) || hasBsod)
         {
             sb.AppendLine(Lang.T("Section 'Pilotes tiers'", "Section 'Third-party drivers'"));
+
+            // POINT 63. L'analyse symbolique des dumps a peut-être DÉSIGNÉ un module.
+            // Le script listait quand même dix pilotes anciens comme « premiers
+            // suspects » : c'est la liste des plus vieux, pas celle des coupables. On
+            // met donc d'abord ce qui est établi, et on requalifie le reste.
+            var designes = r.Dumps
+                .Where(d => d.DeepAnalyzed && !string.IsNullOrWhiteSpace(d.FaultingModule))
+                .GroupBy(d => d.FaultingModule!, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(g => g.Count())
+                .ToList();
+            if (designes.Count > 0)
+            {
+                sb.AppendLine(Lang.T("Write-Host 'DÉSIGNÉ par l''analyse symbolique des vidages (WinDbg) — c''est le suspect établi :' -ForegroundColor Red", "Write-Host 'NAMED by the symbolic dump analysis (WinDbg) — this is the established suspect:' -ForegroundColor Red"));
+                foreach (var g in designes)
+                {
+                    var ligne = Lang.T($"  - {g.Key} — cité dans {g.Count()} vidage(s) sur {r.Dumps.Count(d => d.DeepAnalyzed)} analysé(s)",
+                                       $"  - {g.Key} — named in {g.Count()} dump(s) out of {r.Dumps.Count(d => d.DeepAnalyzed)} analysed");
+                    sb.AppendLine($"Write-Host '{PsEscape(UneLigne(ligne))}'");
+                }
+                sb.AppendLine(Lang.T("Write-Host 'Traiter celui-là en premier. La liste ci-dessous n''est qu''un inventaire d''ancienneté, pas une accusation.' -ForegroundColor Yellow", "Write-Host 'Deal with that one first. The list below is only an age inventory, not an accusation.' -ForegroundColor Yellow"));
+            }
+
             var old = r.System.Drivers
                 .Where(d => !d.IsMicrosoft && d.FileDate is { } fd && fd < DateTime.Now.AddYears(-4) &&
                             d.State.Equals("Running", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(d => d.FileDate).Take(15).ToList();
             if (old.Count > 0)
             {
-                sb.AppendLine(Lang.T("Write-Host 'Pilotes tiers ANCIENS détectés par FaultTracePC (les premiers suspects en cas de BSOD) :' -ForegroundColor Yellow", "Write-Host 'OLD third-party drivers found by FaultTracePC (the first suspects after a BSOD):' -ForegroundColor Yellow"));
+                sb.AppendLine(Lang.T("Write-Host 'Pilotes tiers ANCIENS présents sur la machine — inventaire par ancienneté, aucun n''est accusé par l''analyse :' -ForegroundColor Yellow", "Write-Host 'OLD third-party drivers present on the machine — an inventory by age; none is accused by the analysis:' -ForegroundColor Yellow"));
                 foreach (var d in old)
                 {
                     // Lang.T sorti de l'interpolation : à l'intérieur d'un trou, il
@@ -391,6 +464,14 @@ public static class RepairScriptGenerator
     /// typographie ; dans une console PowerShell, la différence est invisible, et
     /// un script qui démarre vaut mieux qu'une apostrophe élégante.
     /// </summary>
+    /// <summary>
+    /// Une conclusion écrite pour un rapport HTML peut contenir des retours à la ligne.
+    /// Injectée telle quelle dans un <c>Write-Host '…'</c>, elle couperait la chaîne
+    /// PowerShell en plein milieu — et le script ne s'exécuterait plus du tout.
+    /// </summary>
+    internal static string UneLigne(string? s) =>
+        string.Join(" ", (s ?? "").Split('\r', '\n').Select(x => x.Trim()).Where(x => x.Length > 0));
+
     internal static string PsEscape(string s) =>
         (s ?? "")
             .Replace('\u2018', '\'')   // ‘ guillemet-apostrophe culbuté
