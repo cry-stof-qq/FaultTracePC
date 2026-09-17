@@ -1417,6 +1417,44 @@ public sealed class RulesEngine
         });
     }
 
+    /// <summary>
+    /// Composants de Windows. Ils ne figurent JAMAIS dans la liste des programmes
+    /// installés — il n'y a rien à désinstaller. En conclure « ce logiciel n'est plus
+    /// installé, problème sans objet » revient à écarter une panne réelle au motif
+    /// qu'on n'a pas trouvé son entrée dans le Panneau de configuration.
+    /// </summary>
+    private static readonly HashSet<string> BinairesSysteme = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "dwm.exe", "explorer.exe", "csrss.exe", "svchost.exe", "lsass.exe", "winlogon.exe",
+        "services.exe", "smss.exe", "wininit.exe", "conhost.exe", "dllhost.exe", "sihost.exe",
+        "taskhostw.exe", "ctfmon.exe", "audiodg.exe", "spoolsv.exe", "fontdrvhost.exe",
+        "RuntimeBroker.exe", "SearchHost.exe", "SearchIndexer.exe", "ShellExperienceHost.exe",
+        "StartMenuExperienceHost.exe", "TextInputHost.exe", "WmiPrvSE.exe", "MsMpEng.exe",
+    };
+
+    /// <summary>
+    /// Composants de Windows qui dépendent directement de la carte graphique. Quand le
+    /// gestionnaire de fenêtres meurt à répétition, ce n'est pas « une application
+    /// instable » : c'est l'affichage qui s'effondre sous lui. Le ranger dans les
+    /// problèmes logiciels, c'est écarter la meilleure corroboration d'une panne
+    /// graphique au moment précis où on en cherche une.
+    /// </summary>
+    private static readonly HashSet<string> BinairesGraphiques = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "dwm.exe", "ShellExperienceHost.exe",
+    };
+
+    /// <summary>Modules dont la présence dans un plantage désigne la chaîne graphique.</summary>
+    private static readonly string[] ModulesGraphiques =
+    {
+        "dwmcore.dll", "dxgkrnl", "dxgi.dll", "d3d9.dll", "d3d10", "d3d11", "d3d12",
+        "nvlddmkm", "nvwgf2um", "igdumd", "igd10", "atidx", "amdxc", "amdvlk", "opengl32.dll", "vulkan-1.dll",
+    };
+
+    private static bool EstGraphique(string exe, IEnumerable<string?> modules) =>
+        BinairesGraphiques.Contains(exe)
+        || modules.Any(m => m is not null && ModulesGraphiques.Any(g => m.Contains(g, StringComparison.OrdinalIgnoreCase)));
+
     private static void AnalyzeAppCrashes(DiagnosticReport r)
     {
         var crashes = r.Events.Where(e => e.Category == EventCategory.AppCrash).ToList();
@@ -1435,18 +1473,43 @@ public sealed class RulesEngine
             var lastCrash = g.Max(e => e.TimeLocal);
             var (statusText, statusReco, stillActive) = CheckAppStatus(r, g.Key, lastCrash);
 
+            // Un composant graphique de Windows qui tombe en série n'est pas un problème
+            // logiciel : c'est la panne d'affichage, vue depuis l'autre bout. On le range
+            // donc avec le matériel graphique, et on le relie à la conclusion existante
+            // au lieu d'en faire une ligne isolée que le lecteur écarte.
+            var graphique = EstGraphique(g.Key, modules);
+            var conclusionGpu = r.Findings.FirstOrDefault(f => f.Category == FaultCategory.GpuDriver);
+
+            var titre = stillActive
+                ? Lang.T($"Application instable : {g.Key} ({g.Count()} crashs)", $"Unstable application: {g.Key} ({g.Count()} crashes)")
+                : Lang.T($"Application anciennement instable : {g.Key} ({g.Count()} crashs) — {statusText}", $"Formerly unstable application: {g.Key} ({g.Count()} crashes) — {statusText}");
+            var complement = "";
+            var reco = statusReco;
+
+            if (graphique)
+            {
+                titre = Lang.T($"Composant graphique de Windows en échec : {g.Key} ({g.Count()} crashs)", $"Windows graphics component failing: {g.Key} ({g.Count()} crashes)");
+                complement = conclusionGpu is not null
+                    ? Lang.T($" Ces plantages ne sont pas un problème logiciel distinct : ils CORROBORENT la conclusion graphique ci-dessus (« {conclusionGpu.Title} »). {g.Key} s'appuie directement sur la carte, et tombe quand elle cesse de répondre.",
+                             $" These crashes are not a separate software problem: they CORROBORATE the graphics conclusion above (“{conclusionGpu.Title}”). {g.Key} relies directly on the card, and goes down when it stops responding.")
+                    : Lang.T($" {g.Key} s'appuie directement sur la carte graphique : des plantages répétés de ce composant désignent le pilote ou la carte, pas un logiciel à réinstaller. Aucune autre trace graphique n'a été relevée dans ce rapport — c'est donc le seul indice, et il mérite une vérification du pilote et de la carte.",
+                             $" {g.Key} relies directly on the graphics card: repeated crashes of this component point at the driver or the card, not at some application to reinstall. No other graphics evidence was found in this report — so this is the only clue, and it warrants checking the driver and the card.");
+                reco = conclusionGpu is not null
+                    ? Lang.T("Traiter la conclusion graphique : c'est elle qui porte la panne. Rien à faire sur ce composant lui-même.", "Deal with the graphics conclusion: that is where the fault lies. Nothing to do on this component itself.")
+                    : Lang.T("Vérifier le pilote graphique et l'état de la carte avant toute autre piste.", "Check the display driver and the state of the card before any other lead.");
+            }
+
             r.Findings.Add(new Finding
             {
-                Severity = stillActive ? Severity.Warning : Severity.Info,
+                Severity = graphique ? Severity.Warning : (stillActive ? Severity.Warning : Severity.Info),
                 Confidence = Confidence.High,
-                Category = FaultCategory.Software,
-                Title = stillActive
-                    ? Lang.T($"Application instable : {g.Key} ({g.Count()} crashs)", $"Unstable application: {g.Key} ({g.Count()} crashes)")
-                    : Lang.T($"Application anciennement instable : {g.Key} ({g.Count()} crashs) — {statusText}", $"Formerly unstable application: {g.Key} ({g.Count()} crashes) — {statusText}"),
+                Category = graphique ? FaultCategory.GpuDriver : FaultCategory.Software,
+                Title = titre,
                 Details = Lang.T($"{g.Count()} plantages sur la période, dernier le {lastCrash:dd/MM/yyyy}", $"{g.Count()} crashes over the period, the last on {lastCrash:yyyy-MM-dd}")
                           + (modules.Count > 0 ? Lang.T($", module(s) fautif(s) : {string.Join(", ", modules!)}", $", faulting module(s): {string.Join(", ", modules!)}") : "")
-                          + Lang.T($". État actuel : {statusText}", $". Current state: {statusText}"),
-                Recommendation = statusReco,
+                          + Lang.T($". État actuel : {statusText}", $". Current state: {statusText}")
+                          + complement,
+                Recommendation = reco,
             });
         }
 
@@ -1483,6 +1546,15 @@ public sealed class RulesEngine
         if (r.System.InstalledApps.Count == 0)
             return (Lang.T("non vérifié (inventaire des logiciels indisponible)", "not checked (software inventory unavailable)"),
                     Lang.T("Réinstaller ou mettre à jour l'application.", "Reinstall or update the application."), true);
+
+        // Un composant de Windows n'a pas d'entrée de désinstallation : son absence de
+        // l'inventaire ne prouve rien et ne doit surtout pas clore le dossier.
+        if (BinairesSysteme.Contains(exeName))
+        {
+            return (Lang.T("composant de Windows — il n'a pas d'entrée de désinstallation, son absence de la liste des programmes ne veut rien dire", "a Windows component — it has no uninstall entry, so its absence from the program list means nothing"),
+                    Lang.T("Ne pas chercher à le réinstaller : traiter ce qui le fait tomber. Un composant de Windows qui plante à répétition est le symptôme d'un pilote, d'un matériel ou d'une corruption système, jamais la cause.", "Do not try to reinstall it: deal with whatever is bringing it down. A Windows component crashing repeatedly is the symptom of a driver, a piece of hardware or system corruption — never the cause."),
+                    true);
+        }
 
         var app = Collectors.InstalledSoftwareCollector.FindByExecutable(r.System.InstalledApps, exeName);
         if (app is null)
