@@ -631,6 +631,50 @@ public static class HtmlReportGenerator
                 Lang.T($"{H(m.DeviceLocator)} : {RulesEngine.FormatBytes(m.CapacityBytes)} {H(m.Manufacturer)} {H(m.PartNumber)} @ {(m.ConfiguredSpeedMTs > 0 ? m.ConfiguredSpeedMTs : m.SpeedMTs)} MT/s",
                        $"{H(m.DeviceLocator)}: {RulesEngine.FormatBytes(m.CapacityBytes)} {H(m.Manufacturer)} {H(m.PartNumber)} @ {(m.ConfiguredSpeedMTs > 0 ? m.ConfiguredSpeedMTs : m.SpeedMTs)} MT/s"))));
 
+        // POINT 53. Le réseau : cartes, profils Wi-Fi, services, domaine. C'était le seul
+        // domaine dont le rapport ne disait rien, alors que « plus de réseau » est l'une
+        // des pannes les plus fréquentes d'un parc.
+        var res = s.Network;
+        var lignesReseau = new List<string>();
+        foreach (var a in res.Adapters)
+        {
+            var etat = a.HasIpV4
+                ? Lang.T("connectée", "connected")
+                : Lang.T($"pas d'adresse IPv4 (état {a.Status})", $"no IPv4 address (state {a.Status})");
+            var pilote = string.IsNullOrEmpty(a.DriverVersion)
+                ? ""
+                : Lang.T($" · pilote {H(a.DriverVersion)}", $" · driver {H(a.DriverVersion)}")
+                  + (a.DriverDate is { } dp ? Lang.T($" du {dp:dd/MM/yyyy}", $" dated {dp:yyyy-MM-dd}") : "");
+            var mac = string.IsNullOrEmpty(a.MacMasked) ? "" : $" · {H(a.MacMasked)}";
+            // L'espace avant les deux-points est une règle FRANÇAISE : en anglais elle
+            // n'existe pas. Le garde-fou de traduction a eu raison de refuser cette ligne.
+            lignesReseau.Add(Lang.T(
+                $"<strong>{H(a.Kind)}</strong> — {H(a.Name)} ({H(a.Description)}) : {H(etat)}{pilote}{mac}",
+                $"<strong>{H(a.Kind)}</strong> — {H(a.Name)} ({H(a.Description)}): {H(etat)}{pilote}{mac}"));
+        }
+        Card(sb, Lang.T("Cartes réseau", "Network adapters"),
+            lignesReseau.Count == 0 ? Lang.T("aucune détectée", "none detected") : string.Join("<br>", lignesReseau));
+
+        var profils = res.WifiProfileCount < 0
+            ? Lang.T($"non déterminé — {H(res.WifiProfileNote)}", $"undetermined — {H(res.WifiProfileNote)}")
+            : res.WifiProfileCount == 0
+                ? Lang.T("<strong>aucun réseau enregistré</strong> : la liste des réseaux Wi-Fi restera vide, même si la carte fonctionne",
+                         "<strong>no network stored</strong>: the Wi-Fi network list will stay empty even if the adapter works")
+                : Lang.T($"{res.WifiProfileCount} réseau(x) enregistré(s)", $"{res.WifiProfileCount} network(s) stored");
+        if (res.HasWireless || res.WifiProfileCount > 0)
+            Card(sb, Lang.T("Profils Wi-Fi", "Wi-Fi profiles"), profils);
+
+        Card(sb, Lang.T("Services réseau", "Network services"),
+            res.Services.Count == 0 ? Lang.T("non lus", "not read")
+            : string.Join("<br>", res.Services.Select(x => Lang.T(
+                $"{H(x.Name)} ({H(x.DisplayName)}) : {H(x.State)} · {H(x.StartMode)}",
+                $"{H(x.Name)} ({H(x.DisplayName)}): {H(x.State)} · {H(x.StartMode)}"))));
+
+        Card(sb, Lang.T("Domaine", "Domain"),
+            res.PartOfDomain
+                ? Lang.T($"membre de {H(res.Domain)}", $"member of {H(res.Domain)}")
+                : Lang.T("hors domaine (groupe de travail)", "not domain-joined (workgroup)"));
+
         Card(sb, Lang.T("Cartes graphiques", "Graphics cards"),
             s.Gpus.Count == 0 ? Lang.T("aucune détectée", "none detected")
             : string.Join("<br>", s.Gpus.Select(g =>

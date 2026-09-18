@@ -37,6 +37,8 @@ public sealed class ScanOrchestrator
         ct.ThrowIfCancellationRequested();
 
         Step(progress, Lang.T("Analyse des fichiers dump (Minidump, MEMORY.DMP)…", "Analysing the dump files (Minidump, MEMORY.DMP)…"), 70);
+        report.System.Network = NetworkCollector.Collect(errors);
+
         report.Dumps = new DumpCollector(errors).Collect();
         ct.ThrowIfCancellationRequested();
 

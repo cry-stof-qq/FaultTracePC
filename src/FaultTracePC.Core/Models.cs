@@ -232,6 +232,54 @@ public sealed class DriverInfo
     public bool IsMicrosoft { get; set; }
 }
 
+/// <summary>
+/// POINT 53. Ce que le rapport doit savoir dire du réseau. Dans un parc, « plus de
+/// réseau » est l'une des pannes les plus fréquentes, et c'était le seul domaine sur
+/// lequel le logiciel n'avait rien à dire.
+/// </summary>
+public sealed class NetworkInfo
+{
+    public List<NetworkAdapterInfo> Adapters { get; set; } = new();
+
+    /// <summary>
+    /// Nombre de réseaux Wi-Fi enregistrés. <b>-1 signifie « pas pu regarder »</b>, ce
+    /// qui n'est pas la même chose que zéro : l'un empêche de conclure, l'autre EST la
+    /// conclusion. Les confondre ferait annoncer une panne sur une machine saine.
+    /// </summary>
+    public int WifiProfileCount { get; set; } = -1;
+    public string WifiProfileNote { get; set; } = "";
+
+    public List<ServiceStateInfo> Services { get; set; } = new();
+    public bool PartOfDomain { get; set; }
+    public string Domain { get; set; } = "";
+
+    public bool HasWireless => Adapters.Any(a => a.IsWireless);
+}
+
+public sealed class NetworkAdapterInfo
+{
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    /// <summary>Wi-Fi, Ethernet, ou autre.</summary>
+    public string Kind { get; set; } = "";
+    public bool IsWireless { get; set; }
+    /// <summary>État opérationnel rendu par Windows (Up, Down, NotPresent…).</summary>
+    public string Status { get; set; } = "";
+    /// <summary>Constructeur seul : une adresse MAC complète identifie une machine.</summary>
+    public string MacMasked { get; set; } = "";
+    public string DriverVersion { get; set; } = "";
+    public DateTime? DriverDate { get; set; }
+    public bool HasIpV4 { get; set; }
+}
+
+public sealed class ServiceStateInfo
+{
+    public string Name { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string State { get; set; } = "";
+    public string StartMode { get; set; } = "";
+}
+
 public sealed class SystemSnapshot
 {
     public OsInfo Os { get; set; } = new();
@@ -246,6 +294,8 @@ public sealed class SystemSnapshot
     public List<BatteryInfo> Batteries { get; set; } = new();
     /// <summary>Logiciels installés — sert à vérifier si un logiciel fautif est encore présent.</summary>
     public List<InstalledApp> InstalledApps { get; set; } = new();
+    /// <summary>État du réseau : cartes, profils Wi-Fi, services, domaine.</summary>
+    public NetworkInfo Network { get; set; } = new();
     public string MachineName { get; set; } = "";
 }
 
