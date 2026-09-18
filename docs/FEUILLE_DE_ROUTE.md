@@ -469,7 +469,7 @@ Seize points, trois machines, deux semaines. Ils disent tous la même chose : *l
 | 62 ✔ | la boîte noire répète le même incident et laisse le gel passer pour une fin de tableau | PC-W10-11, 17/09 |
 | 63 ✔ | le script de réparation raisonne par familles de panne, pas par mesures | PC-W10-11, 17/09 |
 
-**Les seize points sont livrés**, en dix lots des 17 et 18/09/2026, chacun compilé et testé avant le suivant. Le projet est passé de 428 à 480 tests.
+**Les seize points sont livrés**, en dix lots des 17 et 18/09/2026, chacun compilé et testé avant le suivant. Le projet est passé de 428 à 468 tests.
 
 Les points 48 à 52 et 54 à 63 étaient des **corrections**, sur des données déjà collectées : rien à instrumenter, tout à relier. Le 53 était le seul ajout — et il en a demandé deux lots, un pour collecter les faits réseau, un pour en tirer la conclusion.
 
