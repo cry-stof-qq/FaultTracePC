@@ -21,6 +21,10 @@
     <PackageReference Include="System.Management" Version="10.0.10" />
     <!-- Lecture du journal d'événements Windows (EventLogQuery / EventLogReader) -->
     <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.10" />
+    <!-- Interrogation LDAP de l'Active Directory (DirectorySearcher).
+         Volontairement PAS le module PowerShell ActiveDirectory : il exigerait RSAT
+         sur chaque poste d'administration. Ici, un poste du domaine suffit. -->
+    <PackageReference Include="System.DirectoryServices" Version="10.0.10" />
   </ItemGroup>
 
 </Project>
