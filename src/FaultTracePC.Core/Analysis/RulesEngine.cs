@@ -1994,8 +1994,14 @@ public sealed class RulesEngine
         var app = Collectors.InstalledSoftwareCollector.FindByExecutable(r.System.InstalledApps, exeName);
         if (app is null)
         {
-            return (Lang.T("ce logiciel ne figure plus parmi les programmes installés — problème probablement sans objet", "this software no longer appears among the installed programs — the problem is probably moot"),
-                    Lang.T("Aucune action : le logiciel semble avoir été désinstallé depuis. Si les crashs persistent, c'est qu'il subsiste sous une autre forme (application portable ou du Microsoft Store).", "No action: the software appears to have been uninstalled since. If the crashes persist, it survives in another form (a portable or Microsoft Store application)."),
+            // ON N'AFFIRME PAS UNE DÉSINSTALLATION QU'ON N'A PAS CONSTATÉE.
+            // La liste des programmes installés se lit dans la base de registre : les
+            // composants livrés avec Windows, les applications du Microsoft Store et les
+            // logiciels portables n'y figurent pas, et n'y ont jamais figuré. Écrire
+            // « problème probablement sans objet » sur cette seule base, c'est clore un
+            // dossier sur une absence de preuve.
+            return (Lang.T("aucun programme installé ne porte ce nom — ce qui ne prouve pas une désinstallation : les composants de Windows, les applications du Microsoft Store et les logiciels portables n'ont pas d'entrée de désinstallation", "no installed program carries this name — which does not prove an uninstall: Windows components, Microsoft Store applications and portable software have no uninstall entry"),
+                    Lang.T("Vérifier d'abord si le logiciel est encore là, sous une autre forme : application du Microsoft Store, version portable, ou composant livré avec Windows. S'il a bien été désinstallé, il n'y a rien à faire. S'il est toujours présent, les plantages le sont probablement aussi.", "First check whether the software is still there in another form: a Microsoft Store application, a portable version, or a component shipped with Windows. If it really was uninstalled, there is nothing to do. If it is still present, the crashes probably are too."),
                     false);
         }
 

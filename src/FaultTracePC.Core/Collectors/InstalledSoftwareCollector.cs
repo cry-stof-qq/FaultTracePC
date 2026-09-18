@@ -89,6 +89,14 @@ public static class InstalledSoftwareCollector
     /// (ex. « photoshop.exe ») : correspondance sur le nom du produit, puis sur
     /// le dossier d'installation.
     /// </summary>
+    /// <summary>
+    /// Forme comparable d'un nom : lettres et chiffres seulement, en minuscules.
+    /// Un nom de produit (« Microsoft Edge ») et un nom de fichier (« MicrosoftEdgeUpdate »)
+    /// ne s'écrivent pas pareil ; ce n'est pas une raison pour ne pas les reconnaître.
+    /// </summary>
+    internal static string NomComparable(string? valeur) =>
+        new string((valeur ?? "").Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
     public static InstalledApp? FindByExecutable(IEnumerable<InstalledApp> apps, string exeName)
     {
         var stem = Path.GetFileNameWithoutExtension(exeName);
@@ -96,10 +104,25 @@ public static class InstalledSoftwareCollector
 
         var list = apps as IList<InstalledApp> ?? apps.ToList();
 
-        // Nom du produit contenant le nom de l'exécutable (ou l'inverse).
+        // Nom du produit contenant le nom de l'exécutable (ou l'inverse), ESPACES ET
+        // PONCTUATION MIS DE CÔTÉ.
+        //
+        // Constaté le 18/09/2026 sur TECH-INFO-2025 : « MicrosoftEdgeUpdate.exe » ne
+        // retrouvait pas « Microsoft Edge », pour la seule raison qu'un nom de produit
+        // porte des espaces et pas un nom de fichier. Le rapport concluait « ce logiciel
+        // ne figure plus parmi les programmes installés » pendant que six processus
+        // msedge tournaient, listés dans le même rapport.
+        var racine = NomComparable(stem);
         var byName = list.FirstOrDefault(a =>
-            a.Name.Contains(stem, StringComparison.OrdinalIgnoreCase) ||
-            (stem.Length >= 5 && stem.Contains(a.Name, StringComparison.OrdinalIgnoreCase)));
+        {
+            var nom = NomComparable(a.Name);
+            if (nom.Length == 0 || racine.Length == 0) return false;
+            if (nom.Contains(racine, StringComparison.Ordinal)) return true;
+            // Sens inverse : « MicrosoftEdgeUpdate » contient « MicrosoftEdge ». Les deux
+            // longueurs minimales évitent qu'un nom de produit court — « Java », « Git » —
+            // n'attrape tout exécutable qui le contient par hasard.
+            return racine.Length >= 5 && nom.Length >= 5 && racine.Contains(nom, StringComparison.Ordinal);
+        });
         if (byName is not null) return byName;
 
         // Sinon : l'exécutable existe-t-il dans le dossier d'installation ?
