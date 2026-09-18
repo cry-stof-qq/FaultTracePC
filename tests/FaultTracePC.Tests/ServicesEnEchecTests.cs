@@ -75,6 +75,24 @@ public class ServicesEnEchecTests
     }
 
     [Fact]
+    public void Deux_services_qui_couvrent_presque_tout_ne_sont_pas_une_dispersion()
+    {
+        // LE cas réel de TECH-INFO-2025, 18/09/2026 : 14, 14 et 1. Aucun service
+        // n'atteint la moitié, et pourtant deux d'entre eux couvrent 28 échecs sur 29.
+        // La première version de la règle concluait « aucun ne domine, ce qui désigne
+        // plutôt le système » et renvoyait vers sfc et DISM — pour deux agents tiers.
+        var f = Conclusion(Rapport(("GLPI Agent", 14), ("TmWSCSvc", 14), ("Agent tiers", 1)));
+
+        Assert.Contains("Deux services concentrent 28 des 29 échecs", f.Details);
+        Assert.Contains("GLPI Agent", f.Details);
+        Assert.Contains("TmWSCSvc", f.Details);
+        Assert.DoesNotContain("aucun ne domine", f.Details);
+        // Et surtout : on n'envoie plus réparer Windows pour des services tiers.
+        Assert.Contains("services.msc", f.Recommendation);
+        Assert.DoesNotContain("image Windows", f.Recommendation);
+    }
+
+    [Fact]
     public void Des_echecs_disperses_designent_le_systeme_et_pas_un_service()
     {
         var f = Conclusion(Rapport(("Service A", 2), ("Service B", 2), ("Service C", 2), ("Service D", 2), ("Service E", 2)));

@@ -2169,21 +2169,43 @@ public sealed class RulesEngine
             details = Lang.T($"Services concernés, du plus touché au moins touché : {nommes}{reste}.",
                              $"Services involved, from the most affected to the least: {nommes}{reste}.");
 
-            // Un seul service qui concentre l'essentiel des échecs n'appelle pas le même
-            // geste qu'une dispersion sur dix services : le premier se traite, la seconde
-            // désigne le système lui-même.
-            var premier = parService[0];
-            bool domine = parService.Count == 1 || premier.Count() * 2 >= fails.Count;
+            // COMBIEN DE SERVICES FAUT-IL POUR EXPLIQUER L'ESSENTIEL DES ÉCHECS ?
+            //
+            // Première version : « un service qui pèse la moitié à lui seul domine ».
+            // Constaté faux le 18/09/2026 sur TECH-INFO-2025 — GLPI Agent 14 fois,
+            // TmWSCSvc 14 fois, un troisième service 1 fois. Aucun n'atteignait la
+            // moitié, le rapport concluait « aucun ne domine, ce qui désigne plutôt le
+            // système », et renvoyait vers sfc et DISM. Or deux services nommés
+            // couvraient 28 échecs sur 29 : ce n'est pas une dispersion, et Windows n'y
+            // est pour rien.
+            //
+            // Ce qui compte n'est donc pas le poids du premier, mais le NOMBRE de
+            // services qu'il faut réunir pour couvrir les quatre cinquièmes. Un ou deux :
+            // on les nomme, ce sont eux qu'on traite. Trois ou plus : la dispersion est
+            // réelle, et c'est le système qu'il faut regarder.
+            int cumul = 0, noyau = 0;
+            foreach (var g in parService)
+            {
+                cumul += g.Count();
+                noyau++;
+                if (cumul * 5 >= fails.Count * 4) break;
+            }
+            bool concentre = noyau <= 2;
+            var coupables = parService.Take(noyau).ToList();
+            var nomsCoupables = string.Join(Lang.T(" et ", " and "), coupables.Select(g => g.Key));
 
-            details += domine
-                ? Lang.T($" {premier.Key} concentre {premier.Count()} des {fails.Count} échecs : c'est lui qu'il faut traiter en premier.",
-                         $" {premier.Key} accounts for {premier.Count()} of the {fails.Count} failures: that is the one to deal with first.")
-                : Lang.T($" Les échecs se répartissent sur {parService.Count} services différents — aucun ne domine, ce qui désigne plutôt le système que l'un d'eux.",
-                         $" The failures are spread over {parService.Count} different services — none dominates, which points at the system rather than at any one of them.");
+            details += !concentre
+                ? Lang.T($" Les échecs se répartissent sur {parService.Count} services différents — aucun ne domine, ce qui désigne plutôt le système que l'un d'eux.",
+                         $" The failures are spread over {parService.Count} different services — none dominates, which points at the system rather than at any one of them.")
+                : noyau == 1
+                    ? Lang.T($" {coupables[0].Key} concentre {cumul} des {fails.Count} échecs : c'est lui qu'il faut traiter en premier.",
+                             $" {coupables[0].Key} accounts for {cumul} of the {fails.Count} failures: that is the one to deal with first.")
+                    : Lang.T($" Deux services concentrent {cumul} des {fails.Count} échecs — {nomsCoupables} : ce sont eux qu'il faut traiter, pas le système.",
+                             $" Two services account for {cumul} of the {fails.Count} failures — {nomsCoupables}: those are what to deal with, not the system.");
 
-            reco = domine
-                ? Lang.T($"Ouvrir services.msc et y chercher « {premier.Key} » : ses propriétés donnent son compte de démarrage et ses actions de récupération. Un service tiers qui tombe se met à jour ou se désinstalle ; un service de Windows qui tombe est un symptôme, pas une cause — chercher alors du côté des pilotes et des fichiers système.",
-                         $"Open services.msc and look for “{premier.Key}”: its properties show its startup account and its recovery actions. A third-party service that keeps failing gets updated or uninstalled; a Windows service that keeps failing is a symptom, not a cause — look at drivers and system files instead.")
+            reco = concentre
+                ? Lang.T($"Ouvrir services.msc et y chercher {nomsCoupables} : les propriétés d'un service donnent son compte de démarrage et ses actions de récupération. Un service TIERS qui tombe se met à jour ou se désinstalle ; un service de WINDOWS qui tombe est un symptôme et pas une cause — chercher alors du côté des pilotes et des fichiers système.",
+                         $"Open services.msc and look for {nomsCoupables}: a service's properties show its startup account and its recovery actions. A THIRD-PARTY service that keeps failing gets updated or uninstalled; a WINDOWS service that keeps failing is a symptom and not a cause — look at drivers and system files instead.")
                 : Lang.T("Des échecs dispersés sur plusieurs services désignent rarement ces services : vérifier d'abord les fichiers système et l'image Windows, puis les mises à jour installées à la même période.",
                          "Failures spread across several services rarely point at those services: check the system files and the Windows image first, then the updates installed over the same period.");
         }
