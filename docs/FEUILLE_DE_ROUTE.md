@@ -15,8 +15,8 @@
 | 1.5.0 | **publiée** — thème unique **le parc** — secret maître et jeton dérivé (13, 14, 27), plus le point 36 et le refus des options inconnues |
 | 1.5.1 | correctif de déploiement — le paquet sait se remplacer lui-même, pare-feu posé par la ligne de commande, procédure écrite |
 | 1.5.2 | **publiée** — deux défauts constatés, sans nouvelle surface : la langue d'un rapport distant (point 45) et le lanceur `.bat` du script de réparation (point 36, moitié restante). 428 tests verts |
-| 1.6.0 | en cours — thème **un rapport doit nommer la panne qu'il a sous les yeux** — points 48 à 63 ; 56, 57 et 58 livrés le 17/09/2026 |
-| 1.7.0 | prévue — thème **le déploiement de parc entre dans le logiciel** — point 64, en quatre lots |
+| 1.6.0 | **terminée, non publiée** — thème **un rapport doit nommer la panne qu'il a sous les yeux** — seize points, 48 à 63, livrés les 17 et 18/09/2026 |
+| 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots), 43 (archivage des alertes) et 46 (boîte noire distante) |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
@@ -197,7 +197,7 @@ Or les alertes concernées — température soutenue, disque qui se dégrade, WH
 
 **Écarté au passage :** écrire dans le journal d'événements Windows n'aurait rien changé. L'établissement dispose de GLPI, qui est un outil d'inventaire et de tickets — **son agent ne collecte pas les journaux d'événements**. Les alertes y seraient tombées dans un journal que rien ne ramasse.
 
-**43 — Les alertes disparaissent avec le poste. À traiter avant un vrai déploiement.** Trouvé en fermant le point 7, et plus sérieux que lui.
+**43 — Les alertes disparaissent avec le poste. À FAIRE, 1.7.0.** Trouvé en fermant le point 7, et plus sérieux que lui.
 
 Les alertes vivent **sur la machine**, dans `ProgramData\FaultTracePC\Flight\alerts.jsonl`. Un poste réimagé — opération routinière en établissement, souvent pendant les vacances — repart avec un journal vide. La console les collecte à chaque actualisation mais **ne les conserve pas** : elle les affiche et les oublie.
 
@@ -224,7 +224,7 @@ GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, 
 
 **Contournement en attendant**, à faire sur chaque poste : `FaultTracePC.Cli.exe --set-machine-lang fr` **puis `Restart-Service FaultTracePCMonitor`** — contrairement à `remote.json`, la langue n'est lue qu'au démarrage du service. Au déploiement, `FTPCLANG=fr` fait la même chose d'emblée.
 
-**46 — « Voir en temps réel pourquoi ça coupe » : le besoin est bon, la réponse n'est pas l'actualisation automatique.** Demandé par l'auteur le 31/08/2026 en découvrant que la console n'actualise que sur clic.
+**46 — « Voir en temps réel pourquoi ça coupe » : le besoin est bon, la réponse n'est pas l'actualisation automatique. À FAIRE, 1.7.0.** Demandé par l'auteur le 31/08/2026 en découvrant que la console n'actualise que sur clic.
 
 **Pourquoi le direct ne répondrait pas à la question.** Au moment de la coupure, la machine s'arrête et le réseau avec elle : la console ne verrait rien de plus. Une actualisation toutes les deux secondes afficherait une valeur vieille de deux secondes, puis « injoignable ». Elle donnerait l'**illusion** d'une réponse — exactement le genre de fonctionnalité qui rassure sans informer.
 
@@ -238,7 +238,7 @@ GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, 
 
 **47 — Colonne « Top processus » vide deux fois sur trois. CORRIGÉ.** Constaté dans la console le 31/08/2026. La boîte noire ne relève les processus qu'un échantillon sur trois — toutes les 30 s, pour ne pas grossir le journal — et `/api/status` renvoie le **dernier** échantillon, qui n'en porte donc généralement pas. La colonne se remplissait au hasard, ce qui est pire qu'une colonne toujours vide : on ne sait pas si l'information manque ou si la machine n'a rien à signaler. `BuildStatus` complète désormais avec le relevé le plus récent qui en contienne un — au pire 30 secondes d'âge, sans conséquence pour la question posée.
 
-**48 — Une erreur WHEA de port PCIe est attribuée au processeur, et la recommandation envoie au mauvais endroit. À FAIRE, retenu pour la 1.6.0.** Constaté le 06/09/2026 sur `S2-00-32-2025`, premier poste installé à distance par le script de déploiement.
+**48 — Une erreur WHEA de port PCIe est attribuée au processeur, et la recommandation envoie au mauvais endroit. FAIT le 18/09/2026, 1.6.0.** Constaté le 06/09/2026 sur `S2-00-32-2025`, premier poste installé à distance par le script de déploiement.
 
 Le rapport écrit : « Le processeur a signalé 27 erreur(s) matérielle(s) », et recommande températures, alimentation, retrait de l'overclocking/XMP, mise à jour du BIOS. Les 27 événements sont pourtant tous identiques et disent autre chose : `WHEA-Logger` **ID 17**, *erreur matérielle **corrigée***, `Composant : PCI Express Root Port`, `Source de l'erreur : Advanced Error Reporting (PCI Express)`. Le triplet `0x0:0x1:0x0` désigne le port racine du processeur, et derrière lui la carte graphique.
 
@@ -251,13 +251,13 @@ Résultat concret : la recommandation fait retirer l'XMP et suspecter l'alimenta
 
 **Correctif envisagé :** distinguer les sources WHEA (`Processor Core`, `Cache Hierarchy`, `Memory Controller`, `PCI Express Root Port`) et donner une recommandation par source, ainsi que distinguer corrigé (ID 17) de fatal. Le champ existe déjà dans le message de l'événement : il est lu, puis ignoré.
 
-**49 — Le message WHEA est tronqué juste avant l'information décisive. À FAIRE, retenu pour la 1.6.0.** Même rapport, même jour.
+**49 — Le message WHEA est tronqué juste avant l'information décisive. FAIT le 18/09/2026, 1.6.0.** Même rapport, même jour.
 
 Le tableau des événements affiche : `Bus principal :Appareil :Fonctio…`. Le triplet bus/appareil/fonction est coupé — et c'est la **seule** donnée qui permet d'agir, puisqu'elle nomme le lien fautif. Il a fallu retourner au journal d'événements de la machine pour l'obtenir, ce qui est précisément le travail que le logiciel prétend éviter.
 
 **Correctif envisagé :** pour les événements WHEA, extraire le triplet et le porter dans la conclusion — voire le traduire en nom d'appareil, `Get-PnpDevice` donnant l'emplacement sous la forme « Bus PCI 0, périphérique 1, fonction 0 ». La troncature à 600 caractères reste bonne pour le reste ; ici, ce qui compte est en fin de message.
 
-**50 — Les codes d'arrêt sont dans le journal, le logiciel ne les lit pas. À FAIRE, 1.6.0.** Constaté le 14/09/2026 sur `MLEAR-031-2024`, un poste élève.
+**50 — Les codes d'arrêt sont dans le journal, le logiciel ne les lit pas. FAIT le 18/09/2026, 1.6.0.** Constaté le 14/09/2026 sur `MLEAR-031-2024`, un poste élève.
 
 Le rapport annonce « Aucun BSOD détecté sur la période » et « Pas de panne critique ». La machine avait planté **quinze fois**. Les événements `Kernel-Power 41` portent un champ `BugcheckCode` renseigné à chaque fois : 0xEF, 0xC000021A, 0x1E, 0x7E, 0x7A. Le logiciel conclut à l'absence de plantage parce qu'il ne trouve **aucun fichier de vidage** — or aucun vidage n'avait pu être écrit. Il confond « je n'ai pas de trace » avec « il ne s'est rien passé ».
 
@@ -265,17 +265,17 @@ Le `BugCheckCatalog` existe déjà et sait traduire ces codes. Il n'est aliment�
 
 **Ce que ça apporte, et qui n'est pas qu'une correction d'affichage :** un `BugcheckCode` à **0** signifie qu'il n'y a PAS eu de plantage — la machine a perdu son alimentation, ou quelqu'un a tenu le bouton. Sur ce poste, cinq des vingt événements étaient de ce type. Dans un établissement, c'est la distinction qui compte : elle sépare « un élève a forcé l'extinction » de « Windows s'est planté », et les deux ne se réparent pas pareil. Aucun autre signal ne fait cette séparation. Mieux : l'ordre des dates la tranche dans l'autre sens. Sur cette machine, les coupures arrivent toujours APRÈS les plantages du même jour — les élèves subissaient la panne, ils ne la causaient pas.
 
-**51 — `volmgr` 161 et 46 ne sont pas des erreurs disque. À FAIRE, 1.6.0.** Même machine, même jour.
+**51 — `volmgr` 161 et 46 ne sont pas des erreurs disque. FAIT le 18/09/2026, 1.6.0.** Même machine, même jour.
 
 Ces événements disent « la création du fichier de vidage a échoué ». Le logiciel les compte en « Erreurs disque répétées » et en fait le point le plus notable du rapport. C'est la **conséquence** du plantage prise pour sa cause — et sur ce poste, la vraie explication était ailleurs : un fichier d'échange de 2,4 Go pour 15,8 Go de mémoire, trop petit pour un vidage noyau.
 
 C'est une panne en soi, et c'est celle qui empêche de diagnostiquer toutes les autres. Elle mérite sa conclusion propre, avec les quatre vérifications qui la règlent : type de vidage, taille du fichier d'échange, espace libre, pilotes filtres.
 
-**52 — Un verdict ne peut pas dire « pas de panne critique » après avoir compté cinq arrêts inattendus. À FAIRE, 1.6.0.** Même rapport.
+**52 — Un verdict ne peut pas dire « pas de panne critique » après avoir compté cinq arrêts inattendus. FAIT le 18/09/2026, 1.6.0.** Même rapport.
 
 Les catégories « Arrêt inattendu » et « Coupure (Kernel-Power 41) » existent dans le tableau des événements. Elles n'alimentent aucune conclusion et ne pèsent pas sur le verdict. Le rapport a donc rassuré sur une machine qui plantait toutes les semaines depuis quatre mois. **C'est le pire mode de défaillance possible pour cet outil** : se tromper est réparable, rassurer à tort ne l'est pas.
 
-**53 — Aucune section réseau. À FAIRE, 1.6.0.** Constaté le même jour, sur la même machine, pour une panne dont le rapport ne dit pas un mot : plus aucun réseau Wi-Fi visible.
+**53 — Aucune section réseau. FAIT le 18/09/2026, 1.6.0.** Constaté le même jour, sur la même machine, pour une panne dont le rapport ne dit pas un mot : plus aucun réseau Wi-Fi visible.
 
 Trois faits, tous lisibles sans le moindre outil externe, donnaient le diagnostic en une ligne :
 
@@ -287,7 +287,7 @@ Le rapport, lui, a parlé de la batterie et de sept erreurs disque. Le tableau d
 
 Une section réseau devrait porter : cartes présentes et leur état, pilote et son âge, profils Wi-Fi, dernière connexion au domaine, services `WlanSvc`/`Dhcp`/`Dnscache`, filtres NDIS tiers liés aux cartes. Dans un parc, « plus de réseau » est l'une des pannes les plus fréquentes, et c'est aujourd'hui le seul domaine dont le logiciel ne dit **rien**.
 
-**54 — « Ce logiciel n'est plus installé, problème sans objet » écrit à propos d'un composant de Windows. À FAIRE, 1.6.0.** Constaté le 14/09/2026 sur `PC-W10-11`, le poste qui est à l'origine de ce projet.
+**54 — « Ce logiciel n'est plus installé, problème sans objet » écrit à propos d'un composant de Windows. FAIT le 17/09/2026, 1.6.0.** Constaté le 14/09/2026 sur `PC-W10-11`, le poste qui est à l'origine de ce projet.
 
 Le rapport écrit : *« Application anciennement instable : **dwm.exe** (9 crashs) — ce logiciel ne figure plus parmi les programmes installés — problème probablement sans objet. »*
 
@@ -297,7 +297,7 @@ Et le classement est doublement faux, parce que ces neuf plantages — module fa
 
 **Correctif :** une liste blanche de binaires système (`dwm.exe`, `explorer.exe`, `csrss.exe`, `svchost.exe`, `lsass.exe`, `winlogon.exe`, `services.exe`, `RuntimeBroker.exe`, `SearchHost.exe`…) pour lesquels l'absence dans les programmes installés ne signifie rien. Plus largement : **l'absence d'une entrée de désinstallation ne doit jamais, à elle seule, disqualifier un plantage constaté.** Un programme portable ou du Microsoft Store est dans le même cas.
 
-**55 — La version du pilote fautif n'est pas comparée d'une analyse à l'autre. À FAIRE, 1.6.0.** Même machine, trois rapports : 24/08 07 h 38, 24/08 12 h 41, 14/09.
+**55 — La version du pilote fautif n'est pas comparée d'une analyse à l'autre. FAIT le 18/09/2026, 1.6.0.** Même machine, trois rapports : 24/08 07 h 38, 24/08 12 h 41, 14/09.
 
 Le pilote mis en cause, `nvlddmkm.sys`, apparaît en `32.0.15.8216` dans le premier rapport et en `32.0.15.8278` dans le second, cinq heures plus tard. L'auteur avait mis le pilote à jour entre les deux. Quatre nouveaux écrans bleus portant **la même signature** sont survenus ensuite, après huit semaines de calme.
 
@@ -327,23 +327,23 @@ Les deux séries existaient séparément. Les apparier donne la seule mesure qui
 
 **Correctif livré :** appariement dans une fenêtre de dix minutes, datation de la bascule, disculpation du pilote quand le premier gel lui est antérieur, et mise hors de cause de la surchauffe **par la mesure de la boîte noire** au lieu de demander à l'utilisateur d'aller la prendre lui-même. La recommandation devient le test décisif et gratuit : retirer la carte, brancher l'écran sur la sortie de la carte mère, ou permuter avec un autre poste.
 
-**59 — Les plantages de `dwm.exe` sont une corroboration de la panne graphique, pas un problème logiciel séparé. À FAIRE, 1.6.0.** Même rapport.
+**59 — Les plantages de `dwm.exe` sont une corroboration de la panne graphique, pas un problème logiciel séparé. FAIT le 17/09/2026, 1.6.0.** Même rapport.
 
 Onze plantages de `dwm.exe` via `dwmcore.dll`, classés « Application anciennement instable » et écartés au titre du point 54. Or le gestionnaire de fenêtres de Windows meurt **parce que** l'affichage meurt : c'est la meilleure confirmation de la panne, rangée dans la mauvaise colonne. Le point 54 corrige le « sans objet » ; celui-ci demande davantage — **rattacher le plantage d'un composant graphique de Windows à la conclusion graphique** au lieu d'en faire une ligne isolée.
 
-**60 — Une clé USB et un port de contrôleur comptés ensemble sous « erreurs disque ». À FAIRE, 1.6.0.** Même rapport.
+**60 — Une clé USB et un port de contrôleur comptés ensemble sous « erreurs disque ». FAIT le 18/09/2026, 1.6.0.** Même rapport.
 
 Douze événements agrégés en un seul chiffre : `volmgr` 162, `Ntfs` 55, `disk` 51, `storahci` 129, répartis entre une clé USB (`Generic Flash Disk`, E:), un volume F: et `\Device\RaidPort0`. La recommandation commence par la gestion d'alimentation des liens PCI Express et les câbles SATA — **deux conseils sans aucun sens pour une clé USB.** Il faut séparer par périphérique avant de conseiller quoi que ce soit.
 
-**61 — Deux dates différentes pour le même pilote, dans le même rapport. À FAIRE, 1.6.0.** Même rapport.
+**61 — Deux dates différentes pour le même pilote, dans le même rapport. FAIT le 17/09/2026, 1.6.0.** Même rapport.
 
 `32.0.15.8278 du 08/07/2026` dans une carte, `32.0.15.8278 du 25/06/2026` dans une autre. L'une est la date du fichier `.sys`, l'autre celle du paquet INF ; les deux sont annoncées comme « le pilote du… ». Il faut nommer laquelle on affiche, ou n'en afficher qu'une.
 
-**62 — La boîte noire répète le même incident et masque le gel. À FAIRE, 1.6.0.** Même rapport.
+**62 — La boîte noire répète le même incident et masque le gel. FAIT le 17/09/2026, 1.6.0.** Même rapport.
 
 Trois tableaux identiques pour l'incident du 15/09 09 h 53, deux pour celui du 17/09 12 h 28. Et le tableau intitulé « dernières secondes avant l'incident de 12 h 29 » s'arrête à **12 h 27 min 26 s** — quatre-vingt-quatorze secondes avant. Ce trou n'est pas un défaut d'affichage : **c'est le gel lui-même**, l'échantillonneur ayant cessé de répondre en même temps que la machine. Il faut dédoublonner les incidents proches et **nommer le trou au lieu de le laisser passer pour une fin de tableau.**
 
-**63 — Le script de réparation raisonne par familles de problèmes, pas par mesures. À FAIRE, 1.6.0.** Script `Reparation_PC_2026-09-17_1738.ps1`.
+**63 — Le script de réparation raisonne par familles de problèmes, pas par mesures. FAIT le 18/09/2026, 1.6.0.** Script `Reparation_PC_2026-09-17_1738.ps1`.
 
 Le script est bien construit — point de restauration, confirmation O/N, rien d'irréversible sans accord. Mais il ignore ce que le rapport a mesuré : il désigne comme premiers suspects dix pilotes Trend Micro et AMD de 2021 alors que l'analyse WinDbg nomme `nvlddmkm.sys` dans cinq dumps sur cinq ; il demande de surveiller la température GPU au seuil de 85 °C alors que la boîte noire l'a mesurée pendant 94 h 32 à 67,7 °C maximum ; il propose `chkdsk C: /f` quand les erreurs portent sur une clé USB ; il lance `wsl --update` sur le poste d'une secrétaire.
 
@@ -444,7 +444,7 @@ Trois des quatre points ont été faits ; le quatrième a été **fermé** parce
 
 ---
 
-### 1.6.0 — points 48 à 63, arrêtés les 14 et 17/09/2026
+### 1.6.0 — points 48 à 63, TERMINÉE le 18/09/2026
 
 Thème : **un rapport doit nommer la panne qu'il a sous les yeux.**
 
@@ -452,34 +452,42 @@ Seize points, trois machines, deux semaines. Ils disent tous la même chose : *l
 
 | # | Ce qui manque | Constaté sur |
 |---|---|---|
-| 48 | une erreur WHEA de port PCIe est attribuée au processeur, et « corrigée » est classé critique | S2-00-32-2025, 06/09 |
-| 49 | le triplet bus/appareil/fonction est tronqué à l'écriture comme à l'affichage | S2-00-32-2025, 06/09 |
-| 50 | le `BugcheckCode` de l'événement 41 n'est pas lu — quinze plantages invisibles | MLEAR-031-2024, 14/09 |
-| 51 | l'échec d'écriture du vidage est compté comme une erreur disque | MLEAR-031-2024, 14/09 |
-| 52 | les arrêts inattendus ne pèsent pas sur le verdict | MLEAR-031-2024, 14/09 |
-| 53 | aucune section réseau | MLEAR-031-2024, 14/09 |
-| 54 | un composant de Windows déclaré « désinstallé, sans objet » | PC-W10-11, 14/09 |
-| 55 | la version du pilote fautif n'est pas comparée entre deux analyses | PC-W10-11, 14/09 |
+| 48 ✔ | une erreur WHEA de port PCIe est attribuée au processeur, et « corrigée » est classé critique | S2-00-32-2025, 06/09 |
+| 49 ✔ | le triplet bus/appareil/fonction est tronqué à l'écriture comme à l'affichage | S2-00-32-2025, 06/09 |
+| 50 ✔ | le `BugcheckCode` de l'événement 41 n'est pas lu — quinze plantages invisibles | MLEAR-031-2024, 14/09 |
+| 51 ✔ | l'échec d'écriture du vidage est compté comme une erreur disque | MLEAR-031-2024, 14/09 |
+| 52 ✔ | les arrêts inattendus ne pèsent pas sur le verdict | MLEAR-031-2024, 14/09 |
+| 53 ✔ | aucune section réseau | MLEAR-031-2024, 14/09 |
+| 54 ✔ | un composant de Windows déclaré « désinstallé, sans objet » | PC-W10-11, 14/09 |
+| 55 ✔ | la version du pilote fautif n'est pas comparée entre deux analyses | PC-W10-11, 14/09 |
 | 56 ✔ | 178 vidages « en direct » listés, jamais exploités — dont 155 gels du moteur graphique | PC-W10-11, 17/09 |
 | 57 ✔ | « 0 réinitialisation » écrit en présence de 155 réinitialisations | PC-W10-11, 17/09 |
 | 58 ✔ | un gel suivi d'un écran bleu est une récupération ratée : rapprochement jamais fait | PC-W10-11, 17/09 |
-| 59 | les plantages de `dwm.exe` écartés au lieu d'être rattachés à la panne graphique | PC-W10-11, 17/09 |
-| 60 | une clé USB et un port de contrôleur comptés ensemble sous « erreurs disque » | PC-W10-11, 17/09 |
-| 61 | deux dates différentes pour le même pilote, dans le même rapport | PC-W10-11, 17/09 |
-| 62 | la boîte noire répète le même incident et laisse le gel passer pour une fin de tableau | PC-W10-11, 17/09 |
-| 63 | le script de réparation raisonne par familles de panne, pas par mesures | PC-W10-11, 17/09 |
+| 59 ✔ | les plantages de `dwm.exe` écartés au lieu d'être rattachés à la panne graphique | PC-W10-11, 17/09 |
+| 60 ✔ | une clé USB et un port de contrôleur comptés ensemble sous « erreurs disque » | PC-W10-11, 17/09 |
+| 61 ✔ | deux dates différentes pour le même pilote, dans le même rapport | PC-W10-11, 17/09 |
+| 62 ✔ | la boîte noire répète le même incident et laisse le gel passer pour une fin de tableau | PC-W10-11, 17/09 |
+| 63 ✔ | le script de réparation raisonne par familles de panne, pas par mesures | PC-W10-11, 17/09 |
 
-Les lignes marquées ✔ sont **livrées** : commit `75c3f11` du 17/09/2026, 428 tests verts.
+**Les seize points sont livrés**, en dix lots des 17 et 18/09/2026, chacun compilé et testé avant le suivant. Le projet est passé de 428 à 480 tests.
 
-Les points 48 à 52 et 54 à 63 sont des **corrections**, sur des données déjà collectées : rien à instrumenter, tout à relier. Le 53 est le seul ajout.
+Les points 48 à 52 et 54 à 63 étaient des **corrections**, sur des données déjà collectées : rien à instrumenter, tout à relier. Le 53 était le seul ajout — et il en a demandé deux lots, un pour collecter les faits réseau, un pour en tirer la conclusion.
 
-Ce qui reste à trancher : si les points **43** (la console doit archiver les alertes — les postes sont réinstallés) et **46** (voir à distance ce que la boîte noire a enregistré) rejoignent cette version, ou si elle se limite à 48-55.
+Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict rassurant sur une machine qui s'arrête anormalement**, il nomme le composant au lieu de son rapporteur, et il écrit son script de réparation à partir de ce qu'il a mesuré.
 
-### 1.7.0 — le déploiement de parc entre dans le logiciel
+Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
 
-Thème : **ce qu'on sait faire depuis un script, l'outil doit savoir le faire lui-même.**
+### 1.7.0 — le parc entre dans le logiciel
 
-Un seul point, le **64**, mais en quatre lots livrables séparément : la liste des postes, la vérification sans modification, le déploiement réel, puis le journal et la reprise. Le script publié sur palisser.fr n'est pas abandonné — il devient le moteur, et reste utilisable seul.
+Thème : **ce que l'administrateur fait à la main sur trente postes, l'outil doit savoir le faire et s'en souvenir.**
+
+| # | Ce qui manque | Pourquoi maintenant |
+|---|---|---|
+| 64 | le déploiement se fait par un script distribué à part | quatre lots : la liste des postes, la vérification sans modification, le déploiement réel, le journal et la reprise |
+| 43 | la console affiche les alertes et les oublie | un poste réimagé repart vierge ; on perd la preuve qu'il chauffait depuis six mois, au moment où elle servirait à le faire remplacer |
+| 46 | `/api/flight` existe dans le service et personne ne l'appelle | après une coupure, voir ce que le poste a enregistré dans ses dernières minutes sans s'y rendre |
+
+Les trois sont livrables séparément, et les trois vivent **sur la console, pas sur les postes** — c'est ce qui en fait une version cohérente. Le script publié sur palisser.fr n'est pas abandonné : il devient le moteur du point 64 et reste utilisable seul.
 
 Cette version est volontairement tenue à l'écart de la 1.6.0 : son thème est l'action sur un parc, pas la qualité d'un rapport. Les mélanger aurait fait une version qui ne raconte rien.
 

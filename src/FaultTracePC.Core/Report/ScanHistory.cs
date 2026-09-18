@@ -304,12 +304,42 @@ public static class ScanHistory
         // Pilotes mis à jour depuis le scan précédent.
         // (le dictionnaire relu du JSON perd son comparateur : on le reconstruit insensible à la casse)
         var prevDriverVersions = new Dictionary<string, string>(prev.DriverVersions, StringComparer.OrdinalIgnoreCase);
+        var tousLesPilotesChanges = new List<string>();
         foreach (var (sys, cur) in Summarize(r).DriverVersions)
         {
             if (prevDriverVersions.TryGetValue(sys, out var old) && old != cur)
+            {
+                tousLesPilotesChanges.Add(sys);
                 c.DriverUpdates.Add(Lang.T($"{sys} : {old.Split('|')[0]} → {cur.Split('|')[0]}", $"{sys}: {old.Split('|')[0]} → {cur.Split('|')[0]}"));
+            }
         }
         if (c.DriverUpdates.Count > 12) c.DriverUpdates = c.DriverUpdates.Take(12).ToList();
+
+        // POINT 55. Le pilote accusé a-t-il été remplacé entre les deux analyses, et les
+        // plantages ont-ils continué quand même ? Les deux données existaient déjà, à
+        // quatre cents lignes l'une de l'autre ; il manquait de les rapprocher.
+        //
+        // La liste des mises à jour est calculée AVANT la troncature à douze, pour
+        // qu'un parc riche en pilotes ne fasse pas disparaître le seul qui compte.
+        if (c.SameSignatureRecurred)
+        {
+            var accuses = newBsods
+                .Where(b => !string.IsNullOrEmpty(b.SuspectDriver) && prevDrivers.Contains(b.SuspectDriver!))
+                .Select(b => b.SuspectDriver!)
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var accuse in accuses)
+            {
+                // « nvlddmkm.sys » côté conclusion, « nvlddmkm » côté inventaire.
+                var racine = Path.GetFileNameWithoutExtension(accuse);
+                if (racine.Length == 0) continue;
+                if (tousLesPilotesChanges.Any(u => u.StartsWith(racine, StringComparison.OrdinalIgnoreCase)))
+                {
+                    c.SuspectDriverReplacedInVain = accuse;
+                    break;
+                }
+            }
+        }
 
         // Évolution des disques (santé, usure, température, erreurs de lecture).
         //
@@ -449,6 +479,15 @@ public static class ScanHistory
             crashSentence = Lang.T(
                 $"Le problème PERSISTE : un nouveau crash avec la même signature qu'au scan du {prev.GeneratedAt:dd/MM/yyyy} s'est produit. La réparation n'a pas suffi.",
                 $"The problem PERSISTS: a new crash with the same signature as in the scan of {prev.GeneratedAt:yyyy-MM-dd} occurred. The repair was not enough.");
+
+            // POINT 55. Si le pilote accusé a été remplacé entre les deux analyses et
+            // que les plantages ont continué, ce n'est plus « la réparation n'a pas
+            // suffi » : c'est le pilote qui est hors de cause. Le dire change tout ce
+            // qui suit, à commencer par la recommandation.
+            if (c.SuspectDriverReplacedInVain is { } pilote)
+                crashSentence += Lang.T(
+                    $" Et le rapprochement clôt le dossier : {pilote} a été REMPLACÉ entre les deux analyses, et les plantages ont continué avec la même signature. Ce n'est donc pas le pilote — inutile de le réinstaller une fois de plus, c'est le matériel qu'il faut regarder.",
+                    $" And the cross-check closes the case: {pilote} was REPLACED between the two analyses, and the crashes continued with the same signature. So it is not the driver — no point reinstalling it once more; the hardware is what needs looking at.");
         }
         else if (c.NewBsodCount > 0)
         {

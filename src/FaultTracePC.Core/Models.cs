@@ -628,6 +628,19 @@ public sealed class ScanComparison
     /// <summary>true si un nouveau crash a la même signature (code/pilote) qu'avant.</summary>
     public bool SameSignatureRecurred { get; set; }
     public List<string> DriverUpdates { get; set; } = new();
+
+    /// <summary>
+    /// POINT 55. Nom du pilote accusé par la conclusion qui a été REMPLACÉ entre les
+    /// deux analyses, alors que des plantages de même signature sont survenus après.
+    ///
+    /// C'est la phrase qui clôt un dossier : le pilote a été changé, les plantages ont
+    /// continué, donc ce n'est pas lui. Sans ce rapprochement, la recommandation reste
+    /// « réinstaller proprement le pilote » — c'est-à-dire refaire ce qui vient
+    /// d'échouer. Constaté le 14/09/2026 sur PC-W10-11 : nvlddmkm.sys est passé de
+    /// 32.0.15.8216 à 32.0.15.8278 entre deux analyses, et quatre écrans bleus portant
+    /// la même signature ont suivi.
+    /// </summary>
+    public string? SuspectDriverReplacedInVain { get; set; }
     public List<string> DiskChanges { get; set; } = new();
     public int NewDiskErrorEvents { get; set; }
     public int NewWheaEvents { get; set; }
