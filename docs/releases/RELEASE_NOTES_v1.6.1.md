@@ -86,3 +86,19 @@ Trois décisions comptent plus que le code lui-même :
 ## Ce qui ne change pas
 
 Aucun format de fichier n'évolue : les analyses enregistrées par la 1.6.0 restent lisibles, et la comparaison entre deux scans fonctionne d'une version à l'autre. Aucune nouvelle permission n'est demandée. La seule source de données nouvelle est une lecture de la base de registre, sans écriture.
+
+513 tests, aucun échec.
+
+## Sommes de contrôle (SHA-256)
+
+Ces fichiers ne sont pas signés numériquement. Vérifier l'empreinte est le seul moyen de s'assurer que le fichier téléchargé est bien celui publié ici :
+
+```powershell
+Get-FileHash FaultTracePC-1.6.1.msi -Algorithm SHA256
+Get-FileHash FaultTracePC-1.6.1-portable.zip -Algorithm SHA256
+```
+
+| Fichier | SHA-256 |
+|---|---|
+| `FaultTracePC-1.6.1.msi` | `6D8A8E29BE5F7866DB218C19DC7F766B5E7F1399171E03B697BB092A6694B894` |
+| `FaultTracePC-1.6.1-portable.zip` | `FE82CBBE143CAD5592CC6D38B7205CCFE74BD44513F2487435009381C749D9B5` |

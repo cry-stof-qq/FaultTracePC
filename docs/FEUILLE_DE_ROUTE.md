@@ -16,7 +16,7 @@
 | 1.5.1 | correctif de déploiement — le paquet sait se remplacer lui-même, pare-feu posé par la ligne de commande, procédure écrite |
 | 1.5.2 | **publiée** — deux défauts constatés, sans nouvelle surface : la langue d'un rapport distant (point 45) et le lanceur `.bat` du script de réparation (point 36, moitié restante). 428 tests verts |
 | 1.6.0 | **publiée** le 18/09/2026 — thème **un rapport doit nommer la panne qu'il a sous les yeux** — seize points, 48 à 63, livrés les 17 et 18/09/2026 |
-| 1.6.1 | correctifs constatés sur deux rapports 1.6.0 réels, plus deux ajouts demandés dans la foulée — points 65 à 71 |
+| 1.6.1 | **publiée** le 18/09/2026 — correctifs constatés sur deux rapports 1.6.0 réels, plus deux ajouts demandés dans la foulée — points 65 à 71, 513 tests verts |
 | 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots), 43 (archivage des alertes) et 46 (boîte noire distante) |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
@@ -557,6 +557,8 @@ Deux d'entre eux valaient plus que leur apparence :
 
 - Le **68** n'était pas un défaut d'affichage. La liste des pilotes changés alimente le point 55 : une fausse mise à jour y disculpait un pilote qui n'avait jamais été remplacé.
 - Le **69** touche à ce que ce logiciel promet. Un plafond présenté comme une mesure fausse l'appréciation de la gravité dans les deux sens, et aucune relecture du rapport ne pouvait le détecter — le chiffre avait l'air d'un chiffre.
+
+Les sept points sont livrés, en quatre lots du 18/09/2026, chacun compilé et testé avant le suivant. Le projet passe de 468 à **513 tests**.
 
 Ce que la version change, en une phrase : **le logiciel ne signale plus d'anomalie sur une machine saine, et ne présente plus une limite technique comme un fait mesuré.**
 
