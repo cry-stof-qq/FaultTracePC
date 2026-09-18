@@ -175,6 +175,22 @@ public sealed class EventLogCollector
                 if (p.Count > 6) e.Extracted["ExceptionCode"] = p[6].Value?.ToString() ?? "";
                 break;
             }
+            case EventCategory.ServiceFailure when string.Equals(rec.ProviderName, "Service Control Manager", StringComparison.OrdinalIgnoreCase):
+            {
+                // Les quatre identifiants collectés (7000, 7001, 7031, 7034) portent tous
+                // le service en premier paramètre. On le lit DANS LES DONNÉES de
+                // l'événement, jamais dans sa phrase : le message est traduit, l'ordre
+                // des paramètres non.
+                //
+                // C'est le nom D'AFFICHAGE du service, pas son nom court : c'est celui
+                // que Windows montre dans services.msc, donc celui que l'utilisateur
+                // retrouvera. Il ne convient PAS à sc.exe, qui attend le nom court —
+                // d'où une recommandation qui renvoie à services.msc et pas à une ligne
+                // de commande qui échouerait.
+                if (rec.Properties.Count > 0)
+                    e.Extracted["Service"] = rec.Properties[0].Value?.ToString() ?? "";
+                break;
+            }
             case EventCategory.AppHang:
             {
                 var p = rec.Properties;

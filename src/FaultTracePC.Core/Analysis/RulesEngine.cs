@@ -2058,18 +2058,83 @@ public sealed class RulesEngine
         });
     }
 
+    /// <summary>
+    /// Échecs de services répétés.
+    ///
+    /// Constaté le 18/09/2026 sur TECH-INFO-2025 : « Échecs de services Windows
+    /// répétés (29) », suivi de « Consulter le détail dans la section Événements pour
+    /// identifier le(s) service(s) concerné(s) ». Le logiciel avait les 29 événements
+    /// sous la main, chacun portant le nom du service dans ses données. Il renvoyait
+    /// au lecteur un travail qu'il pouvait faire lui-même — le reproche exact du thème
+    /// de la 1.6.0.
+    ///
+    /// Le nom relevé est le nom D'AFFICHAGE, celui de services.msc. C'est pourquoi la
+    /// recommandation renvoie à services.msc et jamais à sc.exe, qui attend le nom
+    /// court et échouerait sur celui-là.
+    /// </summary>
     private static void AnalyzeServiceFailures(DiagnosticReport r)
     {
         var fails = r.Events.Where(e => e.Category == EventCategory.ServiceFailure).ToList();
         if (fails.Count < 5) return;
+
+        var parService = fails
+            .GroupBy(e => e.Extracted.GetValueOrDefault("Service", "").Trim())
+            .Where(g => g.Key.Length > 0)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        string details, reco;
+
+        if (parService.Count == 0)
+        {
+            // Aucun nom lisible : on le DIT, au lieu de laisser croire qu'on n'a pas cherché.
+            details = Lang.T("Des services n'ont pas démarré ou se sont arrêtés de façon inattendue de manière répétée. Aucun de ces événements ne porte de nom de service exploitable.",
+                             "Services failed to start or stopped unexpectedly, repeatedly. None of these events carries a usable service name.");
+            reco = Lang.T("Ouvrir l'Observateur d'événements, journal Système, et filtrer sur la source « Service Control Manager » pour retrouver les services concernés.",
+                          "Open Event Viewer, System log, and filter on the “Service Control Manager” source to find which services are involved.");
+        }
+        else
+        {
+            var nommes = string.Join(", ", parService.Take(4).Select(g =>
+                Lang.T($"{g.Key} ({g.Count()}×, dernier le {Lang.ShortDateMinute(g.Max(e => e.TimeLocal))})",
+                       $"{g.Key} ({g.Count()}×, last on {Lang.ShortDateMinute(g.Max(e => e.TimeLocal))})")));
+
+            var reste = parService.Count > 4
+                ? Lang.T($" et {parService.Count - 4} autre(s) service(s)", $" and {parService.Count - 4} more service(s)")
+                : "";
+
+            details = Lang.T($"Services concernés, du plus touché au moins touché : {nommes}{reste}.",
+                             $"Services involved, from the most affected to the least: {nommes}{reste}.");
+
+            // Un seul service qui concentre l'essentiel des échecs n'appelle pas le même
+            // geste qu'une dispersion sur dix services : le premier se traite, la seconde
+            // désigne le système lui-même.
+            var premier = parService[0];
+            bool domine = parService.Count == 1 || premier.Count() * 2 >= fails.Count;
+
+            details += domine
+                ? Lang.T($" {premier.Key} concentre {premier.Count()} des {fails.Count} échecs : c'est lui qu'il faut traiter en premier.",
+                         $" {premier.Key} accounts for {premier.Count()} of the {fails.Count} failures: that is the one to deal with first.")
+                : Lang.T($" Les échecs se répartissent sur {parService.Count} services différents — aucun ne domine, ce qui désigne plutôt le système que l'un d'eux.",
+                         $" The failures are spread over {parService.Count} different services — none dominates, which points at the system rather than at any one of them.");
+
+            reco = domine
+                ? Lang.T($"Ouvrir services.msc et y chercher « {premier.Key} » : ses propriétés donnent son compte de démarrage et ses actions de récupération. Un service tiers qui tombe se met à jour ou se désinstalle ; un service de Windows qui tombe est un symptôme, pas une cause — chercher alors du côté des pilotes et des fichiers système.",
+                         $"Open services.msc and look for “{premier.Key}”: its properties show its startup account and its recovery actions. A third-party service that keeps failing gets updated or uninstalled; a Windows service that keeps failing is a symptom, not a cause — look at drivers and system files instead.")
+                : Lang.T("Des échecs dispersés sur plusieurs services désignent rarement ces services : vérifier d'abord les fichiers système et l'image Windows, puis les mises à jour installées à la même période.",
+                         "Failures spread across several services rarely point at those services: check the system files and the Windows image first, then the updates installed over the same period.");
+        }
+
         r.Findings.Add(new Finding
         {
             Severity = Severity.Info,
             Confidence = Confidence.Medium,
             Category = FaultCategory.Software,
+            Code = "service_failure",
             Title = Lang.T($"Échecs de services Windows répétés ({fails.Count})", $"Repeated Windows service failures ({fails.Count})"),
-            Details = Lang.T("Des services n'ont pas démarré ou se sont arrêtés de façon inattendue de manière répétée.", "Services failed to start or stopped unexpectedly, repeatedly."),
-            Recommendation = Lang.T("Consulter le détail dans la section Événements pour identifier le(s) service(s) concerné(s).", "See the detail in the Events section to identify which service(s) are involved.")
+            Details = details,
+            Recommendation = reco,
         });
     }
 
