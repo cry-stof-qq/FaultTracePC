@@ -1457,6 +1457,67 @@ public sealed class RulesEngine
     }
 
     /// <summary>
+    /// Lettre de lecteur citée par un message d'événement — « … sur le volume D: ».
+    ///
+    /// Les deux gardes comptent autant que le motif lui-même :
+    ///   - RIEN D'ALPHANUMÉRIQUE AVANT, sans quoi le « e » de « Note: » ferait une
+    ///     lettre de lecteur ;
+    ///   - NI BARRE OBLIQUE NI CARACTÈRE ALPHANUMÉRIQUE APRÈS, sans quoi « C:\Windows »
+    ///     serait pris pour une référence au volume C: — ce qui est vrai mais inutile,
+    ///     tous les messages citant un chemin système le feraient remonter.
+    ///
+    /// Une heure comme « 09:24 » ne peut pas correspondre : le motif exige une LETTRE.
+    /// </summary>
+    internal static readonly System.Text.RegularExpressions.Regex LettreDeVolumeRx =
+        new(@"(?<![A-Za-z0-9])([A-Za-z]):(?![\\/A-Za-z0-9])", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    internal static List<string> LettresCitees(IEnumerable<WinEvent> evenements) =>
+        evenements.SelectMany(e => LettreDeVolumeRx.Matches(e.Message ?? "")
+                                                   .Select(m => m.Groups[1].Value.ToUpperInvariant() + ":"))
+                  .Distinct(StringComparer.OrdinalIgnoreCase)
+                  .OrderBy(l => l, StringComparer.OrdinalIgnoreCase)
+                  .ToList();
+
+    /// <summary>
+    /// Rapproche une lettre de volume citée par les événements d'un support amovible
+    /// que Windows connaît et qui n'est pas monté aujourd'hui.
+    ///
+    /// D'OÙ VIENT CE RAPPROCHEMENT
+    /// Constaté le 18/09/2026 sur TECH-INFO-2025 : un événement Ntfs 55 nommait
+    /// « le volume D: », et la lecture du registre proposait, deux cartes plus loin,
+    /// « D: (Kingston DataTraveler 3.0 USB Device) ». Le logiciel tenait les deux
+    /// moitiés sans les coller.
+    ///
+    /// CE QUE ÇA VAUT, ET PAS PLUS
+    /// Une lettre de lecteur est réattribuée à chaque branchement, exactement comme un
+    /// numéro de disque. Le rapprochement resserre la piste — il ne la transforme pas
+    /// en preuve, et la phrase le dit. Le filtre « amovible ET non monté » écarte de
+    /// lui-même l'écrasante majorité des correspondances fortuites.
+    /// </summary>
+    internal static string VolumeCiteReconnu(DiagnosticReport r, IEnumerable<WinEvent> evenements)
+    {
+        var historique = r.System.StorageHistory;
+        if (!historique.Readable) return "";
+
+        var candidats = historique.AmoviblesAbsents;
+        if (candidats.Count == 0) return "";
+
+        var lettres = LettresCitees(evenements);
+        if (lettres.Count == 0) return "";
+
+        var trouves = candidats
+            .Where(v => lettres.Contains(v.Letter, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+        if (trouves.Count == 0) return "";
+
+        var liste = string.Join(", ", trouves.Select(v => $"{v.Letter} ({v.Label})"));
+
+        return Lang.T(
+            $" Rapprochement : {liste}. Ces lettres sont citées par les événements ci-dessus ET ne sont pas montées aujourd'hui ; Windows les associe en dernier au matériel indiqué. Une lettre de lecteur est réattribuée à chaque branchement, comme un numéro de disque : c'est une piste plus serrée que la précédente, pas une preuve.",
+            $" Match: {liste}. These letters are cited by the events above AND are not mounted today; Windows last associated them with the hardware shown. A drive letter is reassigned on every connection, just like a disk number: this is a tighter lead than the previous one, not proof.");
+    }
+
+    /// <summary>
     /// Construit la carte d'une nature. Tout ce qui est compté, cité ou conseillé ici
     /// ne porte que sur les événements de CETTE nature : c'est précisément ce que le
     /// chiffre unique d'avant rendait impossible.
@@ -1509,6 +1570,7 @@ public sealed class RulesEngine
                       + (paging > 0 ? Lang.T($" {paging} concernent une opération de pagination (disk 51) — Windows lisait ou écrivait le fichier d'échange.", $" {paging} concern a paging operation (disk 51) — Windows was reading from or writing to the page file.") : "")
                       + (tousAbsents ? Lang.T(" Aucun disque actuellement monté sur cette machine n'est mis en cause : ces erreurs concernent uniquement des supports qui ne sont plus connectés.", " No drive currently mounted on this machine is implicated: these errors concern only media that are no longer connected.") : "")
                       + (tousAbsents ? PistesSupportsAbsents(r) : "")
+                      + VolumeCiteReconnu(r, evenements)
                       + (nature == NatureCitee.PortControleur ? Lang.T(" Un port de contrôleur ne désigne aucun disque en particulier : ces événements ne disent pas lequel des disques montés était visé.", " A controller port designates no particular drive: these events do not say which of the mounted drives was targeted.") : "")
                       + (amovibles.Count > 0
                           ? Lang.T($" {(queDeLAmovible ? "Tous les disques mis en cause sont des supports AMOVIBLES" : "Une partie des disques mis en cause sont des supports AMOVIBLES")} ({string.Join(", ", amovibles.Select(d => d.Model))}) : sur ce type de support, ni la gestion d'alimentation du lien, ni un câble SATA, ni le firmware d'un SSD ne sont en jeu.",
