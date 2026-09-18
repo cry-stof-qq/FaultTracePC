@@ -364,6 +364,12 @@ Le déploiement se fait aujourd'hui par un script PowerShell distribué à part,
 
 **Découpage en quatre lots**, le risque à la fin sur une plomberie déjà éprouvée : **A** la liste seule, en lecture pure — **B** le mode « vérifier seulement », qui construit et prouve le canal JSON sur des opérations inoffensives — **C** le déploiement réel avec ses garde-fous — **D** le journal et la reprise des seuls postes en échec.
 
+**Avancement au 18/09/2026 — le lot A est découpé en trois, et deux sont livrés :**
+
+- **A-1 ✔** la fusion des sources (`ParkInventory`). Décision prise ce jour-là, contre celle du 17/09 : **`postes.csv` ne crée aucun poste.** Son en-tête le disait déjà en majuscules — c'est un annuaire d'adresses MAC, qui contient les téléphones et les tablettes rendus par le DHCP. Il ne fait qu'ajouter une adresse MAC à un poste déjà listé par l'Active Directory ou par `parc.json`. Dédoublonnage par nom Windows normalisé, les trois écritures de l'annuaire et la forme longue du DHCP se rejoignant sur la même clé.
+- **A-2 ✔** l'interrogation de l'annuaire (`ParkDirectory`) et les réglages (`ParametresParc`). `PageSize = 1000` est la ligne qui compte : sans elle un contrôleur de domaine s'arrête à mille résultats **en silence**. Le contrôle de la saisie nomme la faute et sa correction — une virgule non échappée ne produit pas « virgule non échappée » côté LDAP, mais « syntaxe non valide », voire une liste vide sans erreur. Et `ListerUnites` rend les noms distinctifs tels que l'annuaire les stocke, donc déjà échappés : choisir plutôt que saisir supprime le problème à la source.
+- **A-3** l'onglet qui affiche tout ça. **À FAIRE.**
+
 ---
 
 ## Points 65 à 71 — ce que deux rapports 1.6.0 ont montré
@@ -534,6 +540,42 @@ Les points 48 à 52 et 54 à 63 étaient des **corrections**, sur des données d
 Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict rassurant sur une machine qui s'arrête anormalement**, il nomme le composant au lieu de son rapporteur, et il écrit son script de réparation à partir de ce qu'il a mesuré.
 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
+
+---
+
+## Points 72 à 78 — ce que la 1.6.1 a montré à son tour
+
+Même méthode, même jour : un rapport produit par la version qu'on vient de publier, relu ligne à ligne. Sept points de plus, dont **deux créés par la 1.6.1 elle-même** — c'est le prix d'une version qui change la structure des conclusions, et il vaut mieux le payer tout de suite.
+
+**72 — La phrase de comptage était en double, et la première était fausse. FAIT le 18/09/2026.**
+
+La carte des 20 réinitialisations de contrôleur portait « Le journal Windows en contient davantage », qui se lit « il y en a plus de 20 ». **Rien ne l'établit.** Ce qui a buté sur le plafond, c'est la CATÉGORIE ; rien ne dit que la coupe a touché ces 20-là plutôt que les 479 autres. La phrase suivante disait déjà la chose correcte. Les deux fusionnent en une, qui ne parle que du total de la catégorie.
+
+**73 — Une désinstallation affirmée sur une absence de preuve. FAIT le 18/09/2026.**
+
+« MicrosoftEdgeUpdate.exe (27 crashs) — ce logiciel ne figure plus parmi les programmes installés », écrit pendant que **six processus `msedge` tournaient, listés dans le même rapport**. Deux fautes cumulées : la correspondance échouait sur un espace entre « Microsoft Edge » et « MicrosoftEdgeUpdate » ; et l'absence de la liste des programmes installés était présentée comme une preuve, alors que les composants de Windows, les applications du Microsoft Store et les logiciels portables n'y figurent pas. La comparaison se fait désormais sur les lettres et les chiffres seulement, et le texte dit ce qu'il constate sans conclure au-delà.
+
+**74 — Les services en échec étaient comptés, pas nommés. FAIT le 18/09/2026.**
+
+« Échecs de services Windows répétés (29) », suivi de « Consulter le détail dans la section Événements ». Le logiciel avait les 29 événements sous la main, chacun portant le service dans ses **données** — lues là, jamais dans la phrase du message, qui est traduite. C'est le reproche exact du thème de la 1.6.0, revenu sur une autre règle.
+
+**75 — Les deux moitiés de la réponse n'étaient pas collées. FAIT le 18/09/2026.**
+
+Un événement `Ntfs 55` nommait « le volume D: » ; la lecture du registre proposait, deux cartes plus loin, « D: (Kingston DataTraveler 3.0 USB Device) ». Le rapprochement n'est écrit que si la lettre est citée par les événements de cette carte, que le support est amovible et qu'il n'est pas monté aujourd'hui — et il est annoncé comme une piste plus serrée, jamais comme une preuve.
+
+**76 — Deux services couvrant 28 échecs sur 29 étaient déclarés « dispersés ». FAIT le 18/09/2026.**
+
+Le seuil demandait qu'**un seul** service pèse la moitié. `GLPI Agent` 14 fois, `TmWSCSvc` 14 fois, un troisième 1 fois : aucun n'atteignait la moitié, et le rapport concluait « aucun ne domine, ce qui désigne plutôt le système » en renvoyant vers `sfc` et `DISM` — **pour deux agents tiers**. La règle compte désormais combien de services il faut réunir pour couvrir les quatre cinquièmes : un ou deux, on les nomme ; trois ou plus, la dispersion est réelle.
+
+**77 — Le point 65 avait ramené le mélange par une autre porte. FAIT le 18/09/2026.**
+
+L'alerte de la surveillance temps réel citait « le volume D: » et se retrouvait collée à la carte du **port de contrôleur SATA**. La faute n'était pas dans la fusion des doublons : le point 65 a changé le sens de l'identifiant `disk_event`, qui désignait LA carte des erreurs disque et désigne désormais **la première nature présente**. Une leçon à retenir pour la suite : *changer le sens d'un identifiant partagé déplace le problème au lieu de le résoudre, tant qu'on n'a pas cherché qui d'autre s'y appuie.*
+
+**78 — Un service qui ne démarre pas et un service qui meurt étaient dits pareil. FAIT le 18/09/2026.**
+
+`7000`/`7001` — « n'a pas pu démarrer » — et `7031`/`7034` — « s'est terminé de manière inattendue » — ne se regardent pas au même endroit : le premier renvoie à son inscription et à son fichier, le second à son propre journal. La distinction se lit sur l'**identifiant** de l'événement, jamais sur sa phrase.
+
+Et une règle posée par l'auteur ce jour-là, qui vaut au-delà de ce point : **« mettre en avant l'attention que l'utilisateur doit apporter, pas obligatoirement la solution quand il n'y en a pas »** — le logiciel doit valoir pour toutes les machines, pas décrire celle qui a servi à trouver le défaut.
 
 ### 1.6.1 — points 65 à 71, le lendemain de la 1.6.0
 
