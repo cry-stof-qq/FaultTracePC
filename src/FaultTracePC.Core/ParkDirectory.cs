@@ -94,6 +94,62 @@ public static class ParkDirectory
         return postes.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    /// <summary>Une unité d'organisation telle qu'on la propose à l'utilisateur.</summary>
+    public sealed class UniteOrganisation
+    {
+        /// <summary>Nom distinctif complet, à recopier tel quel dans le réglage.</summary>
+        public string NomDistinctif { get; set; } = "";
+
+        /// <summary>Chemin lisible, « Postes / Salle 12 ».</summary>
+        public string Libelle { get; set; } = "";
+
+        public override string ToString() => Libelle.Length > 0 ? Libelle : NomDistinctif;
+    }
+
+    /// <summary>
+    /// Liste les unités d'organisation du domaine, pour que l'utilisateur CHOISISSE
+    /// au lieu de SAISIR.
+    ///
+    /// POURQUOI CETTE MÉTHODE EXISTE
+    /// Un nom distinctif se tape mal : il faut la racine du domaine en entier, et
+    /// toute virgule contenue dans un nom doit être échappée. Une faute de frappe
+    /// ne produit pas un message clair mais une erreur LDAP, ou pire, une liste
+    /// vide sans explication. Lire les noms distinctifs tels que l'annuaire les
+    /// stocke supprime le problème à la source — ils sont déjà échappés.
+    ///
+    /// Lecture seule, ticket Kerberos du compte courant, comme le reste.
+    /// </summary>
+    public static List<UniteOrganisation> ListerUnites(string? depuis = null, List<string>? notes = null)
+    {
+        var unites = new List<UniteOrganisation>();
+
+        try
+        {
+            using var racine = new DirectoryEntry(CheminLdap(depuis));
+            using var chercheur = new DirectorySearcher(racine)
+            {
+                Filter = "(objectClass=organizationalUnit)",
+                SearchScope = SearchScope.Subtree,
+                PageSize = 1000,
+            };
+            chercheur.PropertiesToLoad.Add("distinguishedName");
+
+            using var resultats = chercheur.FindAll();
+            foreach (SearchResult r in resultats)
+            {
+                var dn = (Premiere(r, "distinguishedName") ?? "").Trim();
+                if (dn.Length == 0) continue;
+                unites.Add(new UniteOrganisation { NomDistinctif = dn, Libelle = UniteLisible(dn) });
+            }
+        }
+        catch (Exception ex)
+        {
+            notes?.Add(Lang.T($"Active Directory : {ex.Message}", $"Active Directory: {ex.Message}"));
+        }
+
+        return unites.OrderBy(u => u.Libelle, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
     // ------------------------------------------------------------------
     // Les morceaux vérifiables sans annuaire
     // ------------------------------------------------------------------
@@ -171,6 +227,66 @@ public static class ParkDirectory
         }
         morceaux.Add(courant.ToString());
         return morceaux;
+    }
+
+    /// <summary>
+    /// Vérifie une unité d'organisation saisie à la main, AVANT d'aller déranger
+    /// l'annuaire. Rend une chaîne vide si la saisie est exploitable, sinon la
+    /// phrase à montrer à l'utilisateur.
+    ///
+    /// POURQUOI UN CONTRÔLE ICI PLUTÔT QUE LE MESSAGE DE LDAP
+    /// Une virgule non échappée ne produit pas « virgule non échappée » : elle
+    /// produit « le nom distinctif comporte une syntaxe non valide », ou une liste
+    /// vide sans erreur du tout. Le contrôle ci-dessous nomme la faute ET la
+    /// correction, ce que l'annuaire ne fera jamais.
+    ///
+    /// Une saisie VIDE est valide : elle veut dire « la racine du domaine ».
+    /// </summary>
+    public static string VerifierUnite(string? saisie)
+    {
+        var ou = (saisie ?? "").Trim();
+        if (ou.Length == 0) return "";
+
+        if (ou.StartsWith("LDAP://", StringComparison.OrdinalIgnoreCase)) ou = ou[7..].Trim();
+        if (ou.Length == 0) return "";
+
+        var problemes = new List<string>();
+        var morceaux = DecouperNomDistinctif(ou);
+
+        // Chaque morceau d'un nom distinctif s'écrit « attribut=valeur ». Un morceau
+        // qui n'a pas cette forme est presque toujours la seconde moitié d'une valeur
+        // coupée par une virgule qu'on a oublié d'échapper.
+        bool malForme = morceaux.Any(m => !EstMorceauValide(m));
+        if (malForme)
+            problemes.Add(Lang.T(
+                "Une virgule de ce chemin n'est pas échappée : dans un nom d'unité, une virgule s'écrit « \\, ». Exemple : OU=Ecole primaire\\, batiment B,DC=exemple,DC=fr.",
+                "A comma in this path is not escaped: inside a unit name, a comma is written “\\,”. For example: OU=Primary school\\, building B,DC=example,DC=com."));
+
+        // Sans composant DC=, le chemin ne désigne pas de domaine : l'annuaire ne
+        // saura pas où chercher.
+        bool racineAbsente = !morceaux.Any(m => m.Trim().StartsWith("DC=", StringComparison.OrdinalIgnoreCase));
+        if (racineAbsente)
+            problemes.Add(Lang.T(
+                "Ce chemin est incomplet : il lui manque la racine du domaine. Un chemin complet se termine par les composants « DC= », par exemple OU=Postes,DC=exemple,DC=fr.",
+                "This path is incomplete: the domain root is missing. A complete path ends with the “DC=” components, for example OU=Computers,DC=example,DC=com."));
+
+        if (problemes.Count == 0) return "";
+
+        return string.Join(" ", problemes)
+               + Lang.T(" Le plus sûr reste de choisir dans la liste plutôt que de saisir ce chemin.",
+                        " The safest option is still to pick from the list rather than typing this path.");
+    }
+
+    /// <summary>Un morceau de nom distinctif a la forme « attribut=valeur ».</summary>
+    internal static bool EstMorceauValide(string morceau)
+    {
+        var m = (morceau ?? "").Trim();
+        var egal = m.IndexOf('=');
+        if (egal <= 0 || egal == m.Length - 1) return false;
+
+        var attribut = m[..egal];
+        if (!char.IsLetter(attribut[0])) return false;
+        return attribut.All(c => char.IsLetterOrDigit(c) || c == '-');
     }
 
     private static string? Premiere(SearchResult r, string propriete) =>

@@ -121,4 +121,70 @@ public class AnnuaireTests
         foreach (var interdit in new[] { "password", "motdepasse", "token", "jeton", "secret", "clef", "key" })
             Assert.DoesNotContain(proprietes, p => p.Contains(interdit));
     }
+
+    // ------------------------------------------------------------------
+    // Contrôle de la saisie
+    // ------------------------------------------------------------------
+
+    private static string EnFrancais(Func<string> f)
+    {
+        var initial = Lang.Current;
+        try { Lang.Apply(AppLanguage.French); return f(); }
+        finally { Lang.Apply(initial); }
+    }
+
+    [Theory]
+    // Vide = la racine du domaine : c'est une saisie valide, et c'est le cas par défaut.
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    [InlineData("OU=Postes,DC=exemple,DC=fr")]
+    [InlineData("LDAP://OU=Postes,DC=exemple,DC=fr")]
+    // Virgule correctement échappée : rien à signaler.
+    [InlineData(@"OU=Ecole primaire\, batiment B,OU=Postes,DC=exemple,DC=fr")]
+    public void Une_saisie_exploitable_ne_produit_aucun_message(string? saisie)
+        => Assert.Equal("", EnFrancais(() => ParkDirectory.VerifierUnite(saisie)));
+
+    [Fact]
+    public void Une_virgule_non_echappee_est_nommee_avec_sa_correction()
+    {
+        // L'annuaire, lui, répondrait « syntaxe non valide » — ou rien du tout.
+        var message = EnFrancais(() => ParkDirectory.VerifierUnite("OU=Ecole primaire, batiment B,DC=exemple,DC=fr"));
+
+        Assert.Contains("virgule", message);
+        Assert.Contains(@"\,", message);
+    }
+
+    [Fact]
+    public void Un_chemin_sans_racine_de_domaine_est_signale()
+    {
+        var message = EnFrancais(() => ParkDirectory.VerifierUnite("OU=Postes"));
+
+        Assert.Contains("racine du domaine", message);
+        Assert.Contains("DC=", message);
+    }
+
+    [Fact]
+    public void Deux_fautes_a_la_fois_sont_dites_toutes_les_deux()
+    {
+        // Sinon l'utilisateur corrige, relance, et découvre la seconde faute.
+        var message = EnFrancais(() => ParkDirectory.VerifierUnite("OU=Ecole, batiment B"));
+
+        Assert.Contains("virgule", message);
+        Assert.Contains("racine du domaine", message);
+    }
+
+    [Theory]
+    [InlineData("OU=Postes", true)]
+    [InlineData("DC=fr", true)]
+    [InlineData("CN=POSTE-01", true)]
+    [InlineData(@"OU=Ecole primaire\, batiment B", true)]
+    // Le fragment laissé par une virgule non échappée.
+    [InlineData(" batiment B", false)]
+    [InlineData("", false)]
+    [InlineData("=valeur", false)]
+    [InlineData("OU=", false)]
+    [InlineData("1OU=x", false)]
+    public void Un_morceau_de_nom_distinctif_a_la_forme_attribut_egale_valeur(string morceau, bool valide)
+        => Assert.Equal(valide, ParkDirectory.EstMorceauValide(morceau));
 }
