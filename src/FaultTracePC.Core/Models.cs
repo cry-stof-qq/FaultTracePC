@@ -253,7 +253,8 @@ public sealed class NetworkInfo
     public bool PartOfDomain { get; set; }
     public string Domain { get; set; } = "";
 
-    public bool HasWireless => Adapters.Any(a => a.IsWireless);
+    /// <summary>Carte sans fil RÉELLE : les adaptateurs virtuels ne comptent pas.</summary>
+    public bool HasWireless => Adapters.Any(a => a.IsWireless && a.IsPhysical);
 }
 
 public sealed class NetworkAdapterInfo
@@ -267,6 +268,12 @@ public sealed class NetworkAdapterInfo
     public string Status { get; set; } = "";
     /// <summary>Constructeur seul : une adresse MAC complète identifie une machine.</summary>
     public string MacMasked { get; set; } = "";
+    /// <summary>
+    /// Carte matérielle réelle ? Les cartes virtuelles — VPN, VirtualBox, Wi-Fi Direct —
+    /// se déclarent comme les autres. En compter une comme « carte Wi-Fi présente »
+    /// ferait conclure à une panne de Wi-Fi sur un poste fixe qui n'en a jamais eu.
+    /// </summary>
+    public bool IsPhysical { get; set; } = true;
     public string DriverVersion { get; set; } = "";
     public DateTime? DriverDate { get; set; }
     public bool HasIpV4 { get; set; }
@@ -276,8 +283,47 @@ public sealed class ServiceStateInfo
 {
     public string Name { get; set; } = "";
     public string DisplayName { get; set; } = "";
+    /// <summary>Valeur BRUTE de WMI (Running, Stopped…) : c'est elle qui sert à décider.</summary>
     public string State { get; set; } = "";
+    /// <summary>Valeur BRUTE de WMI (Auto, Manual, Disabled…).</summary>
     public string StartMode { get; set; } = "";
+
+    /// <summary>
+    /// Ces deux libellés sont ce qu'on AFFICHE. Le rapport français montrait
+    /// « Running · Auto », c'est-à-dire du texte anglais de WMI laissé tel quel.
+    /// La valeur brute reste seule à servir aux comparaisons : traduire ce qui décide
+    /// est le meilleur moyen de casser une règle le jour où la langue change.
+    /// </summary>
+    public string StateLabel => State.ToLowerInvariant() switch
+    {
+        "running" => Lang.T("en cours", "running"),
+        "stopped" => Lang.T("arrêté", "stopped"),
+        "paused" => Lang.T("suspendu", "paused"),
+        "start pending" => Lang.T("démarrage en cours", "starting"),
+        "stop pending" => Lang.T("arrêt en cours", "stopping"),
+        _ => State,
+    };
+
+    public string StartModeLabel => StartMode.ToLowerInvariant() switch
+    {
+        "auto" => Lang.T("automatique", "automatic"),
+        "manual" => Lang.T("à la demande", "on demand"),
+        "disabled" => Lang.T("désactivé", "disabled"),
+        "boot" or "system" => Lang.T("au démarrage de Windows", "at Windows start-up"),
+        _ => StartMode,
+    };
+
+    /// <summary>
+    /// Un service en démarrage « Manual » est conçu pour rester arrêté tant que rien
+    /// ne le réclame : sous Windows moderne, la plupart sont même à déclenchement
+    /// automatique. L'arrêt n'y est PAS une panne.
+    ///
+    /// Constaté le 18/09/2026 sur deux machines en parfait état de marche : NlaSvc,
+    /// arrêté et en démarrage « Manual » sur les deux, était signalé comme un défaut.
+    /// Un faux positif sur chaque poste du parc décrédibilise tout le reste du rapport.
+    /// </summary>
+    public bool DoitTourner => StartMode.Equals("Auto", StringComparison.OrdinalIgnoreCase)
+                            || StartMode.Equals("Automatic", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class SystemSnapshot

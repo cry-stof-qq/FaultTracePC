@@ -41,6 +41,24 @@ public static class NetworkCollector
         {
             // Les pilotes des cartes réseau, par description : c'est la seule clé
             // commune entre l'API .NET et l'inventaire WMI des pilotes signés.
+            // Cartes RÉELLES selon Windows. Sans cette liste, un adaptateur VPN ou
+            // « Wi-Fi Direct » compte comme une carte sans fil — et le rapport conclut
+            // à une panne de Wi-Fi sur un poste fixe qui n'en a jamais eu.
+            var physiques = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            bool listePhysiqueLue = false;
+            try
+            {
+                using var wmiCartes = new ManagementObjectSearcher(
+                    "SELECT NetConnectionID FROM Win32_NetworkAdapter WHERE PhysicalAdapter = TRUE");
+                foreach (ManagementObject mo in wmiCartes.Get())
+                {
+                    var id = mo["NetConnectionID"]?.ToString();
+                    if (!string.IsNullOrEmpty(id)) physiques.Add(id);
+                }
+                listePhysiqueLue = physiques.Count > 0;
+            }
+            catch { /* WMI muet : on ne filtrera que sur le nom */ }
+
             var pilotes = new Dictionary<string, (string Version, DateTime? Date)>(StringComparer.OrdinalIgnoreCase);
             try
             {
@@ -67,6 +85,11 @@ public static class NetworkCollector
                     Status = n.OperationalStatus.ToString(),
                     MacMasked = MasquerMac(n.GetPhysicalAddress().ToString()),
                 };
+
+                // Deux filtres, et il faut les deux. WMI dit « adaptateur physique » d'un
+                // Wi-Fi Direct, qui s'appuie pourtant sur la radio d'une autre carte ; et
+                // WMI peut être muet, auquel cas le nom reste le seul indice.
+                carte.IsPhysical = (!listePhysiqueLue || physiques.Contains(n.Name)) && !EstVirtuelle(n.Description);
                 // « Wi-Fi » et « Ethernet » s'écrivent pareil dans les deux langues :
                 // les passer par Lang.T ne ferait qu'ajouter du bruit.
                 carte.Kind = carte.IsWireless
@@ -177,6 +200,21 @@ public static class NetworkCollector
             errors.Add(Lang.T($"Réseau (domaine) : {ex.Message}", $"Network (domain): {ex.Message}"));
         }
     }
+
+    /// <summary>
+    /// Marqueurs d'une carte qui n'existe pas physiquement. Ce ne sont pas des mots
+    /// traduits par Windows : ils viennent du nom que le fabricant donne à son pilote,
+    /// et restent identiques sur un système français.
+    /// </summary>
+    private static readonly string[] MarqueursVirtuels =
+    {
+        "Virtual", "VPN", "Wi-Fi Direct", "WiFi Direct", "TAP-", "Pseudo", "Loopback",
+        "Hyper-V", "VirtualBox", "VMware", "Bluetooth Device (Personal Area Network)",
+        "Microsoft Wi-Fi Direct", "Npcap", "WAN Miniport",
+    };
+
+    internal static bool EstVirtuelle(string description) =>
+        MarqueursVirtuels.Any(m => (description ?? "").Contains(m, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Ne garde que le constructeur (les trois premiers octets) et masque le reste.

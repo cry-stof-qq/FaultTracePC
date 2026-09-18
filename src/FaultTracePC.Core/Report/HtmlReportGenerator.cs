@@ -667,8 +667,8 @@ public static class HtmlReportGenerator
         Card(sb, Lang.T("Services réseau", "Network services"),
             res.Services.Count == 0 ? Lang.T("non lus", "not read")
             : string.Join("<br>", res.Services.Select(x => Lang.T(
-                $"{H(x.Name)} ({H(x.DisplayName)}) : {H(x.State)} · {H(x.StartMode)}",
-                $"{H(x.Name)} ({H(x.DisplayName)}): {H(x.State)} · {H(x.StartMode)}"))));
+                $"{H(x.Name)} ({H(x.DisplayName)}) : {H(x.StateLabel)} · démarrage {H(x.StartModeLabel)}",
+                $"{H(x.Name)} ({H(x.DisplayName)}): {H(x.StateLabel)} · startup {H(x.StartModeLabel)}"))));
 
         Card(sb, Lang.T("Domaine", "Domain"),
             res.PartOfDomain

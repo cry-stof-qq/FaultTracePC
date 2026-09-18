@@ -1897,7 +1897,9 @@ public sealed class RulesEngine
         var net = r.System.Network;
         if (net.Adapters.Count == 0) return;
 
-        var sansFil = net.Adapters.Where(a => a.IsWireless).ToList();
+        // Seules les cartes RÉELLES comptent : un adaptateur VPN ou Wi-Fi Direct ferait
+        // conclure à une panne de Wi-Fi sur une machine qui n'a pas de radio.
+        var sansFil = net.Adapters.Where(a => a.IsWireless && a.IsPhysical).ToList();
         var cableConnecte = net.Adapters.Any(a => !a.IsWireless && a.HasIpV4);
         var aucuneIp = net.Adapters.All(a => !a.HasIpV4);
 
@@ -1947,8 +1949,13 @@ public sealed class RulesEngine
         {
             // Le service Wi-Fi arrêté sur une machine sans carte sans fil est normal.
             if (svc.Name.Equals("WlanSvc", StringComparison.OrdinalIgnoreCase) && sansFil.Count == 0) continue;
-            // Un service désactivé par choix n'est pas une panne à signaler comme telle.
+
+            // Un service à démarrage « à la demande » est CONÇU pour rester arrêté tant
+            // que rien ne le réclame. Le signaler revenait à écrire un défaut sur chaque
+            // poste du parc — le 18/09/2026, NlaSvc était ainsi accusé sur deux machines
+            // en parfait état. Un faux positif universel décrédibilise tout le rapport.
             var voulu = svc.StartMode.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
+            if (!voulu && !svc.DoitTourner) continue;
 
             r.Findings.Add(new Finding
             {
@@ -1957,8 +1964,8 @@ public sealed class RulesEngine
                 Category = FaultCategory.Network,
                 Title = Lang.T($"Service réseau arrêté : {svc.Name}", $"Network service stopped: {svc.Name}"),
                 Details = Lang.T(
-                    $"{svc.DisplayName} ({svc.Name}) est à l'état « {svc.State} », démarrage « {svc.StartMode} ».",
-                    $"{svc.DisplayName} ({svc.Name}) is in state \"{svc.State}\", startup \"{svc.StartMode}\".")
+                    $"{svc.DisplayName} ({svc.Name}) est à l'état « {svc.StateLabel} », démarrage « {svc.StartModeLabel} ».",
+                    $"{svc.DisplayName} ({svc.Name}) is {svc.StateLabel}, startup {svc.StartModeLabel}.")
                     + (voulu
                         ? Lang.T(" Il a été désactivé volontairement : ce n'est signalé que pour mémoire.", " It has been disabled on purpose: this is reported for the record only.")
                         : Lang.T(" Il devrait tourner. Tant qu'il est arrêté, la fonction qu'il rend est indisponible, quelle que soit la santé du matériel.", " It should be running. While it is stopped, the function it provides is unavailable, whatever the state of the hardware.")),
