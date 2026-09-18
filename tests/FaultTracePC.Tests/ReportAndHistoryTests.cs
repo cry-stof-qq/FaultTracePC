@@ -994,11 +994,24 @@ public class ReportAndHistoryTests
         Smart = new SmartInfo { AvailableSparePercent = 100, AvailableSpareThresholdPercent = 10, Source = "SMART NVMe (journal de santé)" },
     };
 
+    /// <summary>
+    /// La carte principale des erreurs de stockage.
+    ///
+    /// POINT 65 (18/09/2026) : ce repère était le TITRE, « Erreurs disque répétées ».
+    /// Depuis que chaque nature de périphérique a sa carte, le titre dit de quoi elle
+    /// parle — contrôleur de stockage, support débranché, volume — et n'est donc plus
+    /// un identifiant. L'identifiant de fait, lui, n'a pas bougé : la première nature
+    /// présente dans l'ordre de priorité porte toujours « disk_event ».
+    /// </summary>
     private static Finding ErreursDisque(DiagnosticReport r)
     {
         new RulesEngine().Analyze(r);
-        return r.Findings.First(f => f.Title.StartsWith("Erreurs disque répétées"));
+        return r.Findings.First(f => f.Code == "disk_event");
     }
+
+    /// <summary>Une carte de nature précise, quand le rapport en contient plusieurs.</summary>
+    private static Finding CarteDisque(DiagnosticReport r, string code) =>
+        r.Findings.First(f => f.Code == code);
 
     [Fact]
     public void ErreursDisque_CitentLesIdentifiantsReellementObserves()
@@ -1020,8 +1033,9 @@ public class ReportAndHistoryTests
     [Fact]
     public void ErreursDisque_SignalentUnPeripheriqueNonInventorie()
     {
-        // Un support absent ET un port de contrôleur : la machine reste concernée,
-        // donc le conseil « identifier avant de réparer » garde tout son sens.
+        // Un support absent ET un port de contrôleur : deux natures, donc deux cartes
+        // depuis le point 65. Chacune garde ce qui la concerne — la machine ses gestes,
+        // le support débranché son renvoi vers lui-même.
         // (Le cas où TOUT se rapporte à des supports débranchés est couvert par
         // ErreursDisque_ToutesSurDesSupportsDebranches_NAlarmentPlusLaMachine, qui
         // vérifie qu'on cesse alors d'alarmer la machine.)
@@ -1031,12 +1045,22 @@ public class ReportAndHistoryTests
             ("disk", 51, @"Une erreur a été détectée sur le périphérique \Device\Harddisk1\DR1 lors d'une opération de pagination."));
         r.System.Disks.Add(NvmeSain(index: 0));   // le seul disque connu est Harddisk0
 
-        var f = ErreursDisque(r);
+        // POINT 65 : deux natures, donc deux cartes. Le support débranché est nommé
+        // sur la sienne ; la machine garde la sienne, avec ses gestes à elle.
+        var machine = ErreursDisque(r);
+        var absent = CarteDisque(r, "disk_event_absent");
 
-        Assert.Contains(@"\Device\Harddisk1", f.Details);
-        Assert.Contains("ABSENT", f.Details);
-        // Et le conseil doit dire de l'identifier AVANT de réparer quoi que ce soit.
-        Assert.Contains("Identifier le périphérique non inventorié", f.Recommendation);
+        Assert.Contains(@"\Device\Harddisk1", absent.Details);
+        Assert.Contains("ABSENT", absent.Details);
+        // Sur la carte du support débranché, il n'y a rien à réparer ICI : le conseil
+        // renvoie vers le support lui-même, rebranché, et vers les dates relevées.
+        Assert.Contains("Rien à réparer sur cette machine", absent.Recommendation);
+        Assert.Equal(Severity.Info, absent.Severity);
+
+        // Le port de contrôleur appartient bien à la machine : lui reste un
+        // avertissement, avec les gestes machine.
+        Assert.Equal(Severity.Warning, machine.Severity);
+        Assert.Contains("PCI Express", machine.Recommendation);
     }
 
     [Fact]

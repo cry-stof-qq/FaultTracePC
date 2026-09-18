@@ -87,13 +87,24 @@ public class ErreursDisqueAmoviblesTests
         r.System.Disks.Add(CleUsb(2));
         r.System.Disks.Add(DisqueFixeSata(0));
 
-        var f = Conclusion(r);
+        // POINT 65 (18/09/2026) : deux natures de support, donc deux cartes. Le point 60
+        // avait séparé les CONSEILS dans un texte commun ; les additionner sous un seul
+        // titre et une seule gravité restait trompeur — une clé fatiguée et un disque
+        // système ne se traitent ni avec les mêmes gestes ni avec la même urgence.
+        new RulesEngine().Analyze(r);
 
-        // La clé reste signalée, mais elle ne fait plus taire le reste.
-        Assert.Contains("Generic Flash Disk USB Device", f.Recommendation);
-        Assert.Contains("gestion d'alimentation des liens", f.Recommendation);
-        Assert.Contains("câble de données", f.Recommendation);
-        Assert.Equal(Severity.Warning, f.Severity);
+        var machine = r.Findings.First(f => f.Code == "disk_event");
+        Assert.Contains("gestion d'alimentation des liens", machine.Recommendation);
+        Assert.Contains("câble de données", machine.Recommendation);
+        Assert.Equal(Severity.Warning, machine.Severity);
+        // Les gestes machine ne parlent plus de la clé : elle a sa propre carte.
+        Assert.DoesNotContain("Generic Flash Disk USB Device", machine.Recommendation);
+
+        // La clé reste signalée, avec son conseil à elle et sans alarmer sur la machine.
+        var cle = r.Findings.First(f => f.Code == "disk_event_amovible");
+        Assert.Contains("Generic Flash Disk USB Device", cle.Recommendation);
+        Assert.DoesNotContain("gestion d'alimentation des liens", cle.Recommendation);
+        Assert.Equal(Severity.Info, cle.Severity);
     }
 
     [Fact]

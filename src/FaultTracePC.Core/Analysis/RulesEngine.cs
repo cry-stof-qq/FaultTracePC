@@ -1280,71 +1280,182 @@ public sealed class RulesEngine
 
         if (diskEvents.Count >= 3 || (diskEvents.Count > 0 && storageBsods.Count > 0))
         {
-            // Sources RÉELLEMENT observées, avec leurs identifiants. Jusqu'à la 1.2.1
-            // ce texte citait « disk 153 / stornvme 129 » quels que soient les
-            // événements collectés — une phrase toute faite qui pouvait nommer des
-            // identifiants absents du rapport, deux lignes sous le tableau qui
-            // affichait les vrais.
-            var bySource = diskEvents
-                .GroupBy(e => $"{e.Provider} {e.EventId}")
-                .OrderByDescending(g => g.Count())
-                .Select(g => $"{g.Key} ×{g.Count()}").ToList();
-
-            var devices = DevicesCited(diskEvents);
-
-            // Point 60 : séparer AVANT de conseiller. Douze erreurs réparties entre une
-            // clé USB, un volume et un port de contrôleur ne demandent pas les mêmes
-            // gestes, et un chiffre unique le cachait.
-            var misEnCause = DisquesMisEnCause(devices, r.System.Disks);
-            var amovibles = misEnCause.Where(EstAmovible).ToList();
-            var fixesMisEnCause = misEnCause.Where(d => !EstAmovible(d)).ToList();
-            bool queDeLAmovible = amovibles.Count > 0 && fixesMisEnCause.Count == 0;
-
-            var resets = diskEvents.Count(e => e.EventId == 129);
-            var paging = diskEvents.Count(e => e.Provider.Equals("disk", StringComparison.OrdinalIgnoreCase) && e.EventId == 51);
-
-            // Tous les périphériques cités sont-ils des disques ABSENTS de la machine ?
+            // POINT 65. Une seule carte additionnait des choses de natures différentes.
+            // Constaté le 18/09/2026 sur TECH-INFO-2025 : « Erreurs disque répétées (500) »
+            // réunissait 479 événements sur un support DÉBRANCHÉ depuis, 20 réinitialisations
+            // d'un port de contrôleur SATA, et une erreur de système de fichiers sur un
+            // volume. Trois choses sans rapport, un seul chiffre, une seule recommandation —
+            // qui commençait par le firmware du SSD, inutile pour les trois.
             //
-            // Le cas est fréquent chez un technicien qui branche des disques à
-            // réparer : les erreurs concernent alors le disque en réparation, pas la
-            // machine qui l'analyse. Continuer à afficher un avertissement sur SA
-            // machine reviendrait à l'alarmer pour le travail qu'il vient de faire.
-            // Un port de contrôleur (RaidPort) ne compte pas comme absent : celui-là
-            // appartient bien à la machine.
-            bool tousAbsents = devices.Count > 0 && devices.All(d =>
-            {
-                var m = System.Text.RegularExpressions.Regex.Match(d.Device, @"Harddisk(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                return m.Success && int.TryParse(m.Groups[1].Value, out var i) && r.System.Disks.All(x => x.Index != i);
-            });
+            // Les événements sont donc répartis par NATURE du périphérique cité, et chaque
+            // nature reçoit sa carte, sa gravité et son conseil.
+            var parNature = diskEvents
+                .GroupBy(e => ClasserEvenement(e, r.System.Disks))
+                .ToDictionary(g => g.Key, g => g.ToList());
 
-            r.Findings.Add(new Finding
+            var natures = OrdreDesNatures.Where(parNature.ContainsKey).ToList();
+            bool separe = natures.Count > 1;
+
+            for (int rang = 0; rang < natures.Count; rang++)
             {
-                Severity = storageBsods.Count > 0 ? Severity.Critical
-                         : tousAbsents ? Severity.Info
-                         // Une clé USB fatiguée n'est pas un avertissement sur la machine :
-                         // elle se remplace pour trois euros et n'annonce aucune panne du poste.
-                         : queDeLAmovible ? Severity.Info
-                         : Severity.Warning,
-                Confidence = storageBsods.Count > 0 ? Confidence.High : Confidence.Medium,
-                Category = FaultCategory.Storage,
-                // Même identifiant de fait que la règle d'alerte « disk_event ».
-                Code = "disk_event",
-                Title = Lang.T($"Erreurs disque répétées ({Denombrer(r, EventCategory.DiskError, diskEvents.Count)})",
-                               $"Repeated disk errors ({Denombrer(r, EventCategory.DiskError, diskEvents.Count)})"),
-                Details = Lang.T($"Sources : {string.Join(", ", bySource)}.", $"Sources: {string.Join(", ", bySource)}.")
-                          + PlafondAtteint(r, EventCategory.DiskError)
-                          + (storageBsods.Count > 0 ? Lang.T($" Corrélées à {storageBsods.Count} BSOD de type stockage.", $" Correlated with {storageBsods.Count} storage-type BSOD.") : "")
-                          + " " + DescribeDevices(devices, r.System.Disks, diskEvents)
-                          + (resets > 0 ? Lang.T($" {resets} de ces événements sont des réinitialisations de contrôleur (ID 129) : l'opération a été retentée, pas perdue.", $" {resets} of those events are controller resets (ID 129): the operation was retried, not lost.") : "")
-                          + (paging > 0 ? Lang.T($" {paging} concernent une opération de pagination (disk 51) — Windows lisait ou écrivait le fichier d'échange.", $" {paging} concern a paging operation (disk 51) — Windows was reading from or writing to the page file.") : "")
-                          + (tousAbsents ? Lang.T(" Aucun disque actuellement monté sur cette machine n'est mis en cause : ces erreurs concernent uniquement des supports qui ne sont plus connectés.", " No drive currently mounted on this machine is implicated: these errors concern only media that are no longer connected.") : "")
-                          + (amovibles.Count > 0
-                              ? Lang.T($" {(queDeLAmovible ? "Tous les disques mis en cause sont des supports AMOVIBLES" : "Une partie des disques mis en cause sont des supports AMOVIBLES")} ({string.Join(", ", amovibles.Select(d => d.Model))}) : sur ce type de support, ni la gestion d'alimentation du lien, ni un câble SATA, ni le firmware d'un SSD ne sont en jeu.",
-                                       $" {(queDeLAmovible ? "Every disk implicated is REMOVABLE media" : "Some of the disks implicated are REMOVABLE media")} ({string.Join(", ", amovibles.Select(d => d.Model))}): on that kind of medium, neither link power management, nor a SATA cable, nor SSD firmware is involved.")
-                              : ""),
-                Recommendation = StorageAdvice(r.System.Disks, devices, resets, paging, tousAbsents, amovibles, fixesMisEnCause)
-            });
+                var nature = natures[rang];
+                var evenements = parNature[nature];
+
+                // La première nature de l'ordre de priorité garde l'identifiant historique
+                // « disk_event » : c'est celle qui concerne le plus directement la machine,
+                // et c'est sur cet identifiant que la fusion des doublons et l'historique
+                // se sont toujours appuyés. Les autres reçoivent le leur — deux cartes qui
+                // partageraient un identifiant seraient refusionnées en une seule.
+                var code = rang == 0 ? "disk_event" : CodeDeNature(nature);
+
+                // Un BSOD de type stockage parle du disque de la machine, pas d'une clé
+                // débranchée : la corrélation ne s'attache qu'à la carte principale.
+                var bsods = rang == 0 ? storageBsods : new List<BsodIncident>();
+
+                r.Findings.Add(CarteDisque(r, nature, evenements, code, bsods, separe, diskEvents.Count));
+            }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Point 65 : répartition des erreurs disque par nature de périphérique
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Nature du périphérique cité par un événement de stockage. Le classement ne
+    /// repose que sur le chemin « \Device\… », que Windows n'a jamais traduit.
+    /// </summary>
+    public enum NatureCitee
+    {
+        /// <summary>Un disque présent à l'inventaire et non amovible : la machine est concernée.</summary>
+        DisqueMonte,
+        /// <summary>Un port du contrôleur de stockage (RaidPort, Scsi…) : pas un disque en particulier.</summary>
+        PortControleur,
+        /// <summary>Un volume nommé (\Device\HarddiskVolumeN) : le système de fichiers, pas le support.</summary>
+        VolumeNomme,
+        /// <summary>L'événement ne nomme aucun périphérique.</summary>
+        NonIdentifie,
+        /// <summary>Un disque présent à l'inventaire et amovible : clé, carte, disque externe.</summary>
+        SupportAmovible,
+        /// <summary>Un numéro de disque qui n'existe plus : le support a été débranché depuis.</summary>
+        DisqueAbsent,
+    }
+
+    /// <summary>
+    /// Ordre d'affichage ET de priorité. Le premier de cette liste présent dans le
+    /// rapport garde l'identifiant de fait « disk_event » : d'abord ce qui concerne
+    /// le matériel encore monté sur la machine, en dernier ce qui n'y est plus.
+    /// </summary>
+    private static readonly NatureCitee[] OrdreDesNatures =
+    {
+        NatureCitee.DisqueMonte, NatureCitee.PortControleur, NatureCitee.VolumeNomme,
+        NatureCitee.NonIdentifie, NatureCitee.SupportAmovible, NatureCitee.DisqueAbsent,
+    };
+
+    public static NatureCitee ClasserEvenement(WinEvent e, List<DiskInfo> inventaire)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(e.Message ?? "", @"\\Device\\([A-Za-z0-9]+)");
+        if (!m.Success) return NatureCitee.NonIdentifie;
+        var nom = m.Groups[1].Value;
+
+        // « Harddisk1 » seul est un numéro de disque ; « HarddiskVolume3 » est un volume.
+        // L'ancre de fin évite de confondre les deux.
+        var hd = System.Text.RegularExpressions.Regex.Match(nom, @"^Harddisk(\d+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (hd.Success && int.TryParse(hd.Groups[1].Value, out var index))
+        {
+            var disque = inventaire.FirstOrDefault(d => d.Index == index);
+            if (disque is null) return NatureCitee.DisqueAbsent;
+            return EstAmovible(disque) ? NatureCitee.SupportAmovible : NatureCitee.DisqueMonte;
+        }
+
+        if (nom.StartsWith("HarddiskVolume", StringComparison.OrdinalIgnoreCase)) return NatureCitee.VolumeNomme;
+        return NatureCitee.PortControleur;
+    }
+
+    private static string CodeDeNature(NatureCitee nature) => nature switch
+    {
+        NatureCitee.DisqueMonte => "disk_event_disque",
+        NatureCitee.PortControleur => "disk_event_controleur",
+        NatureCitee.VolumeNomme => "disk_event_volume",
+        NatureCitee.NonIdentifie => "disk_event_sans_peripherique",
+        NatureCitee.SupportAmovible => "disk_event_amovible",
+        NatureCitee.DisqueAbsent => "disk_event_absent",
+        _ => "disk_event",
+    };
+
+    private static string TitreDeNature(NatureCitee nature, string nombre) => nature switch
+    {
+        NatureCitee.DisqueMonte => Lang.T($"Erreurs disque répétées ({nombre})", $"Repeated disk errors ({nombre})"),
+        NatureCitee.PortControleur => Lang.T($"Erreurs signalées par le contrôleur de stockage ({nombre})", $"Errors reported by the storage controller ({nombre})"),
+        NatureCitee.VolumeNomme => Lang.T($"Erreurs sur un volume ({nombre})", $"Errors on a volume ({nombre})"),
+        NatureCitee.SupportAmovible => Lang.T($"Erreurs sur un support amovible ({nombre})", $"Errors on removable media ({nombre})"),
+        NatureCitee.DisqueAbsent => Lang.T($"Erreurs sur un support qui n'est plus connecté ({nombre})", $"Errors on a medium that is no longer connected ({nombre})"),
+        _ => Lang.T($"Erreurs disque sans périphérique identifié ({nombre})", $"Disk errors with no device identified ({nombre})"),
+    };
+
+    /// <summary>
+    /// Construit la carte d'une nature. Tout ce qui est compté, cité ou conseillé ici
+    /// ne porte que sur les événements de CETTE nature : c'est précisément ce que le
+    /// chiffre unique d'avant rendait impossible.
+    /// </summary>
+    private static Finding CarteDisque(
+        DiagnosticReport r, NatureCitee nature, List<WinEvent> evenements, string code,
+        List<BsodIncident> storageBsods, bool separe, int totalToutesNatures)
+    {
+        // Sources RÉELLEMENT observées, avec leurs identifiants. Jusqu'à la 1.2.1
+        // ce texte citait « disk 153 / stornvme 129 » quels que soient les
+        // événements collectés — une phrase toute faite qui pouvait nommer des
+        // identifiants absents du rapport, deux lignes sous le tableau qui
+        // affichait les vrais.
+        var bySource = evenements
+            .GroupBy(e => $"{e.Provider} {e.EventId}")
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"{g.Key} ×{g.Count()}").ToList();
+
+        var devices = DevicesCited(evenements);
+
+        var misEnCause = DisquesMisEnCause(devices, r.System.Disks);
+        var amovibles = misEnCause.Where(EstAmovible).ToList();
+        var fixesMisEnCause = misEnCause.Where(d => !EstAmovible(d)).ToList();
+        bool queDeLAmovible = amovibles.Count > 0 && fixesMisEnCause.Count == 0;
+
+        var resets = evenements.Count(e => e.EventId == 129);
+        var paging = evenements.Count(e => e.Provider.Equals("disk", StringComparison.OrdinalIgnoreCase) && e.EventId == 51);
+        bool tousAbsents = nature == NatureCitee.DisqueAbsent;
+
+        var nombre = Denombrer(r, EventCategory.DiskError, evenements.Count);
+
+        return new Finding
+        {
+            Severity = storageBsods.Count > 0 ? Severity.Critical
+                     // Un support débranché ou une clé fatiguée n'est pas un avertissement
+                     // sur la machine : elle se remplace pour trois euros et n'annonce
+                     // aucune panne du poste.
+                     : nature is NatureCitee.DisqueAbsent or NatureCitee.SupportAmovible ? Severity.Info
+                     : queDeLAmovible ? Severity.Info
+                     : Severity.Warning,
+            Confidence = storageBsods.Count > 0 ? Confidence.High : Confidence.Medium,
+            Category = FaultCategory.Storage,
+            Code = code,
+            Title = TitreDeNature(nature, nombre),
+            Details = Lang.T($"Sources : {string.Join(", ", bySource)}.", $"Sources: {string.Join(", ", bySource)}.")
+                      + PlafondAtteint(r, EventCategory.DiskError)
+                      + (separe
+                          ? Lang.T($" Cette machine a enregistré {Denombrer(r, EventCategory.DiskError, totalToutesNatures)} erreur(s) de stockage sur la période, séparées ici par périphérique concerné : les gestes ne sont pas les mêmes selon la nature du support.",
+                                   $" This machine recorded {Denombrer(r, EventCategory.DiskError, totalToutesNatures)} storage error(s) over the period, split here by the device concerned: the actions differ with the kind of medium.")
+                          : "")
+                      + (storageBsods.Count > 0 ? Lang.T($" Corrélées à {storageBsods.Count} BSOD de type stockage.", $" Correlated with {storageBsods.Count} storage-type BSOD.") : "")
+                      + " " + DescribeDevices(devices, r.System.Disks, evenements)
+                      + (resets > 0 ? Lang.T($" {resets} de ces événements sont des réinitialisations de contrôleur (ID 129) : l'opération a été retentée, pas perdue.", $" {resets} of those events are controller resets (ID 129): the operation was retried, not lost.") : "")
+                      + (paging > 0 ? Lang.T($" {paging} concernent une opération de pagination (disk 51) — Windows lisait ou écrivait le fichier d'échange.", $" {paging} concern a paging operation (disk 51) — Windows was reading from or writing to the page file.") : "")
+                      + (tousAbsents ? Lang.T(" Aucun disque actuellement monté sur cette machine n'est mis en cause : ces erreurs concernent uniquement des supports qui ne sont plus connectés.", " No drive currently mounted on this machine is implicated: these errors concern only media that are no longer connected.") : "")
+                      + (nature == NatureCitee.PortControleur ? Lang.T(" Un port de contrôleur ne désigne aucun disque en particulier : ces événements ne disent pas lequel des disques montés était visé.", " A controller port designates no particular drive: these events do not say which of the mounted drives was targeted.") : "")
+                      + (amovibles.Count > 0
+                          ? Lang.T($" {(queDeLAmovible ? "Tous les disques mis en cause sont des supports AMOVIBLES" : "Une partie des disques mis en cause sont des supports AMOVIBLES")} ({string.Join(", ", amovibles.Select(d => d.Model))}) : sur ce type de support, ni la gestion d'alimentation du lien, ni un câble SATA, ni le firmware d'un SSD ne sont en jeu.",
+                                   $" {(queDeLAmovible ? "Every disk implicated is REMOVABLE media" : "Some of the disks implicated are REMOVABLE media")} ({string.Join(", ", amovibles.Select(d => d.Model))}): on that kind of medium, neither link power management, nor a SATA cable, nor SSD firmware is involved.")
+                          : ""),
+            Recommendation = StorageAdvice(r.System.Disks, devices, resets, paging, tousAbsents, amovibles, fixesMisEnCause)
+        };
     }
 
     /// <summary>
