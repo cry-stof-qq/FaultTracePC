@@ -365,6 +365,74 @@ public sealed class SystemSnapshot
 /// C'EST UNE PISTE, PAS UNE IDENTIFICATION. Rien dans le registre ne relie une lettre
 /// au numéro de disque qu'elle portait ce jour-là. Le rapport doit le dire.
 /// </summary>
+/// <summary>
+/// D'où vient la connaissance d'un poste. Un même poste peut venir de plusieurs
+/// sources : les indicateurs se cumulent au lieu de se remplacer.
+///
+/// POSTES.CSV N'EST PAS UNE SOURCE. Il n'apporte qu'une adresse MAC à un poste
+/// déjà listé — voir <see cref="ParkInventory"/> pour le pourquoi.
+/// </summary>
+[Flags]
+public enum SourcesDuPoste
+{
+    Aucune = 0,
+    /// <summary>Compte d'ordinateur trouvé dans l'Active Directory.</summary>
+    ActiveDirectory = 1,
+    /// <summary>Déjà suivi par la console de parc (parc.json).</summary>
+    Console = 2,
+}
+
+/// <summary>
+/// Un poste tel que les sources le décrivent, avant toute action. Aucun champ ici
+/// n'est le résultat d'une interrogation du poste lui-même : cette liste se
+/// construit sans qu'aucune machine ne soit contactée.
+/// </summary>
+public sealed class PosteDuParc
+{
+    /// <summary>
+    /// Nom Windows court, en majuscules. C'est la CLÉ : le jeton du mode parc s'en
+    /// déduit, le déploiement le nomme, et les trois sources s'y reconnaissent.
+    /// </summary>
+    public string Name { get; set; } = "";
+
+    public SourcesDuPoste Sources { get; set; }
+
+    /// <summary>Adresse à employer pour joindre le poste : nom DNS ou adresse IP.</summary>
+    public string Host { get; set; } = "";
+
+    public int Port { get; set; } = ParkInventory.PortParDefaut;
+
+    /// <summary>
+    /// Adresse MAC connue, pour le réveil réseau. Vient de postes.csv et peut donc
+    /// être périmée — le script interroge le DHCP en premier quand il en a un.
+    /// Vide signifie « pas connue », jamais « pas de carte réseau ».
+    /// </summary>
+    public string Mac { get; set; } = "";
+
+    /// <summary>Unité d'organisation d'où le compte a été lu, en clair.</summary>
+    public string OrganizationalUnit { get; set; } = "";
+
+    /// <summary>Dernière ouverture de session connue de l'annuaire, si elle l'est.</summary>
+    public DateTime? LastLogon { get; set; }
+
+    /// <summary>Compte d'ordinateur désactivé dans l'annuaire.</summary>
+    public bool Disabled { get; set; }
+
+    public bool MacConnue => Mac.Length > 0;
+
+    /// <summary>Les sources, en toutes lettres — « annuaire », « console », « annuaire + console ».</summary>
+    public string SourcesLabel
+    {
+        get
+        {
+            var noms = new List<string>();
+            if (Sources.HasFlag(SourcesDuPoste.ActiveDirectory)) noms.Add(Lang.T("annuaire", "directory"));
+            if (Sources.HasFlag(SourcesDuPoste.Console)) noms.Add(Lang.T("console", "console"));
+            return noms.Count == 0 ? Lang.T("inconnue", "unknown") : string.Join(" + ", noms);
+        }
+    }
+}
+
 public sealed class StorageHistoryInfo
 {
     /// <summary>
