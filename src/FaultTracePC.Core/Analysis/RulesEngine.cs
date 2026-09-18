@@ -2173,6 +2173,32 @@ public sealed class RulesEngine
     /// recommandation renvoie à services.msc et jamais à sc.exe, qui attend le nom
     /// court et échouerait sur celui-là.
     /// </summary>
+    /// <summary>Identifiants du Gestionnaire de contrôle des services : le service n'a pas pu démarrer.</summary>
+    private static readonly int[] IdsDemarrageEchoue = { 7000, 7001 };
+
+    /// <summary>Identifiants : le service tournait et s'est terminé de lui-même.</summary>
+    private static readonly int[] IdsArretInattendu = { 7031, 7034 };
+
+    /// <summary>
+    /// Ce qui est arrivé au service, en toutes lettres.
+    ///
+    /// La distinction se lit sur l'IDENTIFIANT de l'événement, jamais sur sa phrase :
+    /// le message est traduit par Windows, les identifiants non. Et elle compte, parce
+    /// que les deux ne se regardent pas au même endroit — un service qui ne démarre pas
+    /// renvoie à son inscription et à son fichier, un service qui meurt renvoie à son
+    /// propre journal.
+    /// </summary>
+    private static string NatureDeLEchec(IEnumerable<WinEvent> evenements)
+    {
+        bool demarrage = evenements.Any(e => IdsDemarrageEchoue.Contains(e.EventId));
+        bool arret = evenements.Any(e => IdsArretInattendu.Contains(e.EventId));
+
+        if (demarrage && arret) return Lang.T("n'a pas démarré, et s'est aussi terminé de manière inattendue", "failed to start, and also terminated unexpectedly");
+        if (demarrage) return Lang.T("n'a pas pu démarrer", "failed to start");
+        if (arret) return Lang.T("s'est terminé de manière inattendue", "terminated unexpectedly");
+        return Lang.T("en échec", "failing");
+    }
+
     private static void AnalyzeServiceFailures(DiagnosticReport r)
     {
         var fails = r.Events.Where(e => e.Category == EventCategory.ServiceFailure).ToList();
@@ -2198,8 +2224,8 @@ public sealed class RulesEngine
         else
         {
             var nommes = string.Join(", ", parService.Take(4).Select(g =>
-                Lang.T($"{g.Key} ({g.Count()}×, dernier le {Lang.ShortDateMinute(g.Max(e => e.TimeLocal))})",
-                       $"{g.Key} ({g.Count()}×, last on {Lang.ShortDateMinute(g.Max(e => e.TimeLocal))})")));
+                Lang.T($"{g.Key} ({g.Count()}× — {NatureDeLEchec(g)}, dernier le {Lang.ShortDateMinute(g.Max(e => e.TimeLocal))})",
+                       $"{g.Key} ({g.Count()}× — {NatureDeLEchec(g)}, last on {Lang.ShortDateMinute(g.Max(e => e.TimeLocal))})")));
 
             var reste = parService.Count > 4
                 ? Lang.T($" et {parService.Count - 4} autre(s) service(s)", $" and {parService.Count - 4} more service(s)")
@@ -2241,6 +2267,15 @@ public sealed class RulesEngine
                              $" {coupables[0].Key} accounts for {cumul} of the {fails.Count} failures: that is the one to deal with first.")
                     : Lang.T($" Deux services concentrent {cumul} des {fails.Count} échecs — {nomsCoupables} : ce sont eux qu'il faut traiter, pas le système.",
                              $" Two services account for {cumul} of the {fails.Count} failures — {nomsCoupables}: those are what to deal with, not the system.");
+
+            // UN SERVICE QUI NE DÉMARRE PAS ET UN SERVICE QUI MEURT NE SE REGARDENT PAS
+            // AU MÊME ENDROIT. Le premier appelle une vérification que le logiciel ne
+            // peut pas faire à la place de l'utilisateur ; on lui dit donc où porter son
+            // attention, sans lui promettre une solution qui n'existe pas toujours.
+            if (fails.Any(e => IdsDemarrageEchoue.Contains(e.EventId)))
+                details += Lang.T(
+                    " Un service qui ne parvient pas à DÉMARRER de façon répétée est souvent une inscription restée derrière une désinstallation incomplète : l'entrée existe encore, son exécutable non, et Windows retente à chaque déclenchement. Le point à vérifier est donc l'existence du fichier avant de chercher plus loin.",
+                    " A service that repeatedly fails to START is often a registration left behind by an incomplete uninstall: the entry is still there, its executable is not, and Windows retries at every trigger. The thing to check is therefore whether the file still exists, before looking any further.");
 
             reco = concentre
                 ? Lang.T($"Ouvrir services.msc et y chercher {nomsCoupables} : les propriétés d'un service donnent son compte de démarrage et ses actions de récupération. Un service TIERS qui tombe se met à jour ou se désinstalle ; un service de WINDOWS qui tombe est un symptôme et pas une cause — chercher alors du côté des pilotes et des fichiers système.",

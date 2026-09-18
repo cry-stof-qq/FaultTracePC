@@ -51,6 +51,65 @@ public class ServicesEnEchecTests
         return r.Findings.First(f => f.Code == "service_failure");
     }
 
+    /// <summary>Un rapport où chaque service porte l'identifiant d'événement voulu.</summary>
+    private static DiagnosticReport RapportAvecIds(params (string Service, int Id, int Combien)[] services)
+    {
+        var r = new DiagnosticReport
+        {
+            GeneratedAt = new DateTime(2026, 9, 18, 8, 4, 0),
+            ScanPeriodDays = 30,
+            System = new SystemSnapshot { MachineName = "POSTE-TEST" },
+        };
+        var t = new DateTime(2026, 9, 10, 9, 0, 0);
+        foreach (var (service, id, combien) in services)
+            for (int i = 0; i < combien; i++)
+            {
+                var e = new WinEvent
+                {
+                    Category = EventCategory.ServiceFailure,
+                    Provider = "Service Control Manager",
+                    EventId = id,
+                    TimeLocal = t,
+                    Message = "Échec de service.",
+                };
+                e.Extracted["Service"] = service;
+                r.Events.Add(e);
+                t = t.AddMinutes(7);
+            }
+        return r;
+    }
+
+    [Fact]
+    public void Un_service_qui_ne_demarre_pas_et_un_service_qui_meurt_ne_se_disent_pas_pareil()
+    {
+        // Le cas réel de TECH-INFO-2025 : TmWSCSvc en 7000 (« n'a pas pu démarrer :
+        // le fichier spécifié est introuvable » — une inscription orpheline) et
+        // GLPI Agent en 7031 (« s'est terminé de manière inattendue » — un processus
+        // qui meurt). Deux pannes, deux endroits où regarder.
+        var f = Conclusion(RapportAvecIds(("TmWSCSvc", 7000, 14), ("GLPI Agent", 7031, 14)));
+
+        Assert.Contains("TmWSCSvc (14× — n'a pas pu démarrer", f.Details);
+        Assert.Contains("GLPI Agent (14× — s'est terminé de manière inattendue", f.Details);
+    }
+
+    [Fact]
+    public void Un_echec_de_demarrage_repete_fait_regarder_du_cote_de_l_inscription()
+    {
+        var f = Conclusion(RapportAvecIds(("TmWSCSvc", 7000, 14)));
+
+        // On montre où porter l'attention. On ne promet pas une solution : elle
+        // dépend de la machine, et le logiciel doit valoir pour toutes.
+        Assert.Contains("l'existence du fichier", f.Details);
+        Assert.Contains("désinstallation incomplète", f.Details);
+    }
+
+    [Fact]
+    public void Sans_echec_de_demarrage_cette_phrase_n_apparait_pas()
+    {
+        var f = Conclusion(RapportAvecIds(("GLPI Agent", 7031, 14)));
+        Assert.DoesNotContain("désinstallation incomplète", f.Details);
+    }
+
     [Fact]
     public void Les_services_sont_nommes_au_lieu_d_etre_comptes()
     {
