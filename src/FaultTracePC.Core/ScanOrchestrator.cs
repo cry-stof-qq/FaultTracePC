@@ -40,6 +40,9 @@ public sealed class ScanOrchestrator
 
         Step(progress, Lang.T("Analyse des fichiers dump (Minidump, MEMORY.DMP)…", "Analysing the dump files (Minidump, MEMORY.DMP)…"), 70);
         report.System.Network = NetworkCollector.Collect(errors);
+        // Ce que Windows retient des supports déjà montés : sans cette source, un
+        // disque débranché ne peut être désigné que par un numéro qui ne vaut plus rien.
+        report.System.StorageHistory = StorageHistoryCollector.Collect(errors);
 
         report.Dumps = new DumpCollector(errors).Collect();
         ct.ThrowIfCancellationRequested();

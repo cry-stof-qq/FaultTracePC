@@ -342,7 +342,66 @@ public sealed class SystemSnapshot
     public List<InstalledApp> InstalledApps { get; set; } = new();
     /// <summary>État du réseau : cartes, profils Wi-Fi, services, domaine.</summary>
     public NetworkInfo Network { get; set; } = new();
+
+    /// <summary>
+    /// Ce que Windows garde en mémoire des supports déjà montés sur ce poste.
+    /// Sert à mettre un nom sur un disque qui n'est plus là au moment de l'analyse.
+    /// </summary>
+    public StorageHistoryInfo StorageHistory { get; set; } = new();
+
     public string MachineName { get; set; } = "";
+}
+
+/// <summary>
+/// Trace laissée dans la base de registre par les supports montés par le passé.
+///
+/// POURQUOI CETTE SOURCE EXISTE
+/// Le journal Windows n'écrit qu'un numéro de disque — « \Device\Harddisk1 » — et ce
+/// numéro est réattribué à chaque branchement. Sur un support débranché depuis, le
+/// rapport ne pouvait donc rien dire de plus que « un disque qui portait le numéro 1 ».
+/// La base de registre, elle, retient quelle lettre a été montée par quel matériel :
+/// c'est la seule façon de proposer un nom.
+///
+/// C'EST UNE PISTE, PAS UNE IDENTIFICATION. Rien dans le registre ne relie une lettre
+/// au numéro de disque qu'elle portait ce jour-là. Le rapport doit le dire.
+/// </summary>
+public sealed class StorageHistoryInfo
+{
+    /// <summary>
+    /// <b>false signifie « pas pu regarder »</b> (accès refusé, clé absente), ce qui
+    /// n'est pas la même chose qu'une liste vide : l'un empêche de conclure, l'autre
+    /// EST une conclusion. La lecture de SYSTEM\MountedDevices demande des droits
+    /// d'administrateur.
+    /// </summary>
+    public bool Readable { get; set; }
+    public string Note { get; set; } = "";
+
+    public List<RememberedVolume> Volumes { get; set; } = new();
+
+    /// <summary>Supports amovibles connus de Windows mais non montés au moment de l'analyse.</summary>
+    public List<RememberedVolume> AmoviblesAbsents =>
+        Volumes.Where(v => v.IsRemovable && !v.CurrentlyMounted).ToList();
+}
+
+public sealed class RememberedVolume
+{
+    /// <summary>Lettre de lecteur, « D: ».</summary>
+    public string Letter { get; set; } = "";
+
+    /// <summary>Le dernier matériel à avoir porté cette lettre était un support USB de stockage.</summary>
+    public bool IsRemovable { get; set; }
+
+    /// <summary>« Disk&amp;Ven_SanDisk&amp;Prod_Cruzer_Blade&amp;Rev_1.00 », sans le numéro de série.</summary>
+    public string DeviceId { get; set; } = "";
+
+    /// <summary>Nom lisible déclaré par le matériel, quand Windows l'a retenu.</summary>
+    public string FriendlyName { get; set; } = "";
+
+    /// <summary>La lettre est-elle montée MAINTENANT ?</summary>
+    public bool CurrentlyMounted { get; set; }
+
+    /// <summary>Ce qu'on affiche : le nom lisible si Windows l'a, sinon l'identifiant matériel.</summary>
+    public string Label => FriendlyName.Length > 0 ? FriendlyName : DeviceId;
 }
 
 // ---------------------------------------------------------------------------

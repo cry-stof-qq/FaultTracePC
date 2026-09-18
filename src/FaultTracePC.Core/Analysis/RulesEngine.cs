@@ -1394,6 +1394,41 @@ public sealed class RulesEngine
     };
 
     /// <summary>
+    /// Noms possibles d'un support qui n'est plus branché.
+    ///
+    /// Le journal ne laisse qu'un numéro de disque, réattribué à chaque branchement :
+    /// « un disque qui portait le numéro 1 » était tout ce que le rapport savait dire.
+    /// Windows, lui, retient quelle lettre a été montée par quel matériel. On propose
+    /// donc les supports amovibles qu'il connaît et qui ne sont pas montés aujourd'hui.
+    ///
+    /// LE MOT « PISTE » N'EST PAS UNE PRÉCAUTION DE STYLE. Rien ne relie une lettre de
+    /// lecteur au numéro de disque qu'elle portait ce jour-là. Présenter ce
+    /// rapprochement comme une identification ferait accuser un support au hasard —
+    /// exactement le genre d'erreur que ce logiciel existe pour éviter.
+    /// </summary>
+    internal static string PistesSupportsAbsents(DiagnosticReport r)
+    {
+        var historique = r.System.StorageHistory;
+
+        // « Pas pu regarder » n'est pas « rien trouvé » : le dire vaut mieux que de
+        // laisser croire que Windows ne connaissait aucun support.
+        if (!historique.Readable)
+            return historique.Note.Length > 0 ? " " + historique.Note : "";
+
+        var candidats = historique.AmoviblesAbsents;
+        if (candidats.Count == 0) return "";
+
+        var liste = string.Join(", ", candidats.Take(4).Select(v => $"{v.Letter} ({v.Label})"));
+        var reste = candidats.Count > 4
+            ? Lang.T($" (et {candidats.Count - 4} autre(s))", $" (and {candidats.Count - 4} more)")
+            : "";
+
+        return Lang.T(
+            $" Windows garde la trace des supports déjà montés sur ce poste : {candidats.Count} support(s) amovible(s) qu'il connaît ne sont pas montés aujourd'hui — {liste}{reste}. C'est une PISTE, pas une identification : rien ne relie une lettre de lecteur au numéro de disque qu'elle portait ce jour-là.",
+            $" Windows keeps a record of the media already mounted on this machine: {candidats.Count} removable medium/media it knows are not mounted today — {liste}{reste}. This is a LEAD, not an identification: nothing links a drive letter to the disk number it carried on that day.");
+    }
+
+    /// <summary>
     /// Construit la carte d'une nature. Tout ce qui est compté, cité ou conseillé ici
     /// ne porte que sur les événements de CETTE nature : c'est précisément ce que le
     /// chiffre unique d'avant rendait impossible.
@@ -1449,6 +1484,7 @@ public sealed class RulesEngine
                       + (resets > 0 ? Lang.T($" {resets} de ces événements sont des réinitialisations de contrôleur (ID 129) : l'opération a été retentée, pas perdue.", $" {resets} of those events are controller resets (ID 129): the operation was retried, not lost.") : "")
                       + (paging > 0 ? Lang.T($" {paging} concernent une opération de pagination (disk 51) — Windows lisait ou écrivait le fichier d'échange.", $" {paging} concern a paging operation (disk 51) — Windows was reading from or writing to the page file.") : "")
                       + (tousAbsents ? Lang.T(" Aucun disque actuellement monté sur cette machine n'est mis en cause : ces erreurs concernent uniquement des supports qui ne sont plus connectés.", " No drive currently mounted on this machine is implicated: these errors concern only media that are no longer connected.") : "")
+                      + (tousAbsents ? PistesSupportsAbsents(r) : "")
                       + (nature == NatureCitee.PortControleur ? Lang.T(" Un port de contrôleur ne désigne aucun disque en particulier : ces événements ne disent pas lequel des disques montés était visé.", " A controller port designates no particular drive: these events do not say which of the mounted drives was targeted.") : "")
                       + (amovibles.Count > 0
                           ? Lang.T($" {(queDeLAmovible ? "Tous les disques mis en cause sont des supports AMOVIBLES" : "Une partie des disques mis en cause sont des supports AMOVIBLES")} ({string.Join(", ", amovibles.Select(d => d.Model))}) : sur ce type de support, ni la gestion d'alimentation du lien, ni un câble SATA, ni le firmware d'un SSD ne sont en jeu.",
