@@ -1243,15 +1243,43 @@ public sealed class RulesEngine
             : nombre.ToString();
 
     /// <summary>
-    /// Phrase à ajouter au détail d'un fait quand le plafond a été atteint : elle
-    /// nomme la limite pour que le lecteur sache d'où vient le chiffre. Chaîne vide
-    /// sinon — un rapport ne parle pas d'une limite qui n'a pas joué.
+    /// Une seule phrase pour dire d'où vient le nombre affiché sur une carte de
+    /// stockage : combien la machine a enregistré, si ce total est un plancher, et
+    /// pourquoi il est réparti sur plusieurs cartes.
+    ///
+    /// POURQUOI ELLE EN REMPLACE DEUX
+    /// Constaté le 18/09/2026 sur TECH-INFO-2025, en 1.6.1. La carte des 20
+    /// réinitialisations de contrôleur portait « Le journal Windows en contient
+    /// davantage », qui se lit « il y en a plus de 20 » — ce que rien n'établit. Ce
+    /// qui est établi, c'est que la CATÉGORIE a buté sur son plafond ; rien ne dit
+    /// que la coupe a touché ces 20-là plutôt que les autres. La phrase suivante
+    /// disait déjà la même chose, correctement. Les deux n'en font plus qu'une, qui
+    /// parle du total de la catégorie et de lui seul.
+    ///
+    /// Chaîne vide quand il n'y a ni plafond atteint ni répartition : un rapport ne
+    /// commente pas une limite qui n'a pas joué.
     /// </summary>
-    internal static string PlafondAtteint(DiagnosticReport r, EventCategory categorie) =>
-        r.TruncatedEventCategories.Contains(categorie)
-            ? Lang.T($" Le journal Windows en contient davantage : la collecte s'arrête à {EventLogCollector.MaxEvenementsParRequete} événements par catégorie, ce nombre est donc un plancher et non un total.",
-                     $" The Windows log holds more: collection stops at {EventLogCollector.MaxEvenementsParRequete} events per category, so this number is a floor and not a total.")
+    internal static string ContexteDuComptage(DiagnosticReport r, EventCategory categorie, int total, bool separe)
+    {
+        bool tronque = r.TruncatedEventCategories.Contains(categorie);
+        if (!tronque && !separe) return "";
+
+        var nombre = Denombrer(r, categorie, total);
+
+        var plafond = tronque
+            ? Lang.T($" La collecte s'arrête à {EventLogCollector.MaxEvenementsParRequete} événements par catégorie : ce nombre est un plancher, pas un décompte.",
+                     $" Collection stops at {EventLogCollector.MaxEvenementsParRequete} events per category: this number is a floor, not a count.")
             : "";
+
+        var repartition = separe
+            ? Lang.T(" Elles sont séparées ici par périphérique concerné : les gestes ne sont pas les mêmes selon la nature du support.",
+                     " They are split here by the device concerned: the actions differ with the kind of medium.")
+            : "";
+
+        return Lang.T($" Cette machine a enregistré {nombre} erreur(s) de stockage sur la période.",
+                      $" This machine recorded {nombre} storage error(s) over the period.")
+               + plafond + repartition;
+    }
 
     private static void AnalyzeStorage(DiagnosticReport r)
     {
@@ -1474,11 +1502,7 @@ public sealed class RulesEngine
             Code = code,
             Title = TitreDeNature(nature, nombre),
             Details = Lang.T($"Sources : {string.Join(", ", bySource)}.", $"Sources: {string.Join(", ", bySource)}.")
-                      + PlafondAtteint(r, EventCategory.DiskError)
-                      + (separe
-                          ? Lang.T($" Cette machine a enregistré {Denombrer(r, EventCategory.DiskError, totalToutesNatures)} erreur(s) de stockage sur la période, séparées ici par périphérique concerné : les gestes ne sont pas les mêmes selon la nature du support.",
-                                   $" This machine recorded {Denombrer(r, EventCategory.DiskError, totalToutesNatures)} storage error(s) over the period, split here by the device concerned: the actions differ with the kind of medium.")
-                          : "")
+                      + ContexteDuComptage(r, EventCategory.DiskError, totalToutesNatures, separe)
                       + (storageBsods.Count > 0 ? Lang.T($" Corrélées à {storageBsods.Count} BSOD de type stockage.", $" Correlated with {storageBsods.Count} storage-type BSOD.") : "")
                       + " " + DescribeDevices(devices, r.System.Disks, evenements)
                       + (resets > 0 ? Lang.T($" {resets} de ces événements sont des réinitialisations de contrôleur (ID 129) : l'opération a été retentée, pas perdue.", $" {resets} of those events are controller resets (ID 129): the operation was retried, not lost.") : "")

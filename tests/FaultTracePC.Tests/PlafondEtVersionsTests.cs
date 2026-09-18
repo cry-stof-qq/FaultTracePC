@@ -59,7 +59,9 @@ public class PlafondEtVersionsTests
     {
         var r = AvecErreursDisque(12, tronque: false);
         Assert.Equal("12", EnFrancais(() => RulesEngine.Denombrer(r, EventCategory.DiskError, 12)));
-        Assert.Equal("", EnFrancais(() => RulesEngine.PlafondAtteint(r, EventCategory.DiskError)));
+        // Ni plafond atteint ni répartition : le rapport ne commente pas une limite
+        // qui n'a pas joué.
+        Assert.Equal("", EnFrancais(() => RulesEngine.ContexteDuComptage(r, EventCategory.DiskError, 12, separe: false)));
     }
 
     [Fact]
@@ -67,7 +69,12 @@ public class PlafondEtVersionsTests
     {
         var r = AvecErreursDisque(3, tronque: true);
         Assert.Equal("au moins 500", EnFrancais(() => RulesEngine.Denombrer(r, EventCategory.DiskError, 500)));
-        Assert.Contains("plancher", EnFrancais(() => RulesEngine.PlafondAtteint(r, EventCategory.DiskError)));
+
+        var phrase = EnFrancais(() => RulesEngine.ContexteDuComptage(r, EventCategory.DiskError, 500, separe: false));
+        Assert.Contains("au moins 500", phrase);
+        Assert.Contains("plancher", phrase);
+        // La limite est nommée : le lecteur doit pouvoir savoir d'où sort le chiffre.
+        Assert.Contains(EventLogCollector.MaxEvenementsParRequete.ToString(), phrase);
     }
 
     [Fact]
@@ -75,7 +82,7 @@ public class PlafondEtVersionsTests
     {
         var r = AvecErreursDisque(3, tronque: true);
         Assert.Equal("4", EnFrancais(() => RulesEngine.Denombrer(r, EventCategory.Whea, 4)));
-        Assert.Equal("", EnFrancais(() => RulesEngine.PlafondAtteint(r, EventCategory.Whea)));
+        Assert.Equal("", EnFrancais(() => RulesEngine.ContexteDuComptage(r, EventCategory.Whea, 4, separe: false)));
     }
 
     [Fact]
