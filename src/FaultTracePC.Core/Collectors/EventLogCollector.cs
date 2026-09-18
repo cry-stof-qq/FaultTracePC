@@ -11,6 +11,24 @@ public sealed class EventLogCollector
 {
     private readonly List<string> _errors;
 
+    /// <summary>
+    /// Nombre maximum d'événements chargés PAR REQUÊTE.
+    ///
+    /// POURQUOI CE NOMBRE SE DIT AU LIEU DE RESTER CACHÉ
+    /// Une machine a rapporté « Erreurs disque répétées (500) » : 500 n'était pas
+    /// un comptage, c'était ce plafond atteint. Un chiffre rond présenté comme une
+    /// mesure trompe sur la gravité — dans les deux sens, car le vrai total peut
+    /// être 501 comme 40 000. Quand la limite est atteinte, la catégorie est notée
+    /// dans <see cref="CategoriesTronquees"/> et le rapport écrit « au moins ».
+    /// </summary>
+    public const int MaxEvenementsParRequete = 500;
+
+    /// <summary>
+    /// Catégories dont au moins une requête a atteint <see cref="MaxEvenementsParRequete"/>.
+    /// Pour celles-là, le nombre d'événements collectés est un plancher, pas un total.
+    /// </summary>
+    public HashSet<EventCategory> CategoriesTronquees { get; } = new();
+
     public EventLogCollector(List<string> errors) => _errors = errors;
 
     public List<WinEvent> Collect(int days)
@@ -50,7 +68,14 @@ public sealed class EventLogCollector
             {
                 using (rec)
                 {
-                    if (++count > 500) break; // garde-fou : on ne charge jamais plus de 500 événements par requête
+                    if (++count > MaxEvenementsParRequete)
+                    {
+                        // Garde-fou : on ne charge jamais plus que ce plafond par requête.
+                        // On retient QUE la coupe a eu lieu, pour que le rapport ne
+                        // présente pas le plafond comme un décompte.
+                        CategoriesTronquees.Add(category);
+                        break;
+                    }
                     target.Add(ToWinEvent(rec, logName, category));
                 }
             }

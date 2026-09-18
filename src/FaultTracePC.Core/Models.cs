@@ -484,6 +484,15 @@ public sealed class DiagnosticReport
     public List<string> CollectorErrors { get; set; } = new();
 
     /// <summary>
+    /// Catégories d'événements pour lesquelles la collecte a buté sur son plafond
+    /// (voir <see cref="Collectors.EventLogCollector.MaxEvenementsParRequete"/>).
+    ///
+    /// Pour ces catégories-là, compter les événements donne un PLANCHER et non un
+    /// total : le rapport doit écrire « au moins N », jamais « N ».
+    /// </summary>
+    public HashSet<EventCategory> TruncatedEventCategories { get; set; } = new();
+
+    /// <summary>
     /// Actions d'entretien effectuées pendant l'analyse — purge de l'historique
     /// notamment.
     ///

@@ -269,6 +269,14 @@ public static class ScanHistory
     // Comparaison
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// Extrait la version d'une valeur empaquetée « version|date de fichier » telle
+    /// qu'elle est stockée dans <see cref="ScanSummary.DriverVersions"/>.
+    /// Renvoie la chaîne entière si elle ne contient pas de séparateur.
+    /// </summary>
+    internal static string VersionSeule(string empaquete) =>
+        (empaquete ?? "").Split('|')[0].Trim();
+
     public static ScanComparison? CompareWithPrevious(DiagnosticReport r, List<string> errors)
     {
         var prev = LoadPrevious(r.GeneratedAt, errors, out var ignores);
@@ -307,11 +315,25 @@ public static class ScanHistory
         var tousLesPilotesChanges = new List<string>();
         foreach (var (sys, cur) in Summarize(r).DriverVersions)
         {
-            if (prevDriverVersions.TryGetValue(sys, out var old) && old != cur)
-            {
-                tousLesPilotesChanges.Add(sys);
-                c.DriverUpdates.Add(Lang.T($"{sys} : {old.Split('|')[0]} → {cur.Split('|')[0]}", $"{sys}: {old.Split('|')[0]} → {cur.Split('|')[0]}"));
-            }
+            if (!prevDriverVersions.TryGetValue(sys, out var old)) continue;
+
+            // La valeur stockée est « version|date de fichier ». Comparer la valeur
+            // ENTIÈRE faisait passer pour une mise à jour un simple changement de date
+            // de fichier — un rapport réel affichait « afd.sys : 10.0.26100.8875 →
+            // 10.0.26100.8875 », une flèche entre deux fois le même numéro. Windows
+            // réécrit ces fichiers (réparation de l'image, restauration de composants)
+            // sans changer le pilote. Seule la version dit qu'il a changé.
+            //
+            // Ce n'est pas qu'une question d'affichage : la liste alimente le point 55,
+            // qui conclut « le pilote accusé a été remplacé et les plantages ont
+            // continué ». Sur une fausse mise à jour, cette phrase disculpe un pilote
+            // qui n'a jamais été remplacé.
+            var avant = VersionSeule(old);
+            var apres = VersionSeule(cur);
+            if (string.Equals(avant, apres, StringComparison.OrdinalIgnoreCase)) continue;
+
+            tousLesPilotesChanges.Add(sys);
+            c.DriverUpdates.Add(Lang.T($"{sys} : {avant} → {apres}", $"{sys}: {avant} → {apres}"));
         }
         if (c.DriverUpdates.Count > 12) c.DriverUpdates = c.DriverUpdates.Take(12).ToList();
 
@@ -426,15 +448,25 @@ public static class ScanHistory
         // Sévérité « warn » et non « crit » : le détail et la gravité réelle sont
         // établis par le moteur de règles, qui sait distinguer une erreur corrigée
         // d'une erreur fatale. Ici on constate seulement une évolution défavorable.
+        //
+        // Les deux nombres passent par Denombrer : quand la collecte a buté sur son
+        // plafond, « 500 » devient « au moins 500 ». Un plafond présenté comme un
+        // décompte fausse la comparaison entre deux scans dans les deux sens.
         if (c.NewWheaEvents > 0)
+        {
+            var n = Analysis.RulesEngine.Denombrer(r, EventCategory.Whea, c.NewWheaEvents);
             AddConcern(c, "warn",
-                Lang.T($"{c.NewWheaEvents} nouvelle(s) erreur(s) matérielle(s) (WHEA) enregistrée(s) depuis le scan précédent — le matériel signale des incidents que Windows a pour l'instant absorbés.",
-                       $"{c.NewWheaEvents} new hardware error(s) (WHEA) recorded since the previous scan — the hardware is reporting incidents that Windows has absorbed so far."));
+                Lang.T($"{n} nouvelle(s) erreur(s) matérielle(s) (WHEA) enregistrée(s) depuis le scan précédent — le matériel signale des incidents que Windows a pour l'instant absorbés.",
+                       $"{n} new hardware error(s) (WHEA) recorded since the previous scan — the hardware is reporting incidents that Windows has absorbed so far."));
+        }
 
         if (c.NewDiskErrorEvents > 0)
+        {
+            var n = Analysis.RulesEngine.Denombrer(r, EventCategory.DiskError, c.NewDiskErrorEvents);
             AddConcern(c, "warn",
-                Lang.T($"{c.NewDiskErrorEvents} nouvelle(s) erreur(s) disque dans le journal Windows depuis le scan précédent.",
-                       $"{c.NewDiskErrorEvents} new disk error(s) in the Windows event log since the previous scan."));
+                Lang.T($"{n} nouvelle(s) erreur(s) disque dans le journal Windows depuis le scan précédent.",
+                       $"{n} new disk error(s) in the Windows event log since the previous scan."));
+        }
 
         // Tendance mémoire (virtualisation).
         var curVm = Analysis.RulesEngine.VirtualizationBytes(r);

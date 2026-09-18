@@ -29,7 +29,9 @@ public sealed class ScanOrchestrator
         ct.ThrowIfCancellationRequested();
 
         Step(progress, Lang.T("Lecture du journal d'événements Windows…", "Reading the Windows event log…"), 40);
-        report.Events = new EventLogCollector(errors).Collect(options.Days);
+        var journal = new EventLogCollector(errors);
+        report.Events = journal.Collect(options.Days);
+        report.TruncatedEventCategories = journal.CategoriesTronquees;
         ct.ThrowIfCancellationRequested();
 
         Step(progress, Lang.T("Lecture du Moniteur de fiabilité…", "Reading the Reliability Monitor…"), 60);

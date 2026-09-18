@@ -1222,6 +1222,37 @@ public sealed class RulesEngine
         });
     }
 
+
+    // ------------------------------------------------------------------
+    // Plafond de collecte : dire « au moins » plutôt qu'un chiffre rond
+    // ------------------------------------------------------------------
+    //
+    // EventLogCollector s'arrête à MaxEvenementsParRequete événements par requête.
+    // Une machine a donc rapporté « Erreurs disque répétées (500) » alors que 500
+    // était la limite, pas un comptage — le vrai total pouvait être 501 comme
+    // 40 000. Un chiffre rond présenté comme une mesure fausse l'appréciation de
+    // la gravité, et c'est exactement ce que ce logiciel doit éviter.
+
+    /// <summary>
+    /// Écrit un nombre d'événements en tenant compte du plafond : « 500 » devient
+    /// « au moins 500 » quand la collecte de cette catégorie a été coupée.
+    /// </summary>
+    internal static string Denombrer(DiagnosticReport r, EventCategory categorie, int nombre) =>
+        r.TruncatedEventCategories.Contains(categorie)
+            ? Lang.T($"au moins {nombre}", $"at least {nombre}")
+            : nombre.ToString();
+
+    /// <summary>
+    /// Phrase à ajouter au détail d'un fait quand le plafond a été atteint : elle
+    /// nomme la limite pour que le lecteur sache d'où vient le chiffre. Chaîne vide
+    /// sinon — un rapport ne parle pas d'une limite qui n'a pas joué.
+    /// </summary>
+    internal static string PlafondAtteint(DiagnosticReport r, EventCategory categorie) =>
+        r.TruncatedEventCategories.Contains(categorie)
+            ? Lang.T($" Le journal Windows en contient davantage : la collecte s'arrête à {EventLogCollector.MaxEvenementsParRequete} événements par catégorie, ce nombre est donc un plancher et non un total.",
+                     $" The Windows log holds more: collection stops at {EventLogCollector.MaxEvenementsParRequete} events per category, so this number is a floor and not a total.")
+            : "";
+
     private static void AnalyzeStorage(DiagnosticReport r)
     {
         // Point 51 : les événements d'écriture de vidage sortent du comptage. Les laisser
@@ -1298,8 +1329,10 @@ public sealed class RulesEngine
                 Category = FaultCategory.Storage,
                 // Même identifiant de fait que la règle d'alerte « disk_event ».
                 Code = "disk_event",
-                Title = Lang.T($"Erreurs disque répétées ({diskEvents.Count})", $"Repeated disk errors ({diskEvents.Count})"),
+                Title = Lang.T($"Erreurs disque répétées ({Denombrer(r, EventCategory.DiskError, diskEvents.Count)})",
+                               $"Repeated disk errors ({Denombrer(r, EventCategory.DiskError, diskEvents.Count)})"),
                 Details = Lang.T($"Sources : {string.Join(", ", bySource)}.", $"Sources: {string.Join(", ", bySource)}.")
+                          + PlafondAtteint(r, EventCategory.DiskError)
                           + (storageBsods.Count > 0 ? Lang.T($" Corrélées à {storageBsods.Count} BSOD de type stockage.", $" Correlated with {storageBsods.Count} storage-type BSOD.") : "")
                           + " " + DescribeDevices(devices, r.System.Disks, diskEvents)
                           + (resets > 0 ? Lang.T($" {resets} de ces événements sont des réinitialisations de contrôleur (ID 129) : l'opération a été retentée, pas perdue.", $" {resets} of those events are controller resets (ID 129): the operation was retried, not lost.") : "")
