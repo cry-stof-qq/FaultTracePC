@@ -1324,6 +1324,12 @@ public sealed class RulesEngine
             var natures = OrdreDesNatures.Where(parNature.ContainsKey).ToList();
             bool separe = natures.Count > 1;
 
+            // Les conclusions déjà posées par la SURVEILLANCE TEMPS RÉEL portent
+            // l'identifiant de règle « disk_event ». Relevées ici, AVANT que les cartes
+            // n'existent, pour être recodées ensuite — voir RecoderLesAlertesDisque.
+            var alertesDisque = r.Findings.Where(f => f.Code == "disk_event").ToList();
+            var codeParNature = new Dictionary<NatureCitee, string>();
+
             for (int rang = 0; rang < natures.Count; rang++)
             {
                 var nature = natures[rang];
@@ -1340,8 +1346,41 @@ public sealed class RulesEngine
                 // débranchée : la corrélation ne s'attache qu'à la carte principale.
                 var bsods = rang == 0 ? storageBsods : new List<BsodIncident>();
 
+                codeParNature[nature] = code;
                 r.Findings.Add(CarteDisque(r, nature, evenements, code, bsods, separe, diskEvents.Count));
             }
+
+            RecoderLesAlertesDisque(r, alertesDisque, codeParNature);
+        }
+    }
+
+    /// <summary>
+    /// Rattache une alerte de la surveillance temps réel à la carte du périphérique
+    /// QU'ELLE CITE.
+    ///
+    /// LE DÉFAUT QUE CECI CORRIGE, ET D'OÙ IL VIENT
+    /// Constaté le 18/09/2026 sur TECH-INFO-2025. L'alerte disait « une défaillance a
+    /// été détectée dans la structure du système de fichiers sur le volume D: » et
+    /// s'est retrouvée collée à la carte du PORT DE CONTRÔLEUR SATA. La cause n'est pas
+    /// dans la fusion : c'est le point 65 qui a changé le sens de l'identifiant
+    /// « disk_event ». Il désignait LA carte des erreurs disque, il désigne désormais
+    /// la PREMIÈRE NATURE PRÉSENTE — qui n'a aucune raison d'être celle du périphérique
+    /// cité par l'alerte. Le mélange que le point 65 devait faire cesser était revenu
+    /// par une autre porte.
+    ///
+    /// Une alerte dont la nature n'a pas de carte reçoit le code de SA nature : elle
+    /// reste une conclusion à part, au lieu d'être recollée à une carte qui parle
+    /// d'autre chose.
+    /// </summary>
+    private static void RecoderLesAlertesDisque(
+        DiagnosticReport r, List<Finding> alertes, Dictionary<NatureCitee, string> codeParNature)
+    {
+        foreach (var alerte in alertes)
+        {
+            // Le périphérique n'est cité que par le texte de l'alerte : c'est la seule
+            // chose dont on dispose, et le chemin « \Device\… » n'y est pas traduit.
+            var nature = ClasserEvenement(new WinEvent { Message = alerte.Details }, r.System.Disks);
+            alerte.Code = codeParNature.TryGetValue(nature, out var code) ? code : CodeDeNature(nature);
         }
     }
 
