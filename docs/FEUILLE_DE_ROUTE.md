@@ -15,7 +15,8 @@
 | 1.5.0 | **publiée** — thème unique **le parc** — secret maître et jeton dérivé (13, 14, 27), plus le point 36 et le refus des options inconnues |
 | 1.5.1 | correctif de déploiement — le paquet sait se remplacer lui-même, pare-feu posé par la ligne de commande, procédure écrite |
 | 1.5.2 | **publiée** — deux défauts constatés, sans nouvelle surface : la langue d'un rapport distant (point 45) et le lanceur `.bat` du script de réparation (point 36, moitié restante). 428 tests verts |
-| 1.6.0 | **terminée, non publiée** — thème **un rapport doit nommer la panne qu'il a sous les yeux** — seize points, 48 à 63, livrés les 17 et 18/09/2026 |
+| 1.6.0 | **publiée** le 18/09/2026 — thème **un rapport doit nommer la panne qu'il a sous les yeux** — seize points, 48 à 63, livrés les 17 et 18/09/2026 |
+| 1.6.1 | correctifs constatés sur deux rapports 1.6.0 réels, plus deux ajouts demandés dans la foulée — points 65 à 71 |
 | 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots), 43 (archivage des alertes) et 46 (boîte noire distante) |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
@@ -363,6 +364,63 @@ Le déploiement se fait aujourd'hui par un script PowerShell distribué à part,
 
 **Découpage en quatre lots**, le risque à la fin sur une plomberie déjà éprouvée : **A** la liste seule, en lecture pure — **B** le mode « vérifier seulement », qui construit et prouve le canal JSON sur des opérations inoffensives — **C** le déploiement réel avec ses garde-fous — **D** le journal et la reprise des seuls postes en échec.
 
+---
+
+## Points 65 à 71 — ce que deux rapports 1.6.0 ont montré
+
+Le 18/09/2026, l'auteur envoie deux rapports produits par la 1.6.0 tout juste publiée, l'un en français sur `TECH-INFO-2025`, l'autre en anglais sur `PC-TECH-INFO`, pour vérifier le texte des deux langues. Les deux machines sont saines. **C'est justement ce qui rend ces rapports utiles : sur une machine saine, tout ce que le logiciel signale est un faux positif.**
+
+**65 — Un service à démarrage « à la demande » et arrêté est signalé comme devant tourner. FAIT le 18/09/2026, 1.6.1.**
+
+`NlaSvc` — le service qui détermine si le réseau est un domaine, un réseau privé ou public — apparaît `Stopped` avec un mode de démarrage `Manual` sur **les deux** machines. Le rapport écrit « Il devrait tourner » et propose `sc.exe start NlaSvc`. C'est l'état normal d'un service à la demande : Windows le démarre quand un composant en a besoin et l'arrête ensuite.
+
+La règle ne comparait qu'à une liste de services attendus, sans regarder leur mode de démarrage. Corrigé par `ServiceStateInfo.DoitTourner`, vrai seulement pour `Auto`/`Automatic`. Un service **automatique** arrêté reste signalé — c'est, lui, une anomalie.
+
+**66 — Une carte Wi-Fi Direct virtuelle compte comme une carte sans fil. FAIT le 18/09/2026, 1.6.1.**
+
+`Microsoft Wi-Fi Direct Virtual Adapter` positionne `IsWireless`. Sur un poste fixe sans radio, la conclusion « aucun réseau Wi-Fi enregistré » se serait déclenchée sur une carte qui n'existe pas physiquement. Défaut **latent** : il n'apparaît sur aucun des deux rapports, tous deux sur des machines qui ont une vraie carte sans fil.
+
+Corrigé par deux conditions cumulées : `Win32_NetworkAdapter WHERE PhysicalAdapter = TRUE`, **et** des marqueurs de description (Wi-Fi Direct, VPN, hyperviseurs). Une seule des deux ne suffit pas — certaines cartes virtuelles se déclarent physiques.
+
+**67 — Les états de service ne sont pas traduits. FAIT le 18/09/2026, 1.6.1.**
+
+Le rapport français affichait `Running · Auto`. Deux libellés de plus, `StateLabel` et `StartModeLabel`, tous deux dans `Lang.T`.
+
+**68 — Une date de fichier réécrite passe pour une mise à jour de pilote. FAIT le 18/09/2026, 1.6.1.**
+
+Le rapport annonce « Pilotes mis à jour : … `afd.sys` : 10.0.26100.8875 → 10.0.26100.8875 … ». Une flèche entre deux fois le même numéro. `ScanHistory` stocke `« version|date de fichier »` et comparait la valeur **entière** ; Windows réécrit ces fichiers sans changer le pilote (réparation de l'image, restauration de composants).
+
+**Ce n'est pas qu'un défaut d'affichage.** Cette liste alimente le point 55, qui conclut « le pilote accusé a été remplacé et les plantages ont continué, ce n'est donc pas lui ». Sur une fausse mise à jour, cette phrase **disculpe un pilote qui n'a jamais été remplacé** — l'inverse exact de ce que le point 55 existe pour faire.
+
+**69 — Un plafond de collecte présenté comme un comptage. FAIT le 18/09/2026, 1.6.1.**
+
+Le rapport titre « Erreurs disque répétées (500) ». 500 n'est pas un décompte : c'est la limite en dur d'`EventLogCollector`, atteinte. Le vrai total pouvait être 501 comme 40 000.
+
+Un chiffre rond présenté comme une mesure fausse l'appréciation de la gravité, et **dans les deux sens** — c'est exactement ce que ce logiciel existe pour éviter. La limite porte désormais un nom (`MaxEvenementsParRequete`), le collecteur retient les catégories où la coupe a eu lieu, et le rapport écrit « au moins 500 » en nommant la limite. Appliqué aussi aux comparaisons entre deux scans, disque et WHEA.
+
+**70 — Une seule carte pour des périphériques de natures différentes. FAIT le 18/09/2026, 1.6.1.** Demandé par l'auteur le 18/09/2026, en réponse à sa question « c'est des erreurs de clé USB ? ».
+
+Les 500 erreurs de `TECH-INFO-2025` étaient trois choses sans rapport : 479 blocs défectueux sur un support **débranché depuis**, 20 réinitialisations d'un **port de contrôleur SATA**, une erreur de **système de fichiers** sur un volume. Un seul titre, une seule gravité, une seule recommandation — qui commençait par la gestion d'alimentation PCI Express et le firmware du SSD, inutile pour les trois.
+
+Le point 60 avait séparé les *conseils* dans un texte commun. Il fallait séparer les *cartes*. Six natures de périphérique, lues sur le chemin `\Device\…` que Windows ne traduit jamais : disque monté, port de contrôleur, volume nommé, aucun périphérique nommé, support amovible, support absent. Une nature = une carte, sa gravité, son conseil.
+
+Deux pièges rencontrés en chemin, tous deux verrouillés par un test :
+
+- `HarddiskVolume3` commence par `Harddisk` : le motif historique `Harddisk(\d+)`, non ancré, l'aurait lu comme le disque numéro 3 — absent de l'inventaire, donc classé « support débranché ». Un volume monté aurait disparu du rapport.
+- `FusionnerLesDoublons` recolle tout ce qui partage un identifiant de fait. Deux cartes sous `disk_event` auraient été refusionnées en une, défaisant la séparation. La première nature de l'ordre de priorité garde `disk_event`, les autres reçoivent le leur.
+
+**71 — Un support débranché n'a pas de nom. FAIT le 18/09/2026, 1.6.1.** Demandé par l'auteur le 18/09/2026, même échange.
+
+Le journal Windows n'écrit qu'un numéro de disque, et ce numéro est réattribué à chaque branchement : sur un support débranché depuis, le rapport ne pouvait dire que « un disque qui portait le numéro 1 ». Windows retient pourtant, dans `SYSTEM\MountedDevices`, quelle lettre a été montée par quel matériel, et dans `Enum\USBSTOR` le nom lisible des supports USB déjà vus.
+
+Nouveau collecteur `StorageHistoryCollector`, en lecture seule, qui recoupe les deux. Trois décisions qui comptent plus que le code :
+
+- **Le numéro de série n'est pas retenu.** Identifiant matériel unique, sans valeur diagnostique — même traitement que l'adresse MAC, déjà masquée.
+- **Le rapport écrit « PISTE », jamais « identification ».** Rien ne relie une lettre de lecteur au numéro de disque qu'elle portait ce jour-là. Annoncer autrement ferait accuser un support au hasard.
+- **« Pas pu regarder » ne se lit pas « rien trouvé ».** Lire `MountedDevices` demande des droits d'administrateur ; sans eux, la phrase dit pourquoi. Même principe que le `-1` des profils Wi-Fi.
+
+---
+
 **29 — Limiter ce que le mode simple affiche.** Ton rapport porte 8 conclusions, toutes visibles d'emblée. Un technicien lit une liste ; un débutant ne sait pas par où commencer. Piste : n'afficher que les critiques et le premier avertissement, le reste replié derrière « voir les 6 autres ». *Difficulté : faible ; la décision de ce qu'on masque est plus délicate que le code.*
 
 ---
@@ -476,6 +534,31 @@ Les points 48 à 52 et 54 à 63 étaient des **corrections**, sur des données d
 Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict rassurant sur une machine qui s'arrête anormalement**, il nomme le composant au lieu de son rapporteur, et il écrit son script de réparation à partir de ce qu'il a mesuré.
 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
+
+### 1.6.1 — points 65 à 71, le lendemain de la 1.6.0
+
+Thème : **ce qu'un rapport affirme, il doit pouvoir le soutenir.**
+
+Sept points, tous nés du même geste : l'auteur envoie deux rapports de la 1.6.0 tout juste publiée, un dans chaque langue, sur deux machines **saines**. Sur une machine saine, tout ce que le logiciel signale est un faux positif — et c'est ce qui rend ces deux rapports plus utiles qu'une machine en panne.
+
+| # | Ce qui n'allait pas | Constaté sur |
+|---|---|---|
+| 65 ✔ | un service à la demande arrêté signalé comme devant tourner (`NlaSvc`) | les deux machines, 18/09 |
+| 66 ✔ | une carte Wi-Fi Direct virtuelle comptée comme carte sans fil — défaut latent | relecture du code, 18/09 |
+| 67 ✔ | états et modes de démarrage des services affichés en anglais dans le rapport français | TECH-INFO-2025, 18/09 |
+| 68 ✔ | `afd.sys : 10.0.26100.8875 → 10.0.26100.8875` — une date de fichier prise pour une mise à jour | TECH-INFO-2025, 18/09 |
+| 69 ✔ | « Erreurs disque répétées (500) » — 500 était le plafond de collecte, pas un décompte | TECH-INFO-2025, 18/09 |
+| 70 ✔ | une seule carte pour un support débranché, un port de contrôleur et un volume | TECH-INFO-2025, 18/09 |
+| 71 ✔ | un support débranché ne pouvait être désigné que par un numéro qui ne vaut plus rien | TECH-INFO-2025, 18/09 |
+
+Les points **65 à 69** sont des corrections, livrées sans qu'il soit besoin de les demander. Les points **70 et 71** sont deux ajouts, décidés le 18/09/2026 après la question « c'est des erreurs de clé USB ? » — question à laquelle le rapport ne permettait pas de répondre.
+
+Deux d'entre eux valaient plus que leur apparence :
+
+- Le **68** n'était pas un défaut d'affichage. La liste des pilotes changés alimente le point 55 : une fausse mise à jour y disculpait un pilote qui n'avait jamais été remplacé.
+- Le **69** touche à ce que ce logiciel promet. Un plafond présenté comme une mesure fausse l'appréciation de la gravité dans les deux sens, et aucune relecture du rapport ne pouvait le détecter — le chiffre avait l'air d'un chiffre.
+
+Ce que la version change, en une phrase : **le logiciel ne signale plus d'anomalie sur une machine saine, et ne présente plus une limite technique comme un fait mesuré.**
 
 ### 1.7.0 — le parc entre dans le logiciel
 
