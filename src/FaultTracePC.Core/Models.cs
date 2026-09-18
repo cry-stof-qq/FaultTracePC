@@ -390,7 +390,7 @@ public sealed class ReliabilityRecord
 
 public enum Severity { Critical, Warning, Info }
 public enum Confidence { High, Medium, Low }
-public enum FaultCategory { Hardware, Memory, Storage, GpuDriver, Driver, Software, Power, WindowsUpdate, None }
+public enum FaultCategory { Hardware, Memory, Storage, GpuDriver, Driver, Software, Power, WindowsUpdate, Network, None }
 
 public sealed class Finding
 {

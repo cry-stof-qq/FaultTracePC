@@ -438,6 +438,7 @@ public static class RepairScriptGenerator
         FaultCategory.Driver => Lang.T("pilotes", "drivers"),
         FaultCategory.Software => Lang.T("logiciel", "software"),
         FaultCategory.Power => Lang.T("alimentation", "power"),
+        FaultCategory.Network => Lang.T("réseau", "network"),
         FaultCategory.WindowsUpdate => "Windows Update",
         _ => Lang.T("général", "general"),
     };

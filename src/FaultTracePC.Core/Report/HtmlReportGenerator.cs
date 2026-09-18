@@ -950,6 +950,7 @@ public static class HtmlReportGenerator
         FaultCategory.Driver => Lang.T("Pilote", "Driver"),
         FaultCategory.Software => Lang.T("Logiciel", "Software"),
         FaultCategory.Power => Lang.T("Alimentation", "Power"),
+        FaultCategory.Network => Lang.T("Réseau", "Network"),
         // « Windows Update » est un nom de produit : identique dans les deux langues.
         FaultCategory.WindowsUpdate => "Windows Update",
         _ => Lang.T("Général", "General"),

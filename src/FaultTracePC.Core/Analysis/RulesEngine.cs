@@ -34,6 +34,7 @@ public sealed class RulesEngine
         AnalyzeArretsInattendus(r);
         AnalyzeServiceFailures(r);
         AnalyzeUpdateCorrelation(r);
+        AnalyzeReseau(r);
         AnalyzeDiskSpace(r);
 
         if (r.Findings.Count == 0)
@@ -1884,6 +1885,90 @@ public sealed class RulesEngine
         }
     }
 
+    /// <summary>
+    /// POINT 53, seconde moitié. Les faits réseau étaient collectés depuis le lot
+    /// précédent ; ici on en tire la conclusion que l'auteur avait dû reconstituer à la
+    /// main le 14/09/2026 sur MLEAR-031-2024 : carte Wi-Fi présente et active, ZÉRO
+    /// réseau enregistré, machine du domaine jamais revue depuis sa réinstallation.
+    /// « Plus de Wi-Fi » n'était pas une panne de carte : c'était une absence de profil.
+    /// </summary>
+    private static void AnalyzeReseau(DiagnosticReport r)
+    {
+        var net = r.System.Network;
+        if (net.Adapters.Count == 0) return;
+
+        var sansFil = net.Adapters.Where(a => a.IsWireless).ToList();
+        var cableConnecte = net.Adapters.Any(a => !a.IsWireless && a.HasIpV4);
+        var aucuneIp = net.Adapters.All(a => !a.HasIpV4);
+
+        // --- 1. carte Wi-Fi présente, aucun réseau enregistré ---------------------
+        // Le compteur vaut -1 quand le dossier des profils n'a pas pu être lu : on ne
+        // conclut alors RIEN. Confondre « zéro » et « pas regardé » ferait annoncer une
+        // panne sur une machine saine, ce qui est pire que de se taire.
+        if (sansFil.Count > 0 && net.WifiProfileCount == 0)
+        {
+            var noms = string.Join(", ", sansFil.Select(a => a.Name));
+
+            var details = Lang.T(
+                $"La machine porte une carte Wi-Fi ({noms}), mais AUCUN réseau n'y est enregistré — ni par stratégie de groupe, ni par l'utilisateur. Ce n'est pas une panne de la carte : Windows n'a simplement rien à proposer, donc la liste des réseaux reste vide.",
+                $"The machine has a Wi-Fi adapter ({noms}), but NO network is stored on it — neither by group policy nor by the user. This is not an adapter failure: Windows simply has nothing to offer, so the network list stays empty.");
+
+            if (net.PartOfDomain)
+                details += Lang.T(
+                    $" Le poste appartient au domaine {net.Domain} : ses profils Wi-Fi viennent normalement des stratégies de groupe. Sans réseau, il ne les reçoit pas ; sans elles, il n'a pas de Wi-Fi. C'est une boucle, et seul un câble la casse.",
+                    $" The machine belongs to the {net.Domain} domain: its Wi-Fi profiles normally come from group policy. With no network it never receives them; without them it has no Wi-Fi. That is a loop, and only a cable breaks it.");
+
+            details += cableConnecte
+                ? Lang.T(" Un câble est actuellement connecté : la correction peut être lancée tout de suite.", " A cable is currently connected: the fix can be applied right now.")
+                : Lang.T(" Aucune connexion filaire active en ce moment.", " No wired connection is active at the moment.");
+
+            var reco = net.PartOfDomain
+                ? Lang.T(
+                    "Brancher un câble Ethernet, puis ouvrir une invite de commandes en administrateur et lancer « gpupdate /force ». Les stratégies de groupe rapportent les profils Wi-Fi, qui réapparaissent aussitôt dans la liste des réseaux. Vérifier ensuite que le poste reste joignable par le domaine.",
+                    "Plug in an Ethernet cable, then open an administrator command prompt and run \"gpupdate /force\". Group policy brings the Wi-Fi profiles back, and they reappear in the network list straight away. Then check that the machine stays reachable from the domain.")
+                : Lang.T(
+                    "Enregistrer le réseau à la main (Paramètres → Réseau et Internet → Wi-Fi → Gérer les réseaux connus) : hors domaine, aucun mécanisme ne le fera à votre place.",
+                    "Add the network by hand (Settings → Network & Internet → Wi-Fi → Manage known networks): off-domain, nothing will do it for you.");
+
+            r.Findings.Add(new Finding
+            {
+                Severity = aucuneIp ? Severity.Critical : Severity.Warning,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Network,
+                Code = "wifi_sans_profil",
+                Title = Lang.T("Aucun réseau Wi-Fi enregistré — la liste des réseaux restera vide", "No Wi-Fi network stored — the network list will stay empty"),
+                Details = details,
+                Recommendation = reco
+            });
+        }
+
+        // --- 2. un service sans lequel il n'y a pas de réseau est arrêté -----------
+        foreach (var svc in net.Services.Where(x => !x.State.Equals("Running", StringComparison.OrdinalIgnoreCase)))
+        {
+            // Le service Wi-Fi arrêté sur une machine sans carte sans fil est normal.
+            if (svc.Name.Equals("WlanSvc", StringComparison.OrdinalIgnoreCase) && sansFil.Count == 0) continue;
+            // Un service désactivé par choix n'est pas une panne à signaler comme telle.
+            var voulu = svc.StartMode.Equals("Disabled", StringComparison.OrdinalIgnoreCase);
+
+            r.Findings.Add(new Finding
+            {
+                Severity = voulu ? Severity.Info : Severity.Warning,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Network,
+                Title = Lang.T($"Service réseau arrêté : {svc.Name}", $"Network service stopped: {svc.Name}"),
+                Details = Lang.T(
+                    $"{svc.DisplayName} ({svc.Name}) est à l'état « {svc.State} », démarrage « {svc.StartMode} ».",
+                    $"{svc.DisplayName} ({svc.Name}) is in state \"{svc.State}\", startup \"{svc.StartMode}\".")
+                    + (voulu
+                        ? Lang.T(" Il a été désactivé volontairement : ce n'est signalé que pour mémoire.", " It has been disabled on purpose: this is reported for the record only.")
+                        : Lang.T(" Il devrait tourner. Tant qu'il est arrêté, la fonction qu'il rend est indisponible, quelle que soit la santé du matériel.", " It should be running. While it is stopped, the function it provides is unavailable, whatever the state of the hardware.")),
+                Recommendation = voulu
+                    ? Lang.T("Aucune action si l'arrêt est voulu. Sinon, repasser le démarrage en automatique.", "No action if the shutdown is intended. Otherwise set the startup back to automatic.")
+                    : Lang.T($"Redémarrer le service et vérifier qu'il tient : « sc.exe start {svc.Name} », puis contrôler son démarrage automatique.", $"Restart the service and check that it holds: \"sc.exe start {svc.Name}\", then check its automatic startup.")
+            });
+        }
+    }
+
     private static void AnalyzeDiskSpace(DiagnosticReport r)
     {
         foreach (var v in r.System.Volumes.Where(v => v.SizeBytes > 0 && v.PercentFree < 8))
@@ -1967,6 +2052,7 @@ public sealed class RulesEngine
             FaultCategory.Driver => Lang.T("Cause la plus probable : PILOTE défectueux (voir le détail des BSOD pour le module concerné).", "Most likely cause: a faulty DRIVER (see the BSOD detail for the module involved)."),
             FaultCategory.Power => Lang.T("Cause la plus probable : ALIMENTATION ou surchauffe (coupures brutales sans écran bleu).", "Most likely cause: POWER SUPPLY or overheating (abrupt losses with no blue screen)."),
             FaultCategory.Software => Lang.T("Cause la plus probable : LOGICIELLE (corruption système ou application).", "Most likely cause: SOFTWARE (system corruption or an application)."),
+            FaultCategory.Network => Lang.T("Cause la plus probable : RÉSEAU (configuration, profils ou services — pas le matériel).", "Most likely cause: NETWORK (configuration, profiles or services — not the hardware)."),
             _ => Lang.T("Pannes détectées — voir le détail des conclusions ci-dessous.", "Failures detected — see the detail of the conclusions below."),
         } + $" ({critical.Count} conclusion(s) critique(s))";
     }
