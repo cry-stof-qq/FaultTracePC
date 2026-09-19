@@ -258,6 +258,13 @@ public partial class ParkWindow : Window
         TxtStatus.Text = Lang.T($"Interrogation de {_machines.Count} machine(s)…", $"Querying {_machines.Count} machine(s)…");
         var results = await Task.WhenAll(_machines.Select(QueryAsync));
         _lastResults = results.ToDictionary(r => r.Machine, r => r);
+
+        // POINT 43 — AVANT d'afficher, on archive. Les postes ne gardent leurs
+        // alertes que sept jours et un poste réimagé repart vide : cette
+        // actualisation est le seul moment où la console les a sous la main.
+        // Voir ParkWindow.Alertes.cs.
+        var archivage = await ArchiverLesAlertes(results);
+
         RenderRows(_lastResults);
 
         // Synthèse des versions : la question posée devant un parc n'est pas
@@ -276,7 +283,7 @@ public partial class ParkWindow : Window
                 ? Lang.T($" ⬆ {enRetard} poste(s) à mettre à jour vers la {ConsoleVersion}.", $" ⬆ {enRetard} machine(s) to update to {ConsoleVersion}.")
                 : joignables.Count > 0 ? Lang.T($" Tous les postes joignables sont en {ConsoleVersion}.", $" All reachable machines are on {ConsoleVersion}.") : "";
 
-        TxtStatus.Text = Lang.T($"Actualisé à {DateTime.Now:HH:mm:ss} — {joignables.Count}/{_machines.Count} machine(s) joignable(s).", $"Refreshed at {DateTime.Now:HH:mm:ss} — {joignables.Count}/{_machines.Count} machine(s) reachable.") + versions;
+        TxtStatus.Text = Lang.T($"Actualisé à {DateTime.Now:HH:mm:ss} — {joignables.Count}/{_machines.Count} machine(s) joignable(s).", $"Refreshed at {DateTime.Now:HH:mm:ss} — {joignables.Count}/{_machines.Count} machine(s) reachable.") + versions + archivage;
     }
 
     /// <summary>Génère et ouvre le rapport HTML consolidé du parc.</summary>
@@ -457,6 +464,13 @@ public partial class ParkWindow : Window
 
         /// <summary>Version du poste, comparée à celle de cette console.</summary>
         public string Version { get; set; } = "";
+
+        /// <summary>
+        /// Alertes archivées sur 90 jours — point 43. Un TEXTE et pas un nombre :
+        /// la colonne doit pouvoir écrire « — » quand il n'y a rien, et rappeler
+        /// entre parenthèses combien étaient critiques.
+        /// </summary>
+        public string Alertes90 { get; set; } = "—";
     }
 
     /// <summary>Version de cette console — la référence à laquelle les postes sont comparés.</summary>
@@ -503,6 +517,7 @@ public partial class ParkWindow : Window
                 Ram = r?.Last?.MemPct?.ToString("0.#") ?? "",
                 Top = r?.Last?.TopProcesses ?? "",
                 Version = DescribeVersion(r),
+                Alertes90 = LibelleAlertes90(m.Name),
             };
         }).ToList();
     }

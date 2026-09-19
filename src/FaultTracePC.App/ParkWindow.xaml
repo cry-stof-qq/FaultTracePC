@@ -68,25 +68,53 @@
                 <ListView x:Name="LvMachines" Grid.Row="1" Margin="0,10" BorderThickness="1" BorderBrush="#DBE2EC" FontSize="12">
                     <ListView.View>
                         <GridView>
+                            <!-- LES LARGEURS ONT ÉTÉ RESSERRÉES pour loger « Alertes 90 j »
+                                 sans pousser une colonne hors de la fenêtre : le total des
+                                 colonnes doit rester sous la largeur utile (1 180 px moins
+                                 la bordure et l'ascenseur). C'est l'erreur qui avait déjà
+                                 caché la colonne « Vérification » dans l'onglet Inventaire. -->
                             <GridViewColumn Header="{x:Static loc:L.ParkColMachine}" Width="130" DisplayMemberBinding="{Binding Name}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColHost}" Width="130" DisplayMemberBinding="{Binding Host}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColHost}" Width="120" DisplayMemberBinding="{Binding Host}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkColState}" Width="150" DisplayMemberBinding="{Binding Etat}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColVersion}" Width="165" DisplayMemberBinding="{Binding Version}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColLast}" Width="120" DisplayMemberBinding="{Binding DernierReleve}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColCpu}" Width="60" DisplayMemberBinding="{Binding Cpu}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColCpuTemp}" Width="65" DisplayMemberBinding="{Binding TempCpu}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColGpuTemp}" Width="65" DisplayMemberBinding="{Binding TempGpu}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColRam}" Width="60" DisplayMemberBinding="{Binding Ram}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColTop}" Width="230" DisplayMemberBinding="{Binding Top}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColVersion}" Width="150" DisplayMemberBinding="{Binding Version}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColLast}" Width="115" DisplayMemberBinding="{Binding DernierReleve}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColCpu}" Width="55" DisplayMemberBinding="{Binding Cpu}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColCpuTemp}" Width="60" DisplayMemberBinding="{Binding TempCpu}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColGpuTemp}" Width="60" DisplayMemberBinding="{Binding TempGpu}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColRam}" Width="55" DisplayMemberBinding="{Binding Ram}"/>
+                            <!-- POINT 43 — le décompte qui permet de dire « celui-là alerte
+                                 trois fois plus que les autres ». L'en-tête porte une bulle
+                                 d'aide parce qu'un nombre sans sa période ne veut rien dire. -->
+                            <GridViewColumn Width="95" DisplayMemberBinding="{Binding Alertes90}">
+                                <GridViewColumn.Header>
+                                    <TextBlock Text="{x:Static loc:L.ParkColAlertes90}"
+                                               ToolTip="{x:Static loc:L.ParkColAlertes90Tip}"/>
+                                </GridViewColumn.Header>
+                            </GridViewColumn>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColTop}" Width="160" DisplayMemberBinding="{Binding Top}"/>
                         </GridView>
                     </ListView.View>
                 </ListView>
 
                 <Border Grid.Row="2" Background="#EDF1F6" Padding="14,8">
+                    <!-- DEUX COLONNES, ET PAS DEUX ÉLÉMENTS SUPERPOSÉS. Avec un
+                         cinquième bouton, une barre d'état un peu longue passerait
+                         SOUS les boutons et deviendrait illisible sans qu'on
+                         comprenne pourquoi. La colonne * laisse au texte la place
+                         qui reste, et le reste est tronqué proprement. -->
                     <Grid>
-                        <TextBlock x:Name="TxtStatus" VerticalAlignment="Center" FontSize="12" Foreground="#44546A"
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- La bulle d'aide reprend le texte de la barre elle-même : la
+                             colonne s'est rétrécie en accueillant un bouton de plus, et un
+                             message tronqué doit rester lisible au survol. -->
+                        <TextBlock x:Name="TxtStatus" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#44546A"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="34" Margin="0,0,10,0"
+                                   ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"
                                    Text="{x:Static loc:L.ParkHint}"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button x:Name="BtnParkReport" Content="{x:Static loc:L.ParkReport}" Padding="12,6"
                                     FontSize="12" Margin="0,0,8,0" Click="BtnParkReport_Click"
                                     ToolTip="{x:Static loc:L.ParkReportTip}"/>
@@ -94,6 +122,10 @@
                                     Padding="12,6" FontSize="12" Margin="0,0,8,0"
                                     Click="BtnBoiteNoire_Click"
                                     ToolTip="{x:Static loc:L.FlightOpenTip}"/>
+                            <Button x:Name="BtnHistoriqueAlertes" Content="{x:Static loc:L.ParkHistoAlertes}"
+                                    Padding="12,6" FontSize="12" Margin="0,0,8,0"
+                                    Click="BtnHistoriqueAlertes_Click"
+                                    ToolTip="{x:Static loc:L.ParkHistoAlertesTip}"/>
                             <Button x:Name="BtnRemoteScan" Content="{x:Static loc:L.ParkRemoteScan}" Padding="12,6"
                                     FontSize="12" Margin="0,0,8,0" FontWeight="SemiBold"
                                     Background="#2470B3" Foreground="White" BorderThickness="0"

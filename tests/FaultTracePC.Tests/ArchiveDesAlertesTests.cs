@@ -172,4 +172,102 @@ public class ArchiveDesAlertesTests
         }
         finally { Nettoyer(poste); }
     }
+
+    // ==================================================================
+    // L'ARCHIVE BRANCHÉE SUR L'ACTUALISATION — deuxième partie du point 43.
+    // Ces trois tests décrivent ce que la console fait réellement à chaque
+    // actualisation, et ce dont la fenêtre d'historique a besoin pour afficher
+    // l'archive des mois plus tard.
+    // ==================================================================
+
+    [Fact]
+    public void Ce_que_le_poste_a_oublie_reste_dans_l_archive()
+    {
+        // LE POINT 43 TOUT ENTIER TIENT DANS CE TEST.
+        // Le poste ne garde que sept jours : à chaque actualisation, la console
+        // reçoit une fenêtre GLISSANTE. L'alerte la plus ancienne finit par en
+        // sortir. Si l'archive se contentait de recopier la dernière fenêtre
+        // reçue, elle oublierait exactement en même temps que le poste — et ne
+        // servirait à rien.
+        var poste = PosteDeTest();
+        try
+        {
+            var lundi   = Alerte(new DateTime(2026, 9, 7, 9, 0, 0), "cpu_temp");
+            var mercredi = Alerte(new DateTime(2026, 9, 9, 9, 0, 0), "commit");
+            var vendredi = Alerte(new DateTime(2026, 9, 11, 9, 0, 0), "gpu_temp");
+
+            // Actualisation 1 : le poste montre lundi et mercredi.
+            Assert.Equal(2, ArchiveDesAlertes.Archiver(poste, [lundi, mercredi]));
+
+            // Actualisation 2 : il montre les trois. Seule vendredi est nouvelle.
+            Assert.Equal(1, ArchiveDesAlertes.Archiver(poste, [lundi, mercredi, vendredi]));
+
+            // Actualisation 3 : lundi est sorti de ses sept jours. Rien de neuf,
+            // et surtout rien de perdu.
+            Assert.Equal(0, ArchiveDesAlertes.Archiver(poste, [mercredi, vendredi]));
+
+            var archivees = ArchiveDesAlertes.Lire(poste);
+            Assert.Equal(3, archivees.Count);
+            Assert.Contains(archivees, a => a.RuleId == "cpu_temp");
+        }
+        finally { Nettoyer(poste); }
+    }
+
+    [Fact]
+    public void Le_decompte_separe_les_critiques_des_alertes_a_surveiller()
+    {
+        // C'est le contrat de la colonne « Alertes 90 j » : dix alertes dont
+        // aucune critique et dix alertes dont six critiques ne demandent pas la
+        // même chose, et la colonne doit pouvoir le dire.
+        var poste = PosteDeTest();
+        try
+        {
+            ArchiveDesAlertes.Archiver(poste,
+            [
+                new PreventiveAlert { Time = DateTime.Now.AddDays(-1), RuleId = "cpu_temp", Level = "crit", Value = 96 },
+                new PreventiveAlert { Time = DateTime.Now.AddDays(-2), RuleId = "cpu_temp", Level = "warn", Value = 88 },
+                new PreventiveAlert { Time = DateTime.Now.AddDays(-3), RuleId = "commit",   Level = "crit", Value = 98 },
+                new PreventiveAlert { Time = DateTime.Now.AddDays(-200), RuleId = "commit", Level = "crit", Value = 99 },
+            ]);
+
+            var surQuatreVingtDix = ArchiveDesAlertes.Lire(poste, 90);
+
+            Assert.Equal(3, surQuatreVingtDix.Count);
+            Assert.Equal(2, surQuatreVingtDix.Count(a => a.Level == "crit"));
+
+            // Et l'ancienne n'a pas disparu pour autant.
+            Assert.Equal(4, ArchiveDesAlertes.Compter(poste));
+        }
+        finally { Nettoyer(poste); }
+    }
+
+    [Fact]
+    public void Une_alerte_archivee_se_relit_dans_la_langue_d_aujourd_hui()
+    {
+        // CE QUE LA FENÊTRE D'HISTORIQUE ATTEND DE L'ARCHIVE.
+        // Une alerte écrite il y a six mois porte la phrase de l'époque, dans la
+        // langue de l'époque. Le fichier conserve le FAIT — la règle et la valeur
+        // mesurée — ce qui permet de refabriquer la phrase aujourd'hui. Si l'un
+        // des deux manquait au fichier, l'historique afficherait du français au
+        // milieu d'une fenêtre anglaise, sans qu'aucun autre test ne le voie.
+        var poste = PosteDeTest();
+        var initiale = Lang.Current;
+        try
+        {
+            Lang.Apply(AppLanguage.French);
+            var a = new PreventiveAlert { Time = DateTime.Now.AddDays(-3), RuleId = "cpu_temp", Level = "crit", Value = 96 };
+            AlertCatalog.Localize(a);
+            Assert.Contains("Température", a.Title);
+
+            ArchiveDesAlertes.Archiver(poste, [a]);
+
+            Lang.Apply(AppLanguage.English);
+            var relues = ArchiveDesAlertes.Lire(poste, 90);
+            AlertCatalog.LocalizeAll(relues);
+
+            Assert.Single(relues);
+            Assert.Contains("Processor temperature", relues[0].Title);
+        }
+        finally { Lang.Apply(initiale); Nettoyer(poste); }
+    }
 }

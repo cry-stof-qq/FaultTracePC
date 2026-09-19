@@ -18,7 +18,7 @@
 | 1.6.0 | **publiée** le 18/09/2026 — thème **un rapport doit nommer la panne qu'il a sous les yeux** — seize points, 48 à 63, livrés les 17 et 18/09/2026 |
 | 1.6.1 | **publiée** le 18/09/2026 — correctifs constatés sur deux rapports 1.6.0 réels, plus deux ajouts demandés dans la foulée — points 65 à 71, 513 tests verts |
 | 1.6.2 | **publiée** le 18/09/2026 — sept correctifs constatés sur un rapport 1.6.1 réel, dont **deux créés par la 1.6.1 elle-même** — points 72 à 78, 616 tests verts |
-| 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots), 43 (archivage des alertes) et 46 (boîte noire distante) |
+| 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔ écrit mais non éprouvé, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔ |
 | 1.8.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026 |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
@@ -200,13 +200,24 @@ Or les alertes concernées — température soutenue, disque qui se dégrade, WH
 
 **Écarté au passage :** écrire dans le journal d'événements Windows n'aurait rien changé. L'établissement dispose de GLPI, qui est un outil d'inventaire et de tickets — **son agent ne collecte pas les journaux d'événements**. Les alertes y seraient tombées dans un journal que rien ne ramasse.
 
-**43 — Les alertes disparaissent avec le poste. À FAIRE, 1.7.0.** Trouvé en fermant le point 7, et plus sérieux que lui.
+**43 — Les alertes disparaissent avec le poste. FAIT le 19/09/2026.** Trouvé en fermant le point 7, et plus sérieux que lui.
 
 Les alertes vivent **sur la machine**, dans `ProgramData\FaultTracePC\Flight\alerts.jsonl`. Un poste réimagé — opération routinière en établissement, souvent pendant les vacances — repart avec un journal vide. La console les collecte à chaque actualisation mais **ne les conserve pas** : elle les affiche et les oublie.
 
 Conséquence concrète : on peut perdre la preuve qu'une machine chauffait depuis six mois, précisément au moment où elle servirait à justifier son remplacement. C'est aussi ce qui empêche toute vue dans la durée — « ce poste alerte trois fois plus que les autres » est une phrase que la console ne peut pas dire aujourd'hui.
 
 Piste : la console archive ce qu'elle collecte, dans son dossier à elle, par machine et par règle. Rien à changer sur les postes. *Difficulté : faible à moyenne.*
+
+**Livré le 19/09/2026, en deux gestes.** La console archive ce qu'elle collecte, dans `Documents\FaultTracePC\Alertes`, **un fichier par poste**. Rien n'a changé sur les postes.
+
+- **Rien n'est jamais effacé, et c'est une décision.** Une alerte pèse quelques centaines d'octets ; même un poste bavard produira moins d'un mégaoctet par an. Effacer au bout de N jours, ce serait risquer de supprimer exactement la preuve qu'on cherchait — et la supprimer sans que personne l'ait demandé. Les périodes proposées (7, 30, 90, 365 jours, tout) filtrent **l'affichage**, jamais le fichier. Un bouton ouvre le dossier : c'est là qu'on supprime à la main l'historique d'un poste sorti du parc.
+- **Le dédoublonnage est la règle, pas l'exception.** La console relit sept jours d'alertes à CHAQUE actualisation : sans lui, une alerte du lundi serait archivée une fois par actualisation jusqu'au lundi suivant. Deux alertes sont la même quand elles portent le même **instant** et la même **règle** — les ticks plutôt que le texte de la date, pour qu'un aller-retour de sérialisation ne fabrique pas un faux nouveau.
+- **L'archivage est branché sur l'actualisation, et nulle part ailleurs.** C'est le seul moment où la console a les alertes sous la main. Archiver à la fermeture ou une fois par jour reviendrait à parier que la console est ouverte au bon moment. L'écriture se fait hors du fil d'affichage ; un échec d'archivage n'interrompt pas la supervision mais **est dit** dans la barre d'état — une archive qui cesse de s'écrire en silence est pire que pas d'archive du tout, puisqu'on croirait avoir la preuve.
+- **Le nom du poste est contrôlé AVANT de devenir un chemin.** Lettres, chiffres et traits d'union, comme pour la liste de déploiement. Neuf cas de test, dont `../../ailleurs` et `C:\Windows\System32`.
+- **Une colonne « Alertes 90 j » dans l'onglet Supervision**, avec le nombre de critiques entre parenthèses. Quatre-vingt-dix jours, c'est la durée qui sépare deux vacances scolaires : sept jours ne diraient rien d'un poste qui chauffe une fois par mois, un an mélangerait la machine d'aujourd'hui avec celle d'avant sa réparation. Zéro s'écrit « — » et non « 0 » : une colonne pleine de zéros attire l'œil sur ce qui ne s'est pas produit.
+- **Le texte des alertes est refabriqué, pas recopié.** Une archive de six mois a été écrite dans la langue de l'époque ; le fichier conserve le **fait** — la règle et la valeur mesurée — et `AlertCatalog` réécrit la phrase dans la langue d'aujourd'hui. Sans cela, l'historique serait un mélange de deux langues, et aucun autre test ne l'aurait vu.
+- **Une archive vide n'est pas une preuve de bonne santé.** Un poste jamais interrogé par cette console a exactement le même fichier vide qu'un poste sain. La fenêtre le dit en toutes lettres plutôt que de laisser lire « ce poste va bien ».
+- **Quatrième dossier écrit par le logiciel à côté du code** — après `parametres.json`, `Journal/` et `Deploiement/`. Cette fois la ligne du `.gitignore` a été écrite **dans le même geste** que le code qui écrit le dossier, comme la leçon du 19/09 le demandait.
 
 **44 — Publier l'état du parc dans GLPI. Choix de stratégie, pas correction.** L'établissement utilise déjà GLPI pour son inventaire et ses tickets. Y déposer l'état de santé de chaque poste — ou ouvrir un ticket quand un disque commence à lâcher — mettrait l'information là où l'administrateur regarde déjà, au lieu de lui demander d'ouvrir un outil de plus.
 

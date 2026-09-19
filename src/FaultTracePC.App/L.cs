@@ -396,6 +396,33 @@ public static class L
     public static string FlightColCommit => Lang.T("Mém. virt.", "Virtual mem.");
     public static string FlightColDetail => Lang.T("Détail", "Detail");
 
+
+    // ------------------------------------------------- historique des alertes (point 43)
+    // « Alertes 90 j » et pas « Alertes » tout court : un décompte sans période
+    // affichée se lit comme un total depuis toujours, et ferait paraître un poste
+    // ancien plus malade qu'un poste récent.
+    public static string ParkColAlertes90 => Lang.T("Alertes 90 j", "Alerts 90 d");
+    public static string ParkColAlertes90Tip => Lang.T(
+        "Nombre d'alertes archivées par cette console pour ce poste sur les 90 derniers jours, et entre parenthèses combien étaient critiques. « — » signifie aucune alerte archivée, ce qui peut aussi vouloir dire que le poste n'a jamais été interrogé.",
+        "Number of alerts archived by this console for this machine over the last 90 days, and in brackets how many were critical. “—” means no archived alert, which can also mean the machine was never queried.");
+    public static string ParkHistoAlertes => Lang.T("📜 Historique des alertes", "📜 Alert history");
+    public static string ParkHistoAlertesTip => Lang.T(
+        "Montre toutes les alertes que cette console a archivées pour le poste sélectionné. Aucune machine n'est contactée : la fenêtre répond même si le poste est éteint.",
+        "Shows every alert this console has archived for the selected machine. No machine is contacted: the window answers even if the computer is off.");
+    public static string HistoTitle => Lang.T("FaultTracePC — historique des alertes", "FaultTracePC — alert history");
+    public static string HistoIntro => Lang.T(
+        "Cette fenêtre relit l'archive tenue par cette console, dans Documents\\FaultTracePC\\Alertes. Elle ne contacte aucune machine et rien n'y est jamais effacé : un poste réinstallé garde donc l'historique d'avant.",
+        "This window re-reads the archive kept by this console, in Documents\\FaultTracePC\\Alertes. It contacts no machine and nothing is ever deleted from it: a reinstalled computer therefore keeps its earlier history.");
+    public static string HistoPeriod => Lang.T("Montrer :", "Show:");
+    public static string HistoOpenFolder => Lang.T("📁 Ouvrir le dossier d'archive", "📁 Open the archive folder");
+    public static string HistoOpenFolderTip => Lang.T(
+        "Ouvre le dossier qui contient un fichier par poste. C'est là qu'on supprime l'historique d'un poste retiré du parc — le logiciel n'efface rien tout seul.",
+        "Opens the folder holding one file per machine. That is where the history of a machine removed from the fleet is deleted — the software never deletes anything on its own.");
+    public static string HistoColDate => Lang.T("Quand", "When");
+    public static string HistoColLevel => Lang.T("Niveau", "Level");
+    public static string HistoColTitle => Lang.T("Alerte", "Alert");
+    public static string HistoColDetail => Lang.T("Détail", "Detail");
+
     // ------------------------------------------------- onglet Inventaire (point 64, lot A-3)
     public static string ParkTabMonitoring => Lang.T("📡  Supervision", "📡  Monitoring");
     public static string ParkTabInventory => Lang.T("🗂  Inventaire", "🗂  Inventory");
