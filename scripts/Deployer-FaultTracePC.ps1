@@ -197,11 +197,15 @@ function Initialize-Parametres {
 
     $demande = $false
 
-    # EN VÉRIFICATION SEULE, AUCUNE QUESTION N'EST POSÉE. Ce mode est fait pour
-    # être piloté par la console : une invite sans personne devant bloquerait
-    # indéfiniment. Le paquet MSI n'est de toute façon pas nécessaire, puisque rien
-    # n'est installé.
-    $muet = [bool]$VerifierSeulement
+    # AUCUNE QUESTION DE CONFORT QUAND LE SCRIPT EST PILOTÉ.
+    #
+    # « -SortieJson » signifie qu'un programme relit ce que le script écrit : il y a
+    # donc quelqu'un qui attend la fin du processus, et pas forcément devant l'écran.
+    # Une invite « chemin du MSI ? » ou « serveur DHCP ? » bloquerait indéfiniment.
+    #
+    # LA DEMANDE DU SECRET MAÎTRE, ELLE, N'EST PAS UNE QUESTION DE CONFORT et reste
+    # posée : c'est ce qui permet de ne jamais écrire ce secret sur le disque.
+    $muet = ([bool]$VerifierSeulement) -or ([bool]$SortieJson)
 
     if (-not $Msi) {
         if ($enregistres -and $enregistres.Msi) { $script:Msi = $enregistres.Msi }
@@ -1051,7 +1055,8 @@ function Invoke-Session {
         $script:reveilSeul = $false
         Alerte 'Vérification seule : rien ne sera réveillé, copié, installé ni mis en parc.'
     }
-    elseif (-not $PSBoundParameters.ContainsKey('ConfigurerParc') -and
+    elseif (-not $SortieJson -and
+        -not $PSBoundParameters.ContainsKey('ConfigurerParc') -and
         -not $PSBoundParameters.ContainsKey('SeulementParc') -and
         -not $PSBoundParameters.ContainsKey('ReveilSeulement')) {
         Write-Host ''
@@ -1172,7 +1177,10 @@ try {
         # Ce mode est fait pour être lancé par la console : une invite sans personne
         # devant retiendrait la fenêtre ouverte indéfiniment, et le logiciel
         # attendrait la fin d'un processus qui n'arrive jamais.
-        if ($script:verifierSeul) { $recommencer = $false }
+        # Piloté : la fenêtre est déjà retenue par l'enrobage de la console, qui
+        # pose sa propre invite « Appuyer sur Entrée ». En poser une seconde ici
+        # obligerait à répondre deux fois.
+        if ($script:verifierSeul -or $SortieJson) { $recommencer = $false }
         else {
             Write-Host ''
             Write-Host '  1 = fermer' -ForegroundColor Cyan

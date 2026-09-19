@@ -66,6 +66,13 @@ public partial class ParkWindow
             set { if (_etat != value) { _etat = value; Prevenir(nameof(Etat)); } }
         }
 
+        /// <summary>
+        /// Le même verdict sous forme de CODE, pour compter sans relire du texte.
+        /// Compter des phrases traduites reviendrait à faire dépendre un décompte
+        /// de la langue de l'interface.
+        /// </summary>
+        public string Verdict { get; set; } = "";
+
         public event PropertyChangedEventHandler? PropertyChanged;
         private void Prevenir(string nom) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nom));
     }
@@ -77,6 +84,13 @@ public partial class ParkWindow
     /// clic est une décision qui mérite d'être prise en plusieurs fois.
     /// </summary>
     private const int MaxParVerification = 100;
+
+    /// <summary>
+    /// Plafond par déploiement, plus bas que celui de la vérification et pour une
+    /// raison simple : ici on MODIFIE des machines. Cinquante postes, c'est encore
+    /// une liste qu'on peut relire avant de valider ; deux cents, non.
+    /// </summary>
+    private const int MaxParDeploiement = 50;
 
     /// <summary>Empêche deux interrogations simultanées de l'annuaire.</summary>
     private bool _inventaireOccupe;
@@ -408,7 +422,7 @@ public partial class ParkWindow
             await processus.WaitForExitAsync();
 
             var lecture = ParkDeployment.Lire(journal);
-            foreach (var l in choisis) l.Etat = EtatDuPoste(lecture, l.Nom);
+            AppliquerLesVerdicts(lecture, choisis);
 
             TxtInvStatus.Text = ResumeDeVerification(lecture, choisis.Count, ecartes, journal);
         }
@@ -424,25 +438,51 @@ public partial class ParkWindow
     }
 
     /// <summary>
-    /// Ce que le journal dit d'UN poste. « Aucune trace » n'est pas « tout va
-    /// bien » : c'est un poste que le script n'a pas atteint, et il faut le dire.
+    /// Ce que le journal dit d'UN poste : un code invariant, et la phrase à
+    /// afficher. « Aucune trace » n'est pas « tout va bien » — c'est un poste que
+    /// le script n'a pas atteint, et il faut le dire.
+    ///
+    /// L'ORDRE DE LECTURE VA DU PLUS AVANCÉ AU MOINS AVANCÉ : un poste installé
+    /// ET mis en parc doit s'annoncer comme tel, pas comme « prêt ».
     /// </summary>
-    private static string EtatDuPoste(LectureDuJournal lecture, string nom)
+    private static (string Code, string Phrase) VerdictDuPoste(LectureDuJournal lecture, string nom)
     {
-        var lignes = lecture.Lignes.Where(l => string.Equals(l.Poste, nom, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (lignes.Count == 0) return Lang.T("aucune trace", "no trace");
+        var lignes = lecture.Lignes
+            .Where(l => string.Equals(l.Poste, nom, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        if (lignes.Count == 0)
+            return ("absent", Lang.T("aucune trace", "no trace"));
 
         var echec = lignes.FirstOrDefault(l => l.EstEchec);
         if (echec is not null)
-            return Lang.T($"échec : {LibelleEtape(echec.Etape)}", $"failed: {LibelleEtape(echec.Etape)}");
+            return ("echec", Lang.T($"échec : {LibelleEtape(echec.Etape)}",
+                                    $"failed: {LibelleEtape(echec.Etape)}"));
 
-        bool gestionOk = lignes.Any(l =>
-            string.Equals(l.Etape, ParkDeployment.EtapeGestionADistance, StringComparison.OrdinalIgnoreCase)
+        bool Reussi(string etape) => lignes.Any(l =>
+            string.Equals(l.Etape, etape, StringComparison.OrdinalIgnoreCase)
             && string.Equals(l.Etat, ParkDeployment.EtatOk, StringComparison.OrdinalIgnoreCase));
 
-        return gestionOk
-            ? Lang.T("prêt à recevoir le paquet", "ready for the package")
-            : Lang.T("vérifié en partie", "partly checked");
+        if (Reussi(ParkDeployment.EtapeParc))
+            return ("parc", Lang.T("installé et visible de la console", "installed and visible from the console"));
+
+        if (Reussi(ParkDeployment.EtapeInstallation))
+            return ("installe", Lang.T("installé — pas mis en parc, donc invisible ici",
+                                       "installed — not in fleet mode, so invisible here"));
+
+        if (Reussi(ParkDeployment.EtapeGestionADistance))
+            return ("pret", Lang.T("prêt à recevoir le paquet", "ready for the package"));
+
+        return ("partiel", Lang.T("vérifié en partie", "partly checked"));
+    }
+
+    private static void AppliquerLesVerdicts(LectureDuJournal lecture, List<LigneInventaire> lignes)
+    {
+        foreach (var l in lignes)
+        {
+            var (code, phrase) = VerdictDuPoste(lecture, l.Nom);
+            l.Verdict = code;
+            l.Etat = phrase;
+        }
     }
 
     private static string LibelleEtape(string etape) => etape switch
@@ -452,6 +492,9 @@ public partial class ParkWindow
         ParkDeployment.EtapePartageAdmin => Lang.T("partage administratif", "administrative share"),
         ParkDeployment.EtapeGestionADistance => Lang.T("gestion à distance", "remote management"),
         ParkDeployment.EtapeReveil => Lang.T("réveil réseau", "wake-on-LAN"),
+        ParkDeployment.EtapeCopie => Lang.T("copie du paquet", "package copy"),
+        ParkDeployment.EtapeInstallation => Lang.T("installation", "installation"),
+        ParkDeployment.EtapeParc => Lang.T("mise en mode parc", "switch to fleet mode"),
         _ => etape,
     };
 
@@ -466,6 +509,207 @@ public partial class ParkWindow
         var resume = Lang.T(
             $"{demandes} poste(s) demandé(s), {lecture.Postes.Count} vu(s) dans le journal, {prets} prêt(s). Aucune machine n'a été modifiée.",
             $"{demandes} computer(s) requested, {lecture.Postes.Count} seen in the journal, {prets} ready. No machine was modified.");
+
+        if (ecartes.Count > 0)
+            resume += Lang.T($" {ecartes.Count} nom(s) écarté(s) : {string.Join(", ", ecartes)}.",
+                             $" {ecartes.Count} name(s) set aside: {string.Join(", ", ecartes)}.");
+
+        if (lecture.FichierAbsent)
+            resume += Lang.T(" Le journal n'a pas été écrit : le script ne l'a peut-être pas atteint.",
+                             " The journal was not written: the script may not have reached it.");
+
+        foreach (var note in lecture.Notes) resume += " " + note;
+
+        return resume + Lang.T($" Journal : {journal}", $" Journal: {journal}");
+    }
+
+    // ------------------------------------------------------------------
+    // Déployer la sélection — point 64, lot C
+    // ------------------------------------------------------------------
+
+    private async void BtnInvDeployer_Click(object sender, RoutedEventArgs e)
+    {
+        if (_inventaireOccupe) return;
+
+        var choisis = LignesAffichees().Where(l => l.Coche).ToList();
+
+        if (choisis.Count == 0)
+        {
+            TxtInvStatus.Text = Lang.T("Aucun poste coché : rien à déployer.",
+                                       "No computer ticked: nothing to deploy.");
+            return;
+        }
+
+        if (choisis.Count > MaxParDeploiement)
+        {
+            TxtInvStatus.Text = Lang.T(
+                $"{choisis.Count} postes cochés, le maximum est de {MaxParDeploiement} par déploiement. Procéder en plusieurs fois.",
+                $"{choisis.Count} computers ticked, the maximum is {MaxParDeploiement} per deployment. Work in several passes.");
+            return;
+        }
+
+        // LE PAQUET AVANT TOUT. Un chemin fautif découvert au milieu du lot
+        // laisserait la moitié du parc installée et l'autre moitié non.
+        var paquet = (TxtPaquet.Text ?? "").Trim().Trim('"').Trim();
+        var problemePaquet = ParkDeployment.VerifierLePaquet(paquet);
+        if (problemePaquet.Length > 0)
+        {
+            MajEtatDuPaquet();
+            TxtInvStatus.Text = problemePaquet;
+            return;
+        }
+
+        var politique = PowerShellPolicy.Read(TimeSpan.FromSeconds(8));
+        if (politique is { Blocked: true })
+        {
+            MessageBox.Show(this,
+                Lang.T($"Le déploiement ne peut pas démarrer : une stratégie de groupe interdit l'exécution de scripts sur ce poste ({politique.Scope} = {politique.Policy}).",
+                       $"The deployment cannot start: a Group Policy forbids running scripts on this machine ({politique.Scope} = {politique.Policy}).")
+                + "\n\n"
+                + Lang.T("Ce réglage vient de l'administration du parc, et FaultTracePC ne le contourne pas — volontairement.",
+                         "This setting comes from your fleet administration, and FaultTracePC does not work around it — deliberately."),
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        bool modeParc = ChkModeParc.IsChecked == true;
+
+        // L'APERÇU : ce que la vérification a déjà appris de ces postes-là. Il ne
+        // bloque rien — le script refait tous ses contrôles poste par poste — mais
+        // il évite de découvrir au bout de vingt minutes ce qu'on pouvait savoir
+        // en deux.
+        int prets    = choisis.Count(l => l.Verdict is "pret" or "installe" or "parc");
+        int echoues  = choisis.Count(l => l.Verdict == "echec");
+        int inconnus = choisis.Count - prets - echoues;
+
+        var version = ParkDeployment.VersionAnnonceeParLeNom(paquet);
+
+        var question = Lang.T($"Déployer FaultTracePC sur {choisis.Count} poste(s) ?",
+                              $"Deploy FaultTracePC on {choisis.Count} computer(s)?");
+
+        var detail = Lang.T(
+            $"{prets} déjà vérifié(s) et joignable(s) · {echoues} vérifié(s) en échec · {inconnus} non vérifié(s).",
+            $"{prets} already checked and reachable · {echoues} checked and failing · {inconnus} not checked.")
+            + "\n"
+            + (version.Length > 0
+                ? Lang.T($"Paquet : {Path.GetFileName(paquet)} — son nom annonce la version {version}.",
+                         $"Package: {Path.GetFileName(paquet)} — its name announces version {version}.")
+                : Lang.T($"Paquet : {Path.GetFileName(paquet)} — son nom n'annonce aucune version.",
+                         $"Package: {Path.GetFileName(paquet)} — its name announces no version."))
+            + "\n"
+            + Lang.T("« Non vérifié » ne veut pas dire « en panne » : cela veut dire qu'on ne sait rien de ce poste. Le script refera tous ses contrôles, un par un.",
+                     "“Not checked” does not mean “broken”: it means nothing is known about that computer. The script will redo every check, one by one.");
+
+        // CE QUI VA RÉELLEMENT SE PASSER, écrit avant, pas découvert après.
+        var consequences = Lang.T("Sur chaque poste :", "On each computer:") + "\n"
+            + Lang.T("• le paquet est copié dans C:\\Windows\\Temp, installé en silence, puis effacé ;",
+                     "• the package is copied to C:\\Windows\\Temp, installed silently, then deleted;") + "\n"
+            + Lang.T("• un poste éteint sera RÉVEILLÉ par le réseau, puis traité ;",
+                     "• a computer that is off will be WOKEN over the network, then processed;") + "\n"
+            + Lang.T("• si la gestion à distance est arrêtée, elle sera démarrée et réglée pour démarrer à chaque ouverture du poste — ce réglage est DURABLE ;",
+                     "• if remote management is stopped, it will be started and set to start on every boot — this setting is PERMANENT;") + "\n"
+            + Lang.T("• une version plus ancienne est remplacée ; une version plus récente fait refuser l'installation.",
+                     "• an older version is replaced; a newer version makes the install refuse.")
+            + "\n\n"
+            + (modeParc
+                ? Lang.T("Mode parc demandé : le secret maître sera demandé UNE FOIS dans la fenêtre PowerShell, sans rien afficher. Il n'est jamais écrit sur le disque.",
+                         "Fleet mode requested: the master secret will be asked ONCE in the PowerShell window, with nothing displayed. It is never written to disk.")
+                : Lang.T("Mode parc NON demandé : les postes seront installés mais resteront invisibles depuis cette console.",
+                         "Fleet mode NOT requested: the computers will be installed but will stay invisible from this console."));
+
+        if (!ConfirmationChiffreeWindow.Demander(this, choisis.Count, question, detail, consequences)) return;
+
+        OccuperInventaire(true, Lang.T(
+            $"Déploiement sur {choisis.Count} poste(s) — le résultat s'affichera ici quand tu auras fermé la fenêtre PowerShell.",
+            $"Deploying to {choisis.Count} computer(s) — the result will appear here once you close the PowerShell window."));
+        try
+        {
+            var reglages = ParametresParc.Charger();
+            reglages.CheminDuPaquet = paquet;
+            reglages.Enregistrer();
+
+            var dossier = ScriptDeDeploiement.DossierParDefaut;
+            var script = ScriptDeDeploiement.Extraire(dossier);
+
+            var ecartes = new List<string>();
+            var listeDesPostes = Path.Combine(dossier, "postes-a-deployer.txt");
+            int retenus = ListeDePostes.Ecrire(listeDesPostes, choisis.Select(l => l.Nom), ecartes);
+
+            if (retenus == 0)
+            {
+                TxtInvStatus.Text = Lang.T("Aucun nom de poste exploitable dans la sélection.",
+                                           "No usable computer name in the selection.");
+                return;
+            }
+
+            var journal = Path.Combine(dossier, $"deploiement_{DateTime.Now:yyyy-MM-dd_HHmmss}.jsonl");
+
+            foreach (var l in choisis) l.Etat = Lang.T("en cours…", "in progress…");
+
+            // La langue du parc suit celle de l'interface : un rapport produit sur un
+            // poste distant sort dans la langue de l'administrateur, pas dans celle
+            // que le poste a par hasard.
+            var langue = Lang.Current == AppLanguage.English ? "en" : "fr";
+
+            var parametres = new List<KeyValuePair<string, string?>>
+            {
+                new("Msi", paquet),
+                new("FichierPostes", listeDesPostes),
+                new("SortieJson", journal),
+                new("Langue", langue),
+            };
+            if (modeParc) parametres.Add(new("ConfigurerParc", null));
+
+            using var processus = Process.Start(new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = PowerShellLauncher.ArgumentsForScript(script, L.PsClose, parametres, pauseTousLesCas: true),
+                UseShellExecute = true,
+            });
+
+            if (processus is null)
+            {
+                TxtInvStatus.Text = Lang.T("PowerShell n'a pas pu être lancé.", "PowerShell could not be started.");
+                return;
+            }
+
+            await processus.WaitForExitAsync();
+
+            var lecture = ParkDeployment.Lire(journal);
+            AppliquerLesVerdicts(lecture, choisis);
+
+            TxtInvStatus.Text = ResumeDeDeploiement(lecture, choisis, ecartes, journal);
+        }
+        catch (Exception ex)
+        {
+            TxtInvStatus.Text = Lang.T($"Déploiement impossible : {ex.Message}",
+                                       $"Deployment failed: {ex.Message}");
+        }
+        finally
+        {
+            OccuperInventaire(false, null);
+        }
+    }
+
+    /// <summary>
+    /// Le bilan, compté sur les CODES et non sur les phrases affichées : un
+    /// décompte ne doit pas dépendre de la langue de l'interface.
+    /// </summary>
+    private static string ResumeDeDeploiement(
+        LectureDuJournal lecture, List<LigneInventaire> choisis, List<string> ecartes, string journal)
+    {
+        int enParc     = choisis.Count(l => l.Verdict == "parc");
+        int installes  = choisis.Count(l => l.Verdict == "installe") + enParc;
+        int echoues    = choisis.Count(l => l.Verdict == "echec");
+        int sansTrace  = choisis.Count(l => l.Verdict == "absent");
+
+        var resume = Lang.T(
+            $"{choisis.Count} poste(s) demandé(s) : {installes} installé(s), dont {enParc} visible(s) de la console · {echoues} en échec · {sansTrace} sans aucune trace dans le journal.",
+            $"{choisis.Count} computer(s) requested: {installes} installed, of which {enParc} visible from the console · {echoues} failed · {sansTrace} with no trace at all in the journal.");
+
+        if (sansTrace > 0)
+            resume += Lang.T(" Un poste sans trace n'a pas été atteint par le script : il n'est ni installé, ni en échec, on ne sait simplement rien de lui.",
+                             " A computer with no trace was never reached by the script: it is neither installed nor failed, nothing is known about it.");
 
         if (ecartes.Count > 0)
             resume += Lang.T($" {ecartes.Count} nom(s) écarté(s) : {string.Join(", ", ecartes)}.",
@@ -529,6 +773,8 @@ public partial class ParkWindow
         _inventaireOccupe = occupe;
         BtnInvListerUnites.IsEnabled = !occupe;
         BtnInvActualiser.IsEnabled = !occupe;
+        BtnInvVerifier.IsEnabled = !occupe;
+        BtnInvDeployer.IsEnabled = !occupe;
         Cursor = occupe ? System.Windows.Input.Cursors.Wait : null;
         if (message is not null) TxtInvStatus.Text = message;
     }

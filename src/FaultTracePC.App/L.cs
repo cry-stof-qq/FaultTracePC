@@ -416,6 +416,17 @@ public static class L
     public static string ParkInvVerifyTip => Lang.T(
         "Contrôle, pour chaque poste coché, qu'il est prêt à recevoir le paquet : compte d'ordinateur, réponse réseau, partage administratif et gestion à distance. AUCUNE MACHINE N'EST MODIFIÉE — ni copie, ni installation, ni réveil réseau.",
         "Checks, for each ticked computer, that it is ready to receive the package: computer account, network answer, administrative share and remote management. NO MACHINE IS MODIFIED — no copy, no install, no wake-on-LAN.");
+    public static string ParkInvParkMode => Lang.T("Mettre aussi en mode parc", "Also switch to fleet mode");
+    public static string ParkInvParkModeTip => Lang.T(
+        "Rend le poste visible depuis cette console après l'installation. Sans cela, le logiciel est installé mais le poste reste INVISIBLE ici. Le secret maître sera demandé une fois, dans la fenêtre PowerShell : il n'est jamais écrit sur le disque.",
+        "Makes the computer visible from this console after the install. Without it, the software is installed but the computer stays INVISIBLE here. The master secret is asked once, in the PowerShell window: it is never written to disk.");
+    public static string ParkInvDeploy => Lang.T("📦 Déployer la sélection", "📦 Deploy the selection");
+    public static string ParkInvDeployTip => Lang.T(
+        "Copie le paquet sur chaque poste coché et l'installe à distance. MODIFIE LES POSTES : réveil réseau des machines éteintes, démarrage du service de gestion à distance s'il est arrêté, puis installation silencieuse.",
+        "Copies the package to each ticked computer and installs it remotely. MODIFIES THE COMPUTERS: wake-on-LAN for those that are off, start of the remote management service if stopped, then a silent install.");
+    public static string ConfirmTitle => Lang.T("FaultTracePC — confirmation", "FaultTracePC — confirmation");
+    public static string ConfirmCancel => Lang.T("Annuler", "Cancel");
+    public static string ConfirmGo => Lang.T("Lancer", "Go ahead");
     public static string ParkInvHint => Lang.T(
         "Renseigner l'unité d'organisation si besoin, puis actualiser. La date de dernière session vient de l'annuaire : elle n'est répliquée que tous les neuf à quatorze jours, elle est donc APPROXIMATIVE par construction — elle répond à « ce poste a-t-il été vu ce mois-ci », jamais à « ce poste est-il allumé ».",
         "Set the organizational unit if needed, then refresh. The last logon date comes from the directory: it is replicated only every nine to fourteen days, so it is APPROXIMATE by design — it answers “has this computer been seen this month”, never “is this computer on”.");

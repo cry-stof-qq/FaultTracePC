@@ -207,6 +207,14 @@
                                     Background="#2470B3" Foreground="White" BorderThickness="0"
                                     Click="BtnInvVerifier_Click"
                                     ToolTip="{x:Static loc:L.ParkInvVerifyTip}"/>
+                            <CheckBox x:Name="ChkModeParc" Content="{x:Static loc:L.ParkInvParkMode}"
+                                      IsChecked="True" VerticalAlignment="Center" Margin="14,0,8,0"
+                                      FontSize="12" ToolTip="{x:Static loc:L.ParkInvParkModeTip}"/>
+                            <Button x:Name="BtnInvDeployer" Content="{x:Static loc:L.ParkInvDeploy}"
+                                    Padding="12,6" FontSize="12" FontWeight="SemiBold"
+                                    Background="#B33A3A" Foreground="White" BorderThickness="0"
+                                    Click="BtnInvDeployer_Click"
+                                    ToolTip="{x:Static loc:L.ParkInvDeployTip}"/>
                         </StackPanel>
                     </Grid>
                 </Border>

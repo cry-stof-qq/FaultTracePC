@@ -1,0 +1,44 @@
+<Window x:Class="FaultTracePC.App.ConfirmationChiffreeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:FaultTracePC.App"
+        Title="{x:Static loc:L.ConfirmTitle}"
+        Icon="Assets/FaultTracePC.ico"
+        Width="620" SizeToContent="Height" ResizeMode="NoResize"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
+        Loaded="Fenetre_Loaded">
+    <StackPanel Margin="20">
+
+        <TextBlock x:Name="TxtQuestion" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+
+        <TextBlock x:Name="TxtDetail" Margin="0,10,0,0" FontSize="12.5"
+                   Foreground="#44546A" TextWrapping="Wrap"/>
+
+        <!-- CE QUI VA RÉELLEMENT SE PASSER SUR LES POSTES, en évidence. Une
+             confirmation qui ne dit pas ce qu'elle confirme ne protège de rien. -->
+        <Border Background="#FFF7E0" BorderBrush="#E0C97F" BorderThickness="1"
+                Padding="12,10" Margin="0,14,0,0" CornerRadius="3">
+            <TextBlock x:Name="TxtConsequences" FontSize="12.5" TextWrapping="Wrap" Foreground="#5A4A1A"/>
+        </Border>
+
+        <StackPanel Orientation="Horizontal" Margin="0,16,0,0" VerticalAlignment="Center">
+            <TextBlock x:Name="TxtInvite" VerticalAlignment="Center" Margin="0,0,10,0"
+                       FontSize="13" FontWeight="SemiBold"/>
+            <TextBox x:Name="TxtSaisie" Width="100" FontFamily="Consolas" FontSize="15"
+                     Padding="6,4" TextChanged="TxtSaisie_TextChanged"/>
+            <TextBlock x:Name="TxtAide" VerticalAlignment="Center" Margin="12,0,0,0"
+                       FontSize="12" Foreground="#8A8A8A"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button x:Name="BtnAnnuler" Content="{x:Static loc:L.ConfirmCancel}"
+                    IsCancel="True" IsDefault="True" Padding="16,7" Margin="0,0,10,0" FontSize="12.5"/>
+            <Button x:Name="BtnValider" Content="{x:Static loc:L.ConfirmGo}"
+                    IsEnabled="False" Padding="16,7" FontSize="12.5" FontWeight="SemiBold"
+                    Background="#B33A3A" Foreground="White" BorderThickness="0"
+                    Click="BtnValider_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
