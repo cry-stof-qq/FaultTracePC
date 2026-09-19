@@ -408,7 +408,20 @@ Le déploiement se fait aujourd'hui par un script PowerShell distribué à part,
 - **La vérification préalable prévient, elle n'interdit pas.** Exiger l'état « prêt » aurait bloqué les postes ÉTEINTS — précisément ceux que le déploiement sait réveiller. L'aperçu (« 9 prêts · 1 en échec · 2 non vérifiés ») sert à savoir avant de lancer, pas à empêcher. Et *« non vérifié » ne veut pas dire « en panne » : cela veut dire qu'on ne sait rien de ce poste.*
 - **Le secret maître ne passe pas par la console.** Le script sait le lire dans un fichier ; ce serait l'écrire en clair sur le disque, même brièvement, et la règle « aucun mot de passe nulle part » tient depuis le début. Il est donc demandé UNE FOIS dans la fenêtre PowerShell, sans rien afficher, pour tout le lot. Corollaire : le script se sait « piloté » dès qu'on lui donne un journal JSON et ne pose plus aucune question de confort — **sauf celle-là**, qui n'en est pas une.
 
-**Reste au point 64 : le lot D** — le journal et la reprise des seuls postes en échec.
+**Lot D ✔ — la reprise des seuls postes en échec, livrée le 19/09/2026.**
+
+- **Le bouton PRÉPARE une sélection, il ne lance rien.** Reprendre un déploiement reste une décision, et elle se prend en cliquant sur « Déployer », avec sa confirmation chiffrée, comme la première fois.
+- **Le tri des journaux se fait sur le NOM du fichier, pas sur sa date.** Le nom porte `aaaa-mm-jj_hhmmss`, des chiffres à largeur fixe : trié comme du texte, il est trié comme du temps. La date du fichier, elle, est réécrite par une copie, une restauration ou une sauvegarde — le « dernier » journal ne serait alors plus le dernier. Un test écrit l'ancien journal APRÈS le récent pour vérifier que c'est bien le bon qui gagne.
+- **Le résultat n'est remis que sur les postes que le journal connaît.** L'appliquer aux autres les marquerait « aucune trace », ce qui serait faux : ils n'étaient simplement pas du lot.
+- **Les échecs absents de la liste affichée sont comptés ET nommés**, avec la raison probable au survol. Sans ça, on croirait tout reprendre.
+- **La vraie cause passe avant le symptôme.** Sans inventaire chargé, le bouton le dit au lieu d'annoncer « douze postes absents de la liste », ce qui aurait fait chercher du côté de l'unité d'organisation alors qu'il suffisait d'actualiser. Constaté au premier essai, le jour même.
+
+**Le point 64 est écrit. IL N'EST PAS ÉPROUVÉ.** À la date du 19/09/2026, **aucune machine distante n'a jamais été touchée** : tout a été vérifié à blanc, plus une vérification réelle sur le poste de l'auteur, qui est aussi la console. Le premier déploiement réel — un seul poste, sur place, mode parc compris — est ce qui transformera « ça devrait marcher » en « ça marche ». **La 1.7.0 ne se publie pas avant.**
+
+**Deux enseignements de mise en page, tirés de captures d'écran réelles :**
+
+- **La colonne qu'on vient lire doit tenir dans la fenêtre.** La colonne « Vérification » était hors de l'écran : 1 150 pixels de colonnes pour une fenêtre de 960. Une fonctionnalité qu'il faut aller chercher en faisant défiler est une fonctionnalité à moitié absente.
+- **Un message ne doit pas écraser ce qu'on regarde.** La barre d'état s'étalait sur cinq lignes. Deux lignes au maximum, et le texte complet au survol — le tableau est ce qu'on regarde.
 
 ---
 
