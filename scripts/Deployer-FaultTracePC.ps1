@@ -604,6 +604,47 @@ function Test-WinRM([string]$nom) {
     (port 445), qui lui fonctionne — c'est précisément pourquoi elles
     aboutissent là où Invoke-Command échoue.
 #>
+<#
+    DÉMARRER WinRM QUAND WinRM NE RÉPOND PAS — par l'autre porte.
+
+    « sc.exe \\poste » pilote les services d'un poste distant par le canal des
+    partages Windows, le port 445 — PAS par WinRM. Le partage administratif vient
+    d'être vérifié juste au-dessus : ce canal est donc ouvert, et c'est ce qui rend
+    la manoeuvre possible là où la gestion à distance, elle, est muette.
+
+    CE QUE ÇA RÈGLE, ET CE QUE ÇA NE RÈGLE PAS
+    Ça règle la cause la plus fréquente : le service arrêté. Ça ne règle ni un
+    pare-feu qui bloque le 5985, ni l'absence d'écouteur WinRM sur le poste. Dans
+    ces cas-là le service démarre et le port reste muet — les deux sorties de
+    sc.exe sont alors affichées, plutôt que de laisser conclure au hasard.
+
+    JAMAIS EN VÉRIFICATION. Démarrer un service modifie le poste, et le mode
+    « vérifier seulement » ne modifie rien : c'est sa définition, pas une option.
+
+    LE RÉGLAGE EST DURABLE : « start= auto » fait démarrer le service à chaque
+    redémarrage du poste. C'est l'état voulu sur un parc administré, et le revenir
+    en arrière annulerait justement ce qu'on vient d'obtenir.
+#>
+function Start-WinRMDistant([string]$nom) {
+    Alerte 'Gestion à distance muette : tentative de démarrage du service…'
+
+    # « start= auto » : l'espace APRÈS le signe égal est exigé par sc.exe. Sans lui,
+    # la commande est refusée sans message compréhensible.
+    $config    = & sc.exe "\\$nom" config winrm start= auto 2>&1
+    $demarrage = & sc.exe "\\$nom" start winrm 2>&1
+
+    # Un service met un instant à se mettre à écouter : on laisse le temps avant de
+    # conclure, plutôt que de déclarer l'échec d'une seconde trop tôt.
+    foreach ($essai in 1..3) {
+        Start-Sleep -Seconds 5
+        if (Test-WinRM $nom) { return $true }
+    }
+
+    Alerte "sc.exe config : $($config -join ' ')"
+    Alerte "sc.exe start  : $($demarrage -join ' ')"
+    return $false
+}
+
 function Write-AideWinRM([string]$nom) {
     Grave "La Gestion à distance de Windows (port 5985) ne répond pas sur $nom."
     Alerte 'Le plus souvent, le service WinRM n''est pas démarré sur le poste.'
@@ -729,14 +770,27 @@ function Install-SurUnPoste([string]$nom) {
 
     # Le feu vert de la suite, ce n'est pas 445 : c'est 5985. On le vérifie ici,
     # avant de copier 63 Mo qui seraient perdus.
-    if (-not (Test-WinRM $nom)) {
+    if (Test-WinRM $nom) {
+        Bien 'Gestion à distance disponible (5985).'
+        Write-Json $nom 'winrm' 'ok'
+    }
+    elseif ($script:verifierSeul) {
+        # La vérification constate, elle ne répare pas.
         Write-AideWinRM $nom
         $resume.Etat = 'échec'; $resume.Detail = 'WinRM muet (5985)'
-        Write-Json $nom 'winrm' 'echec' 'aucune réponse sur 5985'
+        Write-Json $nom 'winrm' 'echec' 'aucune reponse sur 5985'
         return $resume
     }
-    Bien 'Gestion à distance disponible (5985).'
-    Write-Json $nom 'winrm' 'ok'
+    elseif (Start-WinRMDistant $nom) {
+        Bien 'Gestion à distance démarrée à distance, puis joignable.'
+        Write-Json $nom 'winrm' 'ok' 'service demarre a distance par la console'
+    }
+    else {
+        Write-AideWinRM $nom
+        $resume.Etat = 'échec'; $resume.Detail = 'WinRM muet (5985)'
+        Write-Json $nom 'winrm' 'echec' 'muet meme apres demarrage du service : pare-feu ou ecouteur absent'
+        return $resume
+    }
 
     # VÉRIFICATION SEULE : ON S'ARRÊTE ICI, AVANT LA PREMIÈRE ÉCRITURE.
     # Tout ce qui précède est en lecture — compte d'ordinateur, réponse réseau,
