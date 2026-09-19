@@ -73,7 +73,13 @@ param(
     # Ne fait QUE les contrôles en lecture : compte d'ordinateur, réponse réseau,
     # partage administratif, gestion à distance. Ni réveil, ni copie, ni
     # installation, ni mise en parc. Et aucune question posée.
-    [switch]$VerifierSeulement
+    [switch]$VerifierSeulement,
+
+    # Liste de postes lue dans un fichier, un nom par ligne. Alternative à -Poste
+    # quand il y en a beaucoup : une ligne de commande Windows a une longueur
+    # maximale, et quelques centaines de noms la dépassent. L'échec n'arriverait
+    # pas au moment où on le comprendrait, mais le jour où le parc a grossi.
+    [string]$FichierPostes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -235,6 +241,34 @@ function Initialize-Parametres {
             catch { Alerte "Enregistrement impossible : $($_.Exception.Message)" }
         }
         else { Alerte 'Rien n''a été enregistré.' }
+    }
+}
+
+<#
+    LA LISTE DE POSTES, LUE DANS UN FICHIER.
+
+    Format volontairement pauvre : un nom par ligne, « # » commence un commentaire,
+    les lignes vides sont ignorées. Il se relit à l'œil et se corrige dans le
+    Bloc-notes. La console l'écrit en ASCII pur — les noms de poste n'ont ni accent
+    ni espace — si bien que la question de l'encodage ne se pose pas.
+
+    UN FICHIER INTROUVABLE OU ILLISIBLE NE REND PAS UNE LISTE VIDE EN SILENCE : il
+    le dit. Une liste vide et une liste qu'on n'a pas pu lire ne veulent pas dire la
+    même chose, et seule la première autorise à conclure qu'il n'y a rien à faire.
+#>
+function Get-PostesDuFichier([string]$chemin) {
+    if (-not (Test-Path $chemin)) {
+        Grave "Liste de postes introuvable : $chemin"
+        return @()
+    }
+    try {
+        return @(Get-Content $chemin -Encoding UTF8 -ErrorAction Stop |
+                 ForEach-Object { ($_ -split '#')[0].Trim() } |
+                 Where-Object { $_ })
+    }
+    catch {
+        Grave "Liste de postes illisible : $($_.Exception.Message)"
+        return @()
     }
 }
 
@@ -883,7 +917,15 @@ function Invoke-Session {
     Write-Host "  Journal de cette exécution : $journal"
     if ($script:cheminJson) { Write-Host "  Journal JSON : $script:cheminJson" }
 
-    if (-not $Poste) {
+    # Le fichier prime sur la saisie, et la saisie n'est proposée que s'il n'y a
+    # ni -Poste ni -FichierPostes : c'est ce qui permet de piloter le script sans
+    # personne devant.
+    if (-not $Poste -and $FichierPostes) {
+        $Poste = Get-PostesDuFichier $FichierPostes
+        if ($Poste) { Write-Host "  $($Poste.Count) poste(s) lu(s) dans $FichierPostes" }
+    }
+
+    if (-not $Poste -and -not $FichierPostes) {
         $saisie = Read-Host 'Nom du ou des postes, séparés par une virgule (ex. PC-1, PC-2)'
         $Poste = $saisie -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
     }
