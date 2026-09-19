@@ -373,6 +373,37 @@ public static class L
         "Triggers a full scan on the selected machine then opens its HTML report. Can take several minutes.");
     public static string ParkOpenReport => Lang.T("📄 Ouvrir le dernier rapport", "📄 Open the last report");
 
+    // ------------------------------------------------- onglet Inventaire (point 64, lot A-3)
+    public static string ParkTabMonitoring => Lang.T("📡  Supervision", "📡  Monitoring");
+    public static string ParkTabInventory => Lang.T("🗂  Inventaire", "🗂  Inventory");
+    public static string ParkInvIntro => Lang.T(
+        "Cet onglet ne contacte aucune machine : il lit l'annuaire, la liste de la console et le fichier postes.csv, puis les rapproche. Il dit quels postes EXISTENT, pas lesquels vont bien.",
+        "This tab contacts no machine: it reads the directory, the console list and the postes.csv file, then matches them up. It says which computers EXIST, not which ones are healthy.");
+    public static string ParkInvOuLabel => Lang.T("Unité d'organisation :", "Organizational unit:");
+    public static string ParkInvOuTip => Lang.T(
+        "Laisser vide interroge la racine du domaine, découverte toute seule — c'est ce qu'il faut dans la plupart des cas. Sinon, un nom distinctif complet, par exemple OU=Postes,DC=exemple,DC=fr.",
+        "Leave empty to query the domain root, discovered on its own — that is what most setups need. Otherwise, a full distinguished name, for example OU=Computers,DC=example,DC=com.");
+    public static string ParkInvPickLabel => Lang.T("Ou choisir dans l'annuaire :", "Or pick from the directory:");
+    public static string ParkInvPickTip => Lang.T(
+        "Choisir ici remplit le champ du dessus avec le chemin exact, ce qui évite les fautes de frappe — une virgule oubliée dans un nom d'unité rend une liste vide sans aucune erreur.",
+        "Picking here fills the field above with the exact path, which avoids typing mistakes — a missed comma in a unit name returns an empty list with no error at all.");
+    public static string ParkInvListUnits => Lang.T("📋 Lister mes unités", "📋 List my units");
+    public static string ParkInvListUnitsTip => Lang.T(
+        "Interroge l'annuaire pour lister les unités d'organisation du domaine. Lecture seule, avec le compte qui a lancé le logiciel : aucun mot de passe n'est demandé.",
+        "Queries the directory for the domain's organizational units. Read-only, using the account that started the software: no password is asked for.");
+    public static string ParkInvRefresh => Lang.T("🔄 Actualiser l'inventaire", "🔄 Refresh the inventory");
+    public static string ParkInvRefreshTip => Lang.T(
+        "Relit les trois sources et reconstruit la liste. Aucune machine n'est contactée, et rien n'est écrit dans l'annuaire.",
+        "Re-reads the three sources and rebuilds the list. No machine is contacted, and nothing is written to the directory.");
+    public static string ParkInvColSources => Lang.T("Vu par", "Seen by");
+    public static string ParkInvColUnit => Lang.T("Unité d'organisation", "Organizational unit");
+    public static string ParkInvColLastLogon => Lang.T("Dernière session", "Last logon");
+    public static string ParkInvColAccount => Lang.T("Compte", "Account");
+    public static string ParkInvColMac => Lang.T("MAC connue", "MAC known");
+    public static string ParkInvHint => Lang.T(
+        "Renseigner l'unité d'organisation si besoin, puis actualiser. La date de dernière session vient de l'annuaire : elle n'est répliquée que tous les neuf à quatorze jours, elle est donc APPROXIMATIVE par construction — elle répond à « ce poste a-t-il été vu ce mois-ci », jamais à « ce poste est-il allumé ».",
+        "Set the organizational unit if needed, then refresh. The last logon date comes from the directory: it is replicated only every nine to fourteen days, so it is APPROXIMATE by design — it answers “has this computer been seen this month”, never “is this computer on”.");
+
     // ---------------------------------------------------------------- mises à jour Windows
     public static string WuTitle => Lang.T("FaultTracePC — Mises à jour Windows (optionnelles et pilotes inclus)",
                                            "FaultTracePC — Windows updates (optional and drivers included)");

@@ -48,6 +48,19 @@ remote.json
 alerts.json
 *.jsonl
 
+# Réglages de la console de parc (parametres.json). Ce fichier ne contient
+# AUCUN secret — c'est une décision tenue, et un test la vérifie. Mais le nom
+# distinctif de l'unité d'organisation porte le domaine et les noms d'unités
+# RÉELS de l'établissement, ce qui n'a pas sa place dans un dépôt public.
+# Ajouté le 19/09/2026 : le fichier venait d'apparaître, ni suivi ni ignoré,
+# donc à un « git add . » près d'être publié.
+parametres.json
+
+# Annuaire d'adresses MAC lu par la console de parc : noms de machines et
+# adresses MAC réelles. Le motif vaut à toute profondeur, donc aussi pour la
+# copie écrite par le script de déploiement à côté de lui.
+postes.csv
+
 # Dumps éventuellement copiés pour analyse
 *.dmp
 
