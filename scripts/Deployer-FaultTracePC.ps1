@@ -1,7 +1,16 @@
 ﻿<#
     Déploiement de FaultTracePC sur un ou plusieurs postes distants.
-    Version 1.1 — 5 septembre 2026. Licence MIT, sans garantie.
+    Version 1.3 — NON PUBLIÉE. 19 septembre 2026. Licence MIT, sans garantie.
     https://palisser.fr — https://github.com/cry-stof-qq/FaultTracePC
+
+    CETTE COPIE N'EST PAS CELLE DE PALISSER.FR. La version publiée dans
+    l'article 34 est la 1.2 ; celle-ci voyage avec FaultTracePC et lui ajoute le
+    journal JSON, le mode « vérifier seulement » et la liste de postes lue dans
+    un fichier — trois paramètres optionnels qui ne changent rien pour qui lance
+    le script à la main. Elle remplacera la 1.2 sur palisser.fr après le premier
+    déploiement réel. Le numéro est écrit ici pour qu'on ne puisse plus prendre
+    les deux fichiers l'un pour l'autre : ils ont porté le même pendant deux
+    semaines, et c'est exactement ainsi que deux copies divergent en silence.
 
     Le script se trouve tout seul ($PSScriptRoot) : il fonctionne depuis
     n'importe quel dossier, y compris une clé USB.
