@@ -26,7 +26,9 @@ public partial class ParkWindow
     /// mille lignes : le même délai couperait la lecture en plein milieu, et
     /// l'erreur ressemblerait à un poste injoignable.
     /// </summary>
-    private static readonly HttpClient BoiteNoireHttp = new() { Timeout = TimeSpan.FromSeconds(30) };
+    // Sans proxy, comme les autres clients de la console : voir ClientDirect
+    // dans ParkWindow.xaml.cs.
+    private static readonly HttpClient BoiteNoireHttp = ClientDirect(TimeSpan.FromSeconds(30));
 
     private void BtnBoiteNoire_Click(object sender, RoutedEventArgs e)
     {

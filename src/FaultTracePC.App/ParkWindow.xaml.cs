@@ -17,10 +17,35 @@ public partial class ParkWindow : Window
     private static string ParkFile => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC", "parc.json");
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(4) };
+    /// <summary>
+    /// Client HTTP qui parle DIRECTEMENT au poste, sans passer par le proxy web
+    /// du système.
+    ///
+    /// POURQUOI C'EST NÉCESSAIRE
+    /// Par défaut, .NET envoie toute requête HTTP dans le proxy déclaré par
+    /// Windows. C'est ce qu'il faut pour aller sur Internet ; c'est absurde pour
+    /// joindre une machine du réseau local par son nom ou son adresse privée. Le
+    /// proxy refait alors la requête à notre place — et un proxy ne recopie pas
+    /// forcément les en-têtes qu'il ne connaît pas. Or toute l'authentification
+    /// tient dans trois en-têtes maison : horodatage, nonce, signature. Perdus en
+    /// route, le poste répond « 403 » et la console conclut à un mauvais jeton.
+    ///
+    /// Le symptôme est déroutant parce qu'il dépend de l'ENDROIT d'où l'on se
+    /// connecte : sur le réseau de l'établissement, le proxy est souvent contourné
+    /// pour les adresses locales et tout fonctionne ; par VPN, la même console
+    /// refuse tous les postes. Ce n'est ni le secret, ni le nom, ni l'horloge —
+    /// aucun des trois ne dépend du chemin réseau.
+    ///
+    /// Constaté le 19/09/2026. Le déploiement, lui, n'était pas concerné : SMB,
+    /// WinRM et le test de port ne passent jamais par un proxy web.
+    /// </summary>
+    private static HttpClient ClientDirect(TimeSpan delai) =>
+        new(new HttpClientHandler { UseProxy = false }) { Timeout = delai };
+
+    private static readonly HttpClient Http = ClientDirect(TimeSpan.FromSeconds(4));
 
     /// <summary>Client dédié aux diagnostics distants : un scan complet peut durer plusieurs minutes.</summary>
-    private static readonly HttpClient ScanHttp = new() { Timeout = TimeSpan.FromMinutes(15) };
+    private static readonly HttpClient ScanHttp = ClientDirect(TimeSpan.FromMinutes(15));
 
     private List<ParkMachine> _machines = new();
 
@@ -373,6 +398,13 @@ public partial class ParkWindow : Window
         public List<PreventiveAlert> Alerts { get; init; } = new();
 
         /// <summary>
+        /// Explication longue, montrée au survol de la ligne. La colonne « État »
+        /// fait 150 pixels : une phrase qui dit vraiment quoi faire n'y tient pas,
+        /// et la tronquer reviendrait à ne rien dire.
+        /// </summary>
+        public string Aide { get; init; } = "";
+
+        /// <summary>
         /// Version du poste, telle qu'il l'annonce. Vide si le client est antérieur
         /// à la 1.2.2 : le champ n'existait pas, ce n'est pas une erreur.
         /// </summary>
@@ -408,10 +440,32 @@ public partial class ParkWindow : Window
             using var req = premiere;
             using var resp = await Http.SendAsync(req);
             if (!resp.IsSuccessStatusCode)
-                return new(m, false, false, null, resp.StatusCode == System.Net.HttpStatusCode.Forbidden
-                    // Le nom entre dans le calcul du jeton : un libellé de fantaisie
-                    // à la place du nom Windows produit exactement ce refus.
-                    ? Lang.T("refusé (jeton, nom Windows ou horloge décalée ?)", "refused (token, Windows name or clock skew?)") : $"HTTP {(int)resp.StatusCode}");
+            {
+                if (resp.StatusCode != System.Net.HttpStatusCode.Forbidden)
+                    return new(m, false, false, null, $"HTTP {(int)resp.StatusCode}");
+
+                // LE SERVICE RÉPOND « 403 » POUR DEUX RAISONS TRÈS DIFFÉRENTES —
+                // adresse source refusée, ou signature refusée — et il répond la
+                // même chose dans les deux cas, délibérément : en dire plus à un
+                // appelant non authentifié, ce serait le renseigner. La console ne
+                // peut donc pas trancher. Elle nomme les causes, dans l'ordre où
+                // elles se produisent en vrai, plutôt que d'en désigner une seule.
+                return new(m, false, false, null, Lang.T("refusé (403)", "refused (403)"))
+                {
+                    Aide = Lang.T(
+                        "Le poste répond mais refuse la requête. Quatre causes possibles, de la plus fréquente à la plus rare :\n\n"
+                      + "1. LE SECRET MAÎTRE de cette console n'est pas celui avec lequel le poste a été configuré. C'est le cas le plus courant : le jeton se calcule à partir du secret, les deux doivent être identiques au caractère près.\n\n"
+                      + "2. LE NOM ne correspond pas. Le jeton se calcule aussi à partir du nom Windows du poste : un libellé de fantaisie dans la colonne « Machine » produit exactement ce refus. La casse, elle, n'a pas d'importance.\n\n"
+                      + "3. L'ADRESSE SOURCE est refusée. Le service n'accepte que la boucle locale et les plages privées (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).\n\n"
+                      + "4. LES HORLOGES sont décalées de plus de 5 minutes entre cette console et le poste.",
+
+                        "The computer answers but refuses the request. Four possible causes, from the most frequent to the rarest:\n\n"
+                      + "1. THE MASTER SECRET of this console is not the one the computer was configured with. This is the most common case: the token is derived from the secret, and both must match character for character.\n\n"
+                      + "2. THE NAME does not match. The token is also derived from the computer's Windows name: a made-up label in the “Machine” column produces exactly this refusal. Case, however, does not matter.\n\n"
+                      + "3. THE SOURCE ADDRESS is refused. The service accepts only loopback and the private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).\n\n"
+                      + "4. THE CLOCKS differ by more than 5 minutes between this console and the computer."),
+                };
+            }
 
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
             bool active = doc.RootElement.TryGetProperty("active", out var a) && a.GetBoolean();
@@ -465,6 +519,9 @@ public partial class ParkWindow : Window
         /// <summary>Version du poste, comparée à celle de cette console.</summary>
         public string Version { get; set; } = "";
 
+        /// <summary>Explication longue montrée au survol de la ligne.</summary>
+        public string Aide { get; set; } = "";
+
         /// <summary>
         /// Alertes archivées sur 90 jours — point 43. Un TEXTE et pas un nombre :
         /// la colonne doit pouvoir écrire « — » quand il n'y a rien, et rappeler
@@ -502,14 +559,19 @@ public partial class ParkWindow : Window
         LvMachines.ItemsSource = _machines.Select(m =>
         {
             var r = results is not null && results.TryGetValue(m, out var q) ? q : null;
+
+            var etat = r is null ? Lang.T("— pas encore interrogée", "— not queried yet")
+                     : !r.Ok ? $"🔴 {r.Error}"
+                     : r.Active ? Lang.T("🟢 surveillance active", "🟢 monitoring active")
+                     : Lang.T("🟠 joignable, surveillance arrêtée", "🟠 reachable, monitoring stopped");
+
             return new Row
             {
                 Name = m.Name,
                 Host = $"{m.Host}:{m.Port}",
-                Etat = r is null ? "—"
-                     : !r.Ok ? $"🔴 {r.Error}"
-                     : r.Active ? Lang.T("🟢 surveillance active", "🟢 monitoring active")
-                     : Lang.T("🟠 joignable, surveillance arrêtée", "🟠 reachable, monitoring stopped"),
+                // La colonne reste courte ; c'est « etat » qui est repris au survol
+                // quand il n'y a pas d'explication plus longue à donner.
+                Etat = r is null ? "—" : etat,
                 DernierReleve = r?.Last?.Time is { } rt ? Lang.ShortDateSecond(rt) : "",
                 Cpu = r?.Last?.CpuLoad?.ToString("0.#") ?? "",
                 TempCpu = r?.Last?.CpuTemp is { } ct ? $"{ct:0.#} °C" : "",
@@ -518,6 +580,10 @@ public partial class ParkWindow : Window
                 Top = r?.Last?.TopProcesses ?? "",
                 Version = DescribeVersion(r),
                 Alertes90 = LibelleAlertes90(m.Name),
+                // LE SURVOL N'EST JAMAIS VIDE. À défaut d'explication particulière,
+                // il reprend l'état complet — la colonne est étroite, et une bulle
+                // d'aide vide est une petite boîte blanche qui n'apprend rien.
+                Aide = !string.IsNullOrEmpty(r?.Aide) ? r!.Aide : etat,
             };
         }).ToList();
     }

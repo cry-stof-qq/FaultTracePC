@@ -66,6 +66,19 @@
                 </Border>
 
                 <ListView x:Name="LvMachines" Grid.Row="1" Margin="0,10" BorderThickness="1" BorderBrush="#DBE2EC" FontSize="12">
+                    <!-- LE SURVOL DIT CE QUE LA COLONNE NE PEUT PAS DIRE. « État » fait
+                         150 pixels ; un refus a quatre causes possibles, et les nommer
+                         demande un paragraphe. Le tronquer reviendrait a ne rien dire. -->
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="ToolTip" Value="{Binding Aide}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Aide}" Value="">
+                                    <Setter Property="ToolTip" Value="{x:Null}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.ItemContainerStyle>
                     <ListView.View>
                         <GridView>
                             <!-- LES LARGEURS ONT ÉTÉ RESSERRÉES pour loger « Alertes 90 j »
