@@ -152,7 +152,8 @@ public sealed class TelemetryService : BackgroundService
             // Verrou 1 : adresse source privée ou locale uniquement.
             if (!RemoteConfig.IsPrivateOrLoopback(ctx.Request.RemoteEndPoint?.Address))
             {
-                Deny(ctx); return;
+                Deny(ctx, MotifAdresse, ctx.Request.RemoteEndPoint?.Address);
+                return;
             }
             // Verrou 2 : signature HMAC de la requête. Le secret ne circule jamais,
             // et l'horodatage + le nonce interdisent de rejouer une requête capturée.
@@ -166,7 +167,7 @@ public sealed class TelemetryService : BackgroundService
                 ctx.Request.Headers[RemoteConfig.HeaderNonce],
                 ctx.Request.Headers[RemoteConfig.HeaderSignature],
                 IsNonceFresh);
-            if (!ok) { Deny(ctx); return; }
+            if (!ok) { Deny(ctx, MotifSignature, ctx.Request.RemoteEndPoint?.Address); return; }
 
             switch (ctx.Request.Url?.AbsolutePath.ToLowerInvariant())
             {
@@ -420,11 +421,64 @@ public sealed class TelemetryService : BackgroundService
         ctx.Response.Close();
     }
 
-    private static void Deny(HttpListenerContext ctx)
+    // Codes écrits dans erreurs.log : invariants, jamais affichés à un utilisateur.
+    private const string MotifAdresse = "adresse-source-refusee";     // pas-de-traduction : code de journal
+    private const string MotifSignature = "signature-refusee";        // pas-de-traduction : code de journal
+
+    /// <summary>Dernier refus journalisé, pour ne pas écrire mille fois la même ligne.</summary>
+    private static (string Motif, string Adresse, DateTime Quand) _dernierRefus = ("", "", DateTime.MinValue);
+
+    private static readonly TimeSpan SilenceEntreRefusIdentiques = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Refuse la requête — et ÉCRIT POURQUOI.
+    ///
+    /// LA RÉPONSE RESTE LA MÊME POUR LES DEUX VERROUS, délibérément : en dire
+    /// plus à un appelant qui ne s'est pas authentifié, ce serait le renseigner.
+    /// Mais l'administrateur, lui, est devant la machine — ou peut lire son
+    /// journal à distance. Ne rien écrire du tout ne protégeait personne : ça
+    /// rendait seulement le diagnostic impossible.
+    ///
+    /// CE QUE ÇA A COÛTÉ. Le 19/09/2026, la console refusait un poste par VPN et
+    /// fonctionnait depuis l'établissement. Quatre causes possibles, aucun moyen
+    /// de savoir laquelle : une soirée entière à éliminer des hypothèses une par
+    /// une, dont deux fausses. Une ligne dans ce fichier aurait répondu en dix
+    /// secondes.
+    ///
+    /// L'ADRESSE EST ÉCRITE, ET C'EST LE POINT. « Signature refusée » dit quoi
+    /// chercher ; « adresse refusée, vue depuis 10.212.134.200 » dit AUSSI quelle
+    /// adresse le poste a réellement vue — ce qu'aucune mesure prise depuis la
+    /// console ne peut établir, puisque le chemin peut la traduire.
+    ///
+    /// UNE MINUTE DE SILENCE ENTRE DEUX REFUS IDENTIQUES : un scanner de ports ou
+    /// une console laissée en actualisation automatique rempliraient sinon le
+    /// journal de la même ligne, et noieraient ce qu'on y cherche.
+    /// </summary>
+    private static void Deny(HttpListenerContext ctx, string motif, System.Net.IPAddress? source)
     {
         ctx.Response.StatusCode = 403;
         ctx.Response.Close();
+
+        try
+        {
+            var adresse = source?.ToString() ?? "?";   // pas-de-traduction : valeur, pas phrase
+            var maintenant = DateTime.Now;
+
+            lock (VerrouRefus)
+            {
+                if (_dernierRefus.Motif == motif && _dernierRefus.Adresse == adresse &&
+                    maintenant - _dernierRefus.Quand < SilenceEntreRefusIdentiques)
+                    return;
+
+                _dernierRefus = (motif, adresse, maintenant);
+            }
+
+            ErrorLog.Write("TelemetryService", $"403 {motif} source={adresse}");   // pas-de-traduction : ligne de journal
+        }
+        catch { /* un journal qui échoue ne doit pas empêcher de répondre */ }
     }
+
+    private static readonly object VerrouRefus = new();
 
     private static void NotFound(HttpListenerContext ctx)
     {
