@@ -405,6 +405,13 @@ public static class L
     public static string ParkInvColLastLogon => Lang.T("Dernière session", "Last logon");
     public static string ParkInvColAccount => Lang.T("Compte", "Account");
     public static string ParkInvColMac => Lang.T("MAC connue", "MAC known");
+    public static string ParkInvColCheck => Lang.T("Vérification", "Check");
+    public static string ParkInvCheckAll => Lang.T("Tout cocher", "Tick all");
+    public static string ParkInvUncheckAll => Lang.T("Tout décocher", "Untick all");
+    public static string ParkInvVerify => Lang.T("\U0001F50E Vérifier la sélection", "\U0001F50E Check the selection");
+    public static string ParkInvVerifyTip => Lang.T(
+        "Contrôle, pour chaque poste coché, qu'il est prêt à recevoir le paquet : compte d'ordinateur, réponse réseau, partage administratif et gestion à distance. AUCUNE MACHINE N'EST MODIFIÉE — ni copie, ni installation, ni réveil réseau.",
+        "Checks, for each ticked computer, that it is ready to receive the package: computer account, network answer, administrative share and remote management. NO MACHINE IS MODIFIED — no copy, no install, no wake-on-LAN.");
     public static string ParkInvHint => Lang.T(
         "Renseigner l'unité d'organisation si besoin, puis actualiser. La date de dernière session vient de l'annuaire : elle n'est répliquée que tous les neuf à quatorze jours, elle est donc APPROXIMATIVE par construction — elle répond à « ce poste a-t-il été vu ce mois-ci », jamais à « ce poste est-il allumé ».",
         "Set the organizational unit if needed, then refresh. The last logon date comes from the directory: it is replicated only every nine to fourteen days, so it is APPROXIMATE by design — it answers “has this computer been seen this month”, never “is this computer on”.");

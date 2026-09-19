@@ -83,6 +83,30 @@ public class LancementPowerShellTests
     }
 
     [Fact]
+    public void La_pause_inconditionnelle_est_un_vrai_appel_et_pas_des_accolades_orphelines()
+    {
+        // LE DÉFAUT DU 19/09/2026. « finally { { Read-Host } } » est accepté par
+        // PowerShell : les accolades y créent un OBJET représentant du code, qui est
+        // aussitôt jeté. Rien n'est demandé, la fenêtre se referme, et aucune erreur
+        // n'est levée — c'est ce qui rend la faute invisible à la relecture.
+        var ligne = PowerShellLauncher.ArgumentsForScript(@"C:\x\y.ps1", Pause, null, pauseTousLesCas: true);
+
+        Assert.Contains("finally { Read-Host ", ligne);
+        Assert.DoesNotContain("{ { ", ligne);
+        Assert.DoesNotContain("-not $fini", ligne);
+    }
+
+    [Fact]
+    public void La_pause_conditionnelle_reste_conditionnelle()
+    {
+        // L'autre forme ne doit pas bouger : les boutons de réparation s'appuient
+        // dessus, et leur script pose DÉJÀ sa propre invite de fin.
+        var ligne = PowerShellLauncher.ArgumentsForScript(@"C:\x\y.ps1", Pause, null);
+
+        Assert.Contains("finally { if (-not $fini) { Read-Host ", ligne);
+    }
+
+    [Fact]
     public void Sans_parametre_la_ligne_est_celle_d_avant()
     {
         // Non-régression : l'ancienne surcharge est maintenant un appel à la

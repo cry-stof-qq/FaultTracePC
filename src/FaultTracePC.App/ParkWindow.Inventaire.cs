@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -36,7 +38,7 @@ public partial class ParkWindow
     /// l'interface : le modèle du noyau porte des dates et des booléens, pas des
     /// phrases.
     /// </summary>
-    private sealed class LigneInventaire
+    private sealed class LigneInventaire : INotifyPropertyChanged
     {
         public string Nom { get; init; } = "";
         public string Sources { get; init; } = "";
@@ -45,7 +47,36 @@ public partial class ParkWindow
         public string DerniereSession { get; init; } = "";
         public string Compte { get; init; } = "";
         public string Mac { get; init; } = "";
+
+        // CES DEUX-LÀ CHANGENT APRÈS COUP, les autres jamais. Sans
+        // INotifyPropertyChanged, cocher une case à la main marcherait, mais
+        // « Tout cocher » ne se verrait pas à l'écran : la liaison ne saurait pas
+        // que la valeur a bougé.
+        private bool _coche;
+        public bool Coche
+        {
+            get => _coche;
+            set { if (_coche != value) { _coche = value; Prevenir(nameof(Coche)); } }
+        }
+
+        private string _etat = "";
+        public string Etat
+        {
+            get => _etat;
+            set { if (_etat != value) { _etat = value; Prevenir(nameof(Etat)); } }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void Prevenir(string nom) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nom));
     }
+
+    /// <summary>
+    /// Plafond par vérification. Ce n'est pas une limite technique : c'est le
+    /// nombre au-delà duquel on ne sait plus ce qu'on a lancé. Chaque poste ouvre
+    /// plusieurs connexions réseau, et une vérification de tout un parc d'un seul
+    /// clic est une décision qui mérite d'être prise en plusieurs fois.
+    /// </summary>
+    private const int MaxParVerification = 100;
 
     /// <summary>Empêche deux interrogations simultanées de l'annuaire.</summary>
     private bool _inventaireOccupe;
@@ -212,6 +243,200 @@ public partial class ParkWindow
                              " The organizational unit could not be saved: it will have to be typed again next time.");
 
         TxtInvStatus.Text = AvecNotes(resume, notes);
+    }
+
+    // ------------------------------------------------------------------
+    // Vérifier la sélection — point 64, lot B
+    // ------------------------------------------------------------------
+
+    private IEnumerable<LigneInventaire> LignesAffichees() =>
+        LvInventaire.ItemsSource as IEnumerable<LigneInventaire> ?? [];
+
+    private void BtnInvToutCocher_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var l in LignesAffichees()) l.Coche = true;
+    }
+
+    private void BtnInvRienCocher_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var l in LignesAffichees()) l.Coche = false;
+    }
+
+    private async void BtnInvVerifier_Click(object sender, RoutedEventArgs e)
+    {
+        if (_inventaireOccupe) return;
+
+        var choisis = LignesAffichees().Where(l => l.Coche).ToList();
+
+        // AUCUNE CASE N'EST COCHÉE AU DÉPART, ET RIEN NE LES COCHE TOUT SEUL.
+        // Un bouton qui agit sur « tout » par défaut finit par agir sur tout un
+        // jour où on ne le voulait pas.
+        if (choisis.Count == 0)
+        {
+            TxtInvStatus.Text = Lang.T("Aucun poste coché : rien à vérifier.",
+                                       "No computer ticked: nothing to check.");
+            return;
+        }
+
+        if (choisis.Count > MaxParVerification)
+        {
+            TxtInvStatus.Text = Lang.T(
+                $"{choisis.Count} postes cochés, le maximum est de {MaxParVerification} par vérification. En décocher, ou procéder en plusieurs fois.",
+                $"{choisis.Count} computers ticked, the maximum is {MaxParVerification} per check. Untick some, or work in several passes.");
+            return;
+        }
+
+        // LA STRATÉGIE D'EXÉCUTION AVANT DE LANCER QUOI QUE CE SOIT.
+        // Une stratégie de groupe qui interdit les scripts refuse le fichier avant
+        // sa première ligne, et la fenêtre se referme trop vite pour être lue. Ce
+        // logiciel ne contourne pas ce réglage : il le constate et le nomme.
+        var politique = PowerShellPolicy.Read(TimeSpan.FromSeconds(8));
+        if (politique is { Blocked: true })
+        {
+            MessageBox.Show(this,
+                Lang.T($"La vérification ne peut pas démarrer : une stratégie de groupe interdit l'exécution de scripts sur ce poste ({politique.Scope} = {politique.Policy}).",
+                       $"The check cannot start: a Group Policy forbids running scripts on this machine ({politique.Scope} = {politique.Policy}).")
+                + "\n\n"
+                + Lang.T("Ce réglage vient de l'administration du parc, et FaultTracePC ne le contourne pas — volontairement.",
+                         "This setting comes from your fleet administration, and FaultTracePC does not work around it — deliberately."),
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        // On annonce ce qu'on va faire AVANT de le faire, et on dit aussi ce qu'on
+        // ne fera pas : c'est la moitié la plus importante de la phrase.
+        var confirmation = MessageBox.Show(this,
+            Lang.T($"Vérifier {choisis.Count} poste(s) ?", $"Check {choisis.Count} computer(s)?")
+            + "\n\n"
+            + Lang.T("Aucune machine ne sera modifiée : ni copie, ni installation, ni réveil réseau. Le logiciel lit seulement le compte d'ordinateur, la réponse réseau, le partage administratif et la gestion à distance.",
+                     "No machine will be modified: no copy, no install, no wake-on-LAN. The software only reads the computer account, the network answer, the administrative share and remote management."),
+            "FaultTracePC", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        OccuperInventaire(true, Lang.T(
+            $"Vérification de {choisis.Count} poste(s) en cours — le résultat s'affichera ici quand tu auras fermé la fenêtre PowerShell.",
+            $"Checking {choisis.Count} computer(s) — the result will appear here once you close the PowerShell window."));
+        try
+        {
+            var dossier = ScriptDeDeploiement.DossierParDefaut;
+            var script = ScriptDeDeploiement.Extraire(dossier);
+
+            var ecartes = new List<string>();
+            var listeDesPostes = Path.Combine(dossier, "postes-a-verifier.txt");
+            int retenus = ListeDePostes.Ecrire(listeDesPostes, choisis.Select(l => l.Nom), ecartes);
+
+            if (retenus == 0)
+            {
+                TxtInvStatus.Text = Lang.T("Aucun nom de poste exploitable dans la sélection.",
+                                           "No usable computer name in the selection.");
+                return;
+            }
+
+            // UN JOURNAL PAR EXÉCUTION, JAMAIS ÉCRASÉ. On ne supprime rien : les
+            // journaux précédents servent à comparer, et c'est aussi ce sur quoi
+            // le lot D s'appuiera pour reprendre les seuls postes en échec.
+            var journal = Path.Combine(dossier, $"verification_{DateTime.Now:yyyy-MM-dd_HHmmss}.jsonl");
+
+            foreach (var l in choisis) l.Etat = Lang.T("en cours…", "checking…");
+
+            // LA FENÊTRE ATTEND UNE TOUCHE, MÊME QUAND TOUT VA BIEN.
+            // Le déroulé d'une vérification EST le résultat : une fenêtre qui se
+            // ferme d'elle-même sur un succès ne laisse rien à lire.
+            var arguments = PowerShellLauncher.ArgumentsForScript(script, L.PsClose,
+            [
+                new("FichierPostes", listeDesPostes),
+                new("VerifierSeulement", null),
+                new("SortieJson", journal),
+            ],
+            pauseTousLesCas: true);
+
+            using var processus = Process.Start(new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = arguments,
+                UseShellExecute = true,
+            });
+
+            if (processus is null)
+            {
+                TxtInvStatus.Text = Lang.T("PowerShell n'a pas pu être lancé.", "PowerShell could not be started.");
+                return;
+            }
+
+            await processus.WaitForExitAsync();
+
+            var lecture = ParkDeployment.Lire(journal);
+            foreach (var l in choisis) l.Etat = EtatDuPoste(lecture, l.Nom);
+
+            TxtInvStatus.Text = ResumeDeVerification(lecture, choisis.Count, ecartes, journal);
+        }
+        catch (Exception ex)
+        {
+            TxtInvStatus.Text = Lang.T($"Vérification impossible : {ex.Message}",
+                                       $"Check failed: {ex.Message}");
+        }
+        finally
+        {
+            OccuperInventaire(false, null);
+        }
+    }
+
+    /// <summary>
+    /// Ce que le journal dit d'UN poste. « Aucune trace » n'est pas « tout va
+    /// bien » : c'est un poste que le script n'a pas atteint, et il faut le dire.
+    /// </summary>
+    private static string EtatDuPoste(LectureDuJournal lecture, string nom)
+    {
+        var lignes = lecture.Lignes.Where(l => string.Equals(l.Poste, nom, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (lignes.Count == 0) return Lang.T("aucune trace", "no trace");
+
+        var echec = lignes.FirstOrDefault(l => l.EstEchec);
+        if (echec is not null)
+            return Lang.T($"échec : {LibelleEtape(echec.Etape)}", $"failed: {LibelleEtape(echec.Etape)}");
+
+        bool gestionOk = lignes.Any(l =>
+            string.Equals(l.Etape, ParkDeployment.EtapeGestionADistance, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(l.Etat, ParkDeployment.EtatOk, StringComparison.OrdinalIgnoreCase));
+
+        return gestionOk
+            ? Lang.T("prêt à recevoir le paquet", "ready for the package")
+            : Lang.T("vérifié en partie", "partly checked");
+    }
+
+    private static string LibelleEtape(string etape) => etape switch
+    {
+        ParkDeployment.EtapeCompte => Lang.T("compte d'ordinateur", "computer account"),
+        ParkDeployment.EtapeReponse => Lang.T("pas de réponse réseau", "no network answer"),
+        ParkDeployment.EtapePartageAdmin => Lang.T("partage administratif", "administrative share"),
+        ParkDeployment.EtapeGestionADistance => Lang.T("gestion à distance", "remote management"),
+        ParkDeployment.EtapeReveil => Lang.T("réveil réseau", "wake-on-LAN"),
+        _ => etape,
+    };
+
+    private static string ResumeDeVerification(
+        LectureDuJournal lecture, int demandes, List<string> ecartes, string journal)
+    {
+        int prets = lecture.Postes.Count(p => lecture.Lignes.Any(l =>
+            string.Equals(l.Poste, p, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(l.Etape, ParkDeployment.EtapeGestionADistance, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(l.Etat, ParkDeployment.EtatOk, StringComparison.OrdinalIgnoreCase)));
+
+        var resume = Lang.T(
+            $"{demandes} poste(s) demandé(s), {lecture.Postes.Count} vu(s) dans le journal, {prets} prêt(s). Aucune machine n'a été modifiée.",
+            $"{demandes} computer(s) requested, {lecture.Postes.Count} seen in the journal, {prets} ready. No machine was modified.");
+
+        if (ecartes.Count > 0)
+            resume += Lang.T($" {ecartes.Count} nom(s) écarté(s) : {string.Join(", ", ecartes)}.",
+                             $" {ecartes.Count} name(s) set aside: {string.Join(", ", ecartes)}.");
+
+        if (lecture.FichierAbsent)
+            resume += Lang.T(" Le journal n'a pas été écrit : le script ne l'a peut-être pas atteint.",
+                             " The journal was not written: the script may not have reached it.");
+
+        foreach (var note in lecture.Notes) resume += " " + note;
+
+        return resume + Lang.T($" Journal : {journal}", $" Journal: {journal}");
     }
 
     // ------------------------------------------------------------------

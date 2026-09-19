@@ -154,6 +154,16 @@
                           BorderBrush="#DBE2EC" FontSize="12">
                     <ListView.View>
                         <GridView>
+                            <!-- AUCUNE CASE N'EST COCHEE AU DEPART : c'est une decision,
+                                 pas un oubli. Voir ParkWindow.Inventaire.cs. -->
+                            <GridViewColumn Width="34">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding Coche, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
                             <GridViewColumn Header="{x:Static loc:L.ParkColMachine}" Width="130" DisplayMemberBinding="{Binding Nom}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkInvColSources}" Width="130" DisplayMemberBinding="{Binding Sources}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkColHost}" Width="150" DisplayMemberBinding="{Binding Hote}"/>
@@ -161,13 +171,34 @@
                             <GridViewColumn Header="{x:Static loc:L.ParkInvColLastLogon}" Width="120" DisplayMemberBinding="{Binding DerniereSession}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkInvColAccount}" Width="100" DisplayMemberBinding="{Binding Compte}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkInvColMac}" Width="90" DisplayMemberBinding="{Binding Mac}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkInvColCheck}" Width="200" DisplayMemberBinding="{Binding Etat}"/>
                         </GridView>
                     </ListView.View>
                 </ListView>
 
                 <Border Grid.Row="2" Background="#EDF1F6" Padding="14,8">
-                    <TextBlock x:Name="TxtInvStatus" FontSize="12" Foreground="#44546A" TextWrapping="Wrap"
-                               Text="{x:Static loc:L.ParkInvHint}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="TxtInvStatus" Grid.Column="0" FontSize="12" Foreground="#44546A"
+                                   TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"
+                                   Text="{x:Static loc:L.ParkInvHint}"/>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="BtnInvToutCocher" Content="{x:Static loc:L.ParkInvCheckAll}"
+                                    Padding="10,5" FontSize="12" Margin="0,0,6,0" Click="BtnInvToutCocher_Click"/>
+                            <Button x:Name="BtnInvRienCocher" Content="{x:Static loc:L.ParkInvUncheckAll}"
+                                    Padding="10,5" FontSize="12" Margin="0,0,6,0" Click="BtnInvRienCocher_Click"/>
+                            <Button x:Name="BtnInvVerifier" Content="{x:Static loc:L.ParkInvVerify}"
+                                    Padding="12,6" FontSize="12" FontWeight="SemiBold"
+                                    Background="#2470B3" Foreground="White" BorderThickness="0"
+                                    Click="BtnInvVerifier_Click"
+                                    ToolTip="{x:Static loc:L.ParkInvVerifyTip}"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
               </Grid>
             </TabItem>

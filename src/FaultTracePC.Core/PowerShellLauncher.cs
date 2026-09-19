@@ -58,8 +58,17 @@ public static class PowerShellLauncher
     /// appelant ne devrait jamais en fabriquer d'autre — et s'il le fait, mieux
     /// vaut une exception qu'une commande inattendue.
     /// </summary>
+    /// <param name="pauseTousLesCas">
+    /// <c>true</c> : la fenetre attend une touche MEME QUAND TOUT S'EST BIEN PASSE.
+    ///
+    /// La pause conditionnelle convient a une reparation, dont on veut seulement
+    /// savoir si elle a echoue. Elle ne convient pas a une VERIFICATION, dont le
+    /// deroule est justement le resultat : le 19/09/2026, la fenetre s'est fermee
+    /// avant que l'on ait pu lire quoi que ce soit, alors que tout avait reussi.
+    /// </param>
     public static string ArgumentsForScript(
-        string scriptPath, string pause, IEnumerable<KeyValuePair<string, string?>>? parametres)
+        string scriptPath, string pause, IEnumerable<KeyValuePair<string, string?>>? parametres,
+        bool pauseTousLesCas = false)
     {
         var appel = new System.Text.StringBuilder("& " + Litteral(scriptPath));
 
@@ -75,9 +84,22 @@ public static class PowerShellLauncher
             if (p.Value is not null) appel.Append(' ').Append(Litteral(p.Value));
         }
 
+        // ATTENTION AUX ACCOLADES ORPHELINES.
+        //
+        // En PowerShell, « { ... } » sans rien devant n'est PAS un bloc de code qui
+        // s'exécute : c'est un objet qui représente du code, créé puis jeté. Écrire
+        // « finally { { Read-Host } } » ne demande donc RIEN, et la fenêtre se
+        // referme aussitôt. Constaté le 19/09/2026, en retirant le « if » qui
+        // précédait ces accolades sans retirer les accolades elles-mêmes.
+        //
+        // Les deux formes sont donc écrites en entier, plutôt que composées par
+        // morceaux : c'est la composition par morceaux qui a produit la faute.
+        var pause_ = pauseTousLesCas
+            ? "Read-Host " + Litteral(pause)
+            : "if (-not $fini) { Read-Host " + Litteral(pause) + " }";
+
         return Prefixe + "& { $fini = $false; try { " + appel
-            + "; $fini = $true } catch { Write-Host $_ } finally { if (-not $fini) { Read-Host "
-            + Litteral(pause) + " } } }\"";
+            + "; $fini = $true } catch { Write-Host $_ } finally { " + pause_ + " } }\"";
     }
 
     /// <summary>

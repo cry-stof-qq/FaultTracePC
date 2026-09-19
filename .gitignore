@@ -66,6 +66,17 @@ postes.csv
 # exprès un AUTRE nom — « postes.exemple.csv » — pour qu'il ne puisse jamais être
 # confondu avec un vrai, et pour que la règle ci-dessus reste sans exception.
 
+# LE DOSSIER DE TRAVAIL DU DÉPLOIEMENT, écrit par la console de parc dans
+# Documents\FaultTracePC\Deploiement — c'est-à-dire ICI, puisque le dossier de
+# données du logiciel et le dossier de développement sont le même. Il contient la
+# liste des postes à vérifier (noms réels), les journaux de chaque exécution, et
+# une copie du script extraite de la ressource embarquée.
+#
+# TROISIÈME FOIS EN DEUX JOURS qu'un dossier écrit par le logiciel apparaît à côté
+# du code sans être nommé ici. La règle à retenir : tout chemin d'écriture ajouté
+# au logiciel doit être ajouté à ce fichier DANS LE MÊME GESTE.
+Deploiement/
+
 # EN REVANCHE, CE QUE LE SCRIPT ÉCRIT NE L'EST PAS. Il range la transcription de
 # chaque exécution dans un sous-dossier « Journal », à côté de lui : noms de
 # postes, adresses IP, adresses MAC. Il est apparu dans scripts\ dès le premier
