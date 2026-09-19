@@ -390,7 +390,10 @@ public static class L
     public static string FlightColGpuTemp => Lang.T("T° GPU", "GPU temp.");
     public static string FlightColGpu => Lang.T("GPU", "GPU");
     public static string FlightColRam => Lang.T("RAM", "RAM");
-    public static string FlightColCommit => Lang.T("Engagée", "Committed");
+    // « Mém. virt. » et pas « Engagée » : c'est le mot que le logiciel emploie déjà
+    // dans la console de surveillance et dans les conclusions du rapport. Deux mots
+    // pour la même chose obligeraient le lecteur à deviner que c'est la même chose.
+    public static string FlightColCommit => Lang.T("Mém. virt.", "Virtual mem.");
     public static string FlightColDetail => Lang.T("Détail", "Detail");
 
     // ------------------------------------------------- onglet Inventaire (point 64, lot A-3)

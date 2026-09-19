@@ -227,7 +227,7 @@ GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, 
 
 **Contournement en attendant**, à faire sur chaque poste : `FaultTracePC.Cli.exe --set-machine-lang fr` **puis `Restart-Service FaultTracePCMonitor`** — contrairement à `remote.json`, la langue n'est lue qu'au démarrage du service. Au déploiement, `FTPCLANG=fr` fait la même chose d'emblée.
 
-**46 — « Voir en temps réel pourquoi ça coupe » : le besoin est bon, la réponse n'est pas l'actualisation automatique. À FAIRE, 1.7.0.** Demandé par l'auteur le 31/08/2026 en découvrant que la console n'actualise que sur clic.
+**46 — « Voir en temps réel pourquoi ça coupe » : le besoin est bon, la réponse n'est pas l'actualisation automatique. FAIT le 19/09/2026 — la vue boîte noire distante. L'actualisation automatique reste à faire, comme confort.** Demandé par l'auteur le 31/08/2026 en découvrant que la console n'actualise que sur clic.
 
 **Pourquoi le direct ne répondrait pas à la question.** Au moment de la coupure, la machine s'arrête et le réseau avec elle : la console ne verrait rien de plus. Une actualisation toutes les deux secondes afficherait une valeur vieille de deux secondes, puis « injoignable ». Elle donnerait l'**illusion** d'une réponse — exactement le genre de fonctionnalité qui rassure sans informer.
 
@@ -238,6 +238,18 @@ GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, 
 **Limite à énoncer dans l'interface** : 10 secondes entre deux relevés. Pour une surchauffe, qui monte en minutes, c'est largement suffisant. Pour un pic de charge instantané, on peut passer à côté. Le dire vaut mieux que laisser croire à un enregistrement continu.
 
 **L'actualisation automatique reste souhaitable** — mais comme confort, pas comme réponse : une case « actualiser toutes les N secondes », désactivée par défaut, en sachant qu'interroger vingt postes en boucle a un coût réseau. *Difficulté : faible pour l'actualisation, moyenne pour la vue boîte noire distante.*
+
+**Livré le 19/09/2026.** Un bouton « Boîte noire du poste » dans l'onglet Supervision ouvre les relevés du poste sélectionné : 15 minutes, 1 heure, 4 heures ou 24 heures.
+
+- **Le plus récent en haut.** Ce qu'on vient chercher après une coupure, ce sont les DERNIÈRES lignes ; les faire défiler depuis le début cacherait la réponse au bas du tableau.
+- **Trois sortes de lignes sautent aux yeux** : les événements Windows, les démarrages et les arrêts de la surveillance. Et parmi elles, la plus précieuse — *« Démarrage de la surveillance — LA SESSION PRÉCÉDENTE S'EST TERMINÉE BRUTALEMENT »* : c'est la preuve, écrite par la machine elle-même, qu'elle n'a pas été éteinte proprement. Sans elle, « le poste a redémarré » et « le poste a planté » se ressemblent.
+- **La limite de dix secondes est écrite en grand**, pas en note de bas de page. Laisser croire à un enregistrement continu ferait chercher une trace qui n'a jamais pu être écrite.
+- **Une période sans relevé se dit comme telle** — poste éteint, ou surveillance arrêtée — et pas comme une panne.
+- **Un délai d'attente propre à cette lecture.** Le client de la console abandonne au bout de quatre secondes, ce qui est voulu pour interroger vingt postes d'affilée ; vingt-quatre heures de relevés font près de neuf mille lignes, et le même délai aurait coupé la lecture en plein milieu, avec une erreur qui aurait ressemblé à un poste injoignable.
+
+**Ce que ce lot a coûté, et pourquoi si peu :** le point d'accès `/api/flight` existait depuis la 1.5.0 et n'était appelé par personne ; la fonction qui signe les requêtes acceptait déjà une chaîne de requête. *Une fonctionnalité à moitié construite et jamais branchée ne se voit pas dans le code : elle se voit dans la feuille de route, et c'est à ça qu'elle sert.*
+
+**Et une inconsistance de vocabulaire corrigée dans la foulée :** la colonne de mémoire virtuelle s'appelait « Engagée » alors que le logiciel dit « Mém. virt. » dans la console et « Mémoire virtuelle » dans ses conclusions. Deux mots pour la même chose obligent le lecteur à deviner que c'est la même chose.
 
 **47 — Colonne « Top processus » vide deux fois sur trois. CORRIGÉ.** Constaté dans la console le 31/08/2026. La boîte noire ne relève les processus qu'un échantillon sur trois — toutes les 30 s, pour ne pas grossir le journal — et `/api/status` renvoie le **dernier** échantillon, qui n'en porte donc généralement pas. La colonne se remplissait au hasard, ce qui est pire qu'une colonne toujours vide : on ne sait pas si l'information manque ou si la machine n'a rien à signaler. `BuildStatus` complète désormais avec le relevé le plus récent qui en contienne un — au pire 30 secondes d'âge, sans conséquence pour la question posée.
 
