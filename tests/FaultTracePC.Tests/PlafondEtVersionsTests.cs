@@ -7,7 +7,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Deux défauts constatés le 18/09/2026 sur le rapport de TECH-INFO-2025 (1.6.0).
+/// Deux défauts constatés le 18/09/2026 sur le rapport du poste de l'auteur (1.6.0).
 ///
 /// 1. « Erreurs disque répétées (500) » : 500 n'était pas un comptage mais le
 ///    plafond de collecte d'EventLogCollector. Un chiffre rond présenté comme une

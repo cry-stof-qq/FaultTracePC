@@ -1248,7 +1248,7 @@ public sealed class RulesEngine
     /// pourquoi il est réparti sur plusieurs cartes.
     ///
     /// POURQUOI ELLE EN REMPLACE DEUX
-    /// Constaté le 18/09/2026 sur TECH-INFO-2025, en 1.6.1. La carte des 20
+    /// Constaté le 18/09/2026 sur le poste de l'auteur, en 1.6.1. La carte des 20
     /// réinitialisations de contrôleur portait « Le journal Windows en contient
     /// davantage », qui se lit « il y en a plus de 20 » — ce que rien n'établit. Ce
     /// qui est établi, c'est que la CATÉGORIE a buté sur son plafond ; rien ne dit
@@ -1309,7 +1309,7 @@ public sealed class RulesEngine
         if (diskEvents.Count >= 3 || (diskEvents.Count > 0 && storageBsods.Count > 0))
         {
             // POINT 65. Une seule carte additionnait des choses de natures différentes.
-            // Constaté le 18/09/2026 sur TECH-INFO-2025 : « Erreurs disque répétées (500) »
+            // Constaté le 18/09/2026 sur le poste de l'auteur : « Erreurs disque répétées (500) »
             // réunissait 479 événements sur un support DÉBRANCHÉ depuis, 20 réinitialisations
             // d'un port de contrôleur SATA, et une erreur de système de fichiers sur un
             // volume. Trois choses sans rapport, un seul chiffre, une seule recommandation —
@@ -1359,7 +1359,7 @@ public sealed class RulesEngine
     /// QU'ELLE CITE.
     ///
     /// LE DÉFAUT QUE CECI CORRIGE, ET D'OÙ IL VIENT
-    /// Constaté le 18/09/2026 sur TECH-INFO-2025. L'alerte disait « une défaillance a
+    /// Constaté le 18/09/2026 sur le poste de l'auteur. L'alerte disait « une défaillance a
     /// été détectée dans la structure du système de fichiers sur le volume D: » et
     /// s'est retrouvée collée à la carte du PORT DE CONTRÔLEUR SATA. La cause n'est pas
     /// dans la fusion : c'est le point 65 qui a changé le sens de l'identifiant
@@ -1522,7 +1522,7 @@ public sealed class RulesEngine
     /// que Windows connaît et qui n'est pas monté aujourd'hui.
     ///
     /// D'OÙ VIENT CE RAPPROCHEMENT
-    /// Constaté le 18/09/2026 sur TECH-INFO-2025 : un événement Ntfs 55 nommait
+    /// Constaté le 18/09/2026 sur le poste de l'auteur : un événement Ntfs 55 nommait
     /// « le volume D: », et la lecture du registre proposait, deux cartes plus loin,
     /// « D: (Kingston DataTraveler 3.0 USB Device) ». Le logiciel tenait les deux
     /// moitiés sans les coller.
@@ -2162,7 +2162,7 @@ public sealed class RulesEngine
     /// <summary>
     /// Échecs de services répétés.
     ///
-    /// Constaté le 18/09/2026 sur TECH-INFO-2025 : « Échecs de services Windows
+    /// Constaté le 18/09/2026 sur le poste de l'auteur : « Échecs de services Windows
     /// répétés (29) », suivi de « Consulter le détail dans la section Événements pour
     /// identifier le(s) service(s) concerné(s) ». Le logiciel avait les 29 événements
     /// sous la main, chacun portant le nom du service dans ses données. Il renvoyait
@@ -2237,7 +2237,7 @@ public sealed class RulesEngine
             // COMBIEN DE SERVICES FAUT-IL POUR EXPLIQUER L'ESSENTIEL DES ÉCHECS ?
             //
             // Première version : « un service qui pèse la moitié à lui seul domine ».
-            // Constaté faux le 18/09/2026 sur TECH-INFO-2025 — GLPI Agent 14 fois,
+            // Constaté faux le 18/09/2026 sur le poste de l'auteur — GLPI Agent 14 fois,
             // TmWSCSvc 14 fois, un troisième service 1 fois. Aucun n'atteignait la
             // moitié, le rapport concluait « aucun ne domine, ce qui désigne plutôt le
             // système », et renvoyait vers sfc et DISM. Or deux services nommés

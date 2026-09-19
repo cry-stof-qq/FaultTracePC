@@ -5,7 +5,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Constaté le 18/09/2026 sur TECH-INFO-2025 : un événement Ntfs 55 nommait « le
+/// Constaté le 18/09/2026 sur le poste de l'auteur : un événement Ntfs 55 nommait « le
 /// volume D: », et la lecture du registre proposait, deux cartes plus loin,
 /// « D: (Kingston DataTraveler 3.0 USB Device) ». Le logiciel tenait les deux
 /// moitiés de la réponse sans jamais les coller.

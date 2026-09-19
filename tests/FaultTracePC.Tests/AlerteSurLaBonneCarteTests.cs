@@ -5,7 +5,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Constaté le 18/09/2026 sur TECH-INFO-2025. L'alerte de la surveillance temps réel
+/// Constaté le 18/09/2026 sur le poste de l'auteur. L'alerte de la surveillance temps réel
 /// — « une défaillance a été détectée dans la structure du système de fichiers sur le
 /// volume D: » — était collée à la carte du PORT DE CONTRÔLEUR SATA.
 ///

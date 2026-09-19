@@ -8,7 +8,7 @@ namespace FaultTracePC.Tests;
 /// Nom de fichier des rapports.
 ///
 /// DÉFAUT CONSTATÉ LE 30/08/2026 en regardant un nom de fichier : la ligne de
-/// commande écrivait « Diagnostic_TECH-INFO-2025_… » et l'application
+/// commande écrivait « Diagnostic_POSTE-01_… » et l'application
 /// « Diagnostic_PC_… ». Deux familles de noms pour la même chose ; et sur un
 /// dossier partagé par plusieurs postes, deux machines analysant à la même
 /// minute écrasaient le rapport l'une de l'autre.
@@ -27,8 +27,8 @@ public class NommageRapportTests
     [Fact]
     public void Le_nom_porte_celui_de_la_machine()
     {
-        Assert.Equal("Diagnostic_TECH-INFO-2025_2026-08-30_0907.html",
-                     HtmlReportGenerator.NomDuRapport(Rapport("TECH-INFO-2025")));
+        Assert.Equal("Diagnostic_POSTE-01_2026-08-30_0907.html",
+                     HtmlReportGenerator.NomDuRapport(Rapport("POSTE-01")));
     }
 
     [Theory]

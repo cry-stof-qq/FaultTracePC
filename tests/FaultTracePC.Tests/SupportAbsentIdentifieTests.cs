@@ -8,7 +8,7 @@ namespace FaultTracePC.Tests;
 /// <summary>
 /// Mettre un nom sur un support qui n'est plus branché.
 ///
-/// Constaté le 18/09/2026 sur TECH-INFO-2025 : 479 erreurs de bloc défectueux sur
+/// Constaté le 18/09/2026 sur le poste de l'auteur : 479 erreurs de bloc défectueux sur
 /// « \Device\Harddisk1 », un numéro qui n'existait plus au moment de l'analyse. Le
 /// rapport ne savait écrire que « un disque qui portait le numéro 1 ». Windows retient
 /// pourtant, dans SYSTEM\MountedDevices et Enum\USBSTOR, quelle lettre a été montée

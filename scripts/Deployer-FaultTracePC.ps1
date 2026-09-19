@@ -62,7 +62,18 @@ param(
     # locale. Laissé vide, le script choisit celle qui mène au poste.
     [string]$Interface,
 
-    [int]$AttenteReveilSecondes = 90
+    [int]$AttenteReveilSecondes = 90,
+
+    # POINT 64, LOT B — le canal vers la console.
+    # Chemin du journal JSON : une ligne par poste et par étape. Sans ce
+    # paramètre, comportement strictement inchangé pour qui lance le script à la
+    # main.
+    [string]$SortieJson,
+
+    # Ne fait QUE les contrôles en lecture : compte d'ordinateur, réponse réseau,
+    # partage administratif, gestion à distance. Ni réveil, ni copie, ni
+    # installation, ni mise en parc. Et aucune question posée.
+    [switch]$VerifierSeulement
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,6 +89,87 @@ function Titre([string]$t) { Write-Host "`n=== $t ===" -ForegroundColor Cyan }
 function Bien([string]$t)  { Write-Host "  $t" -ForegroundColor Green }
 function Alerte([string]$t){ Write-Host "  $t" -ForegroundColor Yellow }
 function Grave([string]$t) { Write-Host "  $t" -ForegroundColor Red }
+
+# ---------------------------------------------------------------- journal JSON
+<#
+    LE CANAL VERS LA CONSOLE (point 64, lot B).
+
+    Une ligne JSON par poste et par étape, écrite DANS UN FICHIER — jamais sur la
+    sortie standard, que PowerShell 5.1 décode avec la page de code de la console :
+    un « é » en ressortirait en charabia.
+
+    « etape » et « etat » sont des CODES invariants. Ce script parle français, la
+    console parle deux langues : c'est elle qui fabrique la phrase. Le champ
+    « detail » reste le texte brut, affiché tel quel et jamais traduit.
+
+    UNE ÉCRITURE IMPOSSIBLE N'INTERROMPT PAS LE DÉPLOIEMENT. On prévient une fois,
+    puis on continue sans réessayer : un journal raconte le travail, il n'est pas
+    le travail.
+#>
+$script:cheminJson = if ($SortieJson) {
+    if ([IO.Path]::IsPathRooted($SortieJson)) { $SortieJson } else { Join-Path $racine $SortieJson }
+} else { '' }
+$script:jsonAvorte = $false
+
+function Write-Json {
+    param(
+        [string]$Poste,
+        [string]$Etape,
+        [string]$Etat,
+        [string]$Detail  = '',
+        [string]$Adresse = '',
+        $Code = $null
+    )
+    if (-not $script:cheminJson -or $script:jsonAvorte) { return }
+
+    try {
+        $ligne = [ordered]@{
+            horodatage = (Get-Date).ToString('o')
+            poste      = $Poste
+            etape      = $Etape
+            etat       = $Etat
+        }
+        if ($Detail)         { $ligne.detail  = $Detail }
+        if ($Adresse)        { $ligne.adresse = $Adresse }
+        if ($null -ne $Code) { $ligne.code    = [int]$Code }
+
+        $dossier = Split-Path $script:cheminJson -Parent
+        if ($dossier -and -not (Test-Path $dossier)) {
+            New-Item -ItemType Directory -Force -Path $dossier | Out-Null
+        }
+
+        # ASCII PUR : TOUT CARACTÈRE ACCENTUÉ PART EN \uXXXX.
+        #
+        # Constaté le 19/09/2026 au premier essai réel : « Get-Content » sans
+        # -Encoding lit le fichier avec la page de code ANSI, et « vérifier »
+        # s'affichait « vÃ©rifier ». Le fichier était correct, sa lecture ne l'était
+        # pas — mais un journal qu'on ne peut lire qu'en connaissant son encodage est
+        # un journal à moitié utile, et personne ne devrait avoir à le savoir.
+        #
+        # L'échappement \uXXXX est du JSON standard : il se relit à l'identique par
+        # System.Text.Json côté console, par ConvertFrom-Json côté PowerShell, et par
+        # n'importe quel lecteur, quelle que soit l'idée qu'il se fait de l'encodage.
+        $json = $ligne | ConvertTo-Json -Compress -Depth 3
+        $ascii = New-Object Text.StringBuilder
+        foreach ($c in $json.ToCharArray()) {
+            $n = [int][char]$c
+            if ($n -lt 32 -or $n -gt 126) { [void]$ascii.AppendFormat('\u{0:x4}', $n) }
+            else { [void]$ascii.Append($c) }
+        }
+
+        # UTF-8 SANS MARQUE D'ORDRE DES OCTETS. « Out-File -Encoding utf8 » en
+        # ajoute une en PowerShell 5.1 — et comme on AJOUTE à chaque étape, elle se
+        # retrouverait au milieu du fichier, au début d'une ligne sur deux.
+        [IO.File]::AppendAllText(
+            $script:cheminJson,
+            $ascii.ToString() + "`r`n",
+            (New-Object Text.UTF8Encoding $false))
+    }
+    catch {
+        $script:jsonAvorte = $true
+        Alerte "Journal JSON non écrit : $($_.Exception.Message)"
+    }
+}
 
 # ---------------------------------------------------------------- paramètres du site
 $script:cheminParams = Join-Path $racine 'parametres.json'
@@ -99,9 +191,15 @@ function Initialize-Parametres {
 
     $demande = $false
 
+    # EN VÉRIFICATION SEULE, AUCUNE QUESTION N'EST POSÉE. Ce mode est fait pour
+    # être piloté par la console : une invite sans personne devant bloquerait
+    # indéfiniment. Le paquet MSI n'est de toute façon pas nécessaire, puisque rien
+    # n'est installé.
+    $muet = [bool]$VerifierSeulement
+
     if (-not $Msi) {
         if ($enregistres -and $enregistres.Msi) { $script:Msi = $enregistres.Msi }
-        else {
+        elseif (-not $muet) {
             Titre 'Premier lancement — paramètres de votre site'
             Write-Host '  Chemin du paquet MSI de FaultTracePC.'
             Write-Host '  Exemple : \\serveur\partage\FaultTracePC-1.6.2.msi' -ForegroundColor DarkGray
@@ -112,7 +210,7 @@ function Initialize-Parametres {
 
     if (-not $ServeurDhcp) {
         if ($enregistres -and $enregistres.ServeurDhcp) { $script:ServeurDhcp = $enregistres.ServeurDhcp }
-        else {
+        elseif (-not $muet) {
             Write-Host ''
             Write-Host '  Serveur DHCP, consulté pour retrouver l''adresse MAC d''un poste éteint.'
             Write-Host '  Exemple : SRV-DHCP   (laisser vide si vous n''en avez pas)' -ForegroundColor DarkGray
@@ -371,14 +469,71 @@ function Send-Reveil([string]$mac, [string]$ipCible) {
     une adresse retenue de mémoire produisent un poste « injoignable » dans la
     console, sans que rien n'explique pourquoi — c'est arrivé.
 #>
+<#
+    UNE ADRESSE QUI NE SERT À RIEN NE DOIT PAS ÊTRE PROPOSÉE.
+
+    Constaté le 19/09/2026 : la vérification a rendu « fe80::e6fe:...:ff31%12 ».
+    Trois raisons de l'écarter, et elles valent aussi pour ce que le script propose
+    de saisir dans la console de parc :
+
+      · l'index de zone (« %12 ») désigne une carte réseau SUR LA MACHINE QUI A
+        PRODUIT L'ADRESSE. Recopié ailleurs, il ne veut plus rien dire ;
+      · une adresse lien-local — fe80::/10, ou 169.254.0.0/16 en IPv4 — ne traverse
+        aucun routeur ;
+      · la boucle locale ne désigne jamais un poste distant.
+
+    Mieux vaut RIEN qu'une adresse fausse : sans adresse, on saisit le nom, ce que
+    le script recommande de toute façon.
+#>
+<#
+    LA MACHINE LOCALE N'A PAS D'« ADRESSE PAR LAQUELLE ON L'A JOINTE ».
+
+    Interrogée depuis elle-même, elle répond par l'UNE de ses adresses, choisie par
+    la pile réseau — et sur un poste d'administration il y en a beaucoup : carte
+    physique, VPN, commutateurs virtuels de WSL, d'Hyper-V ou de Docker. Le
+    19/09/2026, la vérification a rendu 172.19.240.1, une carte virtuelle, alors
+    que la carte utile portait une adresse en 192.168.1.x.
+
+    Aucune de ces adresses n'est « la bonne », et la question n'a pas de sens ici :
+    ce script déploie sur des postes DISTANTS. Pour un poste distant, l'adresse
+    constatée est celle par laquelle la connexion a réellement abouti, ce qui est
+    exactement ce qu'on veut savoir. Pour soi-même, il n'y a rien à constater.
+#>
+function Test-MachineLocale([string]$nom) {
+    $court = ($nom -split '\.')[0]
+    return $court -ieq $env:COMPUTERNAME
+}
+
+function Test-AdresseUtilisable([string]$ip) {
+    if (-not $ip) { return $false }
+    if ($ip -like '*%*') { return $false }
+    if ($ip -match '^fe[89ab]') { return $false }
+    if ($ip -like '169.254.*') { return $false }
+    if ($ip -eq '::1' -or $ip -eq '127.0.0.1') { return $false }
+    return $true
+}
+
 function Get-IpDuPoste([string]$nom) {
+    # Mieux vaut RIEN qu'une adresse qui désigne une carte virtuelle de la console.
+    if (Test-MachineLocale $nom) { return '' }
+
+    # D'abord ce qui a RÉELLEMENT répondu, puis le DNS — et dans les deux cas, on
+    # écarte ce qui ne peut pas servir.
     foreach ($p in @(445, 5985, 58620)) {
         try {
             $t = Test-NetConnection -ComputerName $nom -Port $p -WarningAction SilentlyContinue -ErrorAction Stop
-            if ($t.RemoteAddress) { return $t.RemoteAddress.IPAddressToString }
+            if ($t.RemoteAddress) {
+                $ip = $t.RemoteAddress.IPAddressToString
+                if (Test-AdresseUtilisable $ip) { return $ip }
+            }
         } catch { }
     }
-    try { return (Resolve-DnsName $nom -Type A -ErrorAction Stop | Select-Object -First 1).IPAddress } catch { }
+    try {
+        # Un enregistrement CNAME n'a pas d'adresse : le test l'écarte aussi.
+        foreach ($a in @(Resolve-DnsName $nom -Type A -ErrorAction Stop)) {
+            if (Test-AdresseUtilisable $a.IPAddress) { return $a.IPAddress }
+        }
+    } catch { }
     return ''
 }
 
@@ -433,25 +588,54 @@ function Install-SurUnPoste([string]$nom) {
     $annuaire = Test-PosteDuDomaine $nom
     if (-not $annuaire.AnnuaireOk) {
         Alerte "Annuaire injoignable : impossible de vérifier. On continue quand même."
+        Write-Json $nom 'compte' 'info' 'annuaire injoignable, contrôle non fait'
     }
     elseif (-not $annuaire.Connu) {
         Grave "$nom n'est pas un compte d'ordinateur du domaine."
         Alerte "Téléphone, tablette, machine hors domaine ou faute de frappe : rien n'est tenté."
         $resume.Etat = 'ignoré'; $resume.Detail = 'inconnu de l''annuaire'
+        Write-Json $nom 'compte' 'echec' 'inconnu de l''annuaire'
         return $resume
     }
-    else { Bien 'Compte trouvé dans l''annuaire.' }
+    else {
+        Bien 'Compte trouvé dans l''annuaire.'
+        Write-Json $nom 'compte' 'ok'
+    }
 
     # ---- 2. répond-il ?
     Titre "$nom — 2. Joignable ?"
-    if (Test-Joignable $nom) { Bien 'Le poste répond.' }
+    if (Test-Joignable $nom) {
+        Bien 'Le poste répond.'
+        $ip = Get-IpDuPoste $nom
+        if (-not $ip -and (Test-MachineLocale $nom)) {
+            Alerte 'Ce poste EST la machine locale : aucune adresse distante à constater.'
+            Write-Json $nom 'reponse' 'ok' 'machine locale, pas d''adresse distante'
+        }
+        else {
+            Write-Json $nom 'reponse' 'ok' '' $ip
+        }
+    }
     else {
         Alerte 'Aucune réponse (ni ping, ni port 445).'
+        Write-Json $nom 'reponse' 'echec' 'ni ping, ni port 445'
+
+        # VÉRIFICATION SEULE : ON N'ALLUME PAS.
+        # Envoyer un paquet de réveil ne modifie rien SUR la machine, mais ça
+        # l'allume. Trente postes qui démarrent parce qu'on a cliqué sur
+        # « vérifier » est un effet que personne n'a demandé. On s'arrête ici.
+        if ($script:verifierSeul) {
+            Alerte 'Vérification seule : pas de réveil réseau.'
+            Write-Json $nom 'reveil' 'ignore' 'mode vérifier seulement'
+            $resume.Etat = 'éteint'; $resume.Detail = 'ne répond pas'
+            return $resume
+        }
+
         $mac = Get-MacDuPoste $nom
         if (-not $mac) {
             Grave 'Adresse MAC inconnue : réveil réseau impossible.'
             Alerte "Ajoute une ligne « $nom;AA-BB-CC-DD-EE-FF » dans postes.csv, à côté du script."
             $resume.Etat = 'échec'; $resume.Detail = 'éteint, MAC inconnue'
+            Write-Json $nom 'reveil' 'echec' 'adresse MAC inconnue'
             return $resume
         }
 
@@ -478,9 +662,11 @@ function Install-SurUnPoste([string]$nom) {
         if (-not (Test-Joignable $nom)) {
             Grave "$nom ne répond pas après $AttenteReveilSecondes secondes."
             $resume.Etat = 'échec'; $resume.Detail = 'pas de réponse après réveil'
+            Write-Json $nom 'reveil' 'echec' "pas de réponse après $AttenteReveilSecondes s"
             return $resume
         }
         Bien 'Le poste a répondu après le réveil.'
+        Write-Json $nom 'reveil' 'ok' 'réveillé puis joignable'
     }
 
     if ($script:reveilSeul) {
@@ -501,18 +687,33 @@ function Install-SurUnPoste([string]$nom) {
     if (-not (Test-Path "\\$nom\C$")) {
         Grave "\\$nom\C$ inaccessible : droits insuffisants, ou partages administratifs désactivés."
         $resume.Etat = 'échec'; $resume.Detail = 'partage admin inaccessible'
+        Write-Json $nom 'partage' 'echec' 'partage administratif inaccessible'
         return $resume
     }
     Bien 'Partage administratif accessible.'
+    Write-Json $nom 'partage' 'ok'
 
     # Le feu vert de la suite, ce n'est pas 445 : c'est 5985. On le vérifie ici,
     # avant de copier 63 Mo qui seraient perdus.
     if (-not (Test-WinRM $nom)) {
         Write-AideWinRM $nom
         $resume.Etat = 'échec'; $resume.Detail = 'WinRM muet (5985)'
+        Write-Json $nom 'winrm' 'echec' 'aucune réponse sur 5985'
         return $resume
     }
     Bien 'Gestion à distance disponible (5985).'
+    Write-Json $nom 'winrm' 'ok'
+
+    # VÉRIFICATION SEULE : ON S'ARRÊTE ICI, AVANT LA PREMIÈRE ÉCRITURE.
+    # Tout ce qui précède est en lecture — compte d'ordinateur, réponse réseau,
+    # partage administratif, gestion à distance. Rien n'a touché ce poste, et rien
+    # ne va le toucher : la ligne suivante serait la copie du paquet.
+    if ($script:verifierSeul) {
+        Bien 'Vérification terminée : ce poste peut recevoir le paquet.'
+        $resume.Etat = 'vérifié'; $resume.Detail = 'prêt à recevoir le paquet'
+        $resume.Ip = Get-IpDuPoste $nom
+        return $resume
+    }
 
     # ---- 4. copie et installation
     Titre "$nom — 4. Installation"
@@ -680,6 +881,7 @@ function Invoke-Session {
     Titre 'FaultTracePC — déploiement sur postes distants'
     Initialize-Parametres
     Write-Host "  Journal de cette exécution : $journal"
+    if ($script:cheminJson) { Write-Host "  Journal JSON : $script:cheminJson" }
 
     if (-not $Poste) {
         $saisie = Read-Host 'Nom du ou des postes, séparés par une virgule (ex. PC-1, PC-2)'
@@ -704,8 +906,17 @@ function Invoke-Session {
     $script:faireParc    = [bool]$ConfigurerParc
     $script:sansInstall  = [bool]$SeulementParc
     $script:reveilSeul   = [bool]$ReveilSeulement
+    $script:verifierSeul = [bool]$VerifierSeulement
 
-    if (-not $PSBoundParameters.ContainsKey('ConfigurerParc') -and
+    # La vérification seule l'emporte sur tout le reste, et ne pose aucune
+    # question : elle est faite pour être pilotée par la console.
+    if ($script:verifierSeul) {
+        $script:faireParc = $false
+        $script:sansInstall = $false
+        $script:reveilSeul = $false
+        Alerte 'Vérification seule : rien ne sera réveillé, copié, installé ni mis en parc.'
+    }
+    elseif (-not $PSBoundParameters.ContainsKey('ConfigurerParc') -and
         -not $PSBoundParameters.ContainsKey('SeulementParc') -and
         -not $PSBoundParameters.ContainsKey('ReveilSeulement')) {
         Write-Host ''
@@ -723,13 +934,13 @@ function Invoke-Session {
         }
     }
 
-    if (-not $script:faireParc -and -not $script:reveilSeul) {
+    if (-not $script:verifierSeul -and -not $script:faireParc -and -not $script:reveilSeul) {
         Alerte 'Mode parc non demandé : le poste sera installé mais restera INVISIBLE de la console.'
     }
 
     # Le paquet n'est nécessaire que si l'on installe : ne pas bloquer un simple
     # réveil ou une mise en parc parce qu'un partage est indisponible.
-    if (-not $script:reveilSeul -and -not $script:sansInstall -and (-not $Msi -or -not (Test-Path $Msi))) {
+    if (-not $script:verifierSeul -and -not $script:reveilSeul -and -not $script:sansInstall -and (-not $Msi -or -not (Test-Path $Msi))) {
         Grave $(if ($Msi) { "Paquet introuvable : $Msi" } else { 'Aucun chemin de paquet MSI indiqué.' })
         Alerte 'Vérifie le partage, ou passe -Msi <chemin>.'
         return
@@ -795,9 +1006,20 @@ function Invoke-Session {
         }
     }
 
-    $ok = @($bilan | Where-Object { $_.Etat -in 'installé','déjà installé','allumé' }).Count
     Write-Host ''
-    Write-Host "  $ok poste(s) traité(s) sur $($Poste.Count)."
+    if ($script:verifierSeul) {
+        # « EXAMINÉ », PAS « TRAITÉ ». Un poste éteint a bel et bien été examiné :
+        # l'annoncer « 0 traité sur 1 » laisserait croire que la vérification n'a pas
+        # eu lieu, alors qu'elle a eu lieu et qu'elle a trouvé quelque chose.
+        # Constaté le 19/09/2026 au premier essai réel.
+        $prets = @($bilan | Where-Object { $_.Etat -eq 'vérifié' }).Count
+        Write-Host "  $($Poste.Count) poste(s) examiné(s), dont $prets prêt(s) à recevoir le paquet."
+        Write-Host '  Aucun poste n''a été modifié.' -ForegroundColor DarkGray
+    }
+    else {
+        $ok = @($bilan | Where-Object { $_.Etat -in 'installé','déjà installé','allumé' }).Count
+        Write-Host "  $ok poste(s) traité(s) sur $($Poste.Count)."
+    }
 }
 
 # ================================================================== boucle

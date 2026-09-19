@@ -34,6 +34,8 @@ public static class ParkDeployment
     public const string EtapeCompte = "compte";
     /// <summary>Le poste répond — ping ou port 445.</summary>
     public const string EtapeReponse = "reponse";
+    /// <summary>Le partage administratif répond — un simple test de chemin.</summary>
+    public const string EtapePartageAdmin = "partage";
     /// <summary>La gestion à distance répond (WinRM, 5985) : c'est elle qui installe.</summary>
     public const string EtapeGestionADistance = "winrm";
     /// <summary>Réveil réseau tenté.</summary>
@@ -59,7 +61,7 @@ public static class ParkDeployment
     /// d'autres à côté.
     /// </summary>
     public static readonly string[] EtapesInoffensives =
-        [EtapeCompte, EtapeReponse, EtapeGestionADistance];
+        [EtapeCompte, EtapeReponse, EtapePartageAdmin, EtapeGestionADistance];
 
     public static bool EstInoffensive(string? etape) =>
         EtapesInoffensives.Contains((etape ?? "").Trim(), StringComparer.OrdinalIgnoreCase);

@@ -8,7 +8,7 @@ namespace FaultTracePC.Core.Collectors;
 /// Met un nom sur un support qui n'est plus branché.
 ///
 /// LE PROBLÈME QU'IL RÉSOUT
-/// Constaté le 18/09/2026 sur TECH-INFO-2025 : 479 erreurs de bloc défectueux sur
+/// Constaté le 18/09/2026 sur le poste de l'auteur : 479 erreurs de bloc défectueux sur
 /// « \Device\Harddisk1 », un numéro de disque qui n'existait plus au moment de
 /// l'analyse. Le rapport ne pouvait écrire que « un disque qui portait le numéro 1 ».
 /// Les numéros de disque sont attribués au branchement : celui-là ne désigne plus rien.

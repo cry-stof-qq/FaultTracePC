@@ -107,7 +107,7 @@ public static class InstalledSoftwareCollector
         // Nom du produit contenant le nom de l'exécutable (ou l'inverse), ESPACES ET
         // PONCTUATION MIS DE CÔTÉ.
         //
-        // Constaté le 18/09/2026 sur TECH-INFO-2025 : « MicrosoftEdgeUpdate.exe » ne
+        // Constaté le 18/09/2026 sur le poste de l'auteur : « MicrosoftEdgeUpdate.exe » ne
         // retrouvait pas « Microsoft Edge », pour la seule raison qu'un nom de produit
         // porte des espaces et pas un nom de fichier. Le rapport concluait « ce logiciel
         // ne figure plus parmi les programmes installés » pendant que six processus

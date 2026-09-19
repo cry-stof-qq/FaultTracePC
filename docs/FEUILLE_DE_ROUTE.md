@@ -154,7 +154,7 @@ Corrigé en 1.4.1 : `PsEscape` ramène U+2018, U+2019, U+201B et U+2032 sur l'ap
 
 **La leçon, la même que le point 36 :** un texte que le logiciel écrit pour qu'un autre programme le relise n'est pas du texte, c'est du code — et il faut le tester en le relisant, pas en relisant celui qui l'écrit.
 
-**38 — Deux conventions de nom de rapport. CORRIGÉ.** Trouvé le 30/08/2026 en relisant un rapport réel — pas le contenu du rapport, son **nom de fichier** : `Diagnostic_PC_2026-08-30_0907.html` sur une machine appelée `TECH-INFO-2025`.
+**38 — Deux conventions de nom de rapport. CORRIGÉ.** Trouvé le 30/08/2026 en relisant un rapport réel — pas le contenu du rapport, son **nom de fichier** : `Diagnostic_PC_2026-08-30_0907.html` sur une machine appelée `POSTE-01`.
 
 La ligne de commande écrivait `Diagnostic_<MACHINE>_<date>.html`, avec ce commentaire : « nom incluant la machine, indispensable quand tout un parc écrit dans le même partage réseau ». L'application et le service, eux, étaient restés à `Diagnostic_PC_<date>.html`, reliquat d'avant que le nom de machine existe. Deux familles de noms dans le même dossier — et, sur un partage où plusieurs postes déposent leurs rapports, deux machines analysant à la même minute s'écrasent l'une l'autre.
 
@@ -382,7 +382,7 @@ Le déploiement se fait aujourd'hui par un script PowerShell distribué à part,
 
 ## Points 65 à 71 — ce que deux rapports 1.6.0 ont montré
 
-Le 18/09/2026, l'auteur envoie deux rapports produits par la 1.6.0 tout juste publiée, l'un en français sur `TECH-INFO-2025`, l'autre en anglais sur `PC-TECH-INFO`, pour vérifier le texte des deux langues. Les deux machines sont saines. **C'est justement ce qui rend ces rapports utiles : sur une machine saine, tout ce que le logiciel signale est un faux positif.**
+Le 18/09/2026, l'auteur envoie deux rapports produits par la 1.6.0 tout juste publiée, l'un en français sur `POSTE-01`, l'autre en anglais sur `POSTE-01-EN`, pour vérifier le texte des deux langues. Les deux machines sont saines. **C'est justement ce qui rend ces rapports utiles : sur une machine saine, tout ce que le logiciel signale est un faux positif.**
 
 **65 — Un service à démarrage « à la demande » et arrêté est signalé comme devant tourner. FAIT le 18/09/2026, 1.6.1.**
 
@@ -414,7 +414,7 @@ Un chiffre rond présenté comme une mesure fausse l'appréciation de la gravit�
 
 **70 — Une seule carte pour des périphériques de natures différentes. FAIT le 18/09/2026, 1.6.1.** Demandé par l'auteur le 18/09/2026, en réponse à sa question « c'est des erreurs de clé USB ? ».
 
-Les 500 erreurs de `TECH-INFO-2025` étaient trois choses sans rapport : 479 blocs défectueux sur un support **débranché depuis**, 20 réinitialisations d'un **port de contrôleur SATA**, une erreur de **système de fichiers** sur un volume. Un seul titre, une seule gravité, une seule recommandation — qui commençait par la gestion d'alimentation PCI Express et le firmware du SSD, inutile pour les trois.
+Les 500 erreurs de `POSTE-01` étaient trois choses sans rapport : 479 blocs défectueux sur un support **débranché depuis**, 20 réinitialisations d'un **port de contrôleur SATA**, une erreur de **système de fichiers** sur un volume. Un seul titre, une seule gravité, une seule recommandation — qui commençait par la gestion d'alimentation PCI Express et le firmware du SSD, inutile pour les trois.
 
 Le point 60 avait séparé les *conseils* dans un texte commun. Il fallait séparer les *cartes*. Six natures de périphérique, lues sur le chemin `\Device\…` que Windows ne traduit jamais : disque monté, port de contrôleur, volume nommé, aucun périphérique nommé, support amovible, support absent. Une nature = une carte, sa gravité, son conseil.
 
@@ -614,11 +614,11 @@ Sept points, tous nés du même geste : l'auteur envoie deux rapports de la 1.6.
 |---|---|---|
 | 65 ✔ | un service à la demande arrêté signalé comme devant tourner (`NlaSvc`) | les deux machines, 18/09 |
 | 66 ✔ | une carte Wi-Fi Direct virtuelle comptée comme carte sans fil — défaut latent | relecture du code, 18/09 |
-| 67 ✔ | états et modes de démarrage des services affichés en anglais dans le rapport français | TECH-INFO-2025, 18/09 |
-| 68 ✔ | `afd.sys : 10.0.26100.8875 → 10.0.26100.8875` — une date de fichier prise pour une mise à jour | TECH-INFO-2025, 18/09 |
-| 69 ✔ | « Erreurs disque répétées (500) » — 500 était le plafond de collecte, pas un décompte | TECH-INFO-2025, 18/09 |
-| 70 ✔ | une seule carte pour un support débranché, un port de contrôleur et un volume | TECH-INFO-2025, 18/09 |
-| 71 ✔ | un support débranché ne pouvait être désigné que par un numéro qui ne vaut plus rien | TECH-INFO-2025, 18/09 |
+| 67 ✔ | états et modes de démarrage des services affichés en anglais dans le rapport français | poste de l'auteur, 18/09 |
+| 68 ✔ | `afd.sys : 10.0.26100.8875 → 10.0.26100.8875` — une date de fichier prise pour une mise à jour | poste de l'auteur, 18/09 |
+| 69 ✔ | « Erreurs disque répétées (500) » — 500 était le plafond de collecte, pas un décompte | poste de l'auteur, 18/09 |
+| 70 ✔ | une seule carte pour un support débranché, un port de contrôleur et un volume | poste de l'auteur, 18/09 |
+| 71 ✔ | un support débranché ne pouvait être désigné que par un numéro qui ne vaut plus rien | poste de l'auteur, 18/09 |
 
 Les points **65 à 69** sont des corrections, livrées sans qu'il soit besoin de les demander. Les points **70 et 71** sont deux ajouts, décidés le 18/09/2026 après la question « c'est des erreurs de clé USB ? » — question à laquelle le rapport ne permettait pas de répondre.
 

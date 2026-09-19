@@ -6,7 +6,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Constaté le 18/09/2026 sur TECH-INFO-2025, en 1.6.1 : le rapport écrivait
+/// Constaté le 18/09/2026 sur le poste de l'auteur, en 1.6.1 : le rapport écrivait
 /// « MicrosoftEdgeUpdate.exe (27 crashs) — ce logiciel ne figure plus parmi les
 /// programmes installés — problème probablement sans objet », pendant que six
 /// processus msedge tournaient, listés dans le même rapport, quelques sections plus bas.

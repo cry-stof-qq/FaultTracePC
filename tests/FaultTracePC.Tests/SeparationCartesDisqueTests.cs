@@ -5,7 +5,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Point 65. Constaté le 18/09/2026 sur TECH-INFO-2025 : la carte « Erreurs disque
+/// Point 65. Constaté le 18/09/2026 sur le poste de l'auteur : la carte « Erreurs disque
 /// répétées (500) » additionnait 479 événements sur un support débranché depuis,
 /// 20 réinitialisations d'un port de contrôleur et une erreur de système de fichiers
 /// sur un volume. Trois choses sans rapport, un seul chiffre, une seule
@@ -82,7 +82,7 @@ public class SeparationCartesDisqueTests
     // Séparation des cartes
     // ------------------------------------------------------------------
 
-    /// <summary>Le cas réel de TECH-INFO-2025, en miniature.</summary>
+    /// <summary>Le cas réel du poste de l'auteur, en miniature.</summary>
     private static DiagnosticReport CasTechInfo()
     {
         var evenements = new List<(string, int, string)>();

@@ -14,7 +14,7 @@ public static class HtmlReportGenerator
     /// application, ligne de commande et service.
     ///
     /// LE DÉFAUT QU'ELLE SUPPRIME, constaté le 30/08/2026 sur un rapport réel :
-    /// la ligne de commande écrivait « Diagnostic_TECH-INFO-2025_… » et
+    /// la ligne de commande écrivait « Diagnostic_POSTE-01_… » et
     /// l'application « Diagnostic_PC_… », un reliquat d'avant que le nom de
     /// machine existe. Deux familles de noms pour la même chose dans le même
     /// dossier — et, sur un partage où plusieurs postes déposent leurs rapports,

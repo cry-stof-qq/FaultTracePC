@@ -37,7 +37,7 @@ public class ListeDePostesTests
     [InlineData("POSTE-01", "POSTE-01")]
     [InlineData("poste-01", "POSTE-01")]                       // la casse ne compte pas
     [InlineData("POSTE-01$", "POSTE-01")]                      // sAMAccountName d'un compte d'ordinateur
-    [InlineData("poste-01.0673079h.ac-strasbourg.fr", "POSTE-01")]  // dNSHostName
+    [InlineData("poste-01.exemple.fr", "POSTE-01")]  // dNSHostName
     [InlineData("  POSTE-01  ", "POSTE-01")]
     [InlineData("", "")]
     [InlineData("   ", "")]
@@ -49,7 +49,7 @@ public class ListeDePostesTests
     {
         var liste = ParkInventory.Fusionner(
             [Annuaire("POSTE-01$", ou: "Salle informatique")],
-            [Console("poste-01.0673079h.ac-strasbourg.fr", "10.10.1.24", 58620)]);
+            [Console("poste-01.exemple.fr", "10.10.1.24", 58620)]);
 
         var p = Assert.Single(liste);
         Assert.Equal("POSTE-01", p.Name);
@@ -64,7 +64,7 @@ public class ListeDePostesTests
         // Une adresse saisie à la main l'a été pour une raison : souvent une IP fixe
         // qu'aucun DNS ne rendra. L'écraser avec le nom DNS casserait l'accès.
         var liste = ParkInventory.Fusionner(
-            [Annuaire("POSTE-01", hote: "poste-01.0673079h.ac-strasbourg.fr")],
+            [Annuaire("POSTE-01", hote: "poste-01.exemple.fr")],
             [Console("POSTE-01", "10.10.1.24", 58700)]);
 
         var p = Assert.Single(liste);
@@ -76,11 +76,11 @@ public class ListeDePostesTests
     public void Sans_adresse_dans_la_console_celle_de_l_annuaire_sert()
     {
         var liste = ParkInventory.Fusionner(
-            [Annuaire("POSTE-01", hote: "poste-01.0673079h.ac-strasbourg.fr")],
+            [Annuaire("POSTE-01", hote: "poste-01.exemple.fr")],
             [Console("POSTE-01")]);
 
         var p = Assert.Single(liste);
-        Assert.Equal("poste-01.0673079h.ac-strasbourg.fr", p.Host);
+        Assert.Equal("poste-01.exemple.fr", p.Host);
         Assert.Equal(ParkInventory.PortParDefaut, p.Port);
     }
 
@@ -164,7 +164,7 @@ public class ListeDePostesTests
     public void L_annuaire_mac_se_lit_quel_que_soit_l_ordre_des_colonnes()
     {
         var chemin = FichierTemporaire(
-            "\"MAC\";\"Nom\"\n\"8C-04-BA-11-22-33\";\"POSTE-01\"\n\"AA-BB-CC-11-22-33\";\"poste-02.0673079h.ac-strasbourg.fr\"\n",
+            "\"MAC\";\"Nom\"\n\"8C-04-BA-11-22-33\";\"POSTE-01\"\n\"AA-BB-CC-11-22-33\";\"poste-02.exemple.fr\"\n",
             ".csv");
         try
         {

@@ -66,8 +66,23 @@ postes.csv
 # exprès un AUTRE nom — « postes.exemple.csv » — pour qu'il ne puisse jamais être
 # confondu avec un vrai, et pour que la règle ci-dessus reste sans exception.
 
+# EN REVANCHE, CE QUE LE SCRIPT ÉCRIT NE L'EST PAS. Il range la transcription de
+# chaque exécution dans un sous-dossier « Journal », à côté de lui : noms de
+# postes, adresses IP, adresses MAC. Il est apparu dans scripts\ dès le premier
+# essai du 19/09/2026 — le motif vaut à toute profondeur.
+Journal/
+
 # Dumps éventuellement copiés pour analyse
 *.dmp
+
+# Résidus de l'Explorateur Windows. « Thumbs.db » est un cache de VIGNETTES : il
+# garde une image réduite de tout ce qui est passé dans le dossier, y compris
+# des captures d'écran effacées depuis. Un exemplaire était suivi dans assets\
+# jusqu'au 19/09/2026 — il ne contenait qu'une vignette du logo, mais il n'avait
+# rien à faire là et rien ne l'aurait empêché d'en contenir d'autres.
+Thumbs.db
+ehthumbs.db
+desktop.ini
 
 # Corbeille locale : fichiers de test sortis du dossier de travail.
 _to_delete/

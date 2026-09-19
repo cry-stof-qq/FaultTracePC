@@ -107,6 +107,22 @@ public class JournalDeDeploiementTests
     }
 
     [Fact]
+    public void Les_accents_echappes_par_le_script_se_relisent_intacts()
+    {
+        // Le script écrit son journal en ASCII PUR : tout caractère accentué part en
+        // \uXXXX. C'est ce qui rend le fichier lisible quelle que soit l'idée que le
+        // lecteur se fait de l'encodage — y compris « Get-Content » sans -Encoding,
+        // qui lit en page de code ANSI et affichait « vÃ©rifier » le 19/09/2026.
+        //
+        // Littéral brut : le compilateur C# n'y touche pas, c'est bien la séquence de
+        // six caractères que le script produit qui est donnée à lire.
+        var lecture = ParkDeployment.LireLignes(
+            ["""{"poste":"POSTE-09","etape":"reveil","etat":"ignore","detail":"mode v\u00e9rifier seulement"}"""]);
+
+        Assert.Equal("mode vérifier seulement", Assert.Single(lecture.Lignes).Detail);
+    }
+
+    [Fact]
     public void Un_code_ecrit_en_texte_reste_un_nombre()
     {
         var lecture = ParkDeployment.LireLignes(
@@ -159,8 +175,12 @@ public class JournalDeDeploiementTests
         // cette liste, ce test tombe — et c'est tout ce qu'on lui demande.
         Assert.True(ParkDeployment.EstInoffensive(ParkDeployment.EtapeCompte));
         Assert.True(ParkDeployment.EstInoffensive(ParkDeployment.EtapeReponse));
+        Assert.True(ParkDeployment.EstInoffensive(ParkDeployment.EtapePartageAdmin));
         Assert.True(ParkDeployment.EstInoffensive(ParkDeployment.EtapeGestionADistance));
 
+        // LE RÉVEIL RÉSEAU N'EN EST PAS. Il n'écrit rien SUR la machine, mais il
+        // l'allume : trente postes qui démarrent parce qu'on a cliqué sur
+        // « vérifier » est un effet que personne n'a demandé.
         Assert.False(ParkDeployment.EstInoffensive(ParkDeployment.EtapeReveil));
         Assert.False(ParkDeployment.EstInoffensive(ParkDeployment.EtapeCopie));
         Assert.False(ParkDeployment.EstInoffensive(ParkDeployment.EtapeInstallation));

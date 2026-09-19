@@ -5,7 +5,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Constaté le 18/09/2026 sur TECH-INFO-2025 : « Échecs de services Windows
+/// Constaté le 18/09/2026 sur le poste de l'auteur : « Échecs de services Windows
 /// répétés (29) », suivi de « Consulter le détail dans la section Événements pour
 /// identifier le(s) service(s) concerné(s) ».
 ///
@@ -82,7 +82,7 @@ public class ServicesEnEchecTests
     [Fact]
     public void Un_service_qui_ne_demarre_pas_et_un_service_qui_meurt_ne_se_disent_pas_pareil()
     {
-        // Le cas réel de TECH-INFO-2025 : TmWSCSvc en 7000 (« n'a pas pu démarrer :
+        // Le cas réel du poste de l'auteur : TmWSCSvc en 7000 (« n'a pas pu démarrer :
         // le fichier spécifié est introuvable » — une inscription orpheline) et
         // GLPI Agent en 7031 (« s'est terminé de manière inattendue » — un processus
         // qui meurt). Deux pannes, deux endroits où regarder.
@@ -136,7 +136,7 @@ public class ServicesEnEchecTests
     [Fact]
     public void Deux_services_qui_couvrent_presque_tout_ne_sont_pas_une_dispersion()
     {
-        // LE cas réel de TECH-INFO-2025, 18/09/2026 : 14, 14 et 1. Aucun service
+        // LE cas réel du poste de l'auteur, 18/09/2026 : 14, 14 et 1. Aucun service
         // n'atteint la moitié, et pourtant deux d'entre eux couvrent 28 échecs sur 29.
         // La première version de la règle concluait « aucun ne domine, ce qui désigne
         // plutôt le système » et renvoyait vers sfc et DISM — pour deux agents tiers.
