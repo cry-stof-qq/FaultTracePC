@@ -446,9 +446,15 @@ public sealed class TelemetryService : BackgroundService
     /// secondes.
     ///
     /// L'ADRESSE EST ÉCRITE, ET C'EST LE POINT. « Signature refusée » dit quoi
-    /// chercher ; « adresse refusée, vue depuis 10.212.134.200 » dit AUSSI quelle
-    /// adresse le poste a réellement vue — ce qu'aucune mesure prise depuis la
+    /// chercher ; « adresse refusée, vue depuis <adresse> » dit AUSSI quelle
+    /// adresse le poste a RÉELLEMENT vue — ce qu'aucune mesure prise depuis la
     /// console ne peut établir, puisque le chemin peut la traduire.
+    ///
+    /// ET C'EST EXACTEMENT CE QUI S'EST PASSÉ. Le premier essai réel de cette
+    /// ligne, le soir même, a montré que le poste voyait une adresse PUBLIQUE là
+    /// où la console mesurait chez elle une adresse de tunnel privée : le pare-feu
+    /// traduisait l'adresse source entre le réseau du VPN et celui des postes. Le
+    /// verrou faisait son travail ; personne ne pouvait le savoir.
     ///
     /// UNE MINUTE DE SILENCE ENTRE DEUX REFUS IDENTIQUES : un scanner de ports ou
     /// une console laissée en actualisation automatique rempliraient sinon le

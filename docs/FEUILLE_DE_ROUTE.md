@@ -441,7 +441,7 @@ Le déploiement se fait aujourd'hui par un script PowerShell distribué à part,
 - **Les échecs absents de la liste affichée sont comptés ET nommés**, avec la raison probable au survol. Sans ça, on croirait tout reprendre.
 - **La vraie cause passe avant le symptôme.** Sans inventaire chargé, le bouton le dit au lieu d'annoncer « douze postes absents de la liste », ce qui aurait fait chercher du côté de l'unité d'organisation alors qu'il suffisait d'actualiser. Constaté au premier essai, le jour même.
 
-**PREMIER DÉPLOIEMENT RÉEL — 19/09/2026, 16 h 35, sur P2-01, ET PAR VPN.** Le point 64 cesse d'être « écrit mais pas éprouvé ». Une machine réelle du domaine, à distance, depuis un poste qui n'était pas sur le réseau de l'établissement, a reçu le logiciel et est passée en mode parc. Les sept lignes du journal JSON sont `ok`.
+**PREMIER DÉPLOIEMENT RÉEL — 19/09/2026, 16 h 35, SUR UN POSTE DE SALLE, ET PAR VPN.** Le point 64 cesse d'être « écrit mais pas éprouvé ». Une machine réelle du domaine, à distance, depuis un poste qui n'était pas sur le réseau de l'établissement, a reçu le logiciel et est passée en mode parc. Les sept lignes du journal JSON sont `ok`.
 
 Le déroulé mesuré, bout en bout **75 secondes** :
 
@@ -449,7 +449,7 @@ Le déroulé mesuré, bout en bout **75 secondes** :
 |---|---|---|
 | compte | — | l'annuaire répond à travers le VPN |
 | réponse | 7 s | le poste répond (ping ou 445) |
-| partage | 0,5 s | `\\P2-01\C$` accessible à distance |
+| partage | 0,5 s | le partage administratif `C$` accessible à distance |
 | winrm | 0,06 s | la gestion à distance répond sur 5985 |
 | **copie** | **6,3 s** | **63 Mo à travers le tunnel** |
 | installation | 18 s | msiexec silencieux, **code 0** |
@@ -459,13 +459,32 @@ Le déroulé mesuré, bout en bout **75 secondes** :
 
 **Ce qui n'est toujours pas prouvé**, et qu'il ne faut pas confondre avec le reste :
 
-- **Le réveil réseau.** P2-01 a été allumé autrement, depuis un serveur de l'établissement. Et il ne pouvait pas en être autrement : un paquet de réveil est une **diffusion**, et une diffusion ne franchit pas un routeur — le VPN en est un. L'essai de 16 h 29, poste éteint, l'a d'ailleurs montré proprement : `reponse` → `echec` (« ni ping, ni port 445 »), puis `reveil` → `echec` (« adresse MAC inconnue »). **Le chemin d'échec est donc éprouvé lui aussi**, et il a nommé la vraie cause. Le réveil reste à essayer **sur place**, avec l'adresse MAC connue.
+- **Le réveil réseau.** Le poste a été allumé autrement, depuis un serveur de l'établissement. Et il ne pouvait pas en être autrement : un paquet de réveil est une **diffusion**, et une diffusion ne franchit pas un routeur — le VPN en est un. L'essai de 16 h 29, poste éteint, l'a d'ailleurs montré proprement : `reponse` → `echec` (« ni ping, ni port 445 »), puis `reveil` → `echec` (« adresse MAC inconnue »). **Le chemin d'échec est donc éprouvé lui aussi**, et il a nommé la vraie cause. Le réveil reste à essayer **sur place**, avec l'adresse MAC connue.
 - **Un lot de plusieurs postes.** Un seul poste ne met à l'épreuve ni le plafond de cinquante, ni la confirmation chiffrée sur un nombre supérieur à un, ni l'enchaînement.
 - **La reprise des seuls postes en échec.** Il n'y a pas eu d'échec à reprendre.
 
 **Coût d'un poste éteint : 31 secondes** avant le verdict — deux pings puis le contrôle du port 445. Sur un lot où la moitié des machines dorment, c'est le poste éteint qui fixe la durée, pas le poste installé.
 
 **La 1.7.0 peut donc se préparer.** Reste à faire avant de la publier : un lot de plusieurs postes, et un réveil réseau depuis le réseau de l'établissement.
+
+### La soirée du 19/09/2026 — trois heures pour un refus, et ce qu'elles ont appris
+
+Le déploiement réussi, la console refusait le poste avec « refusé (jeton, nom Windows ou horloge décalée ?) ». Depuis le réseau de l'établissement tout fonctionnait ; par VPN, jamais. **La cause est le premier verrou du service, qui n'accepte que la boucle locale et les plages privées : le pare-feu TRADUISAIT l'adresse source entre le réseau du VPN et celui des postes, et le poste voyait donc une adresse PUBLIQUE là où la console mesurait chez elle une adresse de tunnel privée.** Le verrou faisait exactement ce qu'on lui avait demandé.
+
+**Ce que ça a coûté, et pourquoi.** Le service répondait `403` sans écrire nulle part pourquoi. Quatre causes possibles, aucune mesurable depuis la console — et l'adresse source, la seule qui comptait, n'était **connaissable que du poste**, puisque c'est précisément elle que le chemin altérait. Trois heures, deux hypothèses fausses successives (un proxy web, puis un secret maître différent), chacune plausible et chacune démentie par la mesure suivante.
+
+**Le correctif, livré le soir même : le service écrit ses refus dans `erreurs.log` — le motif ET l'adresse qu'il a réellement vue.** La toute première ligne produite a donné la réponse en dix secondes. Une minute de silence entre deux refus identiques, pour qu'un scanner de ports ne noie pas le journal. La réponse réseau, elle, ne change pas : les deux verrous rendent toujours le même `403`, en dire plus à un appelant non authentifié serait le renseigner. **Ne rien écrire du tout ne protégeait personne — ça rendait seulement le diagnostic impossible.**
+
+Quatre leçons, et la première vaut pour tout ce projet :
+
+- **Un refus qui ne dit pas pourquoi coûte des heures, et le coût est invisible tant qu'on ne l'a pas payé.** Le raisonnement remplace alors la mesure, et le raisonnement se trompe. *Tout point du logiciel qui refuse quelque chose doit pouvoir dire lequel de ses contrôles a refusé.*
+- **Une mesure prise à un bout ne vaut pas pour l'autre bout.** La console a mesuré son adresse source et l'a trouvée privée ; le poste en voyait une autre. *Quand une décision se prend sur une donnée, c'est là où elle se prend qu'il faut aller la lire.*
+- **La boucle locale n'éprouve pas le contrôle d'adresse**, elle le court-circuite par une ligne explicite. Le seul poste qui répondait était la console elle-même en `127.0.0.1` : **aucun essai n'avait jamais franchi ce verrou**, et personne ne s'en était aperçu. *Un cas particulier qui passe toujours n'est pas un test.*
+- **L'utilisateur avait raison dès la première phrase.** Il a dit « c'est peut-être ma sécurité qui bloque » ; deux démonstrations contraires ont suivi, l'une reposant sur une hypothèse non vérifiée (que la règle de pare-feu était seule à ouvrir le port), l'autre sur une déduction. *Une démonstration dont une prémisse n'est pas mesurée n'est pas une démonstration.*
+
+**Ce qui reste ouvert, et ce n'est pas un défaut du logiciel :** la traduction d'adresse entre le réseau du VPN et celui des postes se règle sur le pare-feu, pas ici. Élargir les plages acceptées serait le mauvais correctif — l'adresse vue étant publique, l'autoriser reviendrait à ouvrir le service à tout ce qui se cache derrière cette traduction. Si un besoin de plages réglables apparaît un jour, il devra être posé comme une décision, poste par poste, et non comme un contournement.
+
+**Deux outils de diagnostic entrent dans `scripts/` à cette occasion** — `Test-JetonDirect.ps1` (refait la requête de la console à la main) et `Test-SecretMaitre.ps1` (dit lequel de plusieurs secrets maîtres correspond à un poste, sans jamais afficher ni le jeton ni le secret). Écrits dans l'urgence dans un dossier ignoré par git, ils auraient disparu avant le prochain incident.
 
 **Deux enseignements de mise en page, tirés de captures d'écran réelles :**
 

@@ -468,13 +468,13 @@ public partial class ParkWindow : Window
                         "Le poste répond mais refuse la requête. Quatre causes possibles, de la plus fréquente à la plus rare :\n\n"
                       + "1. LE SECRET MAÎTRE de cette console n'est pas celui avec lequel le poste a été configuré. C'est le cas le plus courant : le jeton se calcule à partir du secret, les deux doivent être identiques au caractère près.\n\n"
                       + "2. LE NOM ne correspond pas. Le jeton se calcule aussi à partir du nom Windows du poste : un libellé de fantaisie dans la colonne « Machine » produit exactement ce refus. La casse, elle, n'a pas d'importance.\n\n"
-                      + "3. L'ADRESSE SOURCE est refusée. Le service n'accepte que la boucle locale et les plages privées (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).\n\n"
+                      + "3. L'ADRESSE SOURCE est refusée. Le service n'accepte que la boucle locale et les plages privées (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16). ATTENTION : l'adresse que le poste voit n'est pas forcément celle que cette console croit avoir — un pare-feu peut la traduire en chemin. Seul le poste le sait, et il l'écrit : C:\\ProgramData\\FaultTracePC\\erreurs.log.\n\n"
                       + "4. LES HORLOGES sont décalées de plus de 5 minutes entre cette console et le poste.",
 
                         "The computer answers but refuses the request. Four possible causes, from the most frequent to the rarest:\n\n"
                       + "1. THE MASTER SECRET of this console is not the one the computer was configured with. This is the most common case: the token is derived from the secret, and both must match character for character.\n\n"
                       + "2. THE NAME does not match. The token is also derived from the computer's Windows name: a made-up label in the “Machine” column produces exactly this refusal. Case, however, does not matter.\n\n"
-                      + "3. THE SOURCE ADDRESS is refused. The service accepts only loopback and the private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).\n\n"
+                      + "3. THE SOURCE ADDRESS is refused. The service accepts only loopback and the private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16). BEWARE: the address the computer sees is not necessarily the one this console believes it has — a firewall may translate it on the way. Only the computer knows, and it writes it down: C:\\ProgramData\\FaultTracePC\\erreurs.log.\n\n"
                       + "4. THE CLOCKS differ by more than 5 minutes between this console and the computer."),
                 };
             }
