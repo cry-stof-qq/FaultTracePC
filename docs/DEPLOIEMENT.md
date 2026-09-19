@@ -1,6 +1,6 @@
 # Déployer FaultTracePC sur un parc
 
-État au 05/09/2026, valable à partir de la **1.5.1**. Ce document décrit ce que
+État au 18/09/2026, valable à partir de la **1.5.1**. Ce document décrit ce que
 le logiciel fait réellement — pas ce qu'il devrait faire. Les limites connues
 sont à la fin, et elles sont nommées.
 
@@ -47,9 +47,32 @@ postes. Le divulguer donne accès à tout le parc.
 
 ### Le paquet
 
-`FaultTracePC-1.5.1.msi`, à déposer sur un partage lisible par les ordinateurs du
-domaine (droit *Lecture* pour `Ordinateurs du domaine`, pas seulement pour les
-utilisateurs — l'installation se fait sous le compte machine).
+Le paquet porte son numéro de version dans son nom — `FaultTracePC-1.6.2.msi`
+pour la version publiée le 18/09/2026. Il est à déposer sur un partage lisible
+par les ordinateurs du domaine (droit *Lecture* pour `Ordinateurs du domaine`,
+pas seulement pour les utilisateurs — l'installation se fait sous le compte
+machine).
+
+**Les commandes de ce document ne portent pas ce numéro.** Elles emploient
+`$msi`, que le bloc ci-dessous résout à partir du fichier réellement présent sur
+le partage. Une commande recopiée avec un numéro périmé donne « fichier
+introuvable » — et sous `/qn`, sans journal, cette erreur ne s'affiche nulle
+part.
+
+```powershell
+# Une fois par session. Seule la première ligne est à adapter.
+$partage = '\\serveur\partage'
+
+$paquets = @(Get-ChildItem (Join-Path $partage 'FaultTracePC-*.msi') -ErrorAction SilentlyContinue |
+             Where-Object { $_.BaseName -match '^FaultTracePC-\d+\.\d+\.\d+$' })
+if ($paquets.Count -eq 0) { throw "Aucun paquet FaultTracePC dans $partage" }
+
+$msi = ($paquets | Sort-Object { [version]($_.BaseName -replace '^FaultTracePC-','') } -Descending)[0].FullName
+Write-Host "Paquet retenu : $msi"
+```
+
+Le tri porte sur le **numéro de version**, pas sur le nom du fichier : trié comme
+du texte, `FaultTracePC-1.10.0.msi` passerait avant `FaultTracePC-1.9.0.msi`.
 
 ---
 
@@ -60,17 +83,17 @@ utilisateurs — l'installation se fait sous le compte machine).
 Le paquet s'installe **par machine**, dans `%ProgramFiles%\FaultTracePC`. Il se
 déploie donc en **« Attribué à l'ordinateur »**.
 
-```
-msiexec /i FaultTracePC-1.5.1.msi /qn
+```powershell
+msiexec /i $msi /qn
 ```
 
 Variantes utiles :
 
 | Besoin | Commande |
 |---|---|
-| Sans raccourci sur le Bureau | `msiexec /i FaultTracePC-1.5.1.msi /qn ADDLOCAL=Main` |
-| Avec raccourci | `msiexec /i FaultTracePC-1.5.1.msi /qn ADDLOCAL=Main,DesktopShortcutFeature` |
-| Imposer l'anglais au parc | `msiexec /i FaultTracePC-1.5.1.msi FTPCLANG=en /qn` |
+| Sans raccourci sur le Bureau | `msiexec /i $msi /qn ADDLOCAL=Main` |
+| Avec raccourci | `msiexec /i $msi /qn ADDLOCAL=Main,DesktopShortcutFeature` |
+| Imposer l'anglais au parc | `msiexec /i $msi FTPCLANG=en /qn` |
 
 `FTPCLANG` accepte `fr`, `en` ou `auto`, et écrit
 `C:\ProgramData\FaultTracePC\langue.txt`. C'est un **défaut**, pas une
@@ -86,7 +109,10 @@ qui échoue ne dit rien du tout. Constaté le 30/08/2026 sur un poste où le paq
 n'a rien installé sans que rien ne le signale.
 
 ```powershell
-$p = Start-Process msiexec -ArgumentList '/i','FaultTracePC-1.5.1.msi','/qn','/l*v','C:\Windows\Temp\ftpc-install.log' -Wait -PassThru
+# Les guillemets autour de $msi sont nécessaires ICI et nulle part ailleurs :
+# Start-Process ne les ajoute pas lui-même, et un chemin de partage contenant une
+# espace serait coupé en deux arguments.
+$p = Start-Process msiexec -ArgumentList '/i',"`"$msi`"",'/qn','/l*v','C:\Windows\Temp\ftpc-install.log' -Wait -PassThru
 if ($p.ExitCode -notin 0,3010) { throw "FaultTracePC : installation echouee ($($p.ExitCode))" }
 ```
 
@@ -100,16 +126,9 @@ if ($p.ExitCode -notin 0,3010) { throw "FaultTracePC : installation echouee ($($
 **Le cas `1638`.** Le `ProductCode` est régénéré à chaque compilation, et une
 mise à jour n'est reconnue que pour une version **strictement inférieure** :
 réinstaller le MÊME numéro de version par-dessus lui-même est donc refusé. Il
-faut désinstaller d'abord :
-
-```powershell
-Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*, HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* |
-  Where-Object DisplayName -like 'FaultTracePC*' | Select-Object DisplayName, DisplayVersion, PSChildName
-msiexec /x "{PSChildName affiché}" /qn
-```
-
-Ne pas employer `Get-CimInstance Win32_Product` pour cette recherche : cette
-classe déclenche une reconfiguration de chaque produit installé sur la machine.
+faut désinstaller d'abord, avec la commande du point 7 — *Retirer un poste,
+désinstaller*. Elle lit le code d'installation **sur le poste**, au lieu de le
+déduire d'un nom de fichier.
 
 Une version **supérieure** remplace proprement l'ancienne, sans désinstallation
 préalable : mettre le parc à jour consiste bien à remplacer le paquet dans la
@@ -335,10 +354,37 @@ révocation par poste reste à concevoir.
   Rien n'est désinstallé sur le poste, son historique n'est pas touché.
 - **Repasser un poste en local** : fenêtre 🌐 *Mode réseau*, cocher **Local**,
   Appliquer. Le service cesse d'écouter dans les 30 secondes.
-- **Désinstaller** : `msiexec /x FaultTracePC-1.5.1.msi /qn`. Le service est
-  arrêté et supprimé. Les rapports et l'historique restent dans les Documents de
-  l'utilisateur — le logiciel n'efface aucune donnée qu'il n'a pas créée pour
-  lui-même.
+- **Désinstaller** : **pas avec le fichier `.msi`.** Le `ProductCode` étant
+  régénéré à chaque compilation, `msiexec /x <paquet>.msi` ne désinstalle que le
+  poste installé avec **ce fichier exact**. Sur un parc où les postes n'ont pas
+  tous la même version, ce fichier n'est pas connu — et l'échec est silencieux
+  sous `/qn`. Le code d'installation se lit sur le poste :
+
+  ```powershell
+  $installe = @(Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*,
+                                 HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* |
+                Where-Object DisplayName -like 'FaultTracePC*')
+
+  if ($installe.Count -eq 0) { throw 'FaultTracePC n''est pas installe sur ce poste.' }
+  if ($installe.Count -gt 1) { throw "Plusieurs installations : $($installe.DisplayVersion -join ', '). A traiter une par une." }
+
+  $code = $installe[0].PSChildName
+  $p = Start-Process msiexec -ArgumentList '/x',$code,'/qn' -Wait -PassThru
+  if ($p.ExitCode -notin 0,3010) { throw "FaultTracePC : desinstallation echouee ($($p.ExitCode))" }
+  ```
+
+  `@()` n'est pas décoratif : sans lui, un résultat unique n'est pas un tableau,
+  et `$installe[0]` rendrait autre chose que ce qu'on croit. Les deux `throw`
+  couvrent les deux cas où continuer serait une erreur : rien d'installé, ou
+  plusieurs installations dont on ne sait pas laquelle viser.
+
+  Ne pas employer `Get-CimInstance Win32_Product` pour cette recherche : cette
+  classe déclenche une reconfiguration de **chaque** produit installé sur la
+  machine.
+
+  Le service est arrêté et supprimé. Les rapports et l'historique restent dans
+  les Documents de l'utilisateur — le logiciel n'efface aucune donnée qu'il n'a
+  pas créée pour lui-même.
 
 ---
 
