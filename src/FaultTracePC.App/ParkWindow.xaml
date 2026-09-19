@@ -4,7 +4,7 @@
         xmlns:loc="clr-namespace:FaultTracePC.App"
         Title="{x:Static loc:L.ParkTitle}"
         Icon="Assets/FaultTracePC.ico"
-        Width="960" Height="560" MinWidth="780" MinHeight="420"
+        Width="1180" Height="640" MinWidth="820" MinHeight="460"
         WindowStartupLocation="CenterOwner" Background="#F4F6F9"
         FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
         Loaded="ParkWindow_Loaded">
@@ -175,13 +175,17 @@
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             <GridViewColumn Header="{x:Static loc:L.ParkColMachine}" Width="130" DisplayMemberBinding="{Binding Nom}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkInvColSources}" Width="130" DisplayMemberBinding="{Binding Sources}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColHost}" Width="150" DisplayMemberBinding="{Binding Hote}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkInvColUnit}" Width="200" DisplayMemberBinding="{Binding Unite}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkInvColLastLogon}" Width="120" DisplayMemberBinding="{Binding DerniereSession}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkInvColAccount}" Width="100" DisplayMemberBinding="{Binding Compte}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkInvColMac}" Width="90" DisplayMemberBinding="{Binding Mac}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkInvColCheck}" Width="200" DisplayMemberBinding="{Binding Etat}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkInvColSources}" Width="110" DisplayMemberBinding="{Binding Sources}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkColHost}" Width="140" DisplayMemberBinding="{Binding Hote}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkInvColUnit}" Width="185" DisplayMemberBinding="{Binding Unite}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkInvColLastLogon}" Width="105" DisplayMemberBinding="{Binding DerniereSession}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkInvColAccount}" Width="85" DisplayMemberBinding="{Binding Compte}"/>
+                            <GridViewColumn Header="{x:Static loc:L.ParkInvColMac}" Width="85" DisplayMemberBinding="{Binding Mac}"/>
+                            <!-- LA COLONNE DU RÉSULTAT EST LA DERNIÈRE, mais c'est celle
+                                 qu'on vient lire : la largeur de la fenêtre est calculée
+                                 pour qu'elle tienne SANS défilement horizontal. Constaté
+                                 le 19/09/2026 — elle était hors de l'écran. -->
+                            <GridViewColumn Header="{x:Static loc:L.ParkInvColCheck}" Width="230" DisplayMemberBinding="{Binding Etat}"/>
                         </GridView>
                     </ListView.View>
                 </ListView>
@@ -193,8 +197,12 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
+                        <!-- DEUX LIGNES AU MAXIMUM. Le texte complet reste accessible au
+                             survol : un message qui s'étale sur cinq lignes écrase le
+                             tableau, qui est ce qu'on regarde. Constaté le 19/09/2026. -->
                         <TextBlock x:Name="TxtInvStatus" Grid.Column="0" FontSize="12" Foreground="#44546A"
-                                   TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="34"
+                                   VerticalAlignment="Center" Margin="0,0,12,0"
                                    Text="{x:Static loc:L.ParkInvHint}"/>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">

@@ -95,6 +95,12 @@ public partial class ParkWindow
     /// <summary>Empêche deux interrogations simultanées de l'annuaire.</summary>
     private bool _inventaireOccupe;
 
+    /// <summary>
+    /// Ce que la barre d'état montre AU SURVOL : le texte long, dont la barre
+    /// elle-même n'affiche que les deux premières lignes.
+    /// </summary>
+    private string _detailDuStatut = "";
+
     private void ParkWindow_Loaded(object sender, RoutedEventArgs e)
     {
         // Le RÉGLAGE est relu, pas l'annuaire. Interroger au démarrage ferait
@@ -114,6 +120,9 @@ public partial class ParkWindow
     private async void BtnInvListerUnites_Click(object sender, RoutedEventArgs e)
     {
         if (_inventaireOccupe) return;
+
+        // Une info-bulle appartient au message qui l'a posée : elle part avec lui.
+        TxtInvStatus.ToolTip = null;
 
         OccuperInventaire(true, Lang.T("Lecture des unités d'organisation…", "Reading organizational units…"));
 
@@ -228,6 +237,9 @@ public partial class ParkWindow
     {
         if (_inventaireOccupe) return;
 
+        // Une info-bulle appartient au message qui l'a posée : elle part avec lui.
+        TxtInvStatus.ToolTip = null;
+
         var saisie = (TxtUnite.Text ?? "").Trim();
 
         // LE CONTRÔLE AVANT L'INTERROGATION, et pas l'inverse. Une virgule non
@@ -283,11 +295,18 @@ public partial class ParkWindow
 
         // « Fichier absent » et « fichier lu, zéro adresse » ne se disent pas pareil :
         // le premier explique une colonne vide, le second signale un fichier à revoir.
+        // COURT À L'ÉCRAN, COMPLET AU SURVOL. La barre d'état a deux lignes ; le
+        // détail d'un chemin et son explication n'y tiennent pas et ne doivent pas
+        // écraser le tableau pour autant.
         var motMac = File.Exists(cheminMac)
-            ? Lang.T($"adresses MAC : {macs.Count} lue(s) dans {cheminMac}",
-                     $"MAC addresses: {macs.Count} read from {cheminMac}")
-            : Lang.T($"aucun annuaire d'adresses MAC à {cheminMac} — le script de déploiement écrit le sien à côté de lui, indiquer son chemin ci-dessus remplit la colonne",
-                     $"no MAC address directory at {cheminMac} — the deployment script writes its own next to itself; setting its path above fills the column");
+            ? Lang.T($"adresses MAC : {macs.Count}", $"MAC addresses: {macs.Count}")
+            : Lang.T("aucun annuaire d'adresses MAC", "no MAC address directory");
+
+        _detailDuStatut = File.Exists(cheminMac)
+            ? Lang.T($"Annuaire d'adresses MAC lu dans {cheminMac}.",
+                     $"MAC address directory read from {cheminMac}.")
+            : Lang.T($"Aucun annuaire d'adresses MAC à {cheminMac}. Le script de déploiement écrit le sien à côté de lui : indiquer son chemin ci-dessus remplit la colonne « MAC connue ».",
+                     $"No MAC address directory at {cheminMac}. The deployment script writes its own next to itself: setting its path above fills the “MAC known” column.");
 
         var resume = Lang.T(
             $"{postes.Count} poste(s) — annuaire : {annuaire.Count}, console : {console.Count}. {motMac}.",
@@ -297,7 +316,7 @@ public partial class ParkWindow
             resume += Lang.T(" L'unité d'organisation n'a pas pu être mémorisée : elle sera à ressaisir à la prochaine ouverture.",
                              " The organizational unit could not be saved: it will have to be typed again next time.");
 
-        TxtInvStatus.Text = AvecNotes(resume, notes);
+        Statut(AvecNotes(resume, notes));
     }
 
     // ------------------------------------------------------------------
@@ -320,6 +339,9 @@ public partial class ParkWindow
     private async void BtnInvVerifier_Click(object sender, RoutedEventArgs e)
     {
         if (_inventaireOccupe) return;
+
+        // Une info-bulle appartient au message qui l'a posée : elle part avec lui.
+        TxtInvStatus.ToolTip = null;
 
         var choisis = LignesAffichees().Where(l => l.Coche).ToList();
 
@@ -530,6 +552,9 @@ public partial class ParkWindow
     private async void BtnInvDeployer_Click(object sender, RoutedEventArgs e)
     {
         if (_inventaireOccupe) return;
+
+        // Une info-bulle appartient au message qui l'a posée : elle part avec lui.
+        TxtInvStatus.ToolTip = null;
 
         var choisis = LignesAffichees().Where(l => l.Coche).ToList();
 
@@ -768,6 +793,18 @@ public partial class ParkWindow
     private static string AvecNotes(string resume, List<string> notes) =>
         notes.Count == 0 ? resume : resume + "  " + string.Join("  ", notes);
 
+    /// <summary>
+    /// Écrit la barre d'état, et accroche au survol le détail quand il y en a un.
+    /// Passer par ici plutôt que par <c>TxtInvStatus.Text</c> évite qu'une info-bulle
+    /// périmée survive au message qu'elle accompagnait.
+    /// </summary>
+    private void Statut(string texte)
+    {
+        TxtInvStatus.Text = texte;
+        TxtInvStatus.ToolTip = _detailDuStatut.Length > 0 ? _detailDuStatut : null;
+        _detailDuStatut = "";
+    }
+
     private void OccuperInventaire(bool occupe, string? message)
     {
         _inventaireOccupe = occupe;
@@ -776,6 +813,6 @@ public partial class ParkWindow
         BtnInvVerifier.IsEnabled = !occupe;
         BtnInvDeployer.IsEnabled = !occupe;
         Cursor = occupe ? System.Windows.Input.Cursors.Wait : null;
-        if (message is not null) TxtInvStatus.Text = message;
+        if (message is not null) Statut(message);
     }
 }
