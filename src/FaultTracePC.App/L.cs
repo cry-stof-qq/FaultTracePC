@@ -395,6 +395,11 @@ public static class L
     public static string ParkInvRefreshTip => Lang.T(
         "Relit les trois sources et reconstruit la liste. Aucune machine n'est contactée, et rien n'est écrit dans l'annuaire.",
         "Re-reads the three sources and rebuilds the list. No machine is contacted, and nothing is written to the directory.");
+    public static string ParkInvMacLabel => Lang.T("Annuaire d'adresses MAC :", "MAC address directory:");
+    public static string ParkInvMacTip => Lang.T(
+        "Le fichier postes.csv écrit par le script de déploiement. Laisser vide le cherche à côté de parc.json. Un dossier convient autant qu'un chemin de fichier. Sans lui, la colonne « MAC connue » reste vide : l'annuaire Active Directory ne stocke aucune adresse MAC.",
+        "The postes.csv file written by the deployment script. Leave empty to look for it next to parc.json. A folder works as well as a file path. Without it the “MAC known” column stays empty: Active Directory stores no MAC address at all.");
+    public static string ParkInvBrowse => Lang.T("📁 Parcourir…", "📁 Browse…");
     public static string ParkInvColSources => Lang.T("Vu par", "Seen by");
     public static string ParkInvColUnit => Lang.T("Unité d'organisation", "Organizational unit");
     public static string ParkInvColLastLogon => Lang.T("Dernière session", "Last logon");

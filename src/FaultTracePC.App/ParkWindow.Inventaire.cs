@@ -26,12 +26,10 @@ namespace FaultTracePC.App;
 public partial class ParkWindow
 {
     /// <summary>
-    /// Annuaire d'adresses MAC écrit par le script de déploiement. Facultatif :
-    /// son absence n'est pas un incident, et il n'ajoute jamais de poste — il
-    /// n'enrichit que ceux qui sont déjà là.
+    /// Dossier des données de la console — celui de <c>parc.json</c>. C'est aussi
+    /// là qu'est cherché l'annuaire d'adresses MAC quand aucun chemin n'est réglé.
     /// </summary>
-    private static string FichierPostesCsv => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC", "postes.csv");
+    private static string DossierDesDonnees => Path.GetDirectoryName(ParkFile)!;
 
     /// <summary>
     /// Une ligne du tableau. Les libellés sont fabriqués ICI, dans la langue de
@@ -57,7 +55,9 @@ public partial class ParkWindow
         // Le RÉGLAGE est relu, pas l'annuaire. Interroger au démarrage ferait
         // attendre tout le monde — y compris sur un poste hors domaine, où il n'y
         // a rien à trouver. L'utilisateur déclenche quand il en a besoin.
-        TxtUnite.Text = ParametresParc.Charger().UniteOrganisation;
+        var reglages = ParametresParc.Charger();
+        TxtUnite.Text = reglages.UniteOrganisation;
+        TxtFichierMac.Text = reglages.FichierAdressesMac;
     }
 
     // ------------------------------------------------------------------
@@ -94,16 +94,37 @@ public partial class ParkWindow
         CbUnite.DisplayMemberPath = nameof(ParkDirectory.UniteOrganisation.Libelle);
         CbUnite.IsEnabled = unites.Count > 0;
 
-        // Aucune unité n'est PAS la même chose qu'un échec : un domaine peut n'en
-        // avoir aucune, et tous les postes vivre sous CN=Computers. Les notes
-        // disent laquelle des deux situations on a.
+        // TROIS SITUATIONS, ET PAS DEUX. Une liste vide après une ERREUR ne se dit
+        // pas comme une liste vide après une lecture réussie : la première
+        // n'autorise aucune conclusion, la seconde en autorise une. Le 19/09/2026,
+        // le rapport annonçait « aucune unité, ce qui convient dans la plupart des
+        // cas » alors que l'annuaire venait de refuser le chemin — rassurant, et faux.
         var etat = unites.Count > 0
             ? Lang.T($"{unites.Count} unité(s) d'organisation trouvée(s). Choisir dans la liste remplit le champ du dessus.",
                      $"{unites.Count} organizational unit(s) found. Picking from the list fills the field above.")
-            : Lang.T("Aucune unité d'organisation lue. Laisser le champ vide interroge la racine du domaine, ce qui convient dans la plupart des cas.",
-                     "No organizational unit read. Leaving the field empty queries the domain root, which is what most setups need.");
+            : notes.Count > 0
+                ? Lang.T("Les unités d'organisation n'ont pas pu être lues — le message de l'annuaire suit. Rien ne permet de dire s'il en existe ou non.",
+                         "The organizational units could not be read — the directory's message follows. Nothing here says whether any exist.")
+                : Lang.T("Aucune unité d'organisation dans cet annuaire. Laisser le champ vide interroge la racine du domaine, ce qui convient dans la plupart des cas.",
+                         "No organizational unit in this directory. Leaving the field empty queries the domain root, which is what most setups need.");
 
         TxtInvStatus.Text = AvecNotes(etat, notes);
+    }
+
+    private void BtnInvParcourirMac_Click(object sender, RoutedEventArgs e)
+    {
+        var boite = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = Lang.T("Choisir l'annuaire d'adresses MAC", "Choose the MAC address directory"),
+            Filter = Lang.T("Fichiers CSV (*.csv)|*.csv|Tous les fichiers (*.*)|*.*",
+                            "CSV files (*.csv)|*.csv|All files (*.*)|*.*"),
+            FileName = ParkInventory.NomAnnuaireMac,
+            CheckFileExists = true,
+        };
+
+        // Choisir plutôt que saisir : un chemin recopié à la main se trompe, et
+        // l'erreur ne se voit qu'à une colonne restée vide.
+        if (boite.ShowDialog(this) == true) TxtFichierMac.Text = boite.FileName;
     }
 
     private void CbUnite_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -136,11 +157,14 @@ public partial class ParkWindow
 
         OccuperInventaire(true, Lang.T("Lecture de l'annuaire…", "Reading the directory…"));
 
-        // Le réglage n'est enregistré QUE s'il a passé le contrôle : mémoriser une
-        // saisie fautive la ferait revenir à chaque ouverture.
+        // Les réglages ne sont enregistrés QUE si la saisie a passé le contrôle :
+        // mémoriser une unité fautive la ferait revenir à chaque ouverture.
         var reglages = ParametresParc.Charger();
         reglages.UniteOrganisation = saisie;
+        reglages.FichierAdressesMac = (TxtFichierMac.Text ?? "").Trim();
         bool memorise = reglages.Enregistrer();
+
+        var cheminMac = ParkInventory.CheminAdressesMac(reglages.FichierAdressesMac, DossierDesDonnees);
 
         var notes = new List<string>();
         List<PosteDuParc> annuaire;
@@ -154,7 +178,7 @@ public partial class ParkWindow
             (annuaire, console, macs) = await Task.Run(() => (
                 ParkDirectory.Interroger(saisie, notes),
                 ParkInventory.LireParcJson(ParkFile, notes),
-                ParkInventory.LireAnnuaireMac(FichierPostesCsv, notes)));
+                ParkInventory.LireAnnuaireMac(cheminMac, notes)));
         }
         catch (Exception ex)
         {
@@ -171,9 +195,17 @@ public partial class ParkWindow
         var postes = ParkInventory.Fusionner(annuaire, console, macs);
         LvInventaire.ItemsSource = postes.Select(Convertir).ToList();
 
+        // « Fichier absent » et « fichier lu, zéro adresse » ne se disent pas pareil :
+        // le premier explique une colonne vide, le second signale un fichier à revoir.
+        var motMac = File.Exists(cheminMac)
+            ? Lang.T($"adresses MAC : {macs.Count} lue(s) dans {cheminMac}",
+                     $"MAC addresses: {macs.Count} read from {cheminMac}")
+            : Lang.T($"aucun annuaire d'adresses MAC à {cheminMac} — le script de déploiement écrit le sien à côté de lui, indiquer son chemin ci-dessus remplit la colonne",
+                     $"no MAC address directory at {cheminMac} — the deployment script writes its own next to itself; setting its path above fills the column");
+
         var resume = Lang.T(
-            $"{postes.Count} poste(s) — annuaire : {annuaire.Count}, console : {console.Count}, adresses MAC connues : {macs.Count}.",
-            $"{postes.Count} computer(s) — directory: {annuaire.Count}, console: {console.Count}, known MAC addresses: {macs.Count}.");
+            $"{postes.Count} poste(s) — annuaire : {annuaire.Count}, console : {console.Count}. {motMac}.",
+            $"{postes.Count} computer(s) — directory: {annuaire.Count}, console: {console.Count}. {motMac}.");
 
         if (!memorise)
             resume += Lang.T(" L'unité d'organisation n'a pas pu être mémorisée : elle sera à ressaisir à la prochaine ouverture.",

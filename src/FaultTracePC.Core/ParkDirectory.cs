@@ -46,7 +46,7 @@ public static class ParkDirectory
 
         try
         {
-            using var racine = new DirectoryEntry(CheminLdap(uniteOrganisation));
+            using var racine = new DirectoryEntry(CheminAInterroger(uniteOrganisation));
 
             using var chercheur = new DirectorySearcher(racine)
             {
@@ -125,7 +125,7 @@ public static class ParkDirectory
 
         try
         {
-            using var racine = new DirectoryEntry(CheminLdap(depuis));
+            using var racine = new DirectoryEntry(CheminAInterroger(depuis));
             using var chercheur = new DirectorySearcher(racine)
             {
                 Filter = "(objectClass=organizationalUnit)",
@@ -155,16 +155,58 @@ public static class ParkDirectory
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Chemin LDAP à interroger. Vide : <c>LDAP://</c> tout court, ce qui laisse
-    /// Windows résoudre la racine du domaine auquel le poste appartient — c'est ce
-    /// qui évite d'avoir à saisir quoi que ce soit dans le cas courant.
+    /// Chemin LDAP à interroger, tel qu'il se déduit de la SAISIE, sans toucher au
+    /// réseau. Une saisie vide rend une chaîne vide, qui veut dire « racine du
+    /// domaine, à découvrir » — c'est <see cref="RacineDuDomaine"/> qui la trouve.
+    ///
+    /// « LDAP:// » TOUT COURT N'EST PAS UN CHEMIN VALIDE. C'était l'erreur de cette
+    /// méthode jusqu'au 19/09/2026 : ADSI le refuse avec 0x80005000
+    /// (E_ADS_BAD_PATHNAME), et comme la chaîne vide était justement le cas par
+    /// défaut, le seul cas où l'utilisateur n'a rien à saisir était le seul qui ne
+    /// pouvait pas marcher. Constaté sur un annuaire réel, jamais par les tests :
+    /// ils vérifiaient que la méthode rendait « LDAP:// », c'est-à-dire exactement
+    /// la mauvaise valeur.
     /// </summary>
     internal static string CheminLdap(string? uniteOrganisation)
     {
         var ou = (uniteOrganisation ?? "").Trim();
-        if (ou.Length == 0) return "LDAP://";
+        if (ou.Length == 0) return "";
         // On accepte les deux écritures : avec ou sans le préfixe.
         return ou.StartsWith("LDAP://", StringComparison.OrdinalIgnoreCase) ? ou : "LDAP://" + ou;
+    }
+
+    /// <summary>
+    /// Racine du domaine auquel ce poste appartient, demandée à l'annuaire lui-même.
+    ///
+    /// <c>RootDSE</c> est l'entrée que tout serveur LDAP publie sans authentification
+    /// particulière ; son attribut <c>defaultNamingContext</c> porte le nom distinctif
+    /// de la racine — « DC=exemple,DC=fr ». C'est la seule façon d'obtenir cette
+    /// racine sans la faire saisir, et sans la deviner à partir du nom DNS du poste,
+    /// qui ne correspond pas toujours.
+    ///
+    /// Lève si le poste n'est pas sur un domaine : l'appelant rattrape et le dit.
+    /// </summary>
+    private static string RacineDuDomaine()
+    {
+        using var rootDse = new DirectoryEntry("LDAP://RootDSE");
+        var racine = (rootDse.Properties["defaultNamingContext"].Value?.ToString() ?? "").Trim();
+
+        if (racine.Length == 0)
+            throw new InvalidOperationException(Lang.T(
+                "Ce poste n'appartient à aucun domaine Active Directory, ou l'annuaire n'a pas répondu.",
+                "This computer belongs to no Active Directory domain, or the directory did not answer."));
+
+        return "LDAP://" + racine;
+    }
+
+    /// <summary>
+    /// Le chemin réellement interrogé : celui de la saisie, ou la racine découverte
+    /// quand la saisie est vide.
+    /// </summary>
+    private static string CheminAInterroger(string? uniteOrganisation)
+    {
+        var chemin = CheminLdap(uniteOrganisation);
+        return chemin.Length > 0 ? chemin : RacineDuDomaine();
     }
 
     internal static bool EstDesactive(int userAccountControl) => (userAccountControl & CompteDesactive) != 0;

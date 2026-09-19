@@ -24,6 +24,16 @@ public sealed class ParametresParc
     /// </summary>
     public string UniteOrganisation { get; set; } = "";
 
+    /// <summary>
+    /// Où trouver <c>postes.csv</c>, l'annuaire d'adresses MAC écrit par le script
+    /// de déploiement. Un dossier convient autant qu'un chemin de fichier.
+    ///
+    /// VIDE = À CÔTÉ DE <c>parc.json</c>, dans les Documents. Ce réglage n'existe
+    /// que parce que le script, prévu pour tourner depuis une clé USB, écrit son
+    /// fichier là où il se trouve — pas là où la console lit.
+    /// </summary>
+    public string FichierAdressesMac { get; set; } = "";
+
     public static string Chemin => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC", "parametres.json");
 

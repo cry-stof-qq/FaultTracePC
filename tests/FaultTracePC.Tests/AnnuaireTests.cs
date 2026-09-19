@@ -17,11 +17,21 @@ public class AnnuaireTests
     // ------------------------------------------------------------------
 
     [Theory]
-    // Vide : Windows résout la racine du domaine du poste. C'est le cas par défaut,
-    // celui où l'utilisateur n'a rien à saisir.
-    [InlineData("", "LDAP://")]
-    [InlineData("   ", "LDAP://")]
-    [InlineData(null, "LDAP://")]
+    // VIDE REND VIDE, et surtout PAS « LDAP:// ».
+    //
+    // C'est la correction du 19/09/2026, et elle mérite d'être expliquée ici parce
+    // que ce test affirmait le contraire : « LDAP:// » tout court n'est pas un
+    // chemin ADSI valide — il échoue avec 0x80005000 (E_ADS_BAD_PATHNAME). La
+    // chaîne vide signifie « racine du domaine, à découvrir », et c'est RootDSE qui
+    // la trouve au moment de l'interrogation.
+    //
+    // La leçon : un test qui grave la mauvaise valeur attendue ne protège de rien,
+    // il empêche seulement de s'apercevoir de l'erreur. Celui-ci est passé au vert
+    // pendant que le cas par défaut — le seul où l'utilisateur n'a rien à saisir —
+    // ne pouvait pas fonctionner.
+    [InlineData("", "")]
+    [InlineData("   ", "")]
+    [InlineData(null, "")]
     [InlineData("OU=Postes,DC=exemple,DC=fr", "LDAP://OU=Postes,DC=exemple,DC=fr")]
     // Les deux écritures sont acceptées : on ne double pas le préfixe.
     [InlineData("LDAP://OU=Postes,DC=exemple,DC=fr", "LDAP://OU=Postes,DC=exemple,DC=fr")]
@@ -107,9 +117,60 @@ public class AnnuaireTests
     [Fact]
     public void Les_reglages_par_defaut_interrogent_la_racine_du_domaine()
     {
-        // Rien à saisir dans le cas courant : c'est le but.
+        // Rien à saisir dans le cas courant : c'est le but. Le réglage vide se
+        // traduit par un chemin vide, que l'interrogation remplace par la racine
+        // lue dans RootDSE — ce que ce test ne peut pas vérifier sans domaine.
         Assert.Equal("", new ParametresParc().UniteOrganisation);
-        Assert.Equal("LDAP://", ParkDirectory.CheminLdap(new ParametresParc().UniteOrganisation));
+        Assert.Equal("", ParkDirectory.CheminLdap(new ParametresParc().UniteOrganisation));
+    }
+
+    // ------------------------------------------------------------------
+    // Où lire l'annuaire d'adresses MAC
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Sans_reglage_l_annuaire_mac_se_cherche_a_cote_de_parc_json()
+    {
+        // Le cas par défaut : rien à saisir, et le fichier est cherché là où la
+        // console range ses données.
+        Assert.Equal(Path.Combine("D:\\Donnees", "postes.csv"),
+                     ParkInventory.CheminAdressesMac("", "D:\\Donnees"));
+        Assert.Equal(Path.Combine("D:\\Donnees", "postes.csv"),
+                     ParkInventory.CheminAdressesMac(null, "D:\\Donnees"));
+        Assert.Equal(Path.Combine("D:\\Donnees", "postes.csv"),
+                     ParkInventory.CheminAdressesMac("   ", "D:\\Donnees"));
+    }
+
+    [Fact]
+    public void Un_chemin_de_fichier_est_pris_tel_quel()
+        => Assert.Equal(@"E:\Deploiement\liste.csv",
+                        ParkInventory.CheminAdressesMac(@"E:\Deploiement\liste.csv", "D:\\Donnees"));
+
+    [Fact]
+    public void Les_guillemets_d_un_copier_le_chemin_d_acces_sont_retires()
+    {
+        // « Copier en tant que chemin d'accès » de l'Explorateur Windows entoure le
+        // chemin de guillemets. Les refuser ferait échouer le geste le plus naturel.
+        Assert.Equal(@"E:\Deploiement\postes.csv",
+                     ParkInventory.CheminAdressesMac("\"E:\\Deploiement\\postes.csv\"", "D:\\Donnees"));
+    }
+
+    [Fact]
+    public void Un_dossier_est_complete_par_le_nom_du_fichier()
+    {
+        // Coller le chemin du DOSSIER où tourne le script de déploiement est le
+        // geste naturel : on le complète au lieu de le refuser.
+        var dossier = Path.Combine(Path.GetTempPath(), "ftpc_test_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dossier);
+        try
+        {
+            Assert.Equal(Path.Combine(dossier, "postes.csv"),
+                         ParkInventory.CheminAdressesMac(dossier, "D:\\Donnees"));
+        }
+        finally
+        {
+            Directory.Delete(dossier);
+        }
     }
 
     [Fact]

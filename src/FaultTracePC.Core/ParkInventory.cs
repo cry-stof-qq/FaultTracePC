@@ -30,6 +30,33 @@ public static class ParkInventory
     /// <summary>Port d'écoute du mode parc, quand aucune source ne le précise.</summary>
     public const int PortParDefaut = 58620;
 
+    /// <summary>Nom du fichier d'adresses MAC, écrit par le script de déploiement.</summary>
+    public const string NomAnnuaireMac = "postes.csv";
+
+    /// <summary>
+    /// Où lire l'annuaire d'adresses MAC.
+    ///
+    /// POURQUOI CE RÉGLAGE EXISTE
+    /// Le script de déploiement écrit <c>postes.csv</c> À CÔTÉ DE LUI : il est fait
+    /// pour tourner depuis une clé USB, et se trouver tout seul. La console, elle,
+    /// lit ses données dans <c>Documents\FaultTracePC</c>. Sans ce réglage, les deux
+    /// fichiers ne se voient jamais et la colonne des adresses MAC reste vide sans
+    /// qu'on sache pourquoi — constaté le 19/09/2026 sur un parc réel.
+    ///
+    /// UN DOSSIER EST ACCEPTÉ AUTANT QU'UN FICHIER. Coller le chemin du dossier où
+    /// tourne le script est le geste naturel ; le refuser n'aiderait personne, alors
+    /// que compléter par le nom du fichier coûte une ligne. Les guillemets d'un
+    /// « Copier en tant que chemin d'accès » de l'Explorateur sont retirés pour la
+    /// même raison.
+    /// </summary>
+    public static string CheminAdressesMac(string? reglage, string dossierParDefaut)
+    {
+        var chemin = (reglage ?? "").Trim().Trim('"').Trim();
+        if (chemin.Length == 0) return Path.Combine(dossierParDefaut, NomAnnuaireMac);
+        if (Directory.Exists(chemin)) return Path.Combine(chemin, NomAnnuaireMac);
+        return chemin;
+    }
+
     // ------------------------------------------------------------------
     // Nom Windows : la clé de tout
     // ------------------------------------------------------------------
