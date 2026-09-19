@@ -18,6 +18,80 @@ public class LancementPowerShellTests
 {
     private const string Pause = "Appuyer sur Entrée pour fermer";
 
+    // ------------------------------------------------------------------
+    // Point 64, lot B : les paramètres passés au script de déploiement
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Un_commutateur_s_ecrit_sans_valeur_et_une_valeur_devient_un_litteral()
+    {
+        var ligne = PowerShellLauncher.ArgumentsForScript(
+            @"C:\Program Files\x\Deployer.ps1", Pause,
+            [
+                new("FichierPostes", @"C:\Mes Documents\postes.txt"),
+                new("VerifierSeulement", null),
+                new("SortieJson", @"C:\Mes Documents\journal.jsonl"),
+            ]);
+
+        // Les chemins à espaces tiennent dans un littéral à guillemets simples :
+        // c'est ce qui évite d'avoir à compter les guillemets de l'hôte.
+        Assert.Contains(@"-FichierPostes 'C:\Mes Documents\postes.txt'", ligne);
+        Assert.Contains(@"-SortieJson 'C:\Mes Documents\journal.jsonl'", ligne);
+
+        // Un commutateur n'a rien derrière lui : le paramètre suivant enchaîne
+        // directement. « -VerifierSeulement '' » serait refusé par PowerShell.
+        Assert.Contains("-VerifierSeulement -SortieJson", ligne);
+        Assert.DoesNotContain("-VerifierSeulement '", ligne);
+    }
+
+    [Fact]
+    public void L_ordre_des_parametres_est_conserve()
+    {
+        // Sans ordre garanti, un essai qui marche aujourd'hui pourrait échouer
+        // demain sans qu'on ait rien changé.
+        var ligne = PowerShellLauncher.ArgumentsForScript(@"C:\x\y.ps1", Pause,
+            [new("Un", "1"), new("Deux", null), new("Trois", "3")]);
+
+        Assert.True(ligne.IndexOf("-Un") < ligne.IndexOf("-Deux"));
+        Assert.True(ligne.IndexOf("-Deux") < ligne.IndexOf("-Trois"));
+    }
+
+    [Fact]
+    public void Une_apostrophe_dans_un_chemin_ne_coupe_pas_la_chaine()
+    {
+        // Le défaut qui a coûté la 1.4.1, dans l'autre sens : un dossier
+        // utilisateur nommé « O'Brien » suffisait à casser la commande.
+        var ligne = PowerShellLauncher.ArgumentsForScript(@"C:\x\y.ps1", Pause,
+            [new("FichierPostes", @"C:\Users\O'Brien\postes.txt")]);
+
+        Assert.Contains(@"'C:\Users\O''Brien\postes.txt'", ligne);
+    }
+
+    [Theory]
+    [InlineData("Fichier Postes")]
+    [InlineData("Fichier;Postes")]
+    [InlineData("Fichier-Postes")]
+    [InlineData("Fichier1")]
+    [InlineData("")]
+    public void Un_nom_de_parametre_inattendu_est_refuse(string nom)
+    {
+        // GARDE-FOU. Le nom part TEL QUEL dans la ligne de commande : n'y accepter
+        // que des lettres ferme la seule porte par laquelle du texte arbitraire
+        // pourrait s'y glisser. Mieux vaut une exception qu'une commande inattendue.
+        Assert.Throws<ArgumentException>(() =>
+            PowerShellLauncher.ArgumentsForScript(@"C:\x\y.ps1", Pause, [new(nom, "valeur")]));
+    }
+
+    [Fact]
+    public void Sans_parametre_la_ligne_est_celle_d_avant()
+    {
+        // Non-régression : l'ancienne surcharge est maintenant un appel à la
+        // nouvelle, et les boutons de réparation s'appuient dessus.
+        Assert.Equal(
+            PowerShellLauncher.ArgumentsForScript(@"C:\x\y.ps1", Pause),
+            PowerShellLauncher.ArgumentsForScript(@"C:\x\y.ps1", Pause, null));
+    }
+
     [Fact]
     public void Plus_aucun_NoExit()
     {

@@ -1075,10 +1075,17 @@ try {
             Alerte "Détail complet dans $journal"
         }
 
-        Write-Host ''
-        Write-Host '  1 = fermer' -ForegroundColor Cyan
-        Write-Host '  2 = recommencer depuis le début'
-        $recommencer = (Read-Host 'Ton choix [1/2]').Trim() -eq '2'
+        # EN VÉRIFICATION SEULE, ON NE DEMANDE RIEN ET ON SORT.
+        # Ce mode est fait pour être lancé par la console : une invite sans personne
+        # devant retiendrait la fenêtre ouverte indéfiniment, et le logiciel
+        # attendrait la fin d'un processus qui n'arrive jamais.
+        if ($script:verifierSeul) { $recommencer = $false }
+        else {
+            Write-Host ''
+            Write-Host '  1 = fermer' -ForegroundColor Cyan
+            Write-Host '  2 = recommencer depuis le début'
+            $recommencer = (Read-Host 'Ton choix [1/2]').Trim() -eq '2'
+        }
     } while ($recommencer)
 }
 finally {

@@ -41,9 +41,44 @@ public static class PowerShellLauncher
     /// la fenêtre ne retient l'utilisateur que lorsqu'il y a quelque chose à lire.
     /// </remarks>
     public static string ArgumentsForScript(string scriptPath, string pause) =>
-        Prefixe + "& { $fini = $false; try { & " + Litteral(scriptPath)
-        + "; $fini = $true } catch { Write-Host $_ } finally { if (-not $fini) { Read-Host "
-        + Litteral(pause) + " } } }\"";
+        ArgumentsForScript(scriptPath, pause, null);
+
+    /// <summary>
+    /// La même chose, avec des PARAMÈTRES passés au script — ce dont le
+    /// déploiement de parc a besoin (point 64, lot B).
+    ///
+    /// Une valeur <c>null</c> désigne un COMMUTATEUR : <c>-VerifierSeulement</c>
+    /// s'écrit sans rien derrière. Toute autre valeur devient un littéral
+    /// PowerShell à guillemets simples, donc insensible aux espaces comme aux
+    /// apostrophes d'un chemin.
+    ///
+    /// LE NOM DU PARAMÈTRE EST CONTRÔLÉ, PAS SEULEMENT SA VALEUR. Un nom est écrit
+    /// tel quel dans la ligne de commande : n'y accepter que des lettres ferme la
+    /// seule porte par laquelle du texte arbitraire pourrait s'y glisser. Le code
+    /// appelant ne devrait jamais en fabriquer d'autre — et s'il le fait, mieux
+    /// vaut une exception qu'une commande inattendue.
+    /// </summary>
+    public static string ArgumentsForScript(
+        string scriptPath, string pause, IEnumerable<KeyValuePair<string, string?>>? parametres)
+    {
+        var appel = new System.Text.StringBuilder("& " + Litteral(scriptPath));
+
+        foreach (var p in parametres ?? [])
+        {
+            if (p.Key is null || p.Key.Length == 0 || !p.Key.All(char.IsAsciiLetter))
+                throw new ArgumentException(
+                    Lang.T($"Nom de paramètre PowerShell inattendu : « {p.Key} »",
+                           $"Unexpected PowerShell parameter name: “{p.Key}”"),
+                    nameof(parametres));
+
+            appel.Append(" -").Append(p.Key);
+            if (p.Value is not null) appel.Append(' ').Append(Litteral(p.Value));
+        }
+
+        return Prefixe + "& { $fini = $false; try { " + appel
+            + "; $fini = $true } catch { Write-Host $_ } finally { if (-not $fini) { Read-Host "
+            + Litteral(pause) + " } } }\"";
+    }
 
     /// <summary>
     /// Exécution d'une COMMANDE écrite par le logiciel (boîte à outils, assistant
