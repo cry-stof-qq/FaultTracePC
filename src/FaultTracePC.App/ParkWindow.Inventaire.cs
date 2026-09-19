@@ -346,11 +346,22 @@ public partial class ParkWindow
             return;
         }
 
+        var affichees = LignesAffichees().ToList();
+
+        // LA VRAIE CAUSE D'ABORD. Sans inventaire chargé, il n'y a aucune case à
+        // recocher — et le message « 12 en échec, 12 absents de la liste » ferait
+        // chercher du côté de l'unité d'organisation, alors qu'il suffit
+        // d'actualiser. Constaté le 19/09/2026 au premier essai.
+        if (affichees.Count == 0)
+        {
+            Statut(Lang.T("L'inventaire n'est pas encore chargé : cliquer d'abord sur « Actualiser l'inventaire ».",
+                          "The inventory is not loaded yet: click “Refresh the inventory” first."));
+            return;
+        }
+
         var lecture = ParkDeployment.Lire(journal);
         var enEchec = new HashSet<string>(lecture.PostesEnEchec, StringComparer.OrdinalIgnoreCase);
         var vusDansLeJournal = new HashSet<string>(lecture.Postes, StringComparer.OrdinalIgnoreCase);
-
-        var affichees = LignesAffichees().ToList();
 
         // Le journal REMET AUSSI LE RÉSULTAT dans la colonne — mais seulement pour
         // les postes qu'il connaît. L'appliquer aux autres les marquerait « aucune
@@ -871,7 +882,12 @@ public partial class ParkWindow
     private void Statut(string texte)
     {
         TxtInvStatus.Text = texte;
-        TxtInvStatus.ToolTip = _detailDuStatut.Length > 0 ? _detailDuStatut : null;
+
+        // LE SURVOL DONNE TOUJOURS QUELQUE CHOSE À LIRE : le détail quand il y en a
+        // un, sinon le texte complet. La barre n'affiche que deux lignes et coupe le
+        // reste — sans ça, une phrase un peu longue finirait par « … » et personne
+        // ne pourrait en voir la fin. Constaté le 19/09/2026.
+        TxtInvStatus.ToolTip = _detailDuStatut.Length > 0 ? _detailDuStatut : texte;
         _detailDuStatut = "";
     }
 
