@@ -753,8 +753,23 @@ function Install-SurUnPoste([string]$nom) {
     Titre "$nom — 4. Installation"
     $nomMsi = Split-Path $Msi -Leaf
     $cible  = "\\$nom\C$\Windows\Temp\$nomMsi"
-    Copy-Item $Msi $cible -Force
-    Bien "Paquet copié ($([math]::Round((Get-Item $cible).Length / 1MB)) Mo)."
+
+    # LA COPIE EST LA PREMIÈRE ÉCRITURE SUR LE POSTE. Tout ce qui précède était en
+    # lecture ; à partir d'ici, le poste est modifié. Un échec de copie se journalise
+    # donc comme tel, et pas comme un échec d'installation : le paquet n'est jamais
+    # arrivé, il n'y a rien à nettoyer sur place.
+    try {
+        Copy-Item $Msi $cible -Force -ErrorAction Stop
+        $mo = [math]::Round((Get-Item $cible).Length / 1MB)
+        Bien "Paquet copié ($mo Mo)."
+        Write-Json $nom 'copie' 'ok' "$mo Mo"
+    }
+    catch {
+        Grave "Copie impossible vers $cible : $($_.Exception.Message)"
+        $resume.Etat = 'échec'; $resume.Detail = 'copie impossible'
+        Write-Json $nom 'copie' 'echec' $_.Exception.Message
+        return $resume
+    }
 
     $r = Invoke-Command -ComputerName $nom -ArgumentList $nomMsi, $Langue -ScriptBlock {
         param($nomMsi, $langue)
@@ -765,12 +780,25 @@ function Install-SurUnPoste([string]$nom) {
         [pscustomobject]@{ Code = $p.ExitCode }
     }
 
+    # LE CODE DE SORTIE EST LE SEUL VERDICT. « /qn » supprime toute interface, y
+    # compris les messages d'erreur : une installation qui échoue ne dit rien du
+    # tout. C'est le défaut constaté le 30/08/2026 sur un poste où le paquet n'a
+    # rien installé sans que rien ne le signale.
     switch ($r.Code) {
-        0    { Bien 'Installé.' }
-        3010 { Bien 'Installé — un redémarrage est demandé (sans urgence).' }
+        0    {
+            Bien 'Installé.'
+            Write-Json $nom 'installation' 'ok' 'installe' $null $r.Code
+        }
+        3010 {
+            Bien 'Installé — un redémarrage est demandé (sans urgence).'
+            # 3010 EST UNE RÉUSSITE, pas un échec : le poste est installé, il
+            # demande seulement un redémarrage. L'état le dit, le code le précise.
+            Write-Json $nom 'installation' 'ok' 'installe, redemarrage demande' $null $r.Code
+        }
         1638 {
             Grave 'Une autre version est déjà installée (1638) : désinstalle-la d''abord.'
             $resume.Etat = 'échec'; $resume.Detail = '1638 — déjà installé'
+            Write-Json $nom 'installation' 'echec' 'une autre version est deja installee' $null $r.Code
             return $resume
         }
         default {
@@ -778,6 +806,7 @@ function Install-SurUnPoste([string]$nom) {
             Alerte "Journal resté sur le poste : C:\Windows\Temp\ftpc-install.log"
             Alerte "Le paquet est laissé en place pour une reprise sur site."
             $resume.Etat = 'échec'; $resume.Detail = "msiexec $($r.Code)"
+            Write-Json $nom 'installation' 'echec' 'voir C:\Windows\Temp\ftpc-install.log sur le poste' $null $r.Code
             return $resume
         }
     }
@@ -813,12 +842,15 @@ function Set-ModeParc([string]$nom, $resume) {
     if (-not $script:secretParc) {
         Grave 'Aucun secret maître disponible : étape sautée.'
         $resume.Detail = 'parc non configuré'
+        # « ignore » et non « echec » : rien n'a raté, l'étape n'a pas été tentée.
+        Write-Json $nom 'parc' 'ignore' 'aucun secret maitre disponible'
         return $resume
     }
 
     if (-not (Test-WinRM $nom)) {
         Write-AideWinRM $nom
         $resume.Detail = 'parc non configuré (WinRM muet)'
+        Write-Json $nom 'parc' 'echec' 'gestion a distance muette (5985)'
         return $resume
     }
 
@@ -880,6 +912,7 @@ function Set-ModeParc([string]$nom, $resume) {
         Alerte 'Les lignes ci-dessus viennent du logiciel lui-même : elles disent quoi corriger.'
         Alerte 'Le poste restera INVISIBLE de la console tant que ce n''est pas réglé.'
         $resume.Detail = "parc échoué (code $($sortie.Code))"
+        Write-Json $nom 'parc' 'echec' 'configuration refusee par FaultTracePC.Cli.exe' $null $sortie.Code
         return $resume   # inutile d'attendre 35 secondes pour un port qui ne s'ouvrira pas
     }
 
@@ -895,11 +928,17 @@ function Set-ModeParc([string]$nom, $resume) {
         $resume.Detail = 'parc OK'
         $resume.Pret = $true
         $resume.Ip = Get-IpDuPoste $nom
+        Write-Json $nom 'parc' 'ok' "port $Port joignable" $resume.Ip
     }
     else {
+        # LA CONFIGURATION A RÉUSSI, LE PORT NE RÉPOND PAS : deux choses
+        # différentes, et le journal doit permettre de les distinguer. Le poste est
+        # configuré — il restera simplement invisible tant que le chemin réseau ne
+        # sera pas ouvert.
         Grave "Le port $Port ne répond pas depuis cette machine."
         Alerte 'Causes possibles : règle de pare-feu absente, service arrêté, ou VLAN filtré.'
         $resume.Detail = 'parc configuré, port muet'
+        Write-Json $nom 'parc' 'echec' "configure, mais le port $Port ne repond pas"
     }
     return $resume
 }
