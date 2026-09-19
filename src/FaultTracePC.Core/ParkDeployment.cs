@@ -67,6 +67,66 @@ public static class ParkDeployment
         EtapesInoffensives.Contains((etape ?? "").Trim(), StringComparer.OrdinalIgnoreCase);
 
     // ------------------------------------------------------------------
+    // Le paquet à déployer
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Ce qui cloche avec le paquet indiqué, ou une chaîne vide si tout va bien.
+    ///
+    /// CONTRÔLÉ ICI, ET PAS SUR LE POSTE DISTANT. Un chemin fautif découvert au
+    /// milieu d'un lot de cinquante machines laisse la moitié du parc dans un état
+    /// et l'autre moitié dans un autre. Autant s'en apercevoir avant le premier
+    /// octet copié.
+    /// </summary>
+    public static string VerifierLePaquet(string? chemin)
+    {
+        var c = (chemin ?? "").Trim().Trim('"').Trim();
+
+        if (c.Length == 0)
+            return Lang.T("Aucun paquet indiqué : renseigner le chemin du fichier .msi de FaultTracePC.",
+                          "No package given: set the path to the FaultTracePC .msi file.");
+
+        if (!c.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
+            return Lang.T($"Ce n'est pas un paquet d'installation : {c} ne se termine pas par .msi.",
+                          $"This is not an installer package: {c} does not end with .msi.");
+
+        try
+        {
+            if (!File.Exists(c))
+                return Lang.T($"Paquet introuvable : {c}. Vérifier le partage et les droits de lecture.",
+                              $"Package not found: {c}. Check the share and the read permissions.");
+        }
+        catch (Exception ex)
+        {
+            // Un chemin réseau injoignable lève au lieu de rendre « false » : le dire
+            // vaut mieux que de le traduire en « introuvable », qui enverrait
+            // chercher au mauvais endroit.
+            return Lang.T($"Paquet illisible : {ex.Message}", $"Package unreadable: {ex.Message}");
+        }
+
+        return "";
+    }
+
+    /// <summary>
+    /// Numéro de version lu DANS LE NOM DU FICHIER — « FaultTracePC-1.6.2.msi »
+    /// donne « 1.6.2 ». Rend une chaîne vide si le nom ne suit pas cette forme.
+    ///
+    /// CE N'EST PAS LA VERSION DU PAQUET, c'est celle que son nom annonce. Un
+    /// fichier renommé mentirait, et c'est pourquoi tout ce qui s'appuie là-dessus
+    /// doit le présenter comme une indication, jamais comme un fait établi.
+    /// </summary>
+    public static string VersionAnnonceeParLeNom(string? chemin)
+    {
+        try
+        {
+            var nom = Path.GetFileNameWithoutExtension((chemin ?? "").Trim().Trim('"').Trim());
+            var m = System.Text.RegularExpressions.Regex.Match(nom, @"^FaultTracePC-(\d+\.\d+\.\d+)$");
+            return m.Success ? m.Groups[1].Value : "";
+        }
+        catch { return ""; }
+    }
+
+    // ------------------------------------------------------------------
     // Lecture
     // ------------------------------------------------------------------
 

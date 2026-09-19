@@ -89,6 +89,8 @@ public partial class ParkWindow
         var reglages = ParametresParc.Charger();
         TxtUnite.Text = reglages.UniteOrganisation;
         TxtFichierMac.Text = reglages.FichierAdressesMac;
+        TxtPaquet.Text = reglages.CheminDuPaquet;
+        MajEtatDuPaquet();
     }
 
     // ------------------------------------------------------------------
@@ -158,6 +160,44 @@ public partial class ParkWindow
         if (boite.ShowDialog(this) == true) TxtFichierMac.Text = boite.FileName;
     }
 
+    private void BtnInvParcourirPaquet_Click(object sender, RoutedEventArgs e)
+    {
+        var boite = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = Lang.T("Choisir le paquet d'installation", "Choose the installer package"),
+            Filter = Lang.T("Paquet Windows (*.msi)|*.msi|Tous les fichiers (*.*)|*.*",
+                            "Windows package (*.msi)|*.msi|All files (*.*)|*.*"),
+            CheckFileExists = true,
+        };
+
+        if (boite.ShowDialog(this) == true)
+        {
+            TxtPaquet.Text = boite.FileName;
+            MajEtatDuPaquet();
+        }
+    }
+
+    /// <summary>
+    /// Dit à côté du champ ce que vaut le paquet indiqué, SANS L'OUVRIR : présent
+    /// ou non, et quelle version son nom annonce. C'est une indication, pas un
+    /// fait — un fichier renommé mentirait, et le texte le dit.
+    /// </summary>
+    private void MajEtatDuPaquet()
+    {
+        var chemin = (TxtPaquet.Text ?? "").Trim();
+        if (chemin.Length == 0) { TxtPaquetEtat.Text = ""; return; }
+
+        var probleme = ParkDeployment.VerifierLePaquet(chemin);
+        if (probleme.Length > 0) { TxtPaquetEtat.Text = "⚠ " + probleme; return; }
+
+        var version = ParkDeployment.VersionAnnonceeParLeNom(chemin);
+        TxtPaquetEtat.Text = version.Length > 0
+            ? Lang.T($"✔ trouvé — son nom annonce la version {version}",
+                     $"✔ found — its name announces version {version}")
+            : Lang.T("✔ trouvé — son nom n'annonce aucune version",
+                     "✔ found — its name announces no version");
+    }
+
     private void CbUnite_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // C'est le NOM DISTINCTIF qui part dans le réglage, pas le libellé lisible :
@@ -193,6 +233,7 @@ public partial class ParkWindow
         var reglages = ParametresParc.Charger();
         reglages.UniteOrganisation = saisie;
         reglages.FichierAdressesMac = (TxtFichierMac.Text ?? "").Trim();
+        reglages.CheminDuPaquet = (TxtPaquet.Text ?? "").Trim();
         bool memorise = reglages.Enregistrer();
 
         var cheminMac = ParkInventory.CheminAdressesMac(reglages.FichierAdressesMac, DossierDesDonnees);

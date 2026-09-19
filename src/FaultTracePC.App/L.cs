@@ -400,6 +400,10 @@ public static class L
         "Le fichier postes.csv écrit par le script de déploiement. Laisser vide le cherche à côté de parc.json. Un dossier convient autant qu'un chemin de fichier. Sans lui, la colonne « MAC connue » reste vide : l'annuaire Active Directory ne stocke aucune adresse MAC.",
         "The postes.csv file written by the deployment script. Leave empty to look for it next to parc.json. A folder works as well as a file path. Without it the “MAC known” column stays empty: Active Directory stores no MAC address at all.");
     public static string ParkInvBrowse => Lang.T("📁 Parcourir…", "📁 Browse…");
+    public static string ParkInvPackageLabel => Lang.T("Paquet à déployer :", "Package to deploy:");
+    public static string ParkInvPackageTip => Lang.T(
+        "Le fichier .msi de FaultTracePC, sur un partage lisible par les ORDINATEURS du domaine — pas seulement par les utilisateurs : l'installation se fait sous le compte machine.",
+        "The FaultTracePC .msi file, on a share readable by the domain COMPUTERS — not only by users: the installation runs under the machine account.");
     public static string ParkInvColSources => Lang.T("Vu par", "Seen by");
     public static string ParkInvColUnit => Lang.T("Unité d'organisation", "Organizational unit");
     public static string ParkInvColLastLogon => Lang.T("Dernière session", "Last logon");

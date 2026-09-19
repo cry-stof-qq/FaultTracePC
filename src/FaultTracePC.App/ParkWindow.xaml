@@ -147,6 +147,16 @@
                         <Button x:Name="BtnInvParcourirMac" Content="{x:Static loc:L.ParkInvBrowse}"
                                 Padding="12,5" Margin="8,0,0,0" Click="BtnInvParcourirMac_Click"/>
                     </WrapPanel>
+                    <WrapPanel VerticalAlignment="Center" Margin="0,8,0,0">
+                        <TextBlock Text="{x:Static loc:L.ParkInvPackageLabel}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox x:Name="TxtPaquet" Width="420" VerticalAlignment="Center"
+                                 FontFamily="Consolas" FontSize="11"
+                                 ToolTip="{x:Static loc:L.ParkInvPackageTip}"/>
+                        <Button x:Name="BtnInvParcourirPaquet" Content="{x:Static loc:L.ParkInvBrowse}"
+                                Padding="12,5" Margin="8,0,0,0" Click="BtnInvParcourirPaquet_Click"/>
+                        <TextBlock x:Name="TxtPaquetEtat" VerticalAlignment="Center" Margin="10,0,0,0"
+                                   FontSize="12" Foreground="#44546A"/>
+                    </WrapPanel>
                   </StackPanel>
                 </Border>
 

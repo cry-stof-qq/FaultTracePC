@@ -34,6 +34,15 @@ public sealed class ParametresParc
     /// </summary>
     public string FichierAdressesMac { get; set; } = "";
 
+    /// <summary>
+    /// Chemin du paquet <c>.msi</c> à déployer, sur un partage lisible par les
+    /// ORDINATEURS du domaine — pas seulement par les utilisateurs : l'installation
+    /// se fait sous le compte machine.
+    ///
+    /// Vide tant qu'on n'a rien déployé. Ce n'est pas un secret : c'est un chemin.
+    /// </summary>
+    public string CheminDuPaquet { get; set; } = "";
+
     public static string Chemin => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FaultTracePC", "parametres.json");
 
