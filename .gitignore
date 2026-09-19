@@ -77,6 +77,12 @@ postes.csv
 # au logiciel doit être ajouté à ce fichier DANS LE MÊME GESTE.
 Deploiement/
 
+# Les alertes archivées par la console (point 43), dans Documents\FaultTracePC\
+# Alertes : un fichier par poste, portant SON NOM et son historique d'incidents.
+# QUATRIÈME dossier écrit par le logiciel à côté du code — et cette fois la règle a
+# été appliquée dans le même geste que le code qui écrit.
+Alertes/
+
 # EN REVANCHE, CE QUE LE SCRIPT ÉCRIT NE L'EST PAS. Il range la transcription de
 # chaque exécution dans un sous-dossier « Journal », à côté de lui : noms de
 # postes, adresses IP, adresses MAC. Il est apparu dans scripts\ dès le premier
