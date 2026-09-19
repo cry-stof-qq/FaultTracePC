@@ -61,6 +61,11 @@ parametres.json
 # copie écrite par le script de déploiement à côté de lui.
 postes.csv
 
+# Le script de déploiement, lui, est suivi depuis le 19/09/2026 : il vit dans
+# scripts\ et le noyau l'embarque. L'exemple d'annuaire qui l'accompagne porte
+# exprès un AUTRE nom — « postes.exemple.csv » — pour qu'il ne puisse jamais être
+# confondu avec un vrai, et pour que la règle ci-dessus reste sans exception.
+
 # Dumps éventuellement copiés pour analyse
 *.dmp
 

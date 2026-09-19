@@ -1,0 +1,104 @@
+﻿Deployer-FaultTracePC — installation de FaultTracePC sur des postes distants
+============================================================================
+Version 1.1 — 5 septembre 2026
+
+Trois fichiers, a garder dans le MEME dossier. Ils fonctionnent depuis
+n'importe ou, y compris une cle USB.
+
+  Deployer-FaultTracePC.cmd   double-cliquez ici (demande l'elevation)
+  Deployer-FaultTracePC.ps1   le script lui-meme
+  postes.csv                  annuaire d'adresses MAC, pour le reveil reseau
+
+
+AVANT LA PREMIERE UTILISATION : DEBLOQUER LES FICHIERS
+------------------------------------------------------
+Windows marque tout fichier venu d'Internet (Mark of the Web). Un script
+PowerShell ainsi marque refuse de s'executer, souvent sans explication claire.
+Apres avoir decompresse l'archive, dans le dossier obtenu :
+
+  Get-ChildItem . -Recurse | Unblock-File
+
+Ou, sans PowerShell : clic droit sur chaque fichier > Proprietes > cocher
+« Debloquer » en bas de l'onglet General > Appliquer.
+
+Ce blocage n'est pas un signe que le fichier est dangereux : Windows l'applique
+a tout telechargement. Explication detaillee :
+https://palisser.fr/spip.php?article28
+
+
+CE QU'IL FAIT
+-------------
+Pour chaque poste que vous nommez :
+
+  1. verifie que le nom est un compte d'ordinateur du domaine ;
+  2. verifie qu'il repond (ping OU port 445) ;
+  3. s'il est eteint, le reveille par Wake-on-LAN ;
+  4. copie le paquet, l'installe, controle le CODE DE SORTIE, puis efface le
+     paquet du poste ;
+  5. configure le mode parc, CONTROLE le code de sortie du logiciel, puis
+     verifie que le port repond vraiment.
+
+Au lancement, il propose : installer, installer et mettre en parc, mettre en
+parc seulement, ou simplement reveiller le poste. A la fin, il affiche ce qu'il
+faut saisir dans la console de parc, et propose de recommencer.
+
+
+PREMIER LANCEMENT
+-----------------
+Il demande deux valeurs propres a votre reseau :
+
+  - le chemin du paquet MSI (partage reseau ou dossier local) ;
+  - le serveur DHCP, consulte pour retrouver l'adresse MAC d'un poste eteint
+    (facultatif : laissez vide si vous n'en avez pas).
+
+Il propose ensuite de les enregistrer dans « parametres.json », a cote du
+script. Ce fichier ne contient AUCUN secret — le secret maitre du parc est
+demande a chaque fois et n'est jamais ecrit. Il nomme en revanche vos serveurs :
+ne le diffusez pas.
+
+
+CE QU'IL FAUT SAVOIR
+--------------------
+Prerequis : etre administrateur des postes vises, et que WinRM y reponde
+(Test-WSMan <poste>). Le compte doit pouvoir atteindre \\<poste>\C$.
+
+WinRM est le point qui bloque le plus souvent. Sur un Windows client, le
+service demarre « a la demande » et personne ne le demande jamais : le poste
+repond au ping et au port 445, mais le port 5985 reste muet. Le script le
+verifie desormais AVANT de copier le paquet, et rappelle les deux commandes
+qui le reglent a distance (elles passent par RPC, pas par WinRM) :
+
+  sc.exe \\<poste> config winrm start= auto
+  sc.exe \\<poste> start winrm
+
+Sur un parc, la reponse durable est une strategie de groupe qui met le service
+« Gestion a distance de Windows (WS-Management) » en demarrage automatique.
+
+Le paquet est COPIE sur le poste avant installation, et non installe depuis le
+partage : une session distante ne peut pas presenter votre identite a un
+troisieme ordinateur (« double saut » Kerberos). Etre administrateur du domaine
+n'y change rien.
+
+Le ping ne suffit pas a dire qu'un poste est eteint : beaucoup de strategies
+bloquent ICMP. Le script teste aussi le port 445.
+
+Le reveil reseau est une DIFFUSION : il ne traverse pas les routeurs. Le script
+choisit la carte reseau qui mene au poste, d'apres l'adresse rendue par le
+serveur DHCP ; « -Interface » permet de l'imposer.
+
+postes.csv n'est PAS une liste de cibles : c'est un annuaire d'adresses MAC,
+consulte uniquement pour reveiller une machine qui ne repond pas. Il peut donc
+contenir sans risque des telephones ou des tablettes.
+
+
+EXEMPLES
+--------
+  .\Deployer-FaultTracePC.ps1
+  .\Deployer-FaultTracePC.ps1 -Poste PC-1 -SeulementParc -ConfigurerParc
+  .\Deployer-FaultTracePC.ps1 -Poste PC-1,PC-2 -ConfigurerParc -SecretFichier C:\chemin\secret.txt
+  .\Deployer-FaultTracePC.ps1 -Poste PC-1 -ReveilSeulement -Interface Ethernet
+
+Chaque execution ecrit un journal complet dans le sous-dossier « Journal ».
+
+
+FaultTracePC — https://github.com/cry-stof-qq/FaultTracePC

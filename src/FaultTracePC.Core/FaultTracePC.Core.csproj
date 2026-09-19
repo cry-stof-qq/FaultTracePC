@@ -17,6 +17,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- LE SCRIPT DE DÉPLOIEMENT VOYAGE AVEC LE LOGICIEL (point 64, lot B).
+         Décidé le 19/09/2026 : distribué à part, il existait en deux exemplaires
+         qui ont fini par diverger. Et le contrat JSON du lot B lie le script à la
+         console — deux fichiers livrés séparément se désynchronisent sans que rien
+         ne le signale, le symptôme étant un journal illisible.
+         LogicalName est fixé explicitement : sans lui, le nom de la ressource se
+         déduirait du chemin du fichier, et déplacer le dossier casserait la
+         lecture en silence. ScriptEmbarqueTests le vérifie à chaque compilation. -->
+    <EmbeddedResource Include="..\..\scripts\Deployer-FaultTracePC.ps1"
+                      LogicalName="FaultTracePC.Deployer-FaultTracePC.ps1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Accès WMI (Win32_OperatingSystem, Win32_DiskDrive, etc.) -->
     <PackageReference Include="System.Management" Version="10.0.10" />
     <!-- Lecture du journal d'événements Windows (EventLogQuery / EventLogReader) -->
