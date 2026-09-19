@@ -206,6 +206,10 @@
                                    Text="{x:Static loc:L.ParkInvHint}"/>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="BtnInvReprendre" Content="{x:Static loc:L.ParkInvResume}"
+                                    Padding="10,5" FontSize="12" Margin="0,0,10,0"
+                                    Click="BtnInvReprendre_Click"
+                                    ToolTip="{x:Static loc:L.ParkInvResumeTip}"/>
                             <Button x:Name="BtnInvToutCocher" Content="{x:Static loc:L.ParkInvCheckAll}"
                                     Padding="10,5" FontSize="12" Margin="0,0,6,0" Click="BtnInvToutCocher_Click"/>
                             <Button x:Name="BtnInvRienCocher" Content="{x:Static loc:L.ParkInvUncheckAll}"

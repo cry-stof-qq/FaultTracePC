@@ -326,6 +326,76 @@ public partial class ParkWindow
     private IEnumerable<LigneInventaire> LignesAffichees() =>
         LvInventaire.ItemsSource as IEnumerable<LigneInventaire> ?? [];
 
+    /// <summary>
+    /// POINT 64, LOT D — recocher les seuls postes en échec du dernier journal.
+    ///
+    /// RIEN N'EST LANCÉ ICI. Ce bouton PRÉPARE une sélection, il ne la traite pas :
+    /// reprendre un déploiement est une décision, et elle se prend en cliquant sur
+    /// « Déployer », avec sa confirmation chiffrée, comme la première fois.
+    /// </summary>
+    private void BtnInvReprendre_Click(object sender, RoutedEventArgs e)
+    {
+        if (_inventaireOccupe) return;
+        TxtInvStatus.ToolTip = null;
+
+        var journal = ParkDeployment.DernierJournal(ScriptDeDeploiement.DossierParDefaut);
+        if (journal.Length == 0)
+        {
+            Statut(Lang.T("Aucun journal : rien n'a encore été vérifié ni déployé depuis cette console.",
+                          "No journal: nothing has been checked or deployed from this console yet."));
+            return;
+        }
+
+        var lecture = ParkDeployment.Lire(journal);
+        var enEchec = new HashSet<string>(lecture.PostesEnEchec, StringComparer.OrdinalIgnoreCase);
+        var vusDansLeJournal = new HashSet<string>(lecture.Postes, StringComparer.OrdinalIgnoreCase);
+
+        var affichees = LignesAffichees().ToList();
+
+        // Le journal REMET AUSSI LE RÉSULTAT dans la colonne — mais seulement pour
+        // les postes qu'il connaît. L'appliquer aux autres les marquerait « aucune
+        // trace », ce qui serait faux : ils n'étaient simplement pas du lot.
+        AppliquerLesVerdicts(lecture, affichees.Where(l => vusDansLeJournal.Contains(l.Nom)).ToList());
+
+        foreach (var l in affichees) l.Coche = enEchec.Contains(l.Nom);
+
+        int recoches = affichees.Count(l => l.Coche);
+        int introuvables = enEchec.Count - recoches;
+
+        var quoi = ParkDeployment.NatureDuJournal(journal) == "deploiement"
+            ? Lang.T("déploiement", "deployment")
+            : Lang.T("vérification", "check");
+
+        var moment = ParkDeployment.MomentDuJournal(journal);
+        var quand = moment is null
+            ? ""
+            : Lang.T($" du {moment:dd/MM/yyyy} à {moment:HH:mm}", $" of {moment:yyyy-MM-dd} at {moment:HH:mm}");
+
+        var texte = enEchec.Count == 0
+            ? Lang.T($"Aucun poste en échec dans le dernier journal de {quoi}{quand}. Rien à reprendre.",
+                     $"No failed computer in the last {quoi} journal{quand}. Nothing to resume.")
+            : Lang.T($"{enEchec.Count} poste(s) en échec dans le journal de {quoi}{quand} — {recoches} recoché(s).",
+                     $"{enEchec.Count} failed computer(s) in the {quoi} journal{quand} — {recoches} ticked.");
+
+        if (introuvables > 0)
+        {
+            // ON NE FAIT PAS SEMBLANT. Un poste en échec absent de la liste affichée
+            // n'a pas été recoché, et le dire évite de croire qu'on reprend tout.
+            texte += Lang.T($" {introuvables} absent(s) de la liste affichée.",
+                            $" {introuvables} not in the displayed list.");
+
+            var noms = enEchec.Where(nom => !affichees.Any(l =>
+                           string.Equals(l.Nom, nom, StringComparison.OrdinalIgnoreCase)))
+                       .OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
+
+            _detailDuStatut = Lang.T(
+                $"Postes en échec absents de la liste affichée — ils sont peut-être hors de l'unité d'organisation interrogée : {string.Join(", ", noms)}.",
+                $"Failed computers missing from the displayed list — they may be outside the queried organizational unit: {string.Join(", ", noms)}.");
+        }
+
+        Statut(texte);
+    }
+
     private void BtnInvToutCocher_Click(object sender, RoutedEventArgs e)
     {
         foreach (var l in LignesAffichees()) l.Coche = true;
@@ -812,6 +882,7 @@ public partial class ParkWindow
         BtnInvActualiser.IsEnabled = !occupe;
         BtnInvVerifier.IsEnabled = !occupe;
         BtnInvDeployer.IsEnabled = !occupe;
+        BtnInvReprendre.IsEnabled = !occupe;
         Cursor = occupe ? System.Windows.Input.Cursors.Wait : null;
         if (message is not null) Statut(message);
     }

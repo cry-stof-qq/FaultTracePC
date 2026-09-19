@@ -127,6 +127,70 @@ public static class ParkDeployment
     }
 
     // ------------------------------------------------------------------
+    // Retrouver le dernier journal — point 64, lot D
+    // ------------------------------------------------------------------
+
+    public const string PrefixeDeploiement = "deploiement_";
+    public const string PrefixeVerification = "verification_";
+
+    /// <summary>
+    /// Le journal le plus récent du dossier, ou une chaîne vide s'il n'y en a aucun.
+    ///
+    /// LE TRI SE FAIT SUR LE NOM, PAS SUR LA DATE DU FICHIER. Le nom porte
+    /// « aaaa-mm-jj_hhmmss », des chiffres à largeur fixe : trié comme du texte, il
+    /// est donc trié comme du temps. La date du fichier, elle, bouge — une copie,
+    /// une restauration ou une synchronisation la réécrit, et le « dernier » journal
+    /// ne serait plus le dernier.
+    /// </summary>
+    public static string DernierJournal(string dossier)
+    {
+        try
+        {
+            if (!Directory.Exists(dossier)) return "";
+
+            return Directory.GetFiles(dossier, "*.jsonl")
+                            .Where(f => EstUnJournal(Path.GetFileName(f)))
+                            .OrderByDescending(f => Path.GetFileName(f), StringComparer.Ordinal)
+                            .FirstOrDefault() ?? "";
+        }
+        catch { return ""; }
+    }
+
+    private static bool EstUnJournal(string nom) =>
+        nom.StartsWith(PrefixeDeploiement, StringComparison.OrdinalIgnoreCase)
+        || nom.StartsWith(PrefixeVerification, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Ce qu'était ce journal : <c>deploiement</c>, <c>verification</c>, ou une
+    /// chaîne vide. Le nom le dit — et c'est pour ça qu'il le porte.
+    /// </summary>
+    public static string NatureDuJournal(string chemin)
+    {
+        var nom = Path.GetFileName((chemin ?? "").Trim());
+        if (nom.StartsWith(PrefixeDeploiement, StringComparison.OrdinalIgnoreCase)) return "deploiement";
+        if (nom.StartsWith(PrefixeVerification, StringComparison.OrdinalIgnoreCase)) return "verification";
+        return "";
+    }
+
+    /// <summary>
+    /// Le moment que le NOM du journal annonce. Rend <c>null</c> si le nom ne suit
+    /// pas la forme attendue — auquel cas on n'affiche pas de date plutôt que d'en
+    /// inventer une à partir de la date du fichier, qui ne veut plus rien dire dès
+    /// qu'il a été copié.
+    /// </summary>
+    public static DateTime? MomentDuJournal(string chemin)
+    {
+        var nom = Path.GetFileNameWithoutExtension((chemin ?? "").Trim());
+        var m = System.Text.RegularExpressions.Regex.Match(nom, @"_(\d{4}-\d{2}-\d{2}_\d{6})$");
+        if (!m.Success) return null;
+
+        return DateTime.TryParseExact(m.Groups[1].Value, "yyyy-MM-dd_HHmmss",
+                                      System.Globalization.CultureInfo.InvariantCulture,
+                                      System.Globalization.DateTimeStyles.None, out var d)
+            ? d : null;
+    }
+
+    // ------------------------------------------------------------------
     // Lecture
     // ------------------------------------------------------------------
 

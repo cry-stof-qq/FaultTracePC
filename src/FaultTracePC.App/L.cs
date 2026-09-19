@@ -412,6 +412,10 @@ public static class L
     public static string ParkInvColCheck => Lang.T("Vérification", "Check");
     public static string ParkInvCheckAll => Lang.T("Tout cocher", "Tick all");
     public static string ParkInvUncheckAll => Lang.T("Tout décocher", "Untick all");
+    public static string ParkInvResume => Lang.T("↩ Reprendre les échecs", "↩ Resume the failures");
+    public static string ParkInvResumeTip => Lang.T(
+        "Relit le dernier journal de cette console et recoche UNIQUEMENT les postes qui y ont échoué. Rien n'est lancé : la sélection est préparée, c'est à vous de cliquer ensuite sur Vérifier ou sur Déployer.",
+        "Re-reads this console's last journal and ticks ONLY the computers that failed in it. Nothing is started: the selection is prepared, it is up to you to then click Check or Deploy.");
     public static string ParkInvVerify => Lang.T("\U0001F50E Vérifier la sélection", "\U0001F50E Check the selection");
     public static string ParkInvVerifyTip => Lang.T(
         "Contrôle, pour chaque poste coché, qu'il est prêt à recevoir le paquet : compte d'ordinateur, réponse réseau, partage administratif et gestion à distance. AUCUNE MACHINE N'EST MODIFIÉE — ni copie, ni installation, ni réveil réseau.",
