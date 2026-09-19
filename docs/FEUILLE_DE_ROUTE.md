@@ -393,7 +393,22 @@ Le déploiement se fait aujourd'hui par un script PowerShell distribué à part,
 - **Une adresse qui ne peut pas servir ne doit pas être proposée** — lien-local, index de zone, boucle locale, et surtout la machine locale elle-même, qui répond par l'une de ses propres cartes, virtuelle aussi bien que physique. Mieux vaut rien qu'une valeur fausse : sans adresse, on saisit le nom, ce que le script recommande de toute façon.
 - **Troisième dossier en deux jours écrit par le logiciel à côté du code sans être ignoré** — après `parametres.json` et `Journal/`, c'est `Deploiement/`. Le dossier de données du logiciel et le dossier de développement sont le même. *Tout nouveau chemin d'écriture ajouté au logiciel doit être ajouté au `.gitignore` dans le même geste.*
 
-**Reste au point 64 : le lot C** — le déploiement réel et ses garde-fous — puis le **lot D**, le journal et la reprise des seuls postes en échec.
+**Lot C ✔ — le déploiement réel, livré le 19/09/2026.** C'est la première fois que ce logiciel modifie autre chose que le poste sur lequel il tourne.
+
+- **Le bouton et sa confirmation chiffrée.** Il faut RECOPIER le nombre de postes pour que « Lancer » s'active. Un « Oui / Non » se clique par réflexe — c'est même le geste le plus rapide quand on est pressé, donc exactement au mauvais moment. Recopier un nombre oblige à le lire, et lire « 47 » quand on croyait en avoir coché trois est la seule chose qui arrête la main à temps. La touche Entrée **annule**.
+- **La fenêtre dit ce qui va se passer, avant.** Copie puis installation silencieuse, réveil réseau des machines éteintes, démarrage **durable** du service de gestion à distance, remplacement d'une version plus ancienne — et, selon la case, ce que le poste deviendra ou ne deviendra pas. *Une confirmation qui ne dit pas ce qu'elle confirme ne protège de rien.*
+- **Plafond de cinquante postes**, contre cent en vérification : ici on modifie des machines, et cinquante est encore une liste qu'on peut relire avant de valider.
+- **Le paquet est contrôlé dans la console, pas sur le poste distant.** Un chemin fautif découvert au milieu d'un lot laisserait la moitié du parc installée et l'autre moitié non. « Introuvable » et « illisible » ne se disent pas pareil : un partage injoignable lève au lieu de rendre faux, et le traduire en « introuvable » enverrait chercher au mauvais endroit. La version affichée est lue **dans le nom du fichier**, donc annoncée comme une indication et jamais comme un fait.
+- **Le déploiement démarre WinRM quand il le trouve muet.** `sc.exe \\poste` pilote les services par le canal des partages Windows (445), pas par WinRM : c'est ce qui permet de démarrer le service quand le service ne répond pas. Jamais en vérification — la vérification ne modifie rien, c'est sa définition.
+- **Les décomptes se font sur des codes, jamais sur les phrases affichées.** Compter des textes traduits ferait dépendre un bilan de la langue de l'interface.
+- **« Aucune trace » ne se dit pas comme « en échec ».** Un poste que le script n'a pas atteint n'est ni installé ni en panne : on ne sait rien de lui, et c'est écrit tel quel.
+
+**Deux décisions de fond, prises après discussion le 19/09/2026 :**
+
+- **La vérification préalable prévient, elle n'interdit pas.** Exiger l'état « prêt » aurait bloqué les postes ÉTEINTS — précisément ceux que le déploiement sait réveiller. L'aperçu (« 9 prêts · 1 en échec · 2 non vérifiés ») sert à savoir avant de lancer, pas à empêcher. Et *« non vérifié » ne veut pas dire « en panne » : cela veut dire qu'on ne sait rien de ce poste.*
+- **Le secret maître ne passe pas par la console.** Le script sait le lire dans un fichier ; ce serait l'écrire en clair sur le disque, même brièvement, et la règle « aucun mot de passe nulle part » tient depuis le début. Il est donc demandé UNE FOIS dans la fenêtre PowerShell, sans rien afficher, pour tout le lot. Corollaire : le script se sait « piloté » dès qu'on lui donne un journal JSON et ne pose plus aucune question de confort — **sauf celle-là**, qui n'en est pas une.
+
+**Reste au point 64 : le lot D** — le journal et la reprise des seuls postes en échec.
 
 ---
 
