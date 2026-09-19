@@ -19,6 +19,7 @@
 | 1.6.1 | **publiée** le 18/09/2026 — correctifs constatés sur deux rapports 1.6.0 réels, plus deux ajouts demandés dans la foulée — points 65 à 71, 513 tests verts |
 | 1.6.2 | **publiée** le 18/09/2026 — sept correctifs constatés sur un rapport 1.6.1 réel, dont **deux créés par la 1.6.1 elle-même** — points 72 à 78, 616 tests verts |
 | 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots), 43 (archivage des alertes) et 46 (boîte noire distante) |
+| 1.8.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026 |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
@@ -59,7 +60,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 12 | **Localisation FR/EN**, détection par session utilisateur, sélecteur dans l'application | **fait en 1.3.0** |
 | 13 | ~~`--configure-remote --generate-token` en ligne de commande~~ | **fait** — `--generate-master-secret` et `--configure-remote --master-secret <valeur\|->`, secret lisible sur l'entrée standard, fichier relu après écriture, ni secret ni jeton affichés (constaté dans `Cli/Program.cs` le 29/08/2026) |
 | 14 | ~~**ACL sur `remote.json`**~~ | **fait** — `FileProtection` : héritage coupé, accès réduit à SYSTEM et Administrateurs par SID, échec journalisé dans `erreurs.log` ; 4 tests posent et relisent l'ACL réelle |
-| 15 | **Bloc winget** : section du rapport + boutons « tout mettre à jour » / choix par logiciel | validé sur le principe |
+| 15 | **Bloc winget** : section du rapport + boutons « tout mettre à jour » / choix par logiciel | validé — **planifié 1.8.0**, plan arrêté le 19/09/2026, plus bas |
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
 
 ## 4. Repris — et une dépendance découverte
@@ -369,7 +370,13 @@ Le déploiement se fait aujourd'hui par un script PowerShell distribué à part,
 
 - **A-1 ✔** la fusion des sources (`ParkInventory`). Décision prise ce jour-là, contre celle du 17/09 : **`postes.csv` ne crée aucun poste.** Son en-tête le disait déjà en majuscules — c'est un annuaire d'adresses MAC, qui contient les téléphones et les tablettes rendus par le DHCP. Il ne fait qu'ajouter une adresse MAC à un poste déjà listé par l'Active Directory ou par `parc.json`. Dédoublonnage par nom Windows normalisé, les trois écritures de l'annuaire et la forme longue du DHCP se rejoignant sur la même clé.
 - **A-2 ✔** l'interrogation de l'annuaire (`ParkDirectory`) et les réglages (`ParametresParc`). `PageSize = 1000` est la ligne qui compte : sans elle un contrôleur de domaine s'arrête à mille résultats **en silence**. Le contrôle de la saisie nomme la faute et sa correction — une virgule non échappée ne produit pas « virgule non échappée » côté LDAP, mais « syntaxe non valide », voire une liste vide sans erreur. Et `ListerUnites` rend les noms distinctifs tels que l'annuaire les stocke, donc déjà échappés : choisir plutôt que saisir supprime le problème à la source.
-- **A-3** l'onglet qui affiche tout ça. **À FAIRE.**
+- **A-3 ✔** l'onglet qui affiche tout ça, livré le 19/09/2026. La console passe à deux onglets ; le contenu de la supervision est déplacé tel quel et `ParkWindow.xaml.cs` n'est pas modifié — la logique du nouvel onglet tient dans une classe partielle à part, branchée par l'événement `Loaded`. Quatre décisions validées ce jour-là : **deux champs plutôt qu'une liste modifiable** (c'est le nom distinctif qui part dans le réglage, pas le libellé lisible) ; **rien ne part au démarrage**, le réglage est relu mais l'annuaire n'est pas interrogé ; **l'adresse MAC ne s'affiche pas**, la colonne dit seulement si elle est connue ; **« hors annuaire » plutôt qu'une valeur par défaut**, un poste saisi à la main n'ayant pas de compte d'ordinateur connu du logiciel.
+
+**Ce que le premier contact avec un annuaire réel a révélé, le 19/09/2026 :**
+
+- **`LDAP://` tout court n'est pas un chemin valide** — ADSI le refuse avec `0x80005000`, `E_ADS_BAD_PATHNAME`. C'était pourtant ce que `CheminLdap` rendait pour une saisie vide, c'est-à-dire **pour le cas par défaut** : le seul où l'utilisateur n'a rien à saisir était le seul qui ne pouvait pas marcher. La racine se demande désormais à l'annuaire lui-même, par `LDAP://RootDSE` et son attribut `defaultNamingContext`. **Et le test était vert** : il affirmait `CheminLdap("") == "LDAP://"`, la mauvaise valeur, gravée. Deuxième leçon de la même famille que le point 77 — *un test qui grave l'erreur attendue ne protège de rien, il empêche seulement de s'en apercevoir.*
+- **Deux `postes.csv` qui ne se voyaient pas.** Le script de déploiement écrit le sien à côté de lui — il est fait pour tourner depuis une clé USB ; la console cherchait le sien dans `Documents\FaultTracePC`. La colonne des adresses MAC restait vide sans que rien ne l'explique. Le chemin est devenu réglable, un dossier est accepté autant qu'un fichier, les guillemets d'un « Copier en tant que chemin d'accès » sont retirés, et le message distingue désormais **fichier absent** de **fichier lu, zéro adresse**.
+- **Une liste vide après une erreur ne se dit plus comme une liste vide après une lecture réussie.** La barre affichait « aucune unité d'organisation, ce qui convient dans la plupart des cas » pendant que l'annuaire refusait le chemin : rassurant, et faux.
 
 ---
 
@@ -541,6 +548,25 @@ Les points 48 à 52 et 54 à 63 étaient des **corrections**, sur des données d
 Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict rassurant sur une machine qui s'arrête anormalement**, il nomme le composant au lieu de son rapporteur, et il écrit son script de réparation à partir de ce qu'il a mesuré.
 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
+
+---
+
+## Point 15 — le bloc winget, plan arrêté le 19/09/2026
+
+Validé sur le principe depuis le début, repoussé deux fois — par les notes de la 1.3.0, puis par le périmètre de la 1.4 (*« un logiciel qui vient de découvrir qu'il ne savait pas signaler ses propres pannes n'a pas besoin de surface supplémentaire »*). Les deux reports étaient justes. Le terrain est maintenant dégagé.
+
+**Pourquoi 1.8.0 et pas 1.7.0.** La 1.7.0 est une version « parc », winget est une fonction « poste » : mélanger les deux donne une version dont on ne peut pas résumer ce qu'elle apporte. Surtout, **tout ce que fait le logiciel aujourd'hui est de la lecture.** Mettre à jour des logiciels, c'est agir sur la machine — redémarrer une application en cours d'usage, changer une interface sous les doigts d'un enseignant, saturer la bande passante un lundi matin. Ça mérite son propre thème et ses propres garde-fous, pas une section ajoutée en fin de version.
+
+**Ce qui est établi, vérifié sur `winget --version` = v1.29.290 le 19/09/2026 :**
+
+- **Aucune sortie exploitable par programme pour `upgrade`** — ni `--output`, ni `--format`, ni JSON dans la liste des options. Le point 24 reste donc obligatoire : découper **aux positions de l'en-tête**, jamais sur « deux espaces ou plus ».
+- **Les deux boutons du point 15 correspondent à deux commandes réelles** : `winget upgrade --id <Identifiant> --exact` pour le choix par logiciel, `--all` (alias `-r`, `--recurse`) pour tout.
+- **Quatre options à ne jamais passer par défaut** : `--allow-reboot` (sans elle winget ne redémarre pas la machine — c'est la seule protection contre un poste qui redémarre sous les doigts de quelqu'un), `--uninstall-previous` (si la nouvelle version échoue, le logiciel a disparu), `--force` (continuer malgré ce qui devrait arrêter), et `--ignore-security-hash`, qui ne doit même pas être proposée dans l'interface.
+- **Trois options à passer, sinon la commande se bloque en silence** : `--disable-interactivity`, `--accept-package-agreements`, `--accept-source-agreements`. Plus `--silent` quand le paquet le supporte.
+- **`--include-pinned` : jamais forcé.** Une épingle a été posée exprès. Le paquet s'affiche « épinglé » plutôt que de laisser croire qu'il est à jour.
+- **`--proxy` existe**, ce qui compte dans un établissement filtré : les sources winget bloquées par stratégie sont un cas fréquent, déjà rencontré en 1.2.3.
+
+**La question ouverte, à trancher par l'essai avant d'écrire quoi que ce soit dans le rapport :** `winget upgrade` liste les paquets de la machine **plus ceux du profil du compte qui l'exécute**. Or le logiciel demande les droits d'administrateur. Élever son propre compte ne change rien ; ouvrir en tant qu'**autre** administrateur ferait disparaître les logiciels installés « pour l'utilisateur courant ». Le rapport dirait « rien à mettre à jour » sur un poste qui en a dix. **Non vérifié à ce jour.**
 
 ---
 
