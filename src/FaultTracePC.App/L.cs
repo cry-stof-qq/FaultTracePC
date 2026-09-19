@@ -373,6 +373,26 @@ public static class L
         "Triggers a full scan on the selected machine then opens its HTML report. Can take several minutes.");
     public static string ParkOpenReport => Lang.T("📄 Ouvrir le dernier rapport", "📄 Open the last report");
 
+    // ------------------------------------------------- boite noire distante (point 46)
+    public static string FlightOpen => Lang.T("📈 Boîte noire du poste", "📈 Computer flight recorder");
+    public static string FlightOpenTip => Lang.T(
+        "Relit ce que le service de surveillance a enregistré sur le poste sélectionné : températures, charge, mémoire, événements. Rien n'est lancé sur le poste, on lit seulement ce qui y est déjà écrit.",
+        "Re-reads what the monitoring service recorded on the selected computer: temperatures, load, memory, events. Nothing is started on the computer, only what is already written there is read.");
+    public static string FlightTitle => Lang.T("FaultTracePC — boîte noire", "FaultTracePC — flight recorder");
+    public static string FlightLimit => Lang.T(
+        "⚠ UN RELEVÉ TOUTES LES 10 SECONDES. Pour une surchauffe, qui monte en minutes, c'est largement suffisant. Pour un pic de charge d'une seconde, on peut passer à côté — ce n'est pas un enregistrement continu.",
+        "⚠ ONE READING EVERY 10 SECONDS. For overheating, which builds over minutes, that is more than enough. A one-second load spike can be missed — this is not a continuous recording.");
+    public static string FlightPeriod => Lang.T("Montrer :", "Show:");
+    public static string FlightRefresh => Lang.T("🔄 Actualiser", "🔄 Refresh");
+    public static string FlightColTime => Lang.T("Heure", "Time");
+    public static string FlightColCpu => Lang.T("CPU", "CPU");
+    public static string FlightColCpuTemp => Lang.T("T° CPU", "CPU temp.");
+    public static string FlightColGpuTemp => Lang.T("T° GPU", "GPU temp.");
+    public static string FlightColGpu => Lang.T("GPU", "GPU");
+    public static string FlightColRam => Lang.T("RAM", "RAM");
+    public static string FlightColCommit => Lang.T("Engagée", "Committed");
+    public static string FlightColDetail => Lang.T("Détail", "Detail");
+
     // ------------------------------------------------- onglet Inventaire (point 64, lot A-3)
     public static string ParkTabMonitoring => Lang.T("📡  Supervision", "📡  Monitoring");
     public static string ParkTabInventory => Lang.T("🗂  Inventaire", "🗂  Inventory");

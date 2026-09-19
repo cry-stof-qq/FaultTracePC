@@ -1,0 +1,75 @@
+<Window x:Class="FaultTracePC.App.BoiteNoireWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:FaultTracePC.App"
+        Title="{x:Static loc:L.FlightTitle}"
+        Icon="Assets/FaultTracePC.ico"
+        Width="1080" Height="620" MinWidth="760" MinHeight="420"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
+        Loaded="Fenetre_Loaded">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#182848" Padding="16,10">
+            <TextBlock x:Name="TxtEntete" Foreground="White" FontSize="15" FontWeight="SemiBold"/>
+        </Border>
+
+        <Border Grid.Row="1" Padding="14,10" Background="#EDF1F6">
+            <StackPanel>
+                <!-- LA LIMITE EST ÉCRITE EN GRAND, PAS EN NOTE DE BAS DE PAGE.
+                     Laisser croire à un enregistrement continu ferait chercher un
+                     pic d'une seconde qui n'a jamais pu être enregistré. -->
+                <TextBlock Text="{x:Static loc:L.FlightLimit}" TextWrapping="Wrap"
+                           FontSize="12.5" Foreground="#7A5A1A" Margin="0,0,0,10"/>
+                <WrapPanel VerticalAlignment="Center">
+                    <TextBlock Text="{x:Static loc:L.FlightPeriod}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="CbDuree" Width="190" VerticalAlignment="Center"
+                              SelectionChanged="CbDuree_SelectionChanged"/>
+                    <Button x:Name="BtnActualiser" Content="{x:Static loc:L.FlightRefresh}"
+                            Padding="12,5" Margin="10,0,0,0" Click="BtnActualiser_Click"/>
+                    <TextBlock x:Name="TxtCompte" VerticalAlignment="Center" Margin="14,0,0,0"
+                               FontSize="12" Foreground="#44546A"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <ListView x:Name="LvVol" Grid.Row="2" Margin="10" BorderThickness="1"
+                  BorderBrush="#DBE2EC" FontSize="12">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Style.Triggers>
+                        <!-- Les ÉVÉNEMENTS sautent aux yeux : ce sont eux qu'on vient
+                             chercher après une coupure, pas la suite des relevés. -->
+                        <DataTrigger Binding="{Binding Marquant}" Value="True">
+                            <Setter Property="Background" Value="#FFF2CC"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="{x:Static loc:L.FlightColTime}" Width="150" DisplayMemberBinding="{Binding Heure}"/>
+                    <GridViewColumn Header="{x:Static loc:L.FlightColCpu}" Width="70" DisplayMemberBinding="{Binding Cpu}"/>
+                    <GridViewColumn Header="{x:Static loc:L.FlightColCpuTemp}" Width="80" DisplayMemberBinding="{Binding TempCpu}"/>
+                    <GridViewColumn Header="{x:Static loc:L.FlightColGpuTemp}" Width="80" DisplayMemberBinding="{Binding TempGpu}"/>
+                    <GridViewColumn Header="{x:Static loc:L.FlightColGpu}" Width="70" DisplayMemberBinding="{Binding Gpu}"/>
+                    <GridViewColumn Header="{x:Static loc:L.FlightColRam}" Width="70" DisplayMemberBinding="{Binding Ram}"/>
+                    <GridViewColumn Header="{x:Static loc:L.FlightColCommit}" Width="80" DisplayMemberBinding="{Binding Commit}"/>
+                    <GridViewColumn Header="{x:Static loc:L.FlightColDetail}" Width="440" DisplayMemberBinding="{Binding Detail}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <Border Grid.Row="3" Background="#EDF1F6" Padding="14,8">
+            <TextBlock x:Name="TxtStatut" FontSize="12" Foreground="#44546A"
+                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="34"/>
+        </Border>
+    </Grid>
+</Window>

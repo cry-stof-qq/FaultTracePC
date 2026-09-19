@@ -90,6 +90,10 @@
                             <Button x:Name="BtnParkReport" Content="{x:Static loc:L.ParkReport}" Padding="12,6"
                                     FontSize="12" Margin="0,0,8,0" Click="BtnParkReport_Click"
                                     ToolTip="{x:Static loc:L.ParkReportTip}"/>
+                            <Button x:Name="BtnBoiteNoire" Content="{x:Static loc:L.FlightOpen}"
+                                    Padding="12,6" FontSize="12" Margin="0,0,8,0"
+                                    Click="BtnBoiteNoire_Click"
+                                    ToolTip="{x:Static loc:L.FlightOpenTip}"/>
                             <Button x:Name="BtnRemoteScan" Content="{x:Static loc:L.ParkRemoteScan}" Padding="12,6"
                                     FontSize="12" Margin="0,0,8,0" FontWeight="SemiBold"
                                     Background="#2470B3" Foreground="White" BorderThickness="0"
