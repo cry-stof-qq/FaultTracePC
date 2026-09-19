@@ -30,14 +30,26 @@ public partial class ParkWindow : Window
     /// tient dans trois en-têtes maison : horodatage, nonce, signature. Perdus en
     /// route, le poste répond « 403 » et la console conclut à un mauvais jeton.
     ///
-    /// Le symptôme est déroutant parce qu'il dépend de l'ENDROIT d'où l'on se
-    /// connecte : sur le réseau de l'établissement, le proxy est souvent contourné
-    /// pour les adresses locales et tout fonctionne ; par VPN, la même console
-    /// refuse tous les postes. Ce n'est ni le secret, ni le nom, ni l'horloge —
-    /// aucun des trois ne dépend du chemin réseau.
+    /// Le symptôme serait déroutant parce qu'il dépendrait de l'ENDROIT d'où l'on
+    /// se connecte : là où le proxy est contourné pour les adresses locales tout
+    /// fonctionnerait, ailleurs la même console refuserait tous les postes. Ni le
+    /// secret, ni le nom, ni l'horloge ne dépendent du chemin réseau ; un proxy,
+    /// si.
     ///
-    /// Constaté le 19/09/2026. Le déploiement, lui, n'était pas concerné : SMB,
-    /// WinRM et le test de port ne passent jamais par un proxy web.
+    /// ET IL Y A PIRE QU'UNE PANNE : un proxy qui relaie fait voir au poste
+    /// l'adresse DU PROXY, pas celle de l'appelant. Le premier verrou du service,
+    /// qui n'accepte que les plages privées, se prononcerait alors sur la mauvaise
+    /// adresse. Retirer le proxy du chemin ne l'affaiblit pas, il le remet en état.
+    ///
+    /// CE N'EST PAS L'EXPLICATION DU PROBLÈME DU 19/09/2026. Ce jour-là, la console
+    /// refusait tous les postes par VPN ; le proxy a été soupçonné, puis MIS HORS
+    /// DE CAUSE par la mesure — la machine était en accès direct, et la requête
+    /// refaite à la main sans proxy recevait le même refus. Ce garde-fou est donc
+    /// une précaution, pas un correctif : il est écrit ici pour que cette panne-là
+    /// ne puisse pas arriver le jour où une stratégie de groupe poserait un proxy.
+    ///
+    /// Le déploiement n'est de toute façon jamais concerné : SMB, WinRM et le test
+    /// de port ne passent par aucun proxy web.
     /// </summary>
     private static HttpClient ClientDirect(TimeSpan delai) =>
         new(new HttpClientHandler { UseProxy = false }) { Timeout = delai };
