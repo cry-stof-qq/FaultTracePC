@@ -18,7 +18,7 @@
 | 1.6.0 | **publiée** le 18/09/2026 — thème **un rapport doit nommer la panne qu'il a sous les yeux** — seize points, 48 à 63, livrés les 17 et 18/09/2026 |
 | 1.6.1 | **publiée** le 18/09/2026 — correctifs constatés sur deux rapports 1.6.0 réels, plus deux ajouts demandés dans la foulée — points 65 à 71, 513 tests verts |
 | 1.6.2 | **publiée** le 18/09/2026 — sept correctifs constatés sur un rapport 1.6.1 réel, dont **deux créés par la 1.6.1 elle-même** — points 72 à 78, 616 tests verts |
-| 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔ écrit mais non éprouvé, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔ |
+| 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔ **premier déploiement réel réussi le 19/09/2026, par VPN**, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔ |
 | 1.8.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026 |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
@@ -441,7 +441,31 @@ Le déploiement se fait aujourd'hui par un script PowerShell distribué à part,
 - **Les échecs absents de la liste affichée sont comptés ET nommés**, avec la raison probable au survol. Sans ça, on croirait tout reprendre.
 - **La vraie cause passe avant le symptôme.** Sans inventaire chargé, le bouton le dit au lieu d'annoncer « douze postes absents de la liste », ce qui aurait fait chercher du côté de l'unité d'organisation alors qu'il suffisait d'actualiser. Constaté au premier essai, le jour même.
 
-**Le point 64 est écrit. IL N'EST PAS ÉPROUVÉ.** À la date du 19/09/2026, **aucune machine distante n'a jamais été touchée** : tout a été vérifié à blanc, plus une vérification réelle sur le poste de l'auteur, qui est aussi la console. Le premier déploiement réel — un seul poste, sur place, mode parc compris — est ce qui transformera « ça devrait marcher » en « ça marche ». **La 1.7.0 ne se publie pas avant.**
+**PREMIER DÉPLOIEMENT RÉEL — 19/09/2026, 16 h 35, sur P2-01, ET PAR VPN.** Le point 64 cesse d'être « écrit mais pas éprouvé ». Une machine réelle du domaine, à distance, depuis un poste qui n'était pas sur le réseau de l'établissement, a reçu le logiciel et est passée en mode parc. Les sept lignes du journal JSON sont `ok`.
+
+Le déroulé mesuré, bout en bout **75 secondes** :
+
+| Étape | Durée | Ce qu'elle prouve |
+|---|---|---|
+| compte | — | l'annuaire répond à travers le VPN |
+| réponse | 7 s | le poste répond (ping ou 445) |
+| partage | 0,5 s | `\\P2-01\C$` accessible à distance |
+| winrm | 0,06 s | la gestion à distance répond sur 5985 |
+| **copie** | **6,3 s** | **63 Mo à travers le tunnel** |
+| installation | 18 s | msiexec silencieux, **code 0** |
+| parc | 43 s | dont 35 s d'attente de relecture par le service, puis le port 58620 répond |
+
+**Ce qui est prouvé** : les quatre contrôles en lecture ; la copie d'un paquet de 63 Mo par VPN ; l'installation silencieuse et son code de sortie ; l'effacement du paquet après coup ; la pose de la règle de pare-feu et la bascule en mode parc ; le secret maître demandé **une seule fois** et jamais affiché ; le journal JSON en ASCII pur sur des données réelles — l'apostrophe de « pas d'adresse distante » est bien sortie en `\u0027`.
+
+**Ce qui n'est toujours pas prouvé**, et qu'il ne faut pas confondre avec le reste :
+
+- **Le réveil réseau.** P2-01 a été allumé autrement, depuis un serveur de l'établissement. Et il ne pouvait pas en être autrement : un paquet de réveil est une **diffusion**, et une diffusion ne franchit pas un routeur — le VPN en est un. L'essai de 16 h 29, poste éteint, l'a d'ailleurs montré proprement : `reponse` → `echec` (« ni ping, ni port 445 »), puis `reveil` → `echec` (« adresse MAC inconnue »). **Le chemin d'échec est donc éprouvé lui aussi**, et il a nommé la vraie cause. Le réveil reste à essayer **sur place**, avec l'adresse MAC connue.
+- **Un lot de plusieurs postes.** Un seul poste ne met à l'épreuve ni le plafond de cinquante, ni la confirmation chiffrée sur un nombre supérieur à un, ni l'enchaînement.
+- **La reprise des seuls postes en échec.** Il n'y a pas eu d'échec à reprendre.
+
+**Coût d'un poste éteint : 31 secondes** avant le verdict — deux pings puis le contrôle du port 445. Sur un lot où la moitié des machines dorment, c'est le poste éteint qui fixe la durée, pas le poste installé.
+
+**La 1.7.0 peut donc se préparer.** Reste à faire avant de la publier : un lot de plusieurs postes, et un réveil réseau depuis le réseau de l'établissement.
 
 **Deux enseignements de mise en page, tirés de captures d'écran réelles :**
 
