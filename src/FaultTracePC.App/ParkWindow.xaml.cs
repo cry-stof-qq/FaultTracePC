@@ -508,7 +508,66 @@ public partial class ParkWindow : Window
         }
         catch (Exception ex)
         {
-            return new(m, false, false, null, ex is TaskCanceledException ? Lang.T("délai dépassé", "timed out") : Lang.T("injoignable", "unreachable"));
+            // DEUX ÉCHECS QUI N'ONT RIEN À VOIR, et c'est voulu.
+            //
+            //   · « délai dépassé »  — le délai d'attente a expiré. On a donc
+            //     trouvé où frapper, on a frappé, et personne n'a répondu dans les
+            //     quatre secondes. Le poste est éteint, muet, ou filtré.
+            //
+            //   · « injoignable »    — tout le reste, et en pratique surtout la
+            //     résolution du nom qui échoue : on n'a même pas su OÙ frapper.
+            //
+            // Constaté le 20/09/2026 par l'auteur, VPN coupé : dans la même liste,
+            // les postes enregistrés avec une ADRESSE affichaient « délai dépassé »
+            // et ceux enregistrés avec leur NOM affichaient « injoignable ». Ce
+            // n'est pas une incohérence : sans VPN, une adresse se tente jusqu'au
+            // délai, un nom ne se résout pas du tout.
+            //
+            // LES DEUX MOTS DISAIENT LA VÉRITÉ SANS QUE PERSONNE PUISSE LA LIRE.
+            // Deux mots de deux syllabes se lisent tous les deux « ça ne répond
+            // pas ». Le survol dit donc ce que chacun veut dire ET quoi vérifier —
+            // et les listes sont volontairement différentes, parce qu'il n'y a
+            // AUCUN recouvrement entre les deux pannes : chercher le pare-feu d'un
+            // poste dont on n'a pas su résoudre le nom, c'est chercher au mauvais
+            // endroit.
+            bool delai = ex is TaskCanceledException;
+
+            return new(m, false, false, null,
+                       delai ? Lang.T("délai dépassé", "timed out") : Lang.T("injoignable", "unreachable"))
+            {
+                Aide = delai
+                    ? Lang.T(
+                        "DÉLAI DÉPASSÉ — l'adresse a été trouvée, la console a frappé, et rien n'a répondu en 4 secondes.\n\n"
+                      + "Ce n'est donc NI le nom, NI le jeton, NI le secret maître : la console n'est pas allée jusque-là.\n\n"
+                      + "À vérifier, dans cet ordre :\n"
+                      + "1. Le poste est-il allumé ?\n"
+                      + "2. Le service de surveillance FaultTracePC y tourne-t-il ? Le mode parc doit avoir été activé sur ce poste.\n"
+                      + "3. Son pare-feu laisse-t-il entrer le port indiqué dans la colonne « Hôte » ?\n"
+                      + "4. Ce poste est-il sur un réseau joignable depuis cette machine en ce moment ? Hors du réseau de l'établissement, il faut le VPN.",
+
+                        "TIMED OUT — the address was found, the console knocked, and nothing answered within 4 seconds.\n\n"
+                      + "So it is NEITHER the name, NOR the token, NOR the master secret: the console never got that far.\n\n"
+                      + "To check, in this order:\n"
+                      + "1. Is the computer switched on?\n"
+                      + "2. Is the FaultTracePC monitoring service running on it? Fleet mode must have been enabled on that computer.\n"
+                      + "3. Does its firewall allow the port shown in the “Host” column?\n"
+                      + "4. Is that computer on a network reachable from here right now? Outside the site network, the VPN is required.")
+
+                    : Lang.T(
+                        "INJOIGNABLE — la console n'a même pas su OÙ frapper : le nom n'a pas pu être traduit en adresse, ou aucune route ne mène à l'adresse indiquée.\n\n"
+                      + "Ce n'est donc NI le jeton, NI le secret maître, NI le pare-feu du poste : aucune connexion n'a été tentée.\n\n"
+                      + "À vérifier, dans cet ordre :\n"
+                      + "1. Le nom écrit dans la colonne « Hôte » est-il exact ?\n"
+                      + "2. Le serveur DNS du domaine est-il joignable ? Hors du réseau de l'établissement et sans VPN, un nom de poste ne se résout pas — et c'est la cause la plus fréquente de ce message.\n"
+                      + "3. Si tu as inscrit une ADRESSE plutôt qu'un nom : est-elle encore la bonne ? En DHCP, elle change. Le nom est préférable, précisément pour cette raison.",
+
+                        "UNREACHABLE — the console did not even know WHERE to knock: the name could not be turned into an address, or no route leads to the address given.\n\n"
+                      + "So it is NEITHER the token, NOR the master secret, NOR the computer's firewall: no connection was ever attempted.\n\n"
+                      + "To check, in this order:\n"
+                      + "1. Is the name in the “Host” column correct?\n"
+                      + "2. Is the domain DNS server reachable? Outside the site network and without the VPN a computer name cannot be resolved — and that is the most frequent cause of this message.\n"
+                      + "3. If you entered an ADDRESS rather than a name: is it still the right one? With DHCP it changes. The name is preferable, for exactly that reason."),
+            };
         }
     }
 
