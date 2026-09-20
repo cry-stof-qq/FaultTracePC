@@ -36,12 +36,15 @@ Ce dépôt est **public**. Rien de ce qui identifie l'établissement, son résea
 | Ce qui ne s'écrit jamais | Ce qu'on écrit à la place |
 |---|---|
 | un secret, un jeton, un mot de passe | des `*`, jamais la valeur ni un extrait |
-| une adresse IP réelle | une adresse de documentation : `192.0.2.x`, `198.51.100.x`, `203.0.113.x` (RFC 5737), ou une valeur d'exemple sans rapport |
+| une adresse IP **publique** réelle | `203.0.113.x` (RFC 5737) — c'est la ligne à ne jamais franchir |
+| une adresse IP privée réelle | `192.0.2.x` ou `198.51.100.x`, ou une valeur d'exemple sans rapport |
 | un nom de poste réel | un pseudonyme stable : `POSTE-01`, `POSTE-ELEVE-01`, `ATELIER-07` |
 | un nom de serveur réel | `SRV-FICHIERS`, `SRV-DHCP`, `SRV-AD` |
 | le domaine Active Directory | `exemple.local`, ou `<domaine>` |
 | un chemin de partage réel | `\\serveur\partage` |
 | une adresse MAC réelle | `AA-BB-CC-DD-EE-FF` |
+
+**Les adresses PUBLIQUES d'abord**, précision de l'auteur le 20/09/2026. Une adresse privée qui fuit ne dit presque rien : `10.x` et `192.168.x` sont les mêmes chez tout le monde, et rien ne permet d'y rattacher un établissement. Une adresse **publique**, elle, désigne un site, un abonnement, un pare-feu — c'est elle qui transforme un dépôt de code en carte d'identité. Les deux se masquent, mais on ne se trompe pas sur la hiérarchie : une adresse privée oubliée se corrige au prochain passage, une adresse publique poussée est une fuite.
 
 **Pourquoi pas `127.0.0.1` pour remplacer une adresse**, alors que c'est le réflexe habituel : dans CE logiciel, `127.0.0.1` a un sens précis et fonctionnel — c'est la boucle locale, le seul cas que le premier verrou du service accepte sans contrôle de plage, et c'est une valeur réellement utilisée dans la console pour superviser la machine locale. L'employer comme bouche-trou ferait lire « la machine distante est la machine locale », ce qui est faux et trompeur. Les plages RFC 5737 existent exactement pour cet usage et ne peuvent être confondues avec rien.
 
