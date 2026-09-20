@@ -5,7 +5,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Point 60 de la feuille de route. Constaté le 17/09/2026 sur PC-W10-11 : douze
+/// Point 60 de la feuille de route. Constaté le 17/09/2026 sur POSTE-TEMOIN : douze
 /// « erreurs disque » réunies sous un seul chiffre, réparties entre une clé USB, un
 /// volume et un port de contrôleur — puis une recommandation qui commençait par la
 /// gestion d'alimentation du lien PCI Express et les câbles SATA. Deux conseils sans

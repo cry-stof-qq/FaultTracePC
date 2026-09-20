@@ -7,7 +7,7 @@ namespace FaultTracePC.Tests;
 
 /// <summary>
 /// Point 63 de la feuille de route. Le script de réparation raisonnait par familles
-/// de panne : sur PC-W10-11, le 17/09/2026, il présentait dix pilotes de 2021 comme
+/// de panne : sur POSTE-TEMOIN, le 17/09/2026, il présentait dix pilotes de 2021 comme
 /// « les premiers suspects » alors que l'analyse symbolique nommait nvlddmkm.sys dans
 /// cinq vidages sur cinq, et demandait de surveiller une température que la boîte
 /// noire avait déjà mesurée pendant 94 heures.

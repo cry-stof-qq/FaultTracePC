@@ -5,7 +5,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Point 53, seconde moitié. Le 14/09/2026 sur MLEAR-031-2024, la panne était « plus
+/// Point 53, seconde moitié. Le 14/09/2026 sur POSTE-ELEVE-01, la panne était « plus
 /// aucun réseau Wi-Fi visible » et il avait fallu la reconstituer à la main : carte
 /// présente, zéro profil enregistré, poste du domaine jamais revu depuis sa
 /// réinstallation. La correction tenait en un câble et un gpupdate /force.
@@ -19,7 +19,7 @@ public class ReseauConclusionTests
         {
             GeneratedAt = new DateTime(2026, 9, 14, 10, 57, 0),
             ScanPeriodDays = 30,
-            System = new SystemSnapshot { MachineName = "MLEAR-TEST" },
+            System = new SystemSnapshot { MachineName = "POSTE-ELEVE-01" },
         };
         r.System.Network = net;
         return r;

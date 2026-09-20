@@ -152,7 +152,7 @@ public sealed class RulesEngine
         // POINT 50. Un Kernel-Power 41 porte un champ BugcheckCode. S'il n'est pas nul,
         // il y a EU un écran bleu — même si aucun fichier de vidage n'a pu être écrit.
         // Ne se fier qu'aux vidages revenait à confondre « je n'ai pas de trace » et
-        // « il ne s'est rien passé » : sur MLEAR-031-2024, le 14/09/2026, quinze
+        // « il ne s'est rien passé » : sur POSTE-ELEVE-01, le 14/09/2026, quinze
         // plantages réels étaient annoncés comme « aucun BSOD détecté sur la période ».
         //
         // Le code est écrit en DÉCIMAL dans le XML de l'événement, contrairement au
@@ -1183,7 +1183,7 @@ public sealed class RulesEngine
         && IdsEcritureVidage.Contains(e.EventId);
 
     /// <summary>
-    /// Constaté le 14/09/2026 sur MLEAR-031-2024, puis le 17/09 sur PC-W10-11 : ces
+    /// Constaté le 14/09/2026 sur POSTE-ELEVE-01, puis le 17/09 sur POSTE-TEMOIN : ces
     /// messages étaient comptés parmi les « erreurs disque » et menaient à un contrôle
     /// de disque. Ils disent en réalité que Windows n'a pas pu écrire le fichier qui
     /// aurait permis de diagnostiquer les plantages — et c'est tout autre chose : le
@@ -2125,7 +2125,7 @@ public sealed class RulesEngine
     /// Arrêts inattendus (EventLog 6008) restés SANS explication : ni écran bleu, ni
     /// coupure franche déjà signalée. Ils étaient collectés, affichés dans le tableau
     /// des événements… et n'alimentaient aucune conclusion. Le 14/09/2026, le rapport
-    /// de MLEAR-031-2024 a donc rassuré sur une machine qui plantait toutes les
+    /// de POSTE-ELEVE-01 a donc rassuré sur une machine qui plantait toutes les
     /// semaines depuis quatre mois. C'est le pire mode de défaillance de cet outil :
     /// se tromper est réparable, rassurer à tort ne l'est pas.
     /// </summary>
@@ -2321,7 +2321,7 @@ public sealed class RulesEngine
     /// <summary>
     /// POINT 53, seconde moitié. Les faits réseau étaient collectés depuis le lot
     /// précédent ; ici on en tire la conclusion que l'auteur avait dû reconstituer à la
-    /// main le 14/09/2026 sur MLEAR-031-2024 : carte Wi-Fi présente et active, ZÉRO
+    /// main le 14/09/2026 sur POSTE-ELEVE-01 : carte Wi-Fi présente et active, ZÉRO
     /// réseau enregistré, machine du domaine jamais revue depuis sa réinstallation.
     /// « Plus de Wi-Fi » n'était pas une panne de carte : c'était une absence de profil.
     /// </summary>

@@ -6,7 +6,7 @@ namespace FaultTracePC.Tests;
 
 /// <summary>
 /// Point 62 de la feuille de route. Deux défauts constatés le 17/09/2026 sur le
-/// rapport de PC-W10-11 : le MÊME incident affiché trois fois sous des titres à une
+/// rapport de POSTE-TEMOIN : le MÊME incident affiché trois fois sous des titres à une
 /// minute d'écart, et un tableau « dernières secondes avant l'incident de 12 h 29 »
 /// qui s'arrêtait à 12 h 27 min 26 s sans que rien ne le signale.
 /// </summary>

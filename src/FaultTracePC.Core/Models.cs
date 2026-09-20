@@ -818,7 +818,7 @@ public sealed class ScanComparison
     /// C'est la phrase qui clôt un dossier : le pilote a été changé, les plantages ont
     /// continué, donc ce n'est pas lui. Sans ce rapprochement, la recommandation reste
     /// « réinstaller proprement le pilote » — c'est-à-dire refaire ce qui vient
-    /// d'échouer. Constaté le 14/09/2026 sur PC-W10-11 : nvlddmkm.sys est passé de
+    /// d'échouer. Constaté le 14/09/2026 sur POSTE-TEMOIN : nvlddmkm.sys est passé de
     /// 32.0.15.8216 à 32.0.15.8278 entre deux analyses, et quatre écrans bleus portant
     /// la même signature ont suivi.
     /// </summary>

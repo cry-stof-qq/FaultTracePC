@@ -103,8 +103,8 @@ public class ListeDePostesTests
     [Fact]
     public void La_liste_est_triee_par_nom()
     {
-        var liste = ParkInventory.Fusionner([Annuaire("POSTE-10"), Annuaire("POSTE-02")], [Console("MLEAR-031")]);
-        Assert.Equal(new[] { "MLEAR-031", "POSTE-02", "POSTE-10" }, liste.Select(p => p.Name).ToArray());
+        var liste = ParkInventory.Fusionner([Annuaire("POSTE-10"), Annuaire("POSTE-02")], [Console("ATELIER-07")]);
+        Assert.Equal(new[] { "ATELIER-07", "POSTE-02", "POSTE-10" }, liste.Select(p => p.Name).ToArray());
     }
 
     // ------------------------------------------------------------------

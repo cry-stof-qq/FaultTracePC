@@ -5,7 +5,7 @@ namespace FaultTracePC.Core.Collectors;
 
 /// <summary>
 /// POINT 53 de la feuille de route. Le réseau était le seul domaine dont le logiciel
-/// ne disait RIEN. Le 14/09/2026, sur MLEAR-031-2024, la panne était « plus aucun
+/// ne disait RIEN. Le 14/09/2026, sur POSTE-ELEVE-01, la panne était « plus aucun
 /// réseau Wi-Fi visible » : le rapport a parlé de la batterie et des erreurs disque.
 ///
 /// Trois faits suffisaient à conclure, et ils sont tous lisibles sans outil externe :

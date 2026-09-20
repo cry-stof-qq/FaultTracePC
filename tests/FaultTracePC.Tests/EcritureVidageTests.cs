@@ -5,8 +5,8 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Point 51 de la feuille de route. Constaté le 14/09/2026 sur MLEAR-031-2024 puis
-/// le 17/09 sur PC-W10-11 : les messages volmgr qui signalent l'échec d'écriture du
+/// Point 51 de la feuille de route. Constaté le 14/09/2026 sur POSTE-ELEVE-01 puis
+/// le 17/09 sur POSTE-TEMOIN : les messages volmgr qui signalent l'échec d'écriture du
 /// vidage de plantage étaient comptés parmi les « erreurs disque » et menaient à un
 /// contrôle de disque. Ils disent tout autre chose — le disque va bien, mais les
 /// plantages ne laissent aucune trace exploitable.

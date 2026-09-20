@@ -6,7 +6,7 @@ namespace FaultTracePC.Tests;
 
 /// <summary>
 /// Points 50 et 52 de la feuille de route. Constatés le 14/09/2026 sur
-/// MLEAR-031-2024 : le rapport annonçait « Aucun BSOD détecté sur la période » et
+/// POSTE-ELEVE-01 : le rapport annonçait « Aucun BSOD détecté sur la période » et
 /// « Pas de panne critique » sur une machine qui avait planté quinze fois. Les
 /// événements Kernel-Power 41 portaient pourtant un BugcheckCode renseigné, et cinq
 /// arrêts inattendus figuraient dans le tableau des événements sans peser sur rien.

@@ -29,6 +29,34 @@
 
 ---
 
+## Règle d'écriture — aucune donnée réelle dans ce dépôt
+
+Ce dépôt est **public**. Rien de ce qui identifie l'établissement, son réseau ou ses machines ne doit y entrer — et la règle, posée le 20/09/2026, est qu'on **écrit directement anonymisé** plutôt que de nettoyer après coup : une donnée réelle poussée une fois reste dans l'historique, et l'effacer coûte une réécriture d'historique disproportionnée.
+
+| Ce qui ne s'écrit jamais | Ce qu'on écrit à la place |
+|---|---|
+| un secret, un jeton, un mot de passe | des `*`, jamais la valeur ni un extrait |
+| une adresse IP réelle | une adresse de documentation : `192.0.2.x`, `198.51.100.x`, `203.0.113.x` (RFC 5737), ou une valeur d'exemple sans rapport |
+| un nom de poste réel | un pseudonyme stable : `POSTE-01`, `POSTE-ELEVE-01`, `ATELIER-07` |
+| un nom de serveur réel | `SRV-FICHIERS`, `SRV-DHCP`, `SRV-AD` |
+| le domaine Active Directory | `exemple.local`, ou `<domaine>` |
+| un chemin de partage réel | `\\serveur\partage` |
+| une adresse MAC réelle | `AA-BB-CC-DD-EE-FF` |
+
+**Pourquoi pas `127.0.0.1` pour remplacer une adresse**, alors que c'est le réflexe habituel : dans CE logiciel, `127.0.0.1` a un sens précis et fonctionnel — c'est la boucle locale, le seul cas que le premier verrou du service accepte sans contrôle de plage, et c'est une valeur réellement utilisée dans la console pour superviser la machine locale. L'employer comme bouche-trou ferait lire « la machine distante est la machine locale », ce qui est faux et trompeur. Les plages RFC 5737 existent exactement pour cet usage et ne peuvent être confondues avec rien.
+
+**Deux pseudonymes sont posés une fois pour toutes** dans le code, les tests et ce document. Ils désignent deux machines réelles dont les rapports ont fourni la matière des points 48 à 71 :
+
+- **`POSTE-TEMOIN`** — le poste à l'origine du projet, celui des rapports des 14 et 17/09/2026 ;
+- **`POSTE-ELEVE-01`** — le poste élève du 14/09/2026, à l'origine des points 50 à 53.
+- **`POSTE-SALLE-02`** — le premier poste installé à distance par le script de déploiement, le 06/09/2026, à l'origine des points 48 et 49.
+
+Les garder stables importe autant que les anonymiser : c'est ce qui permet de relier entre eux, six mois plus tard, un commentaire de code, un test et une ligne de cette feuille de route.
+
+**Ce qui n'est pas concerné** : les plages `10.0.0.0/8`, `172.16.0.0/12` et `192.168.0.0/16` écrites dans la règle de pare-feu et dans le contrôle du service, ainsi que `127.0.0.1` au même endroit. Ce ne sont pas des exemples, ce sont les **valeurs de fonctionnement** du logiciel ; les remplacer casserait le produit.
+
+---
+
 ## 1. Défauts connus, non corrigés
 
 Trouvés en testant la 1.2.3 aujourd'hui.
@@ -264,7 +292,7 @@ GLPI expose une API REST : la v1 historique (`apirest.php`) et, depuis GLPI 11, 
 
 **47 — Colonne « Top processus » vide deux fois sur trois. CORRIGÉ.** Constaté dans la console le 31/08/2026. La boîte noire ne relève les processus qu'un échantillon sur trois — toutes les 30 s, pour ne pas grossir le journal — et `/api/status` renvoie le **dernier** échantillon, qui n'en porte donc généralement pas. La colonne se remplissait au hasard, ce qui est pire qu'une colonne toujours vide : on ne sait pas si l'information manque ou si la machine n'a rien à signaler. `BuildStatus` complète désormais avec le relevé le plus récent qui en contienne un — au pire 30 secondes d'âge, sans conséquence pour la question posée.
 
-**48 — Une erreur WHEA de port PCIe est attribuée au processeur, et la recommandation envoie au mauvais endroit. FAIT le 18/09/2026, 1.6.0.** Constaté le 06/09/2026 sur `S2-00-32-2025`, premier poste installé à distance par le script de déploiement.
+**48 — Une erreur WHEA de port PCIe est attribuée au processeur, et la recommandation envoie au mauvais endroit. FAIT le 18/09/2026, 1.6.0.** Constaté le 06/09/2026 sur `POSTE-SALLE-02`, premier poste installé à distance par le script de déploiement.
 
 Le rapport écrit : « Le processeur a signalé 27 erreur(s) matérielle(s) », et recommande températures, alimentation, retrait de l'overclocking/XMP, mise à jour du BIOS. Les 27 événements sont pourtant tous identiques et disent autre chose : `WHEA-Logger` **ID 17**, *erreur matérielle **corrigée***, `Composant : PCI Express Root Port`, `Source de l'erreur : Advanced Error Reporting (PCI Express)`. Le triplet `0x0:0x1:0x0` désigne le port racine du processeur, et derrière lui la carte graphique.
 
@@ -283,7 +311,7 @@ Le tableau des événements affiche : `Bus principal :Appareil :Fonctio…`. Le 
 
 **Correctif envisagé :** pour les événements WHEA, extraire le triplet et le porter dans la conclusion — voire le traduire en nom d'appareil, `Get-PnpDevice` donnant l'emplacement sous la forme « Bus PCI 0, périphérique 1, fonction 0 ». La troncature à 600 caractères reste bonne pour le reste ; ici, ce qui compte est en fin de message.
 
-**50 — Les codes d'arrêt sont dans le journal, le logiciel ne les lit pas. FAIT le 18/09/2026, 1.6.0.** Constaté le 14/09/2026 sur `MLEAR-031-2024`, un poste élève.
+**50 — Les codes d'arrêt sont dans le journal, le logiciel ne les lit pas. FAIT le 18/09/2026, 1.6.0.** Constaté le 14/09/2026 sur `POSTE-ELEVE-01`, un poste élève.
 
 Le rapport annonce « Aucun BSOD détecté sur la période » et « Pas de panne critique ». La machine avait planté **quinze fois**. Les événements `Kernel-Power 41` portent un champ `BugcheckCode` renseigné à chaque fois : 0xEF, 0xC000021A, 0x1E, 0x7E, 0x7A. Le logiciel conclut à l'absence de plantage parce qu'il ne trouve **aucun fichier de vidage** — or aucun vidage n'avait pu être écrit. Il confond « je n'ai pas de trace » avec « il ne s'est rien passé ».
 
@@ -313,7 +341,7 @@ Le rapport, lui, a parlé de la batterie et de sept erreurs disque. Le tableau d
 
 Une section réseau devrait porter : cartes présentes et leur état, pilote et son âge, profils Wi-Fi, dernière connexion au domaine, services `WlanSvc`/`Dhcp`/`Dnscache`, filtres NDIS tiers liés aux cartes. Dans un parc, « plus de réseau » est l'une des pannes les plus fréquentes, et c'est aujourd'hui le seul domaine dont le logiciel ne dit **rien**.
 
-**54 — « Ce logiciel n'est plus installé, problème sans objet » écrit à propos d'un composant de Windows. FAIT le 17/09/2026, 1.6.0.** Constaté le 14/09/2026 sur `PC-W10-11`, le poste qui est à l'origine de ce projet.
+**54 — « Ce logiciel n'est plus installé, problème sans objet » écrit à propos d'un composant de Windows. FAIT le 17/09/2026, 1.6.0.** Constaté le 14/09/2026 sur `POSTE-TEMOIN`, le poste qui est à l'origine de ce projet.
 
 Le rapport écrit : *« Application anciennement instable : **dwm.exe** (9 crashs) — ce logiciel ne figure plus parmi les programmes installés — problème probablement sans objet. »*
 
@@ -333,7 +361,7 @@ Les données sont déjà là : la version du pilote est enregistrée à chaque a
 
 **Ce que ça change concrètement :** sans ce rapprochement, la recommandation reste « réinstaller le pilote proprement avec DDU » — c'est-à-dire refaire ce qui vient d'échouer. Avec, elle devient « le logiciel est hors de cause, regardez le matériel ». C'est la différence entre une boucle et un diagnostic.
 
-**56 — Les vidages « en direct » de Windows étaient listés, jamais exploités. FAIT le 17/09/2026.** Constaté sur `PC-W10-11`, rapport du 17/09 17 h 38.
+**56 — Les vidages « en direct » de Windows étaient listés, jamais exploités. FAIT le 17/09/2026.** Constaté sur `POSTE-TEMOIN`, rapport du 17/09 17 h 38.
 
 Le rapport affichait **178 fichiers de `C:\Windows\LiveKernelReports`** — nom, date, taille, code d'arrêt — dont **155 portant le code `0x141`**, le plus ancien du 16/06/2022. Il ne les comptait pas, n'en tirait aucune conclusion, et les nommait `BUGCODE_0x141`, un repli fabriqué qui ressemblait à s'y méprendre à un identifiant Microsoft.
 
@@ -349,7 +377,7 @@ La carte de verdict annonçait *« Instabilité du pilote graphique (0 réinitia
 
 **58 — Un gel suivi d'un écran bleu est une réinitialisation qui a ÉCHOUÉ : ce rapprochement n'était pas fait. FAIT le 17/09/2026.**
 
-Les deux séries existaient séparément. Les apparier donne la seule mesure qui distingue un pilote instable d'un matériel qui lâche : **la proportion de gels qui se terminent mal, et la date à laquelle elle bascule.** Sur `PC-W10-11` : environ 145 gels récupérés sans incident de 2022 à juin 2026, puis 10 gels sur 10 soldés par un écran bleu à partir du 1er juillet 2026.
+Les deux séries existaient séparément. Les apparier donne la seule mesure qui distingue un pilote instable d'un matériel qui lâche : **la proportion de gels qui se terminent mal, et la date à laquelle elle bascule.** Sur `POSTE-TEMOIN` : environ 145 gels récupérés sans incident de 2022 à juin 2026, puis 10 gels sur 10 soldés par un écran bleu à partir du 1er juillet 2026.
 
 **Correctif livré :** appariement dans une fenêtre de dix minutes, datation de la bascule, disculpation du pilote quand le premier gel lui est antérieur, et mise hors de cause de la surchauffe **par la mesure de la boîte noire** au lieu de demander à l'utilisateur d'aller la prendre lui-même. La recommandation devient le test décisif et gratuit : retirer la carte, brancher l'écran sur la sortie de la carte mère, ou permuter avec un autre poste.
 
@@ -649,22 +677,22 @@ Seize points, trois machines, deux semaines. Ils disent tous la même chose : *l
 
 | # | Ce qui manque | Constaté sur |
 |---|---|---|
-| 48 ✔ | une erreur WHEA de port PCIe est attribuée au processeur, et « corrigée » est classé critique | S2-00-32-2025, 06/09 |
-| 49 ✔ | le triplet bus/appareil/fonction est tronqué à l'écriture comme à l'affichage | S2-00-32-2025, 06/09 |
-| 50 ✔ | le `BugcheckCode` de l'événement 41 n'est pas lu — quinze plantages invisibles | MLEAR-031-2024, 14/09 |
-| 51 ✔ | l'échec d'écriture du vidage est compté comme une erreur disque | MLEAR-031-2024, 14/09 |
-| 52 ✔ | les arrêts inattendus ne pèsent pas sur le verdict | MLEAR-031-2024, 14/09 |
-| 53 ✔ | aucune section réseau | MLEAR-031-2024, 14/09 |
-| 54 ✔ | un composant de Windows déclaré « désinstallé, sans objet » | PC-W10-11, 14/09 |
-| 55 ✔ | la version du pilote fautif n'est pas comparée entre deux analyses | PC-W10-11, 14/09 |
-| 56 ✔ | 178 vidages « en direct » listés, jamais exploités — dont 155 gels du moteur graphique | PC-W10-11, 17/09 |
-| 57 ✔ | « 0 réinitialisation » écrit en présence de 155 réinitialisations | PC-W10-11, 17/09 |
-| 58 ✔ | un gel suivi d'un écran bleu est une récupération ratée : rapprochement jamais fait | PC-W10-11, 17/09 |
-| 59 ✔ | les plantages de `dwm.exe` écartés au lieu d'être rattachés à la panne graphique | PC-W10-11, 17/09 |
-| 60 ✔ | une clé USB et un port de contrôleur comptés ensemble sous « erreurs disque » | PC-W10-11, 17/09 |
-| 61 ✔ | deux dates différentes pour le même pilote, dans le même rapport | PC-W10-11, 17/09 |
-| 62 ✔ | la boîte noire répète le même incident et laisse le gel passer pour une fin de tableau | PC-W10-11, 17/09 |
-| 63 ✔ | le script de réparation raisonne par familles de panne, pas par mesures | PC-W10-11, 17/09 |
+| 48 ✔ | une erreur WHEA de port PCIe est attribuée au processeur, et « corrigée » est classé critique | POSTE-SALLE-02, 06/09 |
+| 49 ✔ | le triplet bus/appareil/fonction est tronqué à l'écriture comme à l'affichage | POSTE-SALLE-02, 06/09 |
+| 50 ✔ | le `BugcheckCode` de l'événement 41 n'est pas lu — quinze plantages invisibles | POSTE-ELEVE-01, 14/09 |
+| 51 ✔ | l'échec d'écriture du vidage est compté comme une erreur disque | POSTE-ELEVE-01, 14/09 |
+| 52 ✔ | les arrêts inattendus ne pèsent pas sur le verdict | POSTE-ELEVE-01, 14/09 |
+| 53 ✔ | aucune section réseau | POSTE-ELEVE-01, 14/09 |
+| 54 ✔ | un composant de Windows déclaré « désinstallé, sans objet » | POSTE-TEMOIN, 14/09 |
+| 55 ✔ | la version du pilote fautif n'est pas comparée entre deux analyses | POSTE-TEMOIN, 14/09 |
+| 56 ✔ | 178 vidages « en direct » listés, jamais exploités — dont 155 gels du moteur graphique | POSTE-TEMOIN, 17/09 |
+| 57 ✔ | « 0 réinitialisation » écrit en présence de 155 réinitialisations | POSTE-TEMOIN, 17/09 |
+| 58 ✔ | un gel suivi d'un écran bleu est une récupération ratée : rapprochement jamais fait | POSTE-TEMOIN, 17/09 |
+| 59 ✔ | les plantages de `dwm.exe` écartés au lieu d'être rattachés à la panne graphique | POSTE-TEMOIN, 17/09 |
+| 60 ✔ | une clé USB et un port de contrôleur comptés ensemble sous « erreurs disque » | POSTE-TEMOIN, 17/09 |
+| 61 ✔ | deux dates différentes pour le même pilote, dans le même rapport | POSTE-TEMOIN, 17/09 |
+| 62 ✔ | la boîte noire répète le même incident et laisse le gel passer pour une fin de tableau | POSTE-TEMOIN, 17/09 |
+| 63 ✔ | le script de réparation raisonne par familles de panne, pas par mesures | POSTE-TEMOIN, 17/09 |
 
 **Les seize points sont livrés**, en dix lots des 17 et 18/09/2026, chacun compilé et testé avant le suivant. Le projet est passé de 428 à 468 tests.
 

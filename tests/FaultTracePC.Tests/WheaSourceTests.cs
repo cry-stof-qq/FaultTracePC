@@ -6,7 +6,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Points 48 et 49 de la feuille de route. Constatés le 06/09/2026 sur S2-00-32-2025 :
+/// Points 48 et 49 de la feuille de route. Constatés le 06/09/2026 sur POSTE-SALLE-02 :
 /// vingt-sept erreurs WHEA identiques, toutes CORRIGÉES et toutes sur un port racine
 /// PCI Express, étaient annoncées comme « le processeur a signalé 27 erreurs
 /// matérielles », classées critiques, et suivies d'une recommandation qui faisait

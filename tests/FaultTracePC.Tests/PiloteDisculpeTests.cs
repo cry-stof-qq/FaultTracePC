@@ -5,7 +5,7 @@ using Xunit;
 namespace FaultTracePC.Tests;
 
 /// <summary>
-/// Point 55 de la feuille de route. Constaté le 14/09/2026 sur PC-W10-11, trois
+/// Point 55 de la feuille de route. Constaté le 14/09/2026 sur POSTE-TEMOIN, trois
 /// rapports : nvlddmkm.sys apparaît en 32.0.15.8216 dans le premier et en
 /// 32.0.15.8278 dans le second, cinq heures plus tard — le pilote avait été mis à
 /// jour entre les deux. Quatre écrans bleus de MÊME signature ont suivi.

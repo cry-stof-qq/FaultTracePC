@@ -6,7 +6,7 @@ namespace FaultTracePC.Tests;
 
 /// <summary>
 /// Point 53 de la feuille de route. Le réseau était le seul domaine dont le rapport ne
-/// disait rien : le 14/09/2026, sur MLEAR-031-2024, la panne était « plus aucun réseau
+/// disait rien : le 14/09/2026, sur POSTE-ELEVE-01, la panne était « plus aucun réseau
 /// Wi-Fi visible » et le rapport a parlé de la batterie et des erreurs disque.
 /// </summary>
 public class ReseauTests

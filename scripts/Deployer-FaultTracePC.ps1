@@ -538,8 +538,8 @@ function Send-Reveil([string]$mac, [string]$ipCible) {
     Interrogée depuis elle-même, elle répond par l'UNE de ses adresses, choisie par
     la pile réseau — et sur un poste d'administration il y en a beaucoup : carte
     physique, VPN, commutateurs virtuels de WSL, d'Hyper-V ou de Docker. Le
-    19/09/2026, la vérification a rendu 172.19.240.1, une carte virtuelle, alors
-    que la carte utile portait une adresse en 192.168.1.x.
+    19/09/2026, la vérification a rendu l'adresse d'une carte VIRTUELLE alors que
+    la carte utile en portait une tout autre.
 
     Aucune de ces adresses n'est « la bonne », et la question n'a pas de sens ici :
     ce script déploie sur des postes DISTANTS. Pour un poste distant, l'adresse
