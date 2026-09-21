@@ -18,7 +18,8 @@
 | 1.6.0 | **publiée** le 18/09/2026 — thème **un rapport doit nommer la panne qu'il a sous les yeux** — seize points, 48 à 63, livrés les 17 et 18/09/2026 |
 | 1.6.1 | **publiée** le 18/09/2026 — correctifs constatés sur deux rapports 1.6.0 réels, plus deux ajouts demandés dans la foulée — points 65 à 71, 513 tests verts |
 | 1.6.2 | **publiée** le 18/09/2026 — sept correctifs constatés sur un rapport 1.6.1 réel, dont **deux créés par la 1.6.1 elle-même** — points 72 à 78, 616 tests verts |
-| 1.7.0 | prévue — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔ **premier déploiement réel réussi le 19/09/2026, par VPN**, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔ |
+| 1.7.0 | **jamais publiée** — construite et éprouvée sur un parc réel les 19, 20 et 21/09/2026. Cinq défauts en sont sortis, dont trois qu'aucune relecture de code n'aurait trouvés. Publier 1.7.0 puis 1.7.1 à trois jours d'intervalle n'aurait rien appris à personne |
+| 1.7.1 | **à publier** — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔. C'est la 1.7.0 corrigée : voir « La matinée du 21/09/2026 », défauts A à E |
 | 1.8.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026 |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
@@ -671,6 +672,35 @@ Ce qui n'est **pas** annulé : un réveil qui échoue, une copie qui échoue, un
 installation refusée, une mise en parc refusée. Quatre tests fixent ces limites,
 dont un qui vérifie qu'une installation refusée après un réveil réussi reste un
 échec.
+
+**Vérifié le 21/09/2026 à midi**, après correction : un poste éteint, jamais
+installé et absent de la console, a été réveillé, installé, mis en parc **et
+inscrit tout seul dans l'onglet Supervision**. La console passe de 7 à 9 postes
+suivis, toutes versions 1.7.0, tous joignables. Le point 64 est complet de bout
+en bout — de « ce poste existe dans l'annuaire » à « ce poste est supervisé » —
+sans une seule saisie manuelle.
+
+#### Les trois fonctions restantes, éprouvées le 21/09/2026 après-midi
+
+- **« Reprendre les échecs »** — relecture d'un journal de vérification : un seul
+  poste recoché, celui qui avait réellement échoué. Les postes réveillés avec
+  succès le matin ne sont pas recochés. La règle du défaut E tient dans les deux
+  sens : en mode *vérification seule* le script ne réveille pas, l'échec de
+  `reponse` n'est donc rattrapé par rien et reste décisif — ce qui est juste.
+- **Historique des alertes** (point 43) — relecture de l'archive locale sur un
+  poste de salle : 18 alertes sur 90 jours, 18 critiques, toutes de la même règle
+  (erreur matérielle signalée par le processeur, WHEA), du 14 au 21/09. C'est
+  exactement le cas d'usage qui a motivé le point : la preuve écrite qu'une
+  machine signale des erreurs matérielles depuis des semaines.
+- **Boîte noire distante** (point 46) — 360 relevés sur la dernière heure, lus
+  depuis la console sans se rendre sur le poste, avec les événements Windows
+  marquants signalés au passage.
+
+**La 1.7.0 est complète.** Elle sera publiée sous le numéro **1.7.1**, décision
+du 21/09/2026 : les postes du parc portent déjà un paquet numéroté 1.7.0 qui
+n'est plus le binaire d'aujourd'hui, et msiexec n'installe rien par-dessus une
+version identique. Deux binaires différents sous un même numéro est une
+affirmation fausse ; le numéro doit dire la vérité.
 
 **La leçon, et c'est la troisième fois en trois jours :** ce logiciel se trompe
 quand il conclut plus vite qu'il ne mesure. Le 403 muet concluait « refusé » sans
