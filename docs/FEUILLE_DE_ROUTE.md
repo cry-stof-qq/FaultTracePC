@@ -94,6 +94,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 14 | ~~**ACL sur `remote.json`**~~ | **fait** — `FileProtection` : héritage coupé, accès réduit à SYSTEM et Administrateurs par SID, échec journalisé dans `erreurs.log` ; 4 tests posent et relisent l'ACL réelle |
 | 15 | **Bloc winget** : section du rapport + boutons « tout mettre à jour » / choix par logiciel | validé — **planifié 1.8.0**, plan arrêté le 19/09/2026, plus bas |
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
+| 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -708,6 +709,83 @@ dire par quel verrou ; « hors annuaire » concluait « n'existe pas » à parti
 « pas ici » ; et ici « une ligne echec » concluait « poste en échec » alors que
 la ligne suivante disait le contraire. Le même défaut de raisonnement, trois
 habits différents.
+
+---
+
+## Deux publics, un seul paquet — décision du 21/09/2026
+
+**Le constat qui ouvre la question.** Depuis la 1.7.1, le logiciel ne s'adresse
+plus à un seul public. Un particulier veut diagnostiquer sa machine ; un
+administrateur veut piloter un parc. Ce sont deux besoins, deux niveaux de
+risque et deux craintes différentes — et aujourd'hui ils reçoivent le même
+paquet, avec la console de parc, ses ports, son secret maître et
+`System.DirectoryServices.dll` que le particulier n'emploiera jamais.
+
+### Ce qui a été décidé
+
+**Le mode parc devient une fonctionnalité facultative du paquet**, posée à
+l'installation par le même mécanisme que le raccourci du Bureau — celui qui
+existe déjà (`ADDLOCAL=Main,DesktopShortcutFeature`).
+
+- un particulier installe et ne voit **jamais** l'onglet de parc ;
+- un administrateur ajoute la fonctionnalité par une option de ligne de commande,
+  ce qui convient aussi à un déploiement par stratégie de groupe ;
+- **un seul paquet, un seul numéro de version, une seule construction, une seule
+  série de tests.**
+
+Le reste du problème — des notes de version qui parlent de parc à quelqu'un qui
+n'en a pas — se règle dans le texte et non dans le paquet : deux sections
+distinctes dans les notes et dans l'article, l'une pour la machine seule, l'autre
+pour le parc.
+
+**Quand :** pas tout de suite. La 1.7.1 a trois jours d'usage réel. Cette
+décision attend une version ultérieure, sans date.
+
+### Les deux options écartées, et pourquoi
+
+Elles sont écrites ici parce qu'une piste abandonnée sans motif se represente.
+
+**Option A — deux paquets distincts, « perso » et « parc ».** Écartée. Le coût
+n'est pas dans le code, il est autour : deux constructions, deux jeux de notes de
+version, quatre articles qui en deviennent huit, deux chemins de mise à jour à
+éprouver, et une question de plus à laquelle répondre — « lequel je prends ? ».
+Ce coût se paie à chaque version, pour toujours, et le projet tient sur une seule
+personne.
+
+S'y ajoute un piège d'installateur : deux MSI installant dans le même dossier
+avec des `ProductCode` différents se marchent dessus. Qui installerait les deux
+obtiendrait deux entrées dans « Programmes et fonctionnalités », ou un dossier à
+moitié écrasé. Cela se gère — `UpgradeCode`, détection mutuelle — mais
+l'installateur est justement la partie la moins éprouvée et celle qui casse le
+plus silencieusement.
+
+Enfin, deux binaires différents porteraient le même numéro. C'est exactement ce
+qui a été refusé la veille en passant de 1.7.0 à 1.7.1.
+
+**Option B — faire repartir le paquet « perso » de la 1.6.2.** Écartée, et plus
+fermement. Cela veut dire maintenir deux lignées : toute correction du moteur de
+diagnostic — là où vivent la grande majorité des corrections — devrait être
+portée deux fois, éprouvée deux fois, décrite deux fois. C'est l'option la plus
+coûteuse de toutes celles examinées.
+
+### La découpe qui, elle, resterait défendable — plus tard
+
+Si un découpage en paquets devait avoir lieu un jour, ce n'est pas
+**perso / parc** mais **console / agent**. Il y a trois rôles et non deux :
+
+| Rôle | Ce dont il a besoin |
+|---|---|
+| poste personnel | l'application, le service de surveillance, les réparations |
+| poste supervisé | le service de surveillance et `FaultTracePC.Cli.exe` — **pas la console** |
+| poste d'administration | tout, plus la console de parc |
+
+Un poste de salle de classe reçoit aujourd'hui 63 Mo dont il n'emploiera jamais
+l'onglet Inventaire. Ce découpage-là a un bénéfice **chiffrable** — taille copiée,
+durée de copie, surface installée sur les machines les plus exposées — là où
+perso / parc n'aurait été qu'un habillage.
+
+**À ne pas trancher avant d'avoir mesuré.** La question se posera avec des
+chiffres quand le parc aura grossi ; à neuf postes elle n'a pas d'objet.
 
 ---
 

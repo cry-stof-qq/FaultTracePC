@@ -85,3 +85,5 @@ Le quatrième avait trois conséquences pour un seul défaut : la colonne de vé
 Aucun format de fichier n'évolue : les analyses enregistrées par les versions 1.6.x restent lisibles, et la comparaison entre deux scans fonctionne d'une version à l'autre. Le rapport de diagnostic, son moteur de règles et ses 32 conclusions sont ceux de la 1.6.2.
 
 Cette version **ajoute** une capacité, elle n'en modifie aucune.
+
+716 tests, aucun échec.
