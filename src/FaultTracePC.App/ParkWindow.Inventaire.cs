@@ -558,7 +558,12 @@ public partial class ParkWindow
         if (lignes.Count == 0)
             return ("absent", Lang.T("aucune trace", "no trace"));
 
-        var echec = lignes.FirstOrDefault(l => l.EstEchec);
+        // LES ÉCHECS RATTRAPÉS NE COMPTENT PAS. Un poste éteint fait échouer
+        // « reponse » avant d'être réveillé, et une gestion à distance muette fait
+        // échouer « winrm » avant d'être démarrée : dans les deux cas le script
+        // répare et continue. Voir LectureDuJournal.EchecsDecisifs — la règle vit
+        // dans le noyau parce que la reprise du lot D s'en sert aussi.
+        var echec = lecture.EchecsDecisifs(nom).FirstOrDefault();
         if (echec is not null)
             return ("echec", Lang.T($"échec : {LibelleEtape(echec.Etape)}",
                                     $"failed: {LibelleEtape(echec.Etape)}"));

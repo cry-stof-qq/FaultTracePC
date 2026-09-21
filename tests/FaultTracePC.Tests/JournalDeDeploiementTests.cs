@@ -158,6 +158,67 @@ public class JournalDeDeploiementTests
     }
 
     [Fact]
+    public void Un_poste_eteint_puis_reveille_n_est_pas_un_poste_en_echec()
+    {
+        // LE CAS NORMAL D'UN DÉPLOIEMENT SUR MACHINE ÉTEINTE, et le défaut constaté
+        // le 21/09/2026 : trois postes réveillés, installés et joignables étaient
+        // déclarés « échec : pas de réponse réseau » à cause de la seule ligne que
+        // le script écrit AVANT de les réveiller.
+        var lecture = ParkDeployment.LireLignes(
+            ["""{"poste":"POSTE-09","etape":"compte","etat":"ok"}""",
+             """{"poste":"POSTE-09","etape":"reponse","etat":"echec","detail":"ni ping, ni port 445"}""",
+             """{"poste":"POSTE-09","etape":"reveil","etat":"ok","detail":"reveille puis joignable"}""",
+             """{"poste":"POSTE-09","etape":"partage","etat":"ok"}""",
+             """{"poste":"POSTE-09","etape":"installation","etat":"ok","code":0}""",
+             """{"poste":"POSTE-09","etape":"parc","etat":"ok"}"""]);
+
+        Assert.Empty(lecture.EchecsDecisifs("POSTE-09"));
+        Assert.Empty(lecture.PostesEnEchec);
+    }
+
+    [Fact]
+    public void Une_etape_reecrite_ne_vaut_que_par_sa_derniere_ligne()
+    {
+        // La gestion à distance muette : le script écrit l'échec, démarre le service
+        // à distance, puis réécrit la MÊME étape en succès.
+        var lecture = ParkDeployment.LireLignes(
+            ["""{"poste":"POSTE-10","etape":"winrm","etat":"echec","detail":"aucune reponse sur 5985"}""",
+             """{"poste":"POSTE-10","etape":"winrm","etat":"ok","detail":"service demarre a distance"}"""]);
+
+        Assert.Empty(lecture.EchecsDecisifs("POSTE-10"));
+        Assert.Empty(lecture.PostesEnEchec);
+    }
+
+    [Fact]
+    public void Un_reveil_qui_echoue_reste_un_echec()
+    {
+        // La limite de la règle : on annule l'échec de « reponse » PARCE QUE le
+        // réveil a réussi. S'il échoue, les deux lignes disent la même chose et le
+        // poste est bien en échec.
+        var lecture = ParkDeployment.LireLignes(
+            ["""{"poste":"POSTE-11","etape":"reponse","etat":"echec","detail":"ni ping, ni port 445"}""",
+             """{"poste":"POSTE-11","etape":"reveil","etat":"echec","detail":"adresse MAC inconnue"}"""]);
+
+        Assert.Equal(2, lecture.EchecsDecisifs("POSTE-11").Count);
+        Assert.Equal(["POSTE-11"], lecture.PostesEnEchec);
+    }
+
+    [Fact]
+    public void Une_installation_refusee_reste_un_echec_meme_apres_un_reveil_reussi()
+    {
+        // Le réveil n'absout que « reponse ». Il ne rend pas bon ce qui a échoué
+        // après lui — sinon un poste allumé pour rien passerait pour installé.
+        var lecture = ParkDeployment.LireLignes(
+            ["""{"poste":"POSTE-12","etape":"reponse","etat":"echec"}""",
+             """{"poste":"POSTE-12","etape":"reveil","etat":"ok"}""",
+             """{"poste":"POSTE-12","etape":"installation","etat":"echec","code":1603}"""]);
+
+        var echecs = lecture.EchecsDecisifs("POSTE-12");
+        Assert.Equal("installation", Assert.Single(echecs).Etape);
+        Assert.Equal(["POSTE-12"], lecture.PostesEnEchec);
+    }
+
+    [Fact]
     public void Un_fichier_absent_n_est_pas_un_journal_vide()
     {
         // L'un veut dire « pas encore commencé », l'autre « commencé, rien écrit ».

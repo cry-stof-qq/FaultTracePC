@@ -623,6 +623,62 @@ sait demander n'est pas un réglage disponible. Il ne l'est que par les chemins
 qui peuvent effectivement poser la question. Ici la console fermait le seul
 chemin qui l'aurait posée, et rien ne le disait.
 
+#### Vérification sur le parc réel, 21/09/2026, quatre passes
+
+Le serveur DHCP renseigné, le réveil réseau fonctionne. Constaté sur trois
+postes éteints : adresse MAC obtenue du bail, paquet magique envoyé, poste
+réveillé, installé et mis en parc dans la foulée. La première passe, faite sans
+avoir renseigné le serveur, a servi de témoin : elle affiche les trois sources
+et la raison de chacune, exactement comme prévu.
+
+Un poste résiste au réveil (`POSTE-ELEVE-01`) : adresse MAC trouvée, paquet
+envoyé, pas de réponse après 90 secondes. Le BIOS est le suspect, pas le
+logiciel — le message le dit désormais sans ambiguïté.
+
+**Une limite du réveil, visible dans la sortie et à retenir :** le paquet magique
+part de la carte qui mène au poste, et ne traverse pas les routeurs. Un poste sur
+un autre VLAN que celui de la console ne sera pas réveillé, quelle que soit la
+configuration de son BIOS. Le script l'écrit à chaque envoi.
+
+#### Défaut E — un échec rattrapé était compté comme un échec
+
+L'inscription automatique du défaut D n'a rien inscrit. La cause n'est pas dans
+le code écrit ce jour-là, mais dans une règle plus ancienne qu'il a rendue
+visible.
+
+`VerdictDuPoste` s'arrêtait à la PREMIÈRE ligne en échec du journal. Or le script
+consigne ce qu'il observe **au moment où il l'observe, y compris quand il
+s'apprête à le réparer** :
+
+| Étape | Ce que le script écrit | Ce qui se passe ensuite |
+|---|---|---|
+| `reponse` | `echec` — le poste éteint ne répond pas | il est réveillé, puis `reveil ok` |
+| `winrm` | `echec` — la gestion à distance est muette | le service est démarré, puis `winrm ok` |
+
+Ces deux lignes sont le déroulement **normal** d'un déploiement réussi sur
+machine éteinte. Un poste réveillé, installé, mis en parc et joignable ressortait
+donc « échec : pas de réponse réseau ». Conséquences : la colonne Vérification
+mentait, la reprise du lot D (`PostesEnEchec`) recochait des postes qui n'avaient
+rien à reprendre, et le défaut D ne trouvait plus aucun poste à inscrire.
+
+**Corrigé le 21/09/2026**, dans le noyau et non dans la console, parce que la
+reprise du lot D applique la même règle — `LectureDuJournal.EchecsDecisifs` :
+
+1. pour une même étape écrite plusieurs fois, seule la **dernière** ligne compte ;
+2. un échec de `reponse` est annulé par un `reveil` réussi.
+
+Ce qui n'est **pas** annulé : un réveil qui échoue, une copie qui échoue, une
+installation refusée, une mise en parc refusée. Quatre tests fixent ces limites,
+dont un qui vérifie qu'une installation refusée après un réveil réussi reste un
+échec.
+
+**La leçon, et c'est la troisième fois en trois jours :** ce logiciel se trompe
+quand il conclut plus vite qu'il ne mesure. Le 403 muet concluait « refusé » sans
+dire par quel verrou ; « hors annuaire » concluait « n'existe pas » à partir de
+« pas ici » ; et ici « une ligne echec » concluait « poste en échec » alors que
+la ligne suivante disait le contraire. Le même défaut de raisonnement, trois
+habits différents.
+
 ---
 
 ## Points 65 à 71 — ce que deux rapports 1.6.0 ont montré

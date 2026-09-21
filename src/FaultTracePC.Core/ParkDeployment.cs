@@ -387,10 +387,69 @@ public sealed class LectureDuJournal
                                         .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                                         .ToList();
 
-    /// <summary>Les postes dont au moins une étape a échoué — la liste du lot D.</summary>
-    public List<string> PostesEnEchec => Lignes.Where(l => l.EstEchec)
-                                               .Select(l => l.Poste)
-                                               .Distinct(StringComparer.OrdinalIgnoreCase)
-                                               .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-                                               .ToList();
+    /// <summary>
+    /// Les échecs d'un poste qui n'ont PAS été rattrapés ensuite.
+    ///
+    /// UN ÉCHEC ÉCRIT N'EST PAS FORCÉMENT UN ÉCHEC CONSTATÉ. Le script consigne ce
+    /// qu'il observe au moment où il l'observe, y compris quand il s'apprête à le
+    /// réparer. Deux étapes sont concernées, et ce sont les deux cas NORMAUX d'un
+    /// déploiement réussi :
+    ///
+    /// <list type="bullet">
+    /// <item><b>reponse</b> — un poste éteint ne répond pas. Le script écrit
+    /// « echec », réveille la machine par le réseau, puis écrit « reveil ok ».
+    /// Le poste est bel et bien traité ensuite.</item>
+    /// <item><b>winrm</b> — la gestion à distance est muette. Le script écrit
+    /// « echec », démarre le service à distance, puis réécrit « winrm ok ».</item>
+    /// </list>
+    ///
+    /// Compter ces lignes comme des échecs faisait déclarer en échec des postes
+    /// installés et mis en parc sans le moindre incident. <b>Constaté le
+    /// 21/09/2026</b> : trois postes réveillés, installés et joignables ont été
+    /// marqués « échec : pas de réponse réseau », et n'ont donc pas été inscrits
+    /// automatiquement dans la supervision.
+    ///
+    /// DEUX RÈGLES, PAS UNE :
+    /// <list type="number">
+    /// <item>pour une même étape écrite plusieurs fois, seule la DERNIÈRE ligne
+    /// compte — c'est le cas de <c>winrm</c> ;</item>
+    /// <item>un échec de <c>reponse</c> est annulé par un <c>reveil</c> réussi —
+    /// le script n'y revient pas, il passe à la suite.</item>
+    /// </list>
+    ///
+    /// Ce qui n'est PAS annulé : un réveil qui échoue, une copie qui échoue, une
+    /// installation refusée, une mise en parc refusée. Ceux-là restent des échecs.
+    /// </summary>
+    public List<LigneDeDeploiement> EchecsDecisifs(string poste)
+    {
+        var duPoste = Lignes
+            .Where(l => string.Equals(l.Poste, poste, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (duPoste.Count == 0) return [];
+
+        // Règle 1 : une étape réécrite ne vaut que par sa dernière ligne.
+        var echecs = duPoste
+            .GroupBy(l => l.Etape, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.Last())
+            .Where(l => l.EstEchec)
+            .ToList();
+
+        // Règle 2 : le réveil réseau rattrape l'absence de réponse.
+        bool reveilReussi = duPoste.Any(l =>
+            string.Equals(l.Etape, ParkDeployment.EtapeReveil, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(l.Etat, ParkDeployment.EtatOk, StringComparison.OrdinalIgnoreCase));
+
+        if (reveilReussi)
+            echecs.RemoveAll(l =>
+                string.Equals(l.Etape, ParkDeployment.EtapeReponse, StringComparison.OrdinalIgnoreCase));
+
+        return echecs;
+    }
+
+    /// <summary>
+    /// Les postes dont au moins une étape a échoué SANS être rattrapée — la liste
+    /// du lot D, celle qu'on recoche pour reprendre.
+    /// </summary>
+    public List<string> PostesEnEchec => Postes.Where(p => EchecsDecisifs(p).Count > 0).ToList();
 }
