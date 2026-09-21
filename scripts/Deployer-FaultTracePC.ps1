@@ -1,16 +1,29 @@
 ﻿<#
     Déploiement de FaultTracePC sur un ou plusieurs postes distants.
-    Version 1.3 — NON PUBLIÉE. 19 septembre 2026. Licence MIT, sans garantie.
+    Version 1.3 — NON PUBLIÉE TELLE QUELLE. 21 septembre 2026. Licence MIT,
+    sans garantie.
     https://palisser.fr — https://github.com/cry-stof-qq/FaultTracePC
 
-    CETTE COPIE N'EST PAS CELLE DE PALISSER.FR. La version publiée dans
-    l'article 34 est la 1.2 ; celle-ci voyage avec FaultTracePC et lui ajoute le
-    journal JSON, le mode « vérifier seulement » et la liste de postes lue dans
-    un fichier — trois paramètres optionnels qui ne changent rien pour qui lance
-    le script à la main. Elle remplacera la 1.2 sur palisser.fr après le premier
-    déploiement réel. Le numéro est écrit ici pour qu'on ne puisse plus prendre
-    les deux fichiers l'un pour l'autre : ils ont porté le même pendant deux
-    semaines, et c'est exactement ainsi que deux copies divergent en silence.
+    CETTE COPIE N'EST PAS CELLE DE PALISSER.FR, et l'écart est plus grand que
+    ce qui était écrit ici jusqu'au 21/09/2026. Ce commentaire affirmait que
+    l'article 34 publiait la 1.2 : vérification faite en ouvrant le fichier mis
+    en ligne, c'est la 1.1 du 5 septembre 2026 qui s'y trouve. La 1.2 n'a
+    jamais été publiée. Une affirmation sur l'état d'un site, écrite de mémoire
+    dans un commentaire de code, s'était périmée sans que rien ne le signale.
+
+    Ce que cette copie a de plus que la 1.1 en ligne : le journal JSON, le mode
+    « vérifier seulement », la liste de postes lue dans un fichier, et l'annuaire
+    d'adresses MAC désigné par un chemin. Quatre paramètres FACULTATIFS : qui
+    lance le script à la main retrouve exactement le comportement de la 1.1.
+
+    DEPUIS FAULTTRACEPC 1.7.1, CE SCRIPT EST EMBARQUÉ DANS LE LOGICIEL. C'est
+    cette copie-là que la console extrait et pilote — voir ScriptDeDeploiement.
+    Le ZIP de l'article 34 n'est donc plus le chemin normal pour s'en servir : il
+    reste publié pour être LU avant d'être exécuté, et utilisable seul.
+
+    Le numéro reste écrit ici pour qu'on ne puisse pas prendre deux fichiers
+    l'un pour l'autre : ils ont porté le même pendant deux semaines, et c'est
+    exactement ainsi que deux copies divergent en silence.
 
     Le script se trouve tout seul ($PSScriptRoot) : il fonctionne depuis
     n'importe quel dossier, y compris une clé USB.

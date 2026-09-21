@@ -710,6 +710,29 @@ dire par quel verrou ; « hors annuaire » concluait « n'existe pas » à parti
 la ligne suivante disait le contraire. Le même défaut de raisonnement, trois
 habits différents.
 
+#### Le ZIP de palisser.fr — ce qu'il contient vraiment
+
+Vérifié le 21/09/2026 en ouvrant le fichier mis en ligne, plutôt qu'en le
+supposant : l'article 34 publie la **1.1 du 5 septembre 2026**. La **1.2 n'a
+jamais été publiée**, alors que l'entête du script du dépôt affirmait le
+contraire depuis deux jours. Une affirmation sur l'état d'un site, écrite de
+mémoire dans un commentaire de code, s'était périmée sans que rien ne le
+signale. L'entête est corrigé.
+
+Le contenu du ZIP est propre : aucune donnée réelle, `postes.csv` ne porte que
+les adresses d'exemple `AA-BB-CC-DD-EE-01` et `-02`. L'article et le ZIP sont
+cohérents entre eux — tous deux annoncent 1.1.
+
+Écart réel entre la 1.1 en ligne et la copie embarquée : quatre paramètres, tous
+**facultatifs** — journal JSON, mode « vérifier seulement », liste de postes lue
+dans un fichier, annuaire d'adresses MAC désigné par un chemin. Qui lance le
+script à la main retrouve exactement le comportement de la 1.1. La 1.1 sait déjà
+interroger le DHCP, réveiller, installer et mettre en parc.
+
+**Décision à prendre, pas urgente :** republier un ZIP à jour, ou cesser de
+distribuer le ZIP maintenant que le script voyage dans le logiciel. Rien ne
+presse : ce qui est en ligne est exact et fonctionne.
+
 ---
 
 ## Deux publics, un seul paquet — décision du 21/09/2026
