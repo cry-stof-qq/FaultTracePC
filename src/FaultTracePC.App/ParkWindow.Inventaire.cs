@@ -109,6 +109,7 @@ public partial class ParkWindow
         var reglages = ParametresParc.Charger();
         TxtUnite.Text = reglages.UniteOrganisation;
         TxtFichierMac.Text = reglages.FichierAdressesMac;
+        TxtServeurDhcp.Text = reglages.ServeurDhcp;
         TxtPaquet.Text = reglages.CheminDuPaquet;
         MajEtatDuPaquet();
     }
@@ -259,6 +260,7 @@ public partial class ParkWindow
         var reglages = ParametresParc.Charger();
         reglages.UniteOrganisation = saisie;
         reglages.FichierAdressesMac = (TxtFichierMac.Text ?? "").Trim();
+        reglages.ServeurDhcp = (TxtServeurDhcp.Text ?? "").Trim();
         reglages.CheminDuPaquet = (TxtPaquet.Text ?? "").Trim();
         bool memorise = reglages.Enregistrer();
 
@@ -732,6 +734,13 @@ public partial class ParkWindow
         {
             var reglages = ParametresParc.Charger();
             reglages.CheminDuPaquet = paquet;
+
+            // LES RÉGLAGES DU RÉVEIL RÉSEAU SONT PRIS DANS LA FENÊTRE, pas sur le
+            // disque : ils viennent peut-être d'être saisis, et un déploiement lancé
+            // dans la foulée doit en tenir compte sans qu'il faille d'abord
+            // actualiser l'inventaire pour les enregistrer.
+            reglages.ServeurDhcp = (TxtServeurDhcp.Text ?? "").Trim();
+            reglages.FichierAdressesMac = (TxtFichierMac.Text ?? "").Trim();
             reglages.Enregistrer();
 
             var dossier = ScriptDeDeploiement.DossierParDefaut;
@@ -766,6 +775,30 @@ public partial class ParkWindow
             };
             if (modeParc) parametres.Add(new("ConfigurerParc", null));
 
+            // CE QUI MANQUAIT POUR QUE LE RÉVEIL RÉSEAU PUISSE ABOUTIR.
+            //
+            // Le script cherche l'adresse MAC d'un poste éteint dans trois sources,
+            // par ordre de fiabilité : le serveur DHCP, postes.csv, le cache ARP.
+            // Lancé depuis cette console il recevait -SortieJson, se taisait par
+            // construction, et ne demandait donc JAMAIS le nom du serveur DHCP ;
+            // quant au champ « Annuaire d'adresses MAC », il ne remplissait qu'une
+            // colonne et n'arrivait pas jusqu'au script. Les deux premières sources
+            // étaient hors d'atteinte, la troisième est vide pour un poste éteint :
+            // aucun réveil ne pouvait aboutir, quelle que soit la machine visée.
+            //
+            // Constaté le 21/09/2026 sur quatre postes que d'autres outils
+            // réveillent sans difficulté.
+            //
+            // LE CHEMIN N'EST TRANSMIS QUE S'IL EST SAISI. Vide, le script garde son
+            // comportement d'origine — postes.csv à côté de lui — qui est le bon
+            // quand on le lance à la main depuis une clé USB.
+            if (reglages.ServeurDhcp.Length > 0)
+                parametres.Add(new("ServeurDhcp", reglages.ServeurDhcp));
+
+            if (reglages.FichierAdressesMac.Length > 0)
+                parametres.Add(new("FichierMac",
+                    ParkInventory.CheminAdressesMac(reglages.FichierAdressesMac, DossierDesDonnees)));
+
             using var processus = Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
@@ -784,7 +817,9 @@ public partial class ParkWindow
             var lecture = ParkDeployment.Lire(journal);
             AppliquerLesVerdicts(lecture, choisis);
 
-            TxtInvStatus.Text = ResumeDeDeploiement(lecture, choisis, ecartes, journal);
+            int inscrits = InscrireDansLaSupervision(choisis);
+
+            TxtInvStatus.Text = ResumeDeDeploiement(lecture, choisis, ecartes, journal, inscrits);
         }
         catch (Exception ex)
         {
@@ -798,11 +833,64 @@ public partial class ParkWindow
     }
 
     /// <summary>
+    /// Inscrit dans l'onglet Supervision les postes qui viennent d'être mis en mode
+    /// parc, et rend le nombre de lignes ajoutées.
+    ///
+    /// POURQUOI C'EST AUTOMATIQUE DEPUIS LE 21/09/2026. Le script affichait « À
+    /// saisir dans la console de parc » et l'administrateur recopiait à la main un
+    /// nom, un hôte et un port que le logiciel venait lui-même d'établir. Sur un
+    /// poste c'est agaçant ; sur trente c'est une source de fautes de frappe, et une
+    /// faute de frappe dans un nom donne un jeton faux, donc un refus 403 que rien
+    /// n'explique — exactement le piège du 19/09/2026.
+    ///
+    /// SEULS LES POSTES EN MODE PARC SONT INSCRITS. Un poste simplement installé
+    /// n'écoute pas : l'inscrire fabriquerait une ligne qui échoue toujours, et une
+    /// ligne rouge sans cause est pire que pas de ligne du tout.
+    ///
+    /// L'HÔTE EST LE NOM, JAMAIS L'ADRESSE. En DHCP l'adresse change ; le nom, non.
+    /// C'est déjà ce que le script recommande à l'écran.
+    ///
+    /// AUCUN JETON N'EST INSCRIT : il se déduit du secret maître et du nom de
+    /// machine à chaque interrogation. Écrire un jeton ici ressusciterait la liste
+    /// de secrets dans Documents dont on s'est débarrassé.
+    ///
+    /// UN POSTE DÉJÀ PRÉSENT N'EST PAS TOUCHÉ. On ne réécrit pas une ligne que
+    /// l'administrateur a peut-être ajustée à la main — port différent, jeton
+    /// historique. Ajouter, jamais écraser.
+    /// </summary>
+    private int InscrireDansLaSupervision(List<LigneInventaire> choisis)
+    {
+        var aInscrire = choisis.Where(l => l.Verdict == "parc" && l.Nom.Length > 0).ToList();
+        if (aInscrire.Count == 0) return 0;
+
+        var deja = new HashSet<string>(_machines.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
+
+        int ajoutes = 0;
+        foreach (var ligne in aInscrire)
+        {
+            if (!deja.Add(ligne.Nom)) continue;
+
+            // Le port reste celui que ParkMachine porte par défaut : c'est aussi
+            // celui que le script emploie, et la console ne lui en impose pas
+            // d'autre. Le jour où elle le ferait, les deux devraient se lire au
+            // même endroit — pas être recopiés ici.
+            _machines.Add(new ParkMachine { Name = ligne.Nom, Host = ligne.Nom });
+            ajoutes++;
+        }
+
+        if (ajoutes == 0) return 0;
+
+        SaveMachines();
+        RenderRows(null);
+        return ajoutes;
+    }
+
+    /// <summary>
     /// Le bilan, compté sur les CODES et non sur les phrases affichées : un
     /// décompte ne doit pas dépendre de la langue de l'interface.
     /// </summary>
     private static string ResumeDeDeploiement(
-        LectureDuJournal lecture, List<LigneInventaire> choisis, List<string> ecartes, string journal)
+        LectureDuJournal lecture, List<LigneInventaire> choisis, List<string> ecartes, string journal, int inscrits)
     {
         int enParc     = choisis.Count(l => l.Verdict == "parc");
         int installes  = choisis.Count(l => l.Verdict == "installe") + enParc;
@@ -812,6 +900,10 @@ public partial class ParkWindow
         var resume = Lang.T(
             $"{choisis.Count} poste(s) demandé(s) : {installes} installé(s), dont {enParc} visible(s) de la console · {echoues} en échec · {sansTrace} sans aucune trace dans le journal.",
             $"{choisis.Count} computer(s) requested: {installes} installed, of which {enParc} visible from the console · {echoues} failed · {sansTrace} with no trace at all in the journal.");
+
+        if (inscrits > 0)
+            resume += Lang.T($" {inscrits} poste(s) ajouté(s) à l'onglet Supervision — rien à recopier.",
+                             $" {inscrits} computer(s) added to the Monitoring tab — nothing to retype.");
 
         if (sansTrace > 0)
             resume += Lang.T(" Un poste sans trace n'a pas été atteint par le script : il n'est ni installé, ni en échec, on ne sait simplement rien de lui.",
@@ -836,11 +928,24 @@ public partial class ParkWindow
 
     private static LigneInventaire Convertir(PosteDuParc p)
     {
-        // Hors annuaire, « actif » et une date de session seraient des affirmations
-        // sans source : un poste saisi à la main dans la console n'a pas de compte
-        // d'ordinateur connu de ce logiciel.
+        // Sans compte trouvé, « actif » et une date de session seraient des
+        // affirmations sans source : un poste saisi à la main dans la console n'a
+        // pas de compte d'ordinateur connu de ce logiciel.
+        //
+        // LE LIBELLÉ DIT CE QU'ON A CHERCHÉ, PAS CE QUI EXISTE.
+        //
+        // La recherche annuaire part de l'unité d'organisation saisie et descend
+        // (SearchScope.Subtree dans ParkDirectory). Elle ne voit donc RIEN de ce
+        // qui vit ailleurs dans le domaine. Écrire « hors annuaire » — ce que
+        // faisait ce code jusqu'au 21/09/2026 — affirmait que le poste n'existe
+        // pas dans l'annuaire, alors que le logiciel n'en sait rien : il a
+        // seulement constaté que cette unité-là ne le contient pas.
+        //
+        // Signalé le 21/09/2026 : des postes bien présents dans l'annuaire, mais
+        // dans une autre unité, étaient annoncés « hors annuaire ». Le fait était
+        // juste, la phrase était fausse.
         bool vuParLAnnuaire = p.Sources.HasFlag(SourcesDuPoste.ActiveDirectory);
-        var horsAnnuaire = Lang.T("hors annuaire", "not in directory");
+        var horsAnnuaire = Lang.T("pas dans cette unité", "not in this OU");
 
         return new LigneInventaire
         {

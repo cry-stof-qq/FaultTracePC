@@ -536,6 +536,95 @@ Quatre leçons, et la première vaut pour tout ce projet :
 
 ---
 
+### La matinée du 21/09/2026 — le premier lot réel, et un réveil réseau qui ne pouvait pas marcher
+
+Premier déploiement en lot depuis le réseau de l'établissement, sur six postes
+d'une unité d'organisation. Deux postes allumés installés et passés en mode parc
+sans incident. Quatre postes éteints n'ont pas pu être réveillés. Trois défauts en sont sortis, tous constatés, aucun supposé.
+
+#### Défaut A — « hors annuaire » affirmait ce que le logiciel ne sait pas
+
+L'onglet Inventaire annonçait « hors annuaire » pour des postes bien présents
+dans l'annuaire, mais rangés dans une autre unité d'organisation.
+
+La recherche part de l'unité saisie et descend (`SearchScope.Subtree`,
+`ParkDirectory.cs`). Elle ne voit donc rien de ce qui vit ailleurs dans le
+domaine. Le fait constaté était juste — cette unité ne contient pas ce poste —
+mais la phrase affichée disait autre chose.
+
+**Corrigé le 21/09/2026** : le libellé devient « pas dans cette unité »
+(`not in this OU`). Il dit ce qu'on a cherché, pas ce qui existe.
+
+C'est le même défaut de forme que le 403 muet du 19/09 : un logiciel qui conclut
+au-delà de ce qu'il a mesuré coûte du temps à celui qui le lit.
+
+#### Défaut B — le réveil réseau ne pouvait aboutir, quelle que soit la machine
+
+Message affiché sur les quatre postes éteints : « Adresse MAC inconnue : réveil
+réseau impossible ». Or un outil tiers réveille sans difficulté deux de ces
+postes — la carte et le BIOS ne sont donc pas en cause.
+
+`Get-MacDuPoste` cherche l'adresse dans trois sources, dans cet ordre :
+
+| # | Source | État constaté le 21/09/2026 |
+|---|---|---|
+| 1 | serveur DHCP | **jamais interrogé** — la variable est vide |
+| 2 | `postes.csv` à côté du script | **fichier absent** du dossier `Deploiement` |
+| 3 | cache ARP local | vide : un poste éteint n'a pas parlé récemment |
+
+Les trois échouent, et la première pour une raison structurelle : la console
+lance toujours le script avec `-SortieJson`, ce qui met `$muet` à vrai
+(`Initialize-Parametres`) et supprime la question « serveur DHCP ? ». Comme
+`parametres.json` n'existe pas à côté du script, la valeur ne peut jamais être
+renseignée **par ce chemin-là**. Le réveil réseau lancé depuis la console ne
+pouvait donc aboutir pour aucun poste.
+
+La preuve est dans la sortie elle-même : aucune ligne « DHCP injoignable » ni
+« ne connaît pas de bail » n'apparaît. Le bloc DHCP n'a pas échoué — il n'a pas
+été exécuté.
+
+#### Défaut C — le champ « Annuaire d'adresses MAC » ne sert qu'à l'affichage
+
+L'onglet Inventaire propose un champ « Annuaire d'adresses MAC ». Il est lu
+(`ParkInventory.CheminAdressesMac`) pour remplir la colonne « MAC connue », et
+**il s'arrête là** : il ne figure pas dans les paramètres passés au script de
+déploiement, qui cherche son `postes.csv` à côté de lui-même.
+
+Le champ promet donc de configurer le réveil réseau alors qu'il ne configure
+qu'une colonne. Deux notions d'« annuaire MAC » cohabitent sans se parler.
+
+#### Défaut D — le poste déployé devait être recopié à la main
+
+Après un déploiement réussi, la console lisait le journal et mettait à jour
+l'état de la ligne, mais n'inscrivait pas le poste dans l'onglet Supervision. Le
+script affichait « À saisir dans la console de parc » et l'administrateur
+recopiait un nom, un hôte et un port que le logiciel venait d'établir lui-même.
+
+Sur un poste c'est agaçant ; sur trente c'est une source de fautes de frappe. Et
+une faute de frappe dans un nom de machine donne un jeton faux, donc un refus
+403 — le piège du 19/09/2026, retrouvé par un autre chemin.
+
+#### Ce qui a été corrigé le 21/09/2026
+
+| Défaut | Correction |
+|---|---|
+| A | libellé « pas dans cette unité » au lieu de « hors annuaire » |
+| B | champ **Serveur DHCP** dans l'onglet Inventaire (`ParametresParc.ServeurDhcp`), transmis au script ; et le script dit désormais laquelle des trois sources a manqué, au lieu d'un « MAC inconnue » sans motif |
+| C | nouveau paramètre `-FichierMac` du script ; le champ « Annuaire d'adresses MAC » de la console y est transmis — **uniquement s'il est renseigné**, pour que le script gardé sur une clé USB continue de lire le `postes.csv` posé à côté de lui |
+| D | les postes passés en **mode parc** sont inscrits automatiquement dans l'onglet Supervision. Seuls ceux-là : un poste simplement installé n'écoute pas, et une ligne qui échoue toujours vaut moins que pas de ligne. L'hôte inscrit est le **nom**, jamais l'adresse ; aucun jeton n'est écrit ; un poste déjà présent n'est pas touché |
+
+Le réglage du serveur DHCP vit maintenant des deux côtés, et c'est voulu : le
+script interrogé à la main demande le nom et le range dans son `parametres.json`,
+la console le range dans le sien. Deux fichiers de même nom, deux schémas
+différents, deux dossiers différents — à ne pas confondre.
+
+**Ce que ce lot apprend, et qui vaut au-delà de lui :** un réglage qu'un outil
+sait demander n'est pas un réglage disponible. Il ne l'est que par les chemins
+qui peuvent effectivement poser la question. Ici la console fermait le seul
+chemin qui l'aurait posée, et rien ne le disait.
+
+---
+
 ## Points 65 à 71 — ce que deux rapports 1.6.0 ont montré
 
 Le 18/09/2026, l'auteur envoie deux rapports produits par la 1.6.0 tout juste publiée, l'un en français sur `POSTE-01`, l'autre en anglais sur `POSTE-01-EN`, pour vérifier le texte des deux langues. Les deux machines sont saines. **C'est justement ce qui rend ces rapports utiles : sur une machine saine, tout ce que le logiciel signale est un faux positif.**

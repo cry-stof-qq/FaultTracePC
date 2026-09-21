@@ -88,7 +88,19 @@ param(
     # quand il y en a beaucoup : une ligne de commande Windows a une longueur
     # maximale, et quelques centaines de noms la dépassent. L'échec n'arriverait
     # pas au moment où on le comprendrait, mais le jour où le parc a grossi.
-    [string]$FichierPostes
+    [string]$FichierPostes,
+
+    # ANNUAIRE D'ADRESSES MAC — chemin explicite, fichier OU dossier.
+    #
+    # Sans ce paramètre, comportement d'origine : postes.csv à côté du script,
+    # ce qui est juste quand on lance le script à la main depuis son dossier.
+    #
+    # La console, elle, range ses donnees ailleurs que le script. Jusqu'au
+    # 21/09/2026 les deux ne se voyaient donc jamais : la console proposait un
+    # champ « Annuaire d'adresses MAC » qui ne remplissait qu'une colonne et
+    # n'arrivait pas jusqu'ici, et le reveil reseau lance depuis la console ne
+    # trouvait aucune adresse. Ce paramètre est le chaînon qui manquait.
+    [string]$FichierMac
 )
 
 $ErrorActionPreference = 'Stop'
@@ -310,7 +322,29 @@ function Test-PosteDuDomaine([string]$nom) {
 }
 
 # ---------------------------------------------------------------- réveil réseau
+<#
+    OÙ SE TROUVE L'ANNUAIRE D'ADRESSES MAC.
+
+    Par défaut à côté du script, pour qu'il reste utilisable seul depuis une clé
+    USB. Un chemin donné par -FichierMac l'emporte, et un DOSSIER est accepté
+    autant qu'un fichier : coller le chemin du dossier est le geste naturel, le
+    refuser n'aiderait personne. Les guillemets d'un « Copier en tant que chemin
+    d'accès » de l'Explorateur sont retirés pour la même raison.
+
+    Même règle que Get-CheminAdressesMac côté console : les deux doivent
+    comprendre la même saisie, sinon le champ ne veut pas dire la même chose des
+    deux côtés.
+#>
 $script:cheminCsv = Join-Path $racine 'postes.csv'
+if (-not [string]::IsNullOrWhiteSpace($FichierMac)) {
+    $donne = $FichierMac.Trim().Trim('"').Trim()
+    if (Test-Path -LiteralPath $donne -PathType Container) {
+        $script:cheminCsv = Join-Path $donne 'postes.csv'
+    }
+    else {
+        $script:cheminCsv = $donne
+    }
+}
 
 <#
     Écrit ou remplace la ligne d'UN poste dans postes.csv, sans toucher aux
@@ -365,6 +399,13 @@ function Get-MacDuPoste([string]$nom) {
             Alerte "$ServeurDhcp ne connaît pas de bail pour $nom."
         }
         catch { Alerte "DHCP $ServeurDhcp injoignable : $($_.Exception.Message)" }
+    }
+    else {
+        # UNE SOURCE NON CONSULTÉE DOIT LE DIRE. Sans cette ligne, l'absence du
+        # serveur DHCP ressemblait à une recherche qui n'a rien donné, alors que
+        # la recherche n'avait pas eu lieu. Constaté le 21/09/2026 : quatre
+        # postes déclarés « MAC inconnue » sans qu'aucune trace ne dise pourquoi.
+        Alerte 'Aucun serveur DHCP renseigné : la source la plus fiable n''est pas consultée.'
     }
 
     if (Test-Path $script:cheminCsv) {
@@ -720,8 +761,31 @@ function Install-SurUnPoste([string]$nom) {
 
         $mac = Get-MacDuPoste $nom
         if (-not $mac) {
+            <#
+                UN REFUS DOIT DIRE CE QU'IL A ESSAYÉ.
+
+                « MAC inconnue » seul laisse croire à un poste mal configuré —
+                carte réseau, BIOS — alors que la cause est presque toujours en
+                amont : aucune des trois sources n'était en état de répondre. Le
+                21/09/2026, quatre postes que d'autres outils réveillent sans
+                difficulté sont ressortis « MAC inconnue » parce qu'aucun serveur
+                DHCP n'était renseigné et que postes.csv n'était pas là.
+
+                Même leçon que le 403 muet du 19/09/2026 : trois heures perdues
+                faute d'un motif écrit.
+            #>
+            $sourceDhcp = 'aucun serveur DHCP renseigné'
+            if ($ServeurDhcp) { $sourceDhcp = "$ServeurDhcp n'a pas de bail pour ce poste" }
+
+            $sourceCsv = 'fichier absent'
+            if (Test-Path $script:cheminCsv) { $sourceCsv = 'aucune ligne pour ce poste' }
+
             Grave 'Adresse MAC inconnue : réveil réseau impossible.'
-            Alerte "Ajoute une ligne « $nom;AA-BB-CC-DD-EE-FF » dans postes.csv, à côté du script."
+            Alerte 'Les trois sources ont été tentées, dans cet ordre de fiabilité :'
+            Alerte "  1. serveur DHCP : $sourceDhcp"
+            Alerte "  2. $script:cheminCsv : $sourceCsv"
+            Alerte '  3. cache ARP local : rien, un poste éteint n''y figure plus'
+            Alerte "Pour débloquer : renseigner le serveur DHCP, ou ajouter la ligne « $nom;AA-BB-CC-DD-EE-FF » dans le fichier ci-dessus."
             $resume.Etat = 'échec'; $resume.Detail = 'éteint, MAC inconnue'
             Write-Json $nom 'reveil' 'echec' 'adresse MAC inconnue'
             return $resume

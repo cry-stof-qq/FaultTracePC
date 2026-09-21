@@ -196,6 +196,16 @@
                         <Button x:Name="BtnInvParcourirMac" Content="{x:Static loc:L.ParkInvBrowse}"
                                 Padding="12,5" Margin="8,0,0,0" Click="BtnInvParcourirMac_Click"/>
                     </WrapPanel>
+                    <!-- LE SERVEUR DHCP EST UN RÉGLAGE DE LA CONSOLE, pas seulement du
+                         script. Le script sait le demander, mais uniquement quand on le
+                         lance à la main : piloté par la console il se tait, et la question
+                         n'était jamais posée. Voir ParametresParc.ServeurDhcp. -->
+                    <WrapPanel VerticalAlignment="Center" Margin="0,8,0,0">
+                        <TextBlock Text="{x:Static loc:L.ParkInvDhcpLabel}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox x:Name="TxtServeurDhcp" Width="420" VerticalAlignment="Center"
+                                 FontFamily="Consolas" FontSize="11"
+                                 ToolTip="{x:Static loc:L.ParkInvDhcpTip}"/>
+                    </WrapPanel>
                     <WrapPanel VerticalAlignment="Center" Margin="0,8,0,0">
                         <TextBlock Text="{x:Static loc:L.ParkInvPackageLabel}" VerticalAlignment="Center" Margin="0,0,4,0"/>
                         <TextBox x:Name="TxtPaquet" Width="420" VerticalAlignment="Center"

@@ -35,6 +35,25 @@ public sealed class ParametresParc
     public string FichierAdressesMac { get; set; } = "";
 
     /// <summary>
+    /// Nom du serveur DHCP du site, consulté pour retrouver l'adresse MAC d'un
+    /// poste ÉTEINT — la seule source qui ne vieillit pas.
+    ///
+    /// POURQUOI CE RÉGLAGE VIT ICI ET PAS SEULEMENT DANS LE SCRIPT. Le script sait
+    /// demander ce nom au premier lancement, mais seulement quand quelqu'un est
+    /// devant l'écran. Lancé par la console, il reçoit <c>-SortieJson</c>, se tait
+    /// par construction, et la question n'est jamais posée : le réveil réseau ne
+    /// pouvait alors aboutir pour AUCUN poste. Constaté le 21/09/2026 sur quatre
+    /// postes que d'autres outils réveillent sans difficulté.
+    ///
+    /// VIDE = PAS DE DHCP CONSULTÉ. Le script se rabat alors sur postes.csv puis
+    /// sur le cache ARP, et le dit.
+    ///
+    /// CE N'EST PAS UN SECRET, c'est un nom de serveur. Mais parametres.json ne se
+    /// diffuse pas pour autant : il nomme votre infrastructure.
+    /// </summary>
+    public string ServeurDhcp { get; set; } = "";
+
+    /// <summary>
     /// Chemin du paquet <c>.msi</c> à déployer, sur un partage lisible par les
     /// ORDINATEURS du domaine — pas seulement par les utilisateurs : l'installation
     /// se fait sous le compte machine.

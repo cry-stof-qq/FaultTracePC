@@ -449,6 +449,10 @@ public static class L
     public static string ParkInvMacTip => Lang.T(
         "Le fichier postes.csv écrit par le script de déploiement. Laisser vide le cherche à côté de parc.json. Un dossier convient autant qu'un chemin de fichier. Sans lui, la colonne « MAC connue » reste vide : l'annuaire Active Directory ne stocke aucune adresse MAC.",
         "The postes.csv file written by the deployment script. Leave empty to look for it next to parc.json. A folder works as well as a file path. Without it the “MAC known” column stays empty: Active Directory stores no MAC address at all.");
+    public static string ParkInvDhcpLabel => Lang.T("Serveur DHCP :", "DHCP server:");
+    public static string ParkInvDhcpTip => Lang.T(
+        "Le nom du serveur DHCP du site. Il est consulté uniquement pour retrouver l'adresse MAC d'un poste éteint, poste par poste, au moment où on en a besoin — jamais de balayage. Laisser vide si vous n'en avez pas : le réveil réseau se rabattra sur postes.csv, qu'il faudra alors remplir à la main.",
+        "The name of your site's DHCP server. It is queried only to find the MAC address of a powered-off computer, one computer at a time, when needed — never a sweep. Leave empty if you have none: wake-on-LAN then falls back to postes.csv, which you will have to fill in by hand.");
     public static string ParkInvBrowse => Lang.T("📁 Parcourir…", "📁 Browse…");
     public static string ParkInvPackageLabel => Lang.T("Paquet à déployer :", "Package to deploy:");
     public static string ParkInvPackageTip => Lang.T(
