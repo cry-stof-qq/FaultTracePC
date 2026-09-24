@@ -902,6 +902,7 @@ rien dans le rapport ne permettait de le voir.
 | `fltmc filters` — les pilotes qui s'intercalent entre Windows et le disque | quatorze filtres, **tous Microsoft ou du nouvel antivirus** ; aucun de l'ancien |
 | services dont le nom affiché cite l'ancien éditeur | **aucun** |
 | fichiers `.sys` dans les dossiers restants | aucun trouvé |
+| contenu des trois dossiers restants | deux **vides**, un contenant **un seul élément** — mesuré au second essai : la première commande, qui masquait les erreurs, n'avait rien affiché du tout, ce qui ne distinguait pas « vide » de « accès refusé » |
 
 Rien de l'ancien antivirus ne tournait plus : il ne restait que des dossiers sur
 le disque. La désinstallation était **fonctionnellement** terminée, pas
