@@ -95,6 +95,12 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 15 | **Bloc winget** : section du rapport + boutons « tout mettre à jour » / choix par logiciel | validé — **planifié 1.8.0**, plan arrêté le 19/09/2026, plus bas |
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
 | 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
+| 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — voir « Ce qu'un rapport sur une machine inconnue a montré » |
+| 81 | **Signaler deux moteurs antivirus temps réel actifs** | constaté le 24/09/2026, donnée déjà collectée |
+| 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée |
+| 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée |
+| 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
+| 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -732,6 +738,150 @@ interroger le DHCP, réveiller, installer et mettre en parc.
 **Décision à prendre, pas urgente :** republier un ZIP à jour, ou cesser de
 distribuer le ZIP maintenant que le script voyage dans le logiciel. Rien ne
 presse : ce qui est en ligne est exact et fonctionne.
+
+---
+
+## Points 80 à 85 — ce qu'un rapport sur une machine inconnue a montré
+
+24/09/2026. Premier rapport 1.7.1 produit sur une machine **qui n'est pas celle
+de l'auteur** : un portable grand public sous Windows 10 22H2, 8 Go, confié pour
+lenteur et plantages, dont on ne connaît ni l'historique ni l'usage. C'est une
+situation nouvelle pour ce logiciel — jusqu'ici il était relu sur des machines
+dont on savait tout.
+
+**Le contexte réel, appris APRÈS la lecture du rapport :** l'antivirus
+Bitdefender venait d'être désinstallé la veille, Avast avait été installé pour
+le remplacer, et l'utilisateur dit que la machine est devenue lente « avant »
+sans savoir avant quoi. Rien de tout cela n'était déductible du rapport — et
+c'est précisément ce que les points ci-dessous cherchent à corriger.
+
+### Ce que le rapport a bien fait
+
+- Les trois événements `volmgr 161` sont correctement interprétés : ce n'est pas
+  le disque, c'est la destination du vidage mémoire. Deux écrans bleus sans
+  fichier d'analyse, et le rapport dit que la cause restera indéterminée tant
+  que le réglage n'est pas corrigé. C'est juste, utile, et actionnable.
+- La section « Limitations » nomme les cinq échecs d'analyse CDB au lieu de les
+  taire.
+- Les niveaux de confiance sont donnés, et la corrélation Windows Update est
+  bien étiquetée « confiance faible, corrélation temporelle uniquement ».
+
+### Point 80 — WinDbg installé, et déclaré absent
+
+Cinq fois dans les limitations : `Analyse CDB de […].dmp : […] cdb.exe […]
+Accès refusé.` **WinDbg était installé**, en version Microsoft Store, sous
+`C:\Program Files\WindowsApps\…` — un dossier dont les permissions
+interdisent le lancement direct, et une application empaquetée ne se démarre
+pas par son chemin.
+
+Conséquence : les sept écrans bleus portent tous « non identifié (**installer
+WinDbg** pour l'analyse symbolique) ». **Le logiciel demande d'installer ce qui
+est déjà là.**
+
+C'est le point le plus coûteux des six, parce que l'analyse symbolique est la
+seule chose qui aurait tranché entre les deux hypothèses restées ouvertes.
+
+Deux corrections, pas une : employer l'alias d'exécution
+(`%LOCALAPPDATA%\Microsoft\WindowsApps\`) plutôt que le chemin `WindowsApps`,
+**et** distinguer dans le message « WinDbg absent » de « WinDbg présent mais
+inaccessible ». Les deux ne demandent pas le même geste à celui qui lit.
+
+### Point 81 — deux moteurs antivirus, et pas un mot
+
+Les deux plus gros processus de la machine étaient `MsMpEng` (Windows Defender,
+266 Mo) et `AvastSvc` (148 Mo), plus `aswidsagent` (72 Mo). Defender bascule
+normalement en veille quand un antivirus tiers s'enregistre ; ici il était le
+premier consommateur de la machine et recevait toujours ses définitions — dont
+**deux mises à jour en échec** (`0x80070050`, `0x8024200B`).
+
+Deux moteurs qui filtrent les mêmes fichiers en même temps expliquent à la fois
+une lenteur et des blocages d'entrées-sorties. Le logiciel voyait les deux
+processus et n'en a rien conclu.
+
+**Ce qu'il faut :** une conclusion à part entière quand plusieurs moteurs temps
+réel sont actifs — la liste des processus suffit, la donnée est déjà collectée.
+
+### Point 82 — un verdict que ses propres mesures contredisent
+
+Verdict rendu : « Cause la plus probable : **STOCKAGE** (disque/SSD, câblage ou
+firmware) », confiance **élevée**.
+
+Deux sections plus bas, le même rapport mesure le disque : **0** secteur
+réalloué, **0** erreur CRC, **0 %** d'usure, 250 heures de fonctionnement,
+40 °C, et un volume rempli à **7 %**. Un SSD quasi neuf, sans un seul défaut.
+
+Le verdict vient des seuls codes d'arrêt (`0x154`, `0x7A`), sans jamais être
+confronté à la mesure. C'est la quatrième occurrence en une semaine du même pli
+d'écriture : **conclure plus loin que ce qui a été mesuré.**
+
+**Ce qu'il faut :** quand une famille de codes d'arrêt désigne un organe et que
+la mesure de cet organe ne montre rien, la confiance baisse et le rapport le
+dit — « les codes pointent vers le stockage, mais le disque ne montre aucun
+défaut mesurable ; chercher au-dessus du disque ». Ne pas se taire, ne pas
+affirmer : nommer la contradiction.
+
+### Point 83 — sept plantages, deux amas, aucun regroupement
+
+Les plantages n'étaient pas répartis dans le temps :
+
+| Amas | Plantages | Écart |
+|---|---|---|
+| juillet | 3 (deux `0x1A`, un `0x154`) | — |
+| — | — | **74 jours sans rien** |
+| septembre | 4 (trois `0x154`, un `0x7A`) | — |
+
+Et les **10 réinitialisations du contrôleur de stockage** tiennent toutes dans
+la même fenêtre de 48 heures que le second amas. Pas une seule avant.
+
+Le rapport liste les sept plantages dans un tableau chronologique et s'arrête
+là. « Sept plantages en deux amas séparés de 74 jours » est une phrase qu'il a
+de quoi écrire et qu'il n'écrit pas — et c'est la première question qu'un
+technicien pose : **qu'est-ce qui a changé ce jour-là ?**
+
+### Point 84 — les dates de pose des pilotes ne servent à rien
+
+Le rapport donne la date de chaque pilote tiers et marque « ancien » au-delà de
+quatre ans. C'est tout ce qu'il en fait.
+
+Or **quatorze pilotes du même éditeur portaient la date du premier jour de
+l'amas de septembre** — un jeu de pilotes posé, et la machine qui plante le soir
+même. Un seul pilote du même éditeur gardait une date ancienne, ce qui écarte
+une réécriture de masse par Windows.
+
+**Ce qu'il faut :** rapprocher la date de pose des pilotes du début d'un amas de
+plantages. À énoncer comme une **piste**, jamais comme une preuve : une date de
+fichier est une date de pose, pas une causalité.
+
+### Point 85 — les logiciels installés n'apparaissent pas
+
+Question posée par celui qui tenait la machine : « ai-je bien fini de
+désinstaller l'ancien antivirus ? » **Le rapport ne peut pas y répondre.** Il
+n'a pas de section « logiciels installés ».
+
+Ce qu'il permet de dire — aucun pilote chargé, aucun processus, aucun événement
+au nom de cet éditeur — est déjà utile, et c'est la réponse qui a été donnée.
+Ce qu'il ne permet pas de voir : des fichiers restés sur le disque, des services
+orphelins, des pilotes-filtres désenregistrés mais présents.
+
+La liste des programmes installés est **déjà collectée** — elle sert au contrôle
+« ce logiciel est-il toujours installé ? » de la 1.6.0. Elle n'est simplement
+pas affichée.
+
+### Ce que ce rapport apprend au projet
+
+**Cinq des six points ne demandent aucune collecte nouvelle.** Tout est déjà
+lu, rangé, disponible. Ce qui manque est du **raisonnement**, pas de la donnée —
+rapprocher deux sections qui ne se parlent pas. C'est une bonne nouvelle : le
+coût est faible et le gain immédiat.
+
+**Et une leçon de méthode.** Jusqu'ici les rapports étaient relus sur des
+machines dont l'auteur savait tout : il complétait mentalement ce que le rapport
+ne disait pas, sans s'en apercevoir. Sur une machine inconnue, confiée par
+quelqu'un qui ne sait pas raconter ce qui s'est passé, **le rapport est tout ce
+qu'on a** — et c'est là que ses silences se voient.
+
+C'est le meilleur banc d'essai que ce logiciel ait rencontré. Il faudrait en
+chercher d'autres.
 
 ---
 
