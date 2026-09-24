@@ -895,6 +895,26 @@ restaient sur le disque — dans `Program Files` et deux dans `ProgramData`, don
 celui de son agent de gestion. La désinstallation n'était donc pas terminée, et
 rien dans le rapport ne permettait de le voir.
 
+**Ce qui a réellement répondu à la question**, vérifié ensuite en administrateur :
+
+| Contrôle | Résultat |
+|---|---|
+| `fltmc filters` — les pilotes qui s'intercalent entre Windows et le disque | quatorze filtres, **tous Microsoft ou du nouvel antivirus** ; aucun de l'ancien |
+| services dont le nom affiché cite l'ancien éditeur | **aucun** |
+| fichiers `.sys` dans les dossiers restants | aucun trouvé |
+
+Rien de l'ancien antivirus ne tournait plus : il ne restait que des dossiers sur
+le disque. La désinstallation était **fonctionnellement** terminée, pas
+proprement terminée.
+
+**`fltmc filters` mérite une place dans le rapport.** C'est une lecture
+unique, rapide, et le logiciel tourne déjà en administrateur. Un pilote-filtre
+orphelin d'un antivirus mal désinstallé est une cause classique de lenteur et
+d'écrans bleus liés au stockage — et c'est exactement ce qu'il fallait pouvoir
+écarter ici. La pile des filtres, avec leur altitude et leur éditeur, répond à
+la question « qu'est-ce qui se glisse entre Windows et le disque ? » mieux que
+n'importe quelle liste de programmes.
+
 La liste des programmes installés est **déjà collectée** — elle sert au contrôle
 « ce logiciel est-il toujours installé ? » de la 1.6.0. Elle n'est simplement
 pas affichée.
