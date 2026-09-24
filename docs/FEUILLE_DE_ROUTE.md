@@ -102,6 +102,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
+| 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -742,7 +743,7 @@ presse : ce qui est en ligne est exact et fonctionne.
 
 ---
 
-## Points 80 à 86 — ce qu'un rapport sur une machine inconnue a montré
+## Points 80 à 87 — ce qu'un rapport sur une machine inconnue a montré
 
 24/09/2026. Premier rapport 1.7.1 produit sur une machine **qui n'est pas celle
 de l'auteur** : un portable grand public sous Windows 10 22H2, 8 Go, confié pour
@@ -936,6 +937,44 @@ parc, en français aussi, la colonne est remplie. À instrumenter avant toute
 hypothèse : journaliser la raison pour laquelle la mesure échoue, plutôt que
 d'afficher un tiret qui ressemble à « rien à signaler ».
 
+### Point 87 — une recommandation sur un réglage jamais lu
+
+La carte `volmgr 161` du rapport recommandait : « activer les petits vidages
+mémoire […] et laisser le fichier d'échange géré automatiquement par Windows ».
+La recommandation a été reprise telle quelle en conversation — « corriger les
+réglages de vidage ».
+
+**Vérifié sur la machine** : le réglage était **« Vidage mémoire automatique »**,
+fichier `%SystemRoot%\MEMORY.DMP`, remplacement des fichiers existants coché.
+C'est **la configuration d'origine de Windows** depuis Windows 8, et personne
+n'y avait touché. Ce mode écrit l'équivalent d'un vidage noyau **et** des
+petits vidages : le rapport en avait d'ailleurs trouvé les deux sortes sur le
+disque.
+
+Le logiciel a donc déduit un réglage défaillant d'un **événement**, sans jamais
+**lire le réglage**. Et « activer les petits vidages » laissait entendre qu'ils
+ne l'étaient pas, alors qu'ils l'étaient.
+
+Ce que disaient réellement les faits : cinq plantages sur sept ont laissé un
+fichier ; les deux qui n'en ont pas laissé sont tous deux dans l'amas de
+septembre, pendant les réinitialisations du contrôleur de stockage. Une
+explication plausible — non démontrée — est que l'écriture du vidage a échoué
+parce que le chemin vers le disque était lui-même perturbé au moment du
+plantage. Ce n'est pas un réglage à corriger.
+
+**Ce qu'il faut :**
+
+- lire `HKLM\SYSTEM\CurrentControlSet\Control\CrashControl` (`CrashDumpEnabled`)
+  et l'état « géré par le système » du fichier d'échange, et les **afficher** ;
+- ne recommander un changement que si le réglage lu s'écarte de celui d'origine ;
+- quand des vidages manquent alors que le réglage est bon, le dire comme tel :
+  « le réglage est correct ; les plantages sans fichier sont à rapprocher de ce
+  qui se passait sur le stockage à ce moment-là ».
+
+Cinquième occurrence en une semaine du même pli : **conclure plus loin que ce
+qui a été mesuré** — et la troisième fois qu'il est commis aussi par celui qui
+relit, en reprenant la conclusion du logiciel sans la vérifier.
+
 ### L'issue, pour la machine
 
 Le jour même, après la fin de la désinstallation de l'ancien antivirus et sans
@@ -950,14 +989,14 @@ nouvel antivirus, et hors de la fenêtre de 30 jours qu'avait lue le rapport.
 
 À retenir pour le logiciel : **le rapport a désigné le stockage, la cause était
 au-dessus du disque**, et rien de ce qu'il avait collecté ne l'en aurait empêché
-s'il avait rapproché ses propres sections. C'est tout l'objet des points 80 à 86.
+s'il avait rapproché ses propres sections. C'est tout l'objet des points 80 à 87.
 
 ### Ce que ce rapport apprend au projet
 
-**Quatre des sept points ne demandent aucune collecte nouvelle** (82 à 85). Tout
-est déjà lu, rangé, disponible. Le 80 est une correction de lancement, le 81 une
-lecture nouvelle mais légère, et le 86 demande d'abord de comprendre pourquoi une
-mesure échoue en silence. Ce qui manque est du **raisonnement**, pas de la donnée —
+**Quatre des huit points ne demandent aucune collecte nouvelle** (82 à 85). Tout
+est déjà lu, rangé, disponible. Le 80 est une correction de lancement, le 81 et
+le 87 des lectures nouvelles mais légères, et le 86 demande d'abord de comprendre
+pourquoi une mesure échoue en silence. Ce qui manque est du **raisonnement**, pas de la donnée —
 rapprocher deux sections qui ne se parlent pas. C'est une bonne nouvelle : le
 coût est faible et le gain immédiat.
 
