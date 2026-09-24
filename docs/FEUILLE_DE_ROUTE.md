@@ -96,11 +96,12 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
 | 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
 | 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — voir « Ce qu'un rapport sur une machine inconnue a montré » |
-| 81 | **Signaler deux moteurs antivirus temps réel actifs** | constaté le 24/09/2026, donnée déjà collectée |
+| 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas, voir la section |
 | 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
+| 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -741,7 +742,7 @@ presse : ce qui est en ligne est exact et fonctionne.
 
 ---
 
-## Points 80 à 85 — ce qu'un rapport sur une machine inconnue a montré
+## Points 80 à 86 — ce qu'un rapport sur une machine inconnue a montré
 
 24/09/2026. Premier rapport 1.7.1 produit sur une machine **qui n'est pas celle
 de l'auteur** : un portable grand public sous Windows 10 22H2, 8 Go, confié pour
@@ -750,8 +751,8 @@ situation nouvelle pour ce logiciel — jusqu'ici il était relu sur des machine
 dont on savait tout.
 
 **Le contexte réel, appris APRÈS la lecture du rapport :** l'antivirus
-Bitdefender venait d'être désinstallé la veille, Avast avait été installé pour
-le remplacer, et l'utilisateur dit que la machine est devenue lente « avant »
+Bitdefender venait d'être désinstallé la veille — incomplètement, on le saura
+après coup —, Avast avait été installé pour le remplacer, et l'utilisateur dit que la machine est devenue lente « avant »
 sans savoir avant quoi. Rien de tout cela n'était déductible du rapport — et
 c'est précisément ce que les points ci-dessous cherchent à corriger.
 
@@ -786,20 +787,46 @@ Deux corrections, pas une : employer l'alias d'exécution
 **et** distinguer dans le message « WinDbg absent » de « WinDbg présent mais
 inaccessible ». Les deux ne demandent pas le même geste à celui qui lit.
 
-### Point 81 — deux moteurs antivirus, et pas un mot
+### Point 81 — quel antivirus protège réellement la machine ?
 
-Les deux plus gros processus de la machine étaient `MsMpEng` (Windows Defender,
-266 Mo) et `AvastSvc` (148 Mo), plus `aswidsagent` (72 Mo). Defender bascule
-normalement en veille quand un antivirus tiers s'enregistre ; ici il était le
-premier consommateur de la machine et recevait toujours ses définitions — dont
-**deux mises à jour en échec** (`0x80070050`, `0x8024200B`).
+**Une fausse piste d'abord, gardée ici parce qu'elle est instructive.** À la
+lecture du rapport, les deux plus gros processus étaient `MsMpEng` (Windows
+Defender, 266 Mo) et `AvastSvc` (148 Mo). La conclusion tirée en conversation
+fut : « deux moteurs antivirus actifs en même temps, et le logiciel n'en dit
+rien ». Avec, pour la proposition d'amélioration : « la liste des processus
+suffit ».
 
-Deux moteurs qui filtrent les mêmes fichiers en même temps expliquent à la fois
-une lenteur et des blocages d'entrées-sorties. Le logiciel voyait les deux
-processus et n'en a rien conclu.
+**C'était faux, et vérifié faux le jour même** sur la machine :
 
-**Ce qu'il faut :** une conclusion à part entière quand plusieurs moteurs temps
-réel sont actifs — la liste des processus suffit, la donnée est déjà collectée.
+| Commande | Résultat |
+|---|---|
+| `Get-MpComputerStatus` | `AMRunningMode` = **SxS Passive Mode**, `RealTimeProtectionEnabled` = **False** |
+| `root/SecurityCenter2 → AntiVirusProduct` | Defender `393472`, Avast `266240` |
+
+« SxS Passive Mode » est le mode où Defender tourne **à côté** d'un antivirus
+tiers, en analyse périodique limitée, sans protection temps réel. Le processus
+`MsMpEng` existe **dans ce mode aussi** — il continue de recevoir ses mises à
+jour et de faire ses analyses planifiées. Sa présence, et même sa taille, ne
+disent donc rien de son rôle. Les deux valeurs `productState` vont dans le même
+sens selon leur décodage usuel (Defender inactif, Avast actif et à jour) — un
+décodage que Microsoft ne documente pas officiellement, et qui ne vaut ici que
+parce qu'il concorde avec `AMRunningMode`.
+
+C'est **exactement** le défaut que cette section reproche au logiciel —
+conclure plus loin que ce qui a été mesuré — commis cette fois par celui qui
+relisait le rapport. Il vaut d'être écrit pour cette raison.
+
+**Ce qu'il faut, réellement :** que le rapport **lise et affiche** l'état de la
+protection, au lieu de le laisser deviner :
+
+- le mode de Defender (`AMRunningMode`, `RealTimeProtectionEnabled`) ;
+- la liste des antivirus enregistrés auprès du Centre de sécurité, et lequel
+  est actif ;
+- et, seulement si **deux** protections temps réel sont réellement actives, une
+  conclusion à part entière.
+
+Ce n'est plus « une donnée déjà collectée » : c'est une lecture nouvelle, peu
+coûteuse, qui ne demande aucun droit particulier.
 
 ### Point 82 — un verdict que ses propres mesures contredisent
 
@@ -863,14 +890,37 @@ au nom de cet éditeur — est déjà utile, et c'est la réponse qui a été do
 Ce qu'il ne permet pas de voir : des fichiers restés sur le disque, des services
 orphelins, des pilotes-filtres désenregistrés mais présents.
 
+**Vérifié après coup sur la machine** : trois dossiers de l'ancien antivirus
+restaient sur le disque — dans `Program Files` et deux dans `ProgramData`, dont
+celui de son agent de gestion. La désinstallation n'était donc pas terminée, et
+rien dans le rapport ne permettait de le voir.
+
 La liste des programmes installés est **déjà collectée** — elle sert au contrôle
 « ce logiciel est-il toujours installé ? » de la 1.6.0. Elle n'est simplement
 pas affichée.
 
+### Point 86 — la boîte noire sans charge processeur
+
+Sur cette machine, **tous** les relevés de la boîte noire portent « — » dans la
+colonne CPU %, alors que la température du GPU, la mémoire et la mémoire
+virtuelle sont bien enregistrées. La température du processeur manque aussi —
+ce qui est fréquent et documenté, beaucoup de processeurs portables ne
+l'exposent pas. **La charge processeur, elle, ne devrait jamais manquer.**
+
+Or le motif de la visite était « le PC est très lent ». C'est précisément la
+mesure qui aurait servi, et c'est la seule absente.
+
+**Cause non établie.** Ce n'est pas la langue du système : sur les postes du
+parc, en français aussi, la colonne est remplie. À instrumenter avant toute
+hypothèse : journaliser la raison pour laquelle la mesure échoue, plutôt que
+d'afficher un tiret qui ressemble à « rien à signaler ».
+
 ### Ce que ce rapport apprend au projet
 
-**Cinq des six points ne demandent aucune collecte nouvelle.** Tout est déjà
-lu, rangé, disponible. Ce qui manque est du **raisonnement**, pas de la donnée —
+**Quatre des sept points ne demandent aucune collecte nouvelle** (82 à 85). Tout
+est déjà lu, rangé, disponible. Le 80 est une correction de lancement, le 81 une
+lecture nouvelle mais légère, et le 86 demande d'abord de comprendre pourquoi une
+mesure échoue en silence. Ce qui manque est du **raisonnement**, pas de la donnée —
 rapprocher deux sections qui ne se parlent pas. C'est une bonne nouvelle : le
 coût est faible et le gain immédiat.
 
