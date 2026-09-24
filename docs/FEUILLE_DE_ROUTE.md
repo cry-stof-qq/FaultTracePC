@@ -902,7 +902,7 @@ rien dans le rapport ne permettait de le voir.
 | `fltmc filters` — les pilotes qui s'intercalent entre Windows et le disque | quatorze filtres, **tous Microsoft ou du nouvel antivirus** ; aucun de l'ancien |
 | services dont le nom affiché cite l'ancien éditeur | **aucun** |
 | fichiers `.sys` dans les dossiers restants | aucun trouvé |
-| contenu des trois dossiers restants | deux **vides**, un contenant **un seul élément** — mesuré au second essai : la première commande, qui masquait les erreurs, n'avait rien affiché du tout, ce qui ne distinguait pas « vide » de « accès refusé » |
+| contenu des trois dossiers restants | deux **vides**, un contenant **un seul élément**, lui-même un sous-dossier vide — mesuré au second essai : la première commande, qui masquait les erreurs, n'avait rien affiché du tout, ce qui ne distinguait pas « vide » de « accès refusé » |
 
 Rien de l'ancien antivirus ne tournait plus : il ne restait que des dossiers sur
 le disque. La désinstallation était **fonctionnellement** terminée, pas
@@ -935,6 +935,22 @@ mesure qui aurait servi, et c'est la seule absente.
 parc, en français aussi, la colonne est remplie. À instrumenter avant toute
 hypothèse : journaliser la raison pour laquelle la mesure échoue, plutôt que
 d'afficher un tiret qui ressemble à « rien à signaler ».
+
+### L'issue, pour la machine
+
+Le jour même, après la fin de la désinstallation de l'ancien antivirus et sans
+autre intervention, **la machine est redevenue sensiblement plus rapide** —
+constat de celui qui la tenait. Cela conforte l'hypothèse que les plantages de
+septembre et la lenteur venaient de la cohabitation des deux antivirus pendant
+deux jours ; cela ne la prouve pas. La confirmation sera l'absence de nouvel
+écran bleu dans les jours qui suivent.
+
+L'amas de juillet, lui, **reste inexpliqué** : il est antérieur à l'arrivée du
+nouvel antivirus, et hors de la fenêtre de 30 jours qu'avait lue le rapport.
+
+À retenir pour le logiciel : **le rapport a désigné le stockage, la cause était
+au-dessus du disque**, et rien de ce qu'il avait collecté ne l'en aurait empêché
+s'il avait rapproché ses propres sections. C'est tout l'objet des points 80 à 86.
 
 ### Ce que ce rapport apprend au projet
 
