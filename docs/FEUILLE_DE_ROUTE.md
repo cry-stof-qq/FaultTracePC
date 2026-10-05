@@ -103,6 +103,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine |
+| 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, à faire plus tard — voir « Point 88 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1008,6 +1009,73 @@ qu'on a** — et c'est là que ses silences se voient.
 
 C'est le meilleur banc d'essai que ce logiciel ait rencontré. Il faudrait en
 chercher d'autres.
+
+---
+
+## Point 88 — réveiller un poste depuis la console
+
+Demandé le 05/10/2026. **Noté pour plus tard, rien n'est commencé.**
+
+### Ce qui est demandé
+
+Pouvoir démarrer un poste éteint par le réseau (Wake-on-LAN) depuis la console,
+**sans passer par un déploiement**. L'adresse MAC vient :
+
+- du **serveur DHCP du domaine**, interrogé pour le poste visé ;
+- ou d'un **fichier CSV**, comme le fait déjà l'autre outil d'administration de
+  l'auteur.
+
+### Ce qui existe déjà — et c'est presque tout
+
+Le réveil n'est pas à écrire : il est **dans le script de déploiement depuis sa
+première version**, et il a été éprouvé sur le parc réel le 21/09/2026.
+
+| Brique | État |
+|---|---|
+| Envoi du paquet de réveil, choix de la carte réseau, attente de la réponse | **fait** — `Send-Reveil` |
+| Recherche de l'adresse MAC : DHCP, puis CSV, puis cache ARP | **fait** — `Get-MacDuPoste` |
+| Mode « ne fait QUE réveiller », sans copie ni installation | **fait** — paramètre `-ReveilSeulement` du script (choix 4 du menu quand on le lance à la main) |
+| Réglage du serveur DHCP dans la console | **fait** — point B du 21/09/2026 |
+| Réglage de l'annuaire d'adresses MAC, transmis au script | **fait** — point C du 21/09/2026 |
+| **Un bouton dans la console pour s'en servir** | **manque** |
+
+La console sait « Vérifier » et « Déployer ». Elle ne sait pas « Réveiller » :
+aujourd'hui, pour allumer un poste sans rien y installer, il faut lancer le
+script à la main. **Ce point est donc un travail d'interface, pas de moteur.**
+
+### Ce qu'il faudra décider le jour venu
+
+1. **Où mettre le bouton.** Dans l'onglet Inventaire, à côté de « Vérifier » et
+   « Déployer », il agit sur les postes cochés — c'est le plus cohérent. Un
+   poste déjà supervisé mais éteint se réveillerait plus naturellement depuis
+   l'onglet Supervision. Les deux ne s'excluent pas.
+2. **Le format du CSV.** Le script lit `Nom;MAC` séparé par des points-virgules
+   et accepte n'importe quelle écriture de l'adresse — il ne garde que les
+   chiffres hexadécimaux. Le CSV de l'autre outil est à comparer à ce format :
+   s'il diffère par ses colonnes, mieux vaut apprendre au script à le lire que
+   demander de tenir deux fichiers.
+3. **La confirmation.** Réveiller ne modifie rien SUR le poste, mais ça
+   l'allume. Trente postes qui démarrent sur un clic est un effet à annoncer
+   avant, pas après — c'est déjà la raison pour laquelle « Vérifier » ne
+   réveille jamais.
+
+### Les limites connues, à ne pas redécouvrir
+
+- **Le paquet de réveil ne traverse pas les routeurs.** Un poste sur un autre
+  sous-réseau que la console ne sera pas réveillé. Constaté et écrit le
+  21/09/2026 ; le script le rappelle à chaque envoi.
+- **Un portable en Wi-Fi ne se réveille pas** par ce moyen.
+- **Le BIOS et la carte réseau doivent l'autoriser** : un poste a résisté le
+  21/09/2026 alors que son adresse était trouvée et le paquet envoyé.
+- **Interroger le DHCP demande d'y avoir accès** : gestion à distance ouverte
+  sur le serveur, et droit de lire les baux. Sans cela, le CSV est la seule
+  source — d'où l'intérêt de garder les deux.
+
+### Sa place dans le découpage
+
+C'est une fonction de **parc**. Elle relève donc du point 79 : le jour où le
+mode parc deviendra une fonctionnalité facultative du paquet, ce bouton en fera
+partie et n'apparaîtra pas chez un particulier.
 
 ---
 
