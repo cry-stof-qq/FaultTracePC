@@ -103,7 +103,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine |
-| 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, à faire plus tard — voir « Point 88 » plus bas |
+| 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1014,7 +1014,7 @@ chercher d'autres.
 
 ## Point 88 — réveiller un poste depuis la console
 
-Demandé le 05/10/2026. **Noté pour plus tard, rien n'est commencé.**
+Demandé le 05/10/2026. **Noté pour plus tard, rien n'est commencé.** Les choix d'interface sont arrêtés et le code de l'autre outil a été comparé le même jour : le jour où ce point sera ouvert, il n'y aura plus qu'à écrire.
 
 ### Ce qui est demandé
 
@@ -1043,21 +1043,64 @@ La console sait « Vérifier » et « Déployer ». Elle ne sait pas « Réveill
 aujourd'hui, pour allumer un poste sans rien y installer, il faut lancer le
 script à la main. **Ce point est donc un travail d'interface, pas de moteur.**
 
-### Ce qu'il faudra décider le jour venu
+### Décidé le 05/10/2026
 
-1. **Où mettre le bouton.** Dans l'onglet Inventaire, à côté de « Vérifier » et
-   « Déployer », il agit sur les postes cochés — c'est le plus cohérent. Un
-   poste déjà supervisé mais éteint se réveillerait plus naturellement depuis
-   l'onglet Supervision. Les deux ne s'excluent pas.
-2. **Le format du CSV.** Le script lit `Nom;MAC` séparé par des points-virgules
-   et accepte n'importe quelle écriture de l'adresse — il ne garde que les
-   chiffres hexadécimaux. Le CSV de l'autre outil est à comparer à ce format :
-   s'il diffère par ses colonnes, mieux vaut apprendre au script à le lire que
-   demander de tenir deux fichiers.
-3. **La confirmation.** Réveiller ne modifie rien SUR le poste, mais ça
-   l'allume. Trente postes qui démarrent sur un clic est un effet à annoncer
-   avant, pas après — c'est déjà la raison pour laquelle « Vérifier » ne
-   réveille jamais.
+| Question | Réponse |
+|---|---|
+| Où mettre le bouton | **dans les deux onglets** : Inventaire, sur les postes cochés, à côté de « Vérifier » et « Déployer » ; Supervision, sur le poste sélectionné |
+| Confirmation avant d'allumer plusieurs postes | **oui** — même principe que le déploiement : on annonce le nombre avant, pas après |
+| De l'autre outil, que reprendre | **uniquement le réveil**, rien d'autre |
+
+### Ce que la lecture de l'autre outil a appris
+
+Son code de réveil a été lu le 05/10/2026 pour le comparer à celui-ci. Les deux
+sont cousins : la recherche dans le DHCP de l'autre outil est **reprise de ce
+script-ci**, son commentaire le dit.
+
+| | Ce logiciel | L'autre outil |
+|---|---|---|
+| Recherche de l'adresse MAC | DHCP, puis CSV, puis cache ARP | DHCP, puis son CSV, puis un `postes.csv` trouvé dans ses dossiers, puis **saisie à la main** |
+| Colonnes du CSV | `Nom;MAC` | `Nom;MAC;IP;Date` |
+| Séparateur | point-virgule | point-virgule |
+| D'où vient le CSV | écrit après une réponse du DHCP | écrit **aussi** chaque fois qu'un poste ALLUMÉ est examiné |
+| Envoi du paquet | par la carte qui mène au poste, à défaut toutes | par toutes les cartes |
+| Cibles et ports | diffusion du sous-réseau puis `255.255.255.255`, ports 9 et 7 | les mêmes |
+
+**En lecture, les deux fichiers sont compatibles tels quels.** Même séparateur,
+mêmes noms de colonnes `Nom` et `MAC` ; les colonnes en plus sont ignorées, la
+casse du nom ne compte pas, et l'adresse est acceptée sous n'importe quelle
+écriture puisque seuls ses chiffres hexadécimaux sont gardés. Il n'y a donc
+**aucun format à apprendre** : le champ « Annuaire d'adresses MAC » peut déjà
+désigner le fichier de l'autre outil.
+
+**En écriture, non — et c'est un défaut à corriger AVANT de les brancher
+ensemble.** `Update-LigneCsv` réécrit le fichier entier avec une ligne neuve qui
+n'a que deux colonnes. Or PowerShell 5.1 décide des colonnes d'un CSV d'après
+**la première ligne qu'il écrit** : si le poste réveillé est le premier dans
+l'ordre alphabétique, le fichier ressort avec `Nom;MAC` seulement, et les
+colonnes `IP` et `Date` de **toutes** les autres lignes sont perdues. Si un
+autre poste est premier, rien n'est perdu. Un défaut qui ne se produit qu'une
+fois sur plusieurs est le pire à retrouver après coup.
+
+À faire en même temps que le bouton : `Update-LigneCsv` doit **conserver les
+colonnes qu'il ne connaît pas** — relire l'entête existant, et écrire la ligne
+neuve avec les mêmes colonnes, vides là où il n'a rien à mettre.
+
+**Deux idées de l'autre outil qui valent d'être reprises**, à décider le moment
+venu :
+
+- **Apprendre l'adresse d'un poste quand il est allumé.** C'est ce qui rend
+  l'autre outil indépendant du DHCP. Ici ce serait encore plus simple : la
+  console interroge déjà chaque poste supervisé à chaque relève, et le service
+  qui lui répond connaît sa propre carte réseau. Un poste supervisé une fois
+  serait réveillable ensuite **sans serveur DHCP du tout** — ce qui compte pour
+  qui n'a pas de DHCP Windows, puisque la recherche actuelle ne sait interroger
+  que celui-là. C'est un ajout au protocole entre le poste et la console : une
+  décision à part, pas un détail du bouton. À concilier avec le choix du
+  19/09/2026 de ne jamais **afficher** l'adresse MAC.
+- **La saisie à la main en dernier recours**, avec contrôle de la forme. Quand
+  les trois sources n'ont rien, la console pourrait demander l'adresse au lieu
+  de renvoyer vers un fichier à modifier.
 
 ### Les limites connues, à ne pas redécouvrir
 
