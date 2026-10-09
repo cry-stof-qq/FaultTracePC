@@ -1029,9 +1029,20 @@ limitations : les deux sources ont été lues.
 - rien n'est conclu sur l'ensemble si une des deux lectures a échoué ;
 - l'inscription orpheline est une **information** : elle ne change pas le
   verdict. Sur le poste de l'auteur, c'est la seule conclusion qui apparaît ;
-- sept tests (`ConclusionsProtectionTests`), dont les deux configurations
+- huit tests (`ConclusionsProtectionTests`, dont un ajouté après l'essai réel), dont les deux configurations
   réellement mesurées : la machine du 24/09/2026 ne déclenche **rien** — ce qui
   aurait été la bonne réponse à la fausse piste de ce jour-là.
+
+**Vérifié en réel le 09/10/2026, et un défaut trouvé.** Sur le poste de
+l'auteur, la conclusion « Antivirus mal désinstallé : Trend Micro Apex One
+Antivirus » apparaît bien, seule, en information ; le verdict n'en est pas
+changé. Mais elle était suivie de « 🧰 Dans FaultTracePC bouton Outils, puis :
+sfc /scannow, puis DISM » — l'indication attachée à la catégorie « Logiciel ».
+Ces outils réparent les fichiers de Windows, ils ne retirent pas un antivirus.
+**Corrigé le même jour** : les trois conclusions passent en catégorie neutre
+(« Général »), qui n'annonce aucun outil et n'ajoute rien au script de
+réparation — sans quoi un avertissement « deux antivirus » y aurait ajouté les
+sections prévues pour une corruption système. Un test de plus.
 
 **Le point 81 est terminé.**
 

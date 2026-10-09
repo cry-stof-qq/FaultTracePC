@@ -62,6 +62,17 @@ public class ConclusionsProtectionTests
         Assert.Equal("protection.orpheline", seule.Code);
         Assert.Equal(Severity.Info, seule.Severity);
         Assert.Contains("Trend Micro Apex One Antivirus", seule.Title);
+        // Constaté le 09/10/2026 : en catégorie « Logiciel », le rapport proposait
+        // sfc /scannow et DISM, qui ne retirent pas un antivirus.
+        Assert.Equal(FaultCategory.None, seule.Category);
+    }
+
+    [Fact]
+    public void Aucune_conclusion_de_protection_ne_promet_un_outil_de_reparation_systeme()
+    {
+        var f = Conclure(Lu(false, "Normal", Defender(393472), Tiers("Ancien antivirus", actif: true, present: false)));
+        Assert.NotEmpty(f);
+        Assert.All(f, x => Assert.Equal(FaultCategory.None, x.Category));
     }
 
     [Fact]

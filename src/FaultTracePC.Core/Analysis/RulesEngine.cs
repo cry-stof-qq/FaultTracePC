@@ -2446,6 +2446,15 @@ public sealed class RulesEngine
     ///
     /// Rien n'est conclu sur l'ensemble si l'une des deux lectures a échoué :
     /// « rien pu lire » ne doit jamais devenir « rien trouvé ».
+    ///
+    /// CATÉGORIE « None », PAS « Software » — constaté sur le rapport réel du
+    /// 09/10/2026. Classée « Logiciel », la conclusion « Antivirus mal désinstallé »
+    /// recevait l'indication de la boîte à outils propre à cette catégorie :
+    /// « sfc /scannow, puis DISM ». Ces deux outils réparent les fichiers de Windows ;
+    /// ils ne retirent pas un antivirus. Et un avertissement « Logiciel » aurait aussi
+    /// ajouté au script de réparation les sections prévues pour une corruption
+    /// système. Aucun outil du logiciel ne traite ces cas : la catégorie neutre
+    /// n'en promet aucun.
     /// </summary>
     internal static void AnalyzeProtection(DiagnosticReport r)
     {
@@ -2461,7 +2470,7 @@ public sealed class RulesEngine
             {
                 Severity = Severity.Info,
                 Confidence = Confidence.High,
-                Category = FaultCategory.Software,
+                Category = FaultCategory.None,
                 Code = "protection.orpheline",
                 Subject = a.Nom,
                 Title = Lang.T($"Antivirus mal désinstallé : {a.Nom}", $"Antivirus not fully uninstalled: {a.Nom}"),
@@ -2489,7 +2498,7 @@ public sealed class RulesEngine
                 // Moyenne : l'état des antivirus tiers vient du code non documenté
                 // du Centre de sécurité.
                 Confidence = Confidence.Medium,
-                Category = FaultCategory.Software,
+                Category = FaultCategory.None,
                 Code = "protection.deux",
                 Subject = string.Join(", ", noms),
                 Title = Lang.T($"{noms.Count} antivirus surveillent la machine en même temps", $"{noms.Count} antivirus products are watching the machine at the same time"),
@@ -2510,7 +2519,7 @@ public sealed class RulesEngine
             {
                 Severity = Severity.Warning,
                 Confidence = Confidence.Medium,
-                Category = FaultCategory.Software,
+                Category = FaultCategory.None,
                 Code = "protection.aucune",
                 Title = Lang.T("Aucune protection antivirus en temps réel", "No real-time antivirus protection"),
                 Details = Lang.T(
