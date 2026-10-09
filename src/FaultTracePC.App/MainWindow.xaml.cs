@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using FaultTracePC.Core;
+using FaultTracePC.Core.Analysis;
 using FaultTracePC.Core.Report;
 
 namespace FaultTracePC.App;
@@ -296,7 +297,7 @@ public partial class MainWindow : Window
             BtnRepair.IsEnabled = _lastRepairScriptPath is not null;
             ShowResults(report);
             OpenInBrowser(_lastReportPath);
-            ProposerWinDbg(report, options);
+            ProposerWinDbg(report);
         }
         catch (Exception ex)
         {
@@ -315,8 +316,8 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Après un scan qui a trouvé des dumps sans pouvoir les analyser, propose
-    /// d'installer WinDbg.
+    /// Après un scan qui a trouvé des dumps sans pouvoir les analyser, dit pourquoi —
+    /// et propose d'installer WinDbg seulement s'il est VRAIMENT absent.
     ///
     /// La question est posée ICI et pas ailleurs parce que c'est ici qu'elle a un
     /// sens : l'utilisateur vient de constater qu'aucun pilote n'est nommé. Un
@@ -326,27 +327,23 @@ public partial class MainWindow : Window
     /// c'est là que vivent les actions modifiant le système, avec leur garde-fou de
     /// concurrence et leur fenêtre visible. Un second chemin d'installation, posé à
     /// côté, contournerait tout ça.
+    ///
+    /// Le choix du message est dans <see cref="ConseilWinDbg"/> (point 80, lot B) :
+    /// « absent » propose l'installation, « présent mais refusé par Windows »
+    /// informe seulement, puisque réinstaller donnerait la même version.
     /// </summary>
-    private void ProposerWinDbg(DiagnosticReport report, ScanOptions options)
+    private void ProposerWinDbg(DiagnosticReport report)
     {
-        if (!options.DeepDumpAnalysis) return;
+        var conseil = ConseilWinDbg.ApresAnalyse(report);
+        if (conseil is null) return;
 
-        var dumpsNoyau = report.Dumps
-            .Where(d => d.Kind is DumpKind.KernelMinidump or DumpKind.FullMemoryDump)
-            .ToList();
+        if (!conseil.ProposerBoiteAOutils)
+        {
+            MessageBox.Show(this, conseil.Message, conseil.Titre, MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
-        // Aucun dump : rien à analyser, donc rien à proposer.
-        // Au moins un dump analysé en profondeur : l'outil est présent, rien à faire.
-        if (dumpsNoyau.Count == 0 || dumpsNoyau.Any(d => d.DeepAnalyzed)) return;
-
-        var choix = MessageBox.Show(this,
-            Lang.T($"{dumpsNoyau.Count} fichier(s) d'incident ont été trouvés, mais le pilote fautif n'a pas pu être nommé : ", $"{dumpsNoyau.Count} crash file(s) were found, but the faulting driver could not be named: ")
-            + Lang.T("les outils de débogage de Microsoft ne sont pas installés sur cette machine.\n\n", "the Microsoft debugging tools are not installed on this machine.\n\n")
-            + Lang.T("Sans eux, le code d'arrêt est lu, mais le coupable reste souvent anonyme — c'est la différence ", "Without them the stop code is read, but the culprit often stays anonymous — that is the difference ")
-            + Lang.T("entre « la machine a planté » et « c'est ce pilote-là ».\n\n", "between “the machine crashed” and “it is that driver”.\n\n")
-            + Lang.T("Ouvrir la boîte à outils pour les installer ?", "Open the toolbox to install them?"),
-            Lang.T("Analyse incomplète", "Incomplete analysis"), MessageBoxButton.YesNo, MessageBoxImage.Information);
-
+        var choix = MessageBox.Show(this, conseil.Message, conseil.Titre, MessageBoxButton.YesNo, MessageBoxImage.Information);
         if (choix == MessageBoxResult.Yes) BtnToolbox_Click(this, new RoutedEventArgs());
     }
 

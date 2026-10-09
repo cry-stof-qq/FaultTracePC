@@ -823,13 +823,33 @@ Windows » du Windows SDK sont la voie qui fonctionne.
   qui provoquent le refus de lancement avec un fichier portant l'extension `.exe`
   sans en être un.
 
-#### Lot B — à faire : la fenêtre qui suit l'analyse
+#### Lot B ✔ — la fenêtre qui suit l'analyse, livré le 09/10/2026
 
-Après un scan, la fenêtre principale affiche « les outils de débogage de
-Microsoft ne sont pas installés sur cette machine » et propose d'ouvrir la boîte
+Après un scan, la fenêtre principale affichait « les outils de débogage de
+Microsoft ne sont pas installés sur cette machine » et proposait d'ouvrir la boîte
 à outils pour les installer. Sur la machine du 24/09/2026, c'était faux, et le
 bouton aurait réinstallé le même paquet. Elle doit lire le nouvel état et dire
 « installé mais impossible à lancer » le cas échéant.
+
+**Ce qui a été fait :**
+
+- la décision est sortie de la fenêtre vers `Core/Analysis/ConseilWinDbg.cs`,
+  pour pouvoir être testée (le projet de tests ne charge pas l'interface) ;
+- elle lit `DiagnosticReport.AnalyseProfonde`, le même état que le rapport —
+  la fenêtre et le rapport ne peuvent plus se contredire ;
+- **WinDbg absent** : message et bouton inchangés (« pas installés », ouvrir la
+  boîte à outils ?) ;
+- **WinDbg présent mais refusé par Windows** : nouveau message, sans bouton
+  d'installation — « sont bien installés, mais Windows a refusé de les lancer »,
+  renvoi vers les limitations du rapport, et rappel que le bouton de la boîte à
+  outils réinstallerait la même version ;
+- **analyse faite, non demandée, ou aucun dump noyau** : rien ne s'affiche.
+  Second défaut corrigé au passage : l'ancienne règle proposait d'installer
+  WinDbg dès qu'aucun dump n'avait été analysé, y compris quand WinDbg s'était
+  bien lancé mais avait dépassé le délai sur chaque dump (symboles trop longs à
+  télécharger, par exemple) — vérifié dans `CdbAnalyzer` : un dépassement de
+  délai laisse le dump marqué « non analysé » ;
+- six cas de test (`ConseilWinDbgTests`).
 
 #### Lot C — à mesurer AVANT de décider : ce que le bouton installe
 
