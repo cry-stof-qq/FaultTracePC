@@ -209,6 +209,65 @@ public sealed class InstalledApp
     public string InstallLocation { get; set; } = "";
 }
 
+/// <summary>
+/// POINT 81 — quelle protection antivirus est réellement active.
+///
+/// Constaté le 24/09/2026 : à la seule lecture des processus, Windows Defender
+/// et Avast semblaient tourner tous les deux. Vérifié sur la machine, Defender
+/// était en « SxS Passive Mode », sans protection temps réel : il laissait la
+/// place à Avast. La présence d'un processus ne dit rien du rôle d'un antivirus ;
+/// il faut lire son état. Deux sources, lues séparément :
+///
+/// - Windows Defender lui-même (<c>MSFT_MpComputerStatus</c>, ce qu'affiche
+///   <c>Get-MpComputerStatus</c>) : mode de fonctionnement et protection temps réel ;
+/// - le Centre de sécurité Windows (<c>root\SecurityCenter2</c>,
+///   <c>AntiVirusProduct</c>) : la liste des antivirus inscrits, tiers compris.
+///   Cette source n'existe pas sur les éditions Serveur de Windows.
+/// </summary>
+public sealed class EtatProtection
+{
+    /// <summary>Vrai si le Centre de sécurité a pu être lu (même avec une liste vide).</summary>
+    public bool CentreSecuriteLu { get; set; }
+    public List<AntivirusInscrit> Antivirus { get; set; } = new();
+
+    /// <summary>Vrai si l'état de Defender a pu être lu.</summary>
+    public bool DefenderLu { get; set; }
+
+    /// <summary>
+    /// Valeur brute de <c>AMRunningMode</c>, telle que Windows la donne — par exemple
+    /// « Normal », ou « SxS Passive Mode » mesuré sur la machine du 24/09/2026.
+    /// Vide si la propriété n'existe pas sur cette version de Windows.
+    /// </summary>
+    public string DefenderMode { get; set; } = "";
+
+    /// <summary><c>RealTimeProtectionEnabled</c> ; null si non lu.</summary>
+    public bool? DefenderTempsReel { get; set; }
+}
+
+/// <summary>Un antivirus inscrit auprès du Centre de sécurité Windows.</summary>
+public sealed class AntivirusInscrit
+{
+    public string Nom { get; set; } = "";
+    public string CheminProduit { get; set; } = "";
+
+    /// <summary>Valeur brute de <c>productState</c>.</summary>
+    public uint EtatBrut { get; set; }
+
+    // DÉCODAGE NON DOCUMENTÉ PAR MICROSOFT. C'est le décodage d'usage courant :
+    // le bit 0x1000 indique un antivirus actif, le bit 0x10 des signatures périmées.
+    // Il n'est retenu que parce qu'il a concordé avec Defender lui-même sur la
+    // machine du 24/09/2026 : Defender 393472 (0x060100) → inactif, alors que
+    // AMRunningMode disait « SxS Passive Mode » ; Avast 266240 (0x041000) → actif
+    // et à jour. Le rapport devra donc le présenter comme une indication, et
+    // préférer l'état lu chez Defender quand il s'agit de Defender.
+
+    /// <summary>Actif selon le décodage usuel de <c>productState</c> (non documenté).</summary>
+    public bool Actif => (EtatBrut & 0x1000) != 0;
+
+    /// <summary>Signatures à jour selon le décodage usuel de <c>productState</c> (non documenté).</summary>
+    public bool SignaturesAJour => (EtatBrut & 0x10) == 0;
+}
+
 public sealed class VolumeInfo
 {
     public string Letter { get; set; } = "";
@@ -342,6 +401,9 @@ public sealed class SystemSnapshot
     public List<InstalledApp> InstalledApps { get; set; } = new();
     /// <summary>État du réseau : cartes, profils Wi-Fi, services, domaine.</summary>
     public NetworkInfo Network { get; set; } = new();
+
+    /// <summary>Protection antivirus : état de Defender et antivirus inscrits (point 81).</summary>
+    public EtatProtection Protection { get; set; } = new();
 
     /// <summary>
     /// Ce que Windows garde en mémoire des supports déjà montés sur ce poste.

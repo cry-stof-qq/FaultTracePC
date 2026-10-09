@@ -97,7 +97,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
 | 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
 | 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — **✔ terminé le 09/10/2026** : lot A (le rapport dit pourquoi le pilote n'est pas nommé), lot B (la fenêtre après analyse), lot C (mesuré : le WinDbg du Store se lance sur un autre poste, le bouton d'installation reste tel quel) — voir « Ce qu'un rapport sur une machine inconnue a montré » |
-| 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas, voir la section |
+| 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **en cours** : lot 1 (lecture) livré le 09/10/2026, voir la section |
 | 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
@@ -929,6 +929,30 @@ protection, au lieu de le laisser deviner :
 
 Ce n'est plus « une donnée déjà collectée » : c'est une lecture nouvelle, peu
 coûteuse, qui ne demande aucun droit particulier.
+
+**Commencé le 09/10/2026, en deux lots.**
+
+**Lot 1 ✔ — la lecture, livré le 09/10/2026.** Rien ne change encore dans le
+rapport : la donnée est collectée, pas encore affichée.
+
+- `Models.cs` : `EtatProtection` (Defender : mode brut `AMRunningMode`,
+  protection temps réel ; Centre de sécurité : liste des antivirus inscrits) et
+  `AntivirusInscrit` (nom, chemin, `productState` brut et son décodage) ;
+  rangé dans `SystemSnapshot.Protection` ;
+- `Collectors/ProtectionCollector.cs` : deux lectures indépendantes — si l'une
+  échoue, l'autre est faite quand même, et l'échec est dit une fois dans les
+  limitations (avec la mention que le Centre de sécurité n'existe pas sur les
+  éditions Serveur) ;
+- **la différence entre « rien trouvé » et « rien pu lire » est gardée** :
+  `CentreSecuriteLu` et `DefenderLu` restent faux tant que la lecture n'a pas
+  réussi, pour que le rapport ne dise jamais « aucun antivirus » faute d'avoir
+  pu regarder ;
+- le décodage de `productState` est marqué **non documenté** dans le code, et
+  testé avec les deux valeurs réellement mesurées le 24/09/2026 ;
+- quatre tests (`ProtectionTests`).
+
+**Lot 2 — à faire : l'affichage**, et la conclusion « deux protections temps
+réel actives » seulement quand elle est mesurée.
 
 ### Point 82 — un verdict que ses propres mesures contredisent
 
