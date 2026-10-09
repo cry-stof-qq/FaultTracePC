@@ -105,7 +105,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine |
 | 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
-| 89 | **Voir qu'un pilote a disparu, et lequel** | demandé le 09/10/2026 — quatre angles morts vérifiés dans le code ; cas réel (carte graphique sans pilote) et mesure sur machine saine notés, voir « Point 89 » plus bas |
+| 89 | **Voir qu'un pilote a disparu, et lequel** | demandé le 09/10/2026 — **noté pour plus tard, rien n'est commencé** ; quatre angles morts vérifiés dans le code ; cas réel (carte graphique sans pilote) et mesure sur machine saine notés, voir « Point 89 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1096,6 +1096,12 @@ chercher d'autres.
 
 Question posée le 09/10/2026 : « sur un PC le pilote avait disparu — est-ce que
 la correction permet de voir qu'un pilote est manquant et lequel ? »
+
+**Demande notée le 09/10/2026, pour plus tard — rien n'est commencé** :
+pouvoir **voir le matériel** de la machine, afin de savoir **si un pilote
+manque** et **quel pilote est attendu**, c'est-à-dire au minimum **la marque**
+du matériel concerné (NVIDIA, Intel, AMD…). C'est l'angle mort C ci-dessous,
+complété par la lecture du code fabricant décrite dans « Le cas réel ».
 
 **Réponse : non.** Le lot A du point 80 dit pourquoi le pilote fautif d'un écran
 bleu n'est pas nommé ; il ne cherche pas de pilote manquant. Et en vérifiant le
