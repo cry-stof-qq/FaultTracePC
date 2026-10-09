@@ -1006,6 +1006,12 @@ dans les informations système du rapport :
 - six tests de plus dans `ProtectionTests`, dont les deux configurations
   réellement mesurées (24/09 et 09/10).
 
+**Vérifié en réel le 09/10/2026** sur le poste de l'auteur, avec la version
+compilée : la carte affiche « Windows Defender : protection en temps réel
+active (mode Normal) » puis « Trend Micro Apex One Antivirus : inscription
+orpheline », avec le chemin disparu. Aucune ligne d'échec de lecture dans les
+limitations : les deux sources ont été lues.
+
 **Lot 2b — à faire : les conclusions.** « Deux protections temps réel actives »
 (orphelines exclues), « aucune protection temps réel », « inscription orpheline
 d'un antivirus » — chacune seulement si les deux lectures ont réussi.
