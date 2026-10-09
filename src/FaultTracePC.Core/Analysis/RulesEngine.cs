@@ -36,6 +36,7 @@ public sealed class RulesEngine
         AnalyzeUpdateCorrelation(r);
         AnalyzeReseau(r);
         AnalyzeDiskSpace(r);
+        AnalyzeProtection(r);
 
         if (r.Findings.Count == 0)
         {
@@ -2421,6 +2422,103 @@ public sealed class RulesEngine
                 Title = Lang.T($"Espace disque faible sur {v.Letter} ({v.PercentFree} % libre)", $"Low disk space on {v.Letter} ({v.PercentFree}% free)"),
                 Details = Lang.T($"Volume {v.Letter} ({v.Label}) : {FormatBytes(v.FreeBytes)} libres sur {FormatBytes(v.SizeBytes)}. Un disque système saturé provoque lenteurs et échecs d'écriture du fichier d'échange ou des dumps.", $"Volume {v.Letter} ({v.Label}): {FormatBytes(v.FreeBytes)} free out of {FormatBytes(v.SizeBytes)}. A saturated system drive causes slowness and write failures for the page file or the dumps."),
                 Recommendation = Lang.T("Libérer de l'espace (nettoyage de disque, %TEMP%, anciens dumps volumineux comme MEMORY.DMP une fois analysé).", "Free up space (disk cleanup, %TEMP%, large old dumps such as MEMORY.DMP once analysed).")
+            });
+        }
+    }
+
+    /// <summary>
+    /// POINT 81, LOT 2b — les conclusions sur la protection antivirus.
+    ///
+    /// Trois faits, chacun dit seulement s'il est MESURÉ :
+    ///
+    /// - deux protections en temps réel actives en même temps (le soupçon du
+    ///   24/09/2026, qui s'était révélé faux : il faut donc le mesurer, pas le
+    ///   déduire des processus) ;
+    /// - aucune protection en temps réel ;
+    /// - un antivirus déclaré dont le programme a disparu (cas réel du 09/10/2026 :
+    ///   Apex One mal désinstallé sur le poste de l'auteur).
+    ///
+    /// LES DEUX SEUILS SONT VOLONTAIREMENT DIFFÉRENTS. Pour crier « deux
+    /// antivirus », un antivirus tiers doit être déclaré actif ET son programme
+    /// vérifié présent. Pour crier « aucune protection », il suffit qu'un tiers
+    /// déclaré actif ne soit pas prouvé absent. Dans le doute — chemin non
+    /// vérifiable — on ne crie dans aucun des deux sens.
+    ///
+    /// Rien n'est conclu sur l'ensemble si l'une des deux lectures a échoué :
+    /// « rien pu lire » ne doit jamais devenir « rien trouvé ».
+    /// </summary>
+    internal static void AnalyzeProtection(DiagnosticReport r)
+    {
+        var p = r.System.Protection;
+        if (!p.CentreSecuriteLu) return;
+
+        var tiers = p.Antivirus.Where(a => !a.EstDefender).ToList();
+
+        foreach (var a in tiers.Where(a => a.ProgrammePresent == false))
+        {
+            var declare = a.Actif ? Lang.T("actif", "active") : Lang.T("inactif", "inactive");
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Info,
+                Confidence = Confidence.High,
+                Category = FaultCategory.Software,
+                Code = "protection.orpheline",
+                Subject = a.Nom,
+                Title = Lang.T($"Antivirus mal désinstallé : {a.Nom}", $"Antivirus not fully uninstalled: {a.Nom}"),
+                Details = Lang.T(
+                    $"{a.Nom} est encore déclaré au Centre de sécurité de Windows, comme {declare}, mais son programme n'existe plus ({a.CheminProduit}). C'est la trace d'une désinstallation incomplète : d'autres restes, services ou pilotes, peuvent subsister. Ce logiciel ne protège pas la machine.",
+                    $"{a.Nom} is still declared to the Windows Security Center, as {declare}, but its program no longer exists ({a.CheminProduit}). This is the trace of an incomplete uninstall: other leftovers, services or drivers, may remain. This software does not protect the machine."),
+                Recommendation = Lang.T(
+                    "Terminer la désinstallation avec l'outil de nettoyage fourni par l'éditeur de cet antivirus.",
+                    "Finish the uninstall with the cleanup tool provided by this antivirus vendor."),
+            });
+        }
+
+        if (!p.DefenderLu || p.DefenderTempsReel is null) return;
+        var defenderActif = p.DefenderTempsReel == true;
+
+        var tiersProuves = tiers.Where(a => a.Actif && a.ProgrammePresent == true).ToList();
+        if ((defenderActif && tiersProuves.Count > 0) || tiersProuves.Count > 1)
+        {
+            var noms = tiersProuves.Select(a => a.Nom).ToList();
+            if (defenderActif) noms.Insert(0, "Windows Defender");
+            var liste = string.Join(Lang.T(" et ", " and "), noms);
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Warning,
+                // Moyenne : l'état des antivirus tiers vient du code non documenté
+                // du Centre de sécurité.
+                Confidence = Confidence.Medium,
+                Category = FaultCategory.Software,
+                Code = "protection.deux",
+                Subject = string.Join(", ", noms),
+                Title = Lang.T($"{noms.Count} antivirus surveillent la machine en même temps", $"{noms.Count} antivirus products are watching the machine at the same time"),
+                Details = Lang.T(
+                    $"{liste} sont actifs en temps réel en même temps, et leurs programmes sont bien présents. Deux antivirus qui examinent chaque fichier en même temps peuvent se gêner : lenteurs, blocages.",
+                    $"{liste} are active in real time at the same time, and their programs are present. Two antivirus products examining every file at the same time can get in each other's way: slowness, freezes."),
+                Recommendation = Lang.T(
+                    "N'en garder qu'un. Normalement, Windows Defender se met de lui-même en retrait quand un autre antivirus est installé : s'il ne l'a pas fait, vérifier que l'autre antivirus est complet et à jour, ou le désinstaller avec l'outil de son éditeur.",
+                    "Keep only one. Windows Defender normally stands back by itself when another antivirus is installed: if it did not, check that the other antivirus is complete and up to date, or uninstall it with its vendor's tool."),
+            });
+        }
+
+        var tiersPossibles = tiers.Where(a => a.Actif && a.ProgrammePresent != false).ToList();
+        if (!defenderActif && tiersPossibles.Count == 0)
+        {
+            var mode = string.IsNullOrEmpty(p.DefenderMode) ? "" : Lang.T($" (mode {p.DefenderMode})", $" ({p.DefenderMode} mode)");
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Warning,
+                Confidence = Confidence.Medium,
+                Category = FaultCategory.Software,
+                Code = "protection.aucune",
+                Title = Lang.T("Aucune protection antivirus en temps réel", "No real-time antivirus protection"),
+                Details = Lang.T(
+                    $"Windows Defender n'a pas de protection en temps réel{mode}, et aucun autre antivirus actif dont le programme existe n'est déclaré au Centre de sécurité de Windows.",
+                    $"Windows Defender has no real-time protection{mode}, and no other active antivirus whose program exists is declared to the Windows Security Center."),
+                Recommendation = Lang.T(
+                    "Réactiver la protection en temps réel dans Sécurité Windows (Protection contre les virus et menaces), ou installer l'antivirus prévu pour ce poste.",
+                    "Turn real-time protection back on in Windows Security (Virus & threat protection), or install the antivirus intended for this machine."),
             });
         }
     }

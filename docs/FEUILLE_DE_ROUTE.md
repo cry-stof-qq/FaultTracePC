@@ -97,7 +97,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
 | 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
 | 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — **✔ terminé le 09/10/2026** : lot A (le rapport dit pourquoi le pilote n'est pas nommé), lot B (la fenêtre après analyse), lot C (mesuré : le WinDbg du Store se lance sur un autre poste, le bouton d'installation reste tel quel) — voir « Ce qu'un rapport sur une machine inconnue a montré » |
-| 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **en cours** : lot 1 (lecture) et lot 2a (affichage) livrés le 09/10/2026, voir la section |
+| 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **✔ terminé le 09/10/2026** : lecture, carte « Protection antivirus », trois conclusions, voir la section |
 | 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
@@ -1012,9 +1012,28 @@ active (mode Normal) » puis « Trend Micro Apex One Antivirus : inscription
 orpheline », avec le chemin disparu. Aucune ligne d'échec de lecture dans les
 limitations : les deux sources ont été lues.
 
-**Lot 2b — à faire : les conclusions.** « Deux protections temps réel actives »
-(orphelines exclues), « aucune protection temps réel », « inscription orpheline
-d'un antivirus » — chacune seulement si les deux lectures ont réussi.
+**Lot 2b ✔ — les conclusions, livré le 09/10/2026.** `RulesEngine.AnalyzeProtection` :
+
+| Conclusion | Gravité | Quand |
+|---|---|---|
+| `protection.orpheline` — « Antivirus mal désinstallé : … » | information | un antivirus tiers est déclaré au Centre de sécurité mais son programme n'existe plus |
+| `protection.deux` — « N antivirus surveillent la machine en même temps » | avertissement, confiance moyenne | Defender en temps réel **et** un tiers actif dont le programme est **vérifié présent** (ou deux tiers ainsi) |
+| `protection.aucune` — « Aucune protection antivirus en temps réel » | avertissement, confiance moyenne | Defender sans temps réel **et** aucun tiers actif qui ne soit pas prouvé absent |
+
+- **Deux seuils volontairement différents** : pour dire « deux antivirus », le
+  programme du tiers doit être prouvé présent ; pour dire « aucune protection »,
+  il suffit qu'il ne soit pas prouvé absent. Quand le chemin n'est pas
+  vérifiable, rien n'est dit dans un sens comme dans l'autre ;
+- **confiance moyenne** pour les deux avertissements : l'état des antivirus
+  tiers vient du code non documenté du Centre de sécurité ;
+- rien n'est conclu sur l'ensemble si une des deux lectures a échoué ;
+- l'inscription orpheline est une **information** : elle ne change pas le
+  verdict. Sur le poste de l'auteur, c'est la seule conclusion qui apparaît ;
+- sept tests (`ConclusionsProtectionTests`), dont les deux configurations
+  réellement mesurées : la machine du 24/09/2026 ne déclenche **rien** — ce qui
+  aurait été la bonne réponse à la fausse piste de ce jour-là.
+
+**Le point 81 est terminé.**
 
 ### Point 82 — un verdict que ses propres mesures contredisent
 
