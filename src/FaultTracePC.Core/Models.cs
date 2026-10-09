@@ -508,6 +508,34 @@ public sealed class WinEvent
 
 public enum DumpKind { KernelMinidump, FullMemoryDump, LiveKernelReport, UserModeMinidump, Unknown }
 
+/// <summary>
+/// POINT 80 — ce qui est arrivé à l'analyse profonde des dumps pendant un scan.
+///
+/// Un pilote non nommé n'a pas une cause, il en a cinq, et chacune appelle un geste
+/// différent. Jusqu'au 09/10/2026 le rapport n'en connaissait qu'une — « installer
+/// WinDbg » — et la donnait aussi quand WinDbg était installé mais impossible à
+/// lancer, quand l'utilisateur avait décoché l'analyse, ou quand le plantage n'avait
+/// laissé aucun fichier à analyser. Constaté le 24/09/2026 sur une machine où les
+/// sept écrans bleus portaient tous « installer WinDbg » alors qu'il était installé.
+/// </summary>
+public enum EtatAnalyseProfonde
+{
+    /// <summary>Aucun dump noyau à analyser : rien n'a été tenté, et rien n'est à réclamer.</summary>
+    SansObjet,
+    /// <summary>L'utilisateur a décoché l'analyse profonde (ou <c>--no-deep</c>).</summary>
+    NonDemandee,
+    /// <summary>Aucun débogueur trouvé sur la machine.</summary>
+    Absente,
+    /// <summary>
+    /// Débogueur trouvé, mais Windows a refusé de le lancer. Cas constaté : WinDbg
+    /// installé depuis le Microsoft Store, dont l'exécutable vit dans un dossier
+    /// protégé et ne se démarre pas par son chemin.
+    /// </summary>
+    Inaccessible,
+    /// <summary>Le débogueur a tourné — avec ou sans verdict sur chaque dump.</summary>
+    Faite,
+}
+
 public sealed class DumpFileInfo
 {
     public string Path { get; set; } = "";
@@ -607,6 +635,14 @@ public sealed class DiagnosticReport
     public List<Finding> Findings { get; set; } = new();
     public string Verdict { get; set; } = "";
     public FaultCategory VerdictCategory { get; set; } = FaultCategory.None;
+
+    /// <summary>
+    /// Point 80 : pourquoi un pilote peut ne pas être nommé. Voir
+    /// <see cref="EtatAnalyseProfonde"/>. Valeur par défaut sans objet : un rapport
+    /// relu d'une version antérieure n'a pas cette information, et le rapport ne
+    /// doit alors rien affirmer de plus qu'avant.
+    /// </summary>
+    public EtatAnalyseProfonde AnalyseProfonde { get; set; } = EtatAnalyseProfonde.SansObjet;
     /// <summary>Erreurs non bloquantes rencontrées pendant la collecte (transparence).</summary>
     public List<string> CollectorErrors { get; set; } = new();
 

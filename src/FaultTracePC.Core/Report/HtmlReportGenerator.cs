@@ -513,12 +513,53 @@ public static class HtmlReportGenerator
             var pars = b.Parameters is null ? "—" : string.Join("<br>", b.Parameters.Select(p => $"0x{p:X16}"));
             sb.Append($"<tr><td>{Lang.DateMinute(b.TimeLocal)}</td><td class=\"mono\">{code}</td><td>{H(b.BugCheckName)}</td>");
             var driverCell = b.SuspectDriver is null
-                ? Lang.T("<span class=\"small\">non identifié (installer WinDbg pour l'analyse symbolique)</span>", "<span class=\"small\">not identified (install WinDbg for symbolic analysis)</span>")
+                ? $"<span class=\"small\">{H(RaisonPiloteNonNomme(r, b))}</span>"
                 : $"<strong>{H(b.SuspectDriver)}</strong>";
             sb.Append($"<td class=\"mono small\">{pars}</td><td>{driverCell}</td>");
             sb.Append($"<td class=\"small\">{H(b.DumpPath is null ? "—" : Path.GetFileName(b.DumpPath))}</td><td class=\"small\">{H(string.Join(", ", b.Sources))}</td></tr>");
         }
         sb.Append("</tbody></table></section>");
+    }
+
+    /// <summary>
+    /// POINT 80 — pourquoi le pilote d'un écran bleu n'est pas nommé.
+    ///
+    /// Jusqu'au 09/10/2026 la cellule disait toujours « installer WinDbg ». Le
+    /// 24/09/2026, sur une machine où WinDbg était installé, les sept écrans bleus
+    /// le disaient — y compris les deux qui n'avaient laissé AUCUN fichier, et pour
+    /// lesquels aucun débogueur au monde n'aurait rien pu nommer. Un conseil donné
+    /// à tort apprend à ne plus lire les conseils.
+    ///
+    /// L'ordre compte : l'absence de fichier passe avant tout, parce que c'est la
+    /// seule raison qu'aucun outil ne peut lever.
+    /// </summary>
+    internal static string RaisonPiloteNonNomme(DiagnosticReport r, BsodIncident b)
+    {
+        if (b.DumpPath is null)
+            return Lang.T("non identifié (aucun fichier d'incident pour ce plantage)",
+                          "not identified (no crash file for this crash)");
+
+        switch (r.AnalyseProfonde)
+        {
+            case EtatAnalyseProfonde.NonDemandee:
+                return Lang.T("non identifié (analyse profonde non demandée)",
+                              "not identified (deep analysis not requested)");
+            case EtatAnalyseProfonde.Absente:
+                return Lang.T("non identifié (installer WinDbg pour l'analyse symbolique)",
+                              "not identified (install WinDbg for symbolic analysis)");
+            case EtatAnalyseProfonde.Inaccessible:
+                return Lang.T("non identifié (WinDbg présent mais impossible à lancer — voir les limitations en fin de rapport)",
+                              "not identified (WinDbg present but cannot be started — see the limitations at the end of the report)");
+        }
+
+        // L'analyse a tourné, ou l'état n'est pas connu (rapport d'une version
+        // antérieure) : on ne dit que ce que le fichier lui-même établit.
+        var dump = r.Dumps.FirstOrDefault(d => string.Equals(d.Path, b.DumpPath, StringComparison.OrdinalIgnoreCase));
+        if (r.AnalyseProfonde == EtatAnalyseProfonde.Faite && dump is not null && !dump.DeepAnalyzed && dump.DeepAnalysisError is null)
+            return Lang.T("non identifié (fichier non analysé : seuls les plus récents le sont)",
+                          "not identified (file not analysed: only the most recent ones are)");
+
+        return Lang.T("non identifié", "not identified");
     }
 
     private static void DumpSection(StringBuilder sb, DiagnosticReport r)

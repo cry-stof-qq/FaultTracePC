@@ -19,8 +19,9 @@
 | 1.6.1 | **publiée** le 18/09/2026 — correctifs constatés sur deux rapports 1.6.0 réels, plus deux ajouts demandés dans la foulée — points 65 à 71, 513 tests verts |
 | 1.6.2 | **publiée** le 18/09/2026 — sept correctifs constatés sur un rapport 1.6.1 réel, dont **deux créés par la 1.6.1 elle-même** — points 72 à 78, 616 tests verts |
 | 1.7.0 | **jamais publiée** — construite et éprouvée sur un parc réel les 19, 20 et 21/09/2026. Cinq défauts en sont sortis, dont trois qu'aucune relecture de code n'aurait trouvés. Publier 1.7.0 puis 1.7.1 à trois jours d'intervalle n'aurait rien appris à personne |
-| 1.7.1 | **à publier** — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔. C'est la 1.7.0 corrigée : voir « La matinée du 21/09/2026 », défauts A à E |
-| 1.8.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026 |
+| 1.7.1 | **publiée** le 21/09/2026 — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔. C'est la 1.7.0 corrigée : voir « La matinée du 21/09/2026 », défauts A à E |
+| 1.8.0 | **en cours depuis le 09/10/2026** — thème **le rapport rapproche ce qu'il sait** — points 80 à 87, ce qu'un rapport sur une machine inconnue a montré. Décidé le 09/10/2026 : passe AVANT winget, parce qu'il touche à la promesse même du logiciel — trouver la cause d'une panne — et sert tous les utilisateurs, pas seulement un parc |
+| 1.9.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026. Décalé d'une version le 09/10/2026 |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
@@ -788,6 +789,56 @@ Deux corrections, pas une : employer l'alias d'exécution
 (`%LOCALAPPDATA%\Microsoft\WindowsApps\`) plutôt que le chemin `WindowsApps`,
 **et** distinguer dans le message « WinDbg absent » de « WinDbg présent mais
 inaccessible ». Les deux ne demandent pas le même geste à celui qui lit.
+
+**La première correction était une fausse piste — constaté le 09/10/2026 en
+lisant le code.** L'alias d'exécution était DÉJÀ cherché, et avant le chemin
+protégé : s'il avait existé sur cette machine, c'est lui qui aurait été lancé.
+Il n'existait pas. Rien de vérifiable ne dit que le WinDbg du Store publie un
+alias pour `cdb.exe` ; l'affirmation figurait dans un commentaire du code, sans
+source, et a été retirée. Une question du Microsoft Q&A de mai 2025 (réponse
+d'un conseiller indépendant, pas de Microsoft) va dans le même sens : la version
+du Store ne se lance pas par son exécutable, et les « Debugging Tools for
+Windows » du Windows SDK sont la voie qui fonctionne.
+
+#### Lot A — livré le 09/10/2026 : dire la vérité
+
+- Nouvel état `EtatAnalyseProfonde` sur le rapport : **sans objet, non
+  demandée, absente, inaccessible, faite**. Cinq raisons de ne pas nommer un
+  pilote, qui n'appellent pas le même geste.
+- Un débogueur qui ne se lance pas est dit **une fois**, dans les limitations,
+  avec le chemin, le motif donné par Windows, la mention du Microsoft Store
+  **seulement si le chemin le désigne**, et ce qui fonctionne à la place. Les
+  dumps suivants ne sont plus tentés : la cause est la même pour tous.
+- Dans le tableau des écrans bleus, la cellule « pilote suspect » dit
+  désormais **laquelle** des raisons s'applique. « Installer WinDbg » ne s'écrit
+  plus que si WinDbg est réellement absent.
+- Un plantage **sans fichier d'incident** dit « aucun fichier d'incident pour ce
+  plantage » — il ne demande plus jamais d'installer quoi que ce soit.
+- Une machine qui n'a que des dumps d'applications ne reçoit plus « WinDbg
+  introuvable » pour une analyse qui n'avait rien à faire.
+- En passant : une phrase française hors `Lang.T` dans `CdbAnalyzer`
+  (« CDB n'a pas produit de verdict »), fuite de traduction corrigée.
+- Neuf cas de test (six tests, dont un décliné en trois), parmi lesquels deux
+  qui provoquent le refus de lancement avec un fichier portant l'extension `.exe`
+  sans en être un.
+
+#### Lot B — à faire : la fenêtre qui suit l'analyse
+
+Après un scan, la fenêtre principale affiche « les outils de débogage de
+Microsoft ne sont pas installés sur cette machine » et propose d'ouvrir la boîte
+à outils pour les installer. Sur la machine du 24/09/2026, c'était faux, et le
+bouton aurait réinstallé le même paquet. Elle doit lire le nouvel état et dire
+« installé mais impossible à lancer » le cas échéant.
+
+#### Lot C — à mesurer AVANT de décider : ce que le bouton installe
+
+Le bouton « 🐞 Installer WinDbg » de la boîte à outils lance
+`winget install Microsoft.WinDbg` — c'est-à-dire **la version du Microsoft Store,
+celle-là même qui n'a pas pu être lancée**. Avant de le changer, il faut savoir
+si c'est vrai partout ou seulement sur cette machine : vérifier sur le poste de
+l'auteur quelle version de WinDbg est présente, si l'alias existe, et si
+l'analyse profonde y a déjà fonctionné. On ne change pas un installateur sur la
+foi d'une seule machine.
 
 ### Point 81 — quel antivirus protège réellement la machine ?
 
