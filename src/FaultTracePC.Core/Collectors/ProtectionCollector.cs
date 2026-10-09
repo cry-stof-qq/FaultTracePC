@@ -27,11 +27,13 @@ public static class ProtectionCollector
             using var searcher = new ManagementObjectSearcher(@"root\SecurityCenter2", "SELECT * FROM AntiVirusProduct");
             foreach (ManagementObject mo in searcher.Get())
             {
+                var chemin = Texte(mo, "pathToSignedProductExe");
                 etat.Antivirus.Add(new AntivirusInscrit
                 {
                     Nom = Texte(mo, "displayName"),
-                    CheminProduit = Texte(mo, "pathToSignedProductExe"),
+                    CheminProduit = chemin,
                     EtatBrut = Entier(mo, "productState"),
+                    ProgrammePresent = ProgrammePresent(chemin),
                 });
             }
             etat.CentreSecuriteLu = true;
@@ -64,6 +66,19 @@ public static class ProtectionCollector
                 $"État de Windows Defender illisible ({ex.Message}).",
                 $"Windows Defender status unreadable ({ex.Message})."));
         }
+    }
+
+    /// <summary>
+    /// Le programme déclaré existe-t-il encore ? Null si le chemin est vide ou n'est
+    /// pas un fichier (<c>windowsdefender://</c>), ou si la question ne peut pas être
+    /// posée. Les guillemets et les variables d'environnement (<c>%ProgramFiles%</c>)
+    /// sont acceptés par prudence : aucun cas réel ne les a montrés à ce jour.
+    /// </summary>
+    internal static bool? ProgrammePresent(string chemin)
+    {
+        if (string.IsNullOrWhiteSpace(chemin) || chemin.Contains("://")) return null;
+        try { return File.Exists(Environment.ExpandEnvironmentVariables(chemin.Trim().Trim('"'))); }
+        catch { return null; }
     }
 
     private static bool Existe(ManagementObject mo, string prop) =>

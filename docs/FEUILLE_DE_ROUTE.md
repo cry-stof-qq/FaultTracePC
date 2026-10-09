@@ -97,7 +97,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
 | 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
 | 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — **✔ terminé le 09/10/2026** : lot A (le rapport dit pourquoi le pilote n'est pas nommé), lot B (la fenêtre après analyse), lot C (mesuré : le WinDbg du Store se lance sur un autre poste, le bouton d'installation reste tel quel) — voir « Ce qu'un rapport sur une machine inconnue a montré » |
-| 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **en cours** : lot 1 (lecture) livré le 09/10/2026, voir la section |
+| 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **en cours** : lot 1 (lecture) et lot 2a (affichage) livrés le 09/10/2026, voir la section |
 | 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
@@ -974,8 +974,41 @@ Ce que cette mesure établit :
   lui) et Apex One (décodé). Si la règle « deux protections temps réel » était
   écrite telle quelle, elle se déclencherait ici. Avant de conclure, il faut
   savoir ce qu'est réellement Apex One sur ce poste : installé et actif, ou
-  inscription restée derrière un logiciel retiré. **Non établi à ce jour** —
-  mesure demandée le même jour.
+  inscription restée derrière un logiciel retiré. ~~Non établi à ce jour~~ —
+  **établi le même jour** (ci-dessous).
+
+**Mesure complémentaire, même jour.** L'auteur confirme qu'Apex One a été mal
+désinstallé de ce poste. Le programme déclaré au Centre de sécurité
+(`Pccntmon.exe`) **n'existe plus** (`Test-Path` → False). Un seul service
+reste : « Apex One NT WSC Service » (`TmWSCSvc`), **arrêté** — c'est celui qui
+inscrit le produit auprès du Centre de sécurité. L'inscription est donc
+**orpheline** : le Centre de sécurité déclare actif un antivirus qui n'existe
+plus. Conséquence pour le logiciel : **un antivirus tiers ne compte comme
+protection que si son programme existe encore**, et une inscription orpheline
+est signalée pour ce qu'elle est.
+
+**Lot 2 découpé en deux, pour rester petit :**
+
+**Lot 2a ✔ — l'affichage, livré le 09/10/2026.** Carte « Protection antivirus »
+dans les informations système du rapport :
+
+- Defender décrit d'après **sa propre lecture** (temps réel actif ou non, mode ;
+  « en retrait » quand le mode contient *Passive*), jamais d'après le code non
+  documenté du Centre de sécurité ;
+- autres antivirus : actif / inactif, signatures à jour ou périmées, avec la
+  mention qu'il s'agit de ce qu'ils déclarent au Centre de sécurité ;
+- **inscription orpheline** nommée comme telle, avec le chemin disparu, et la
+  phrase « ce logiciel ne protège pas la machine » ;
+- rien lu → « état non lu », « inconnus » — jamais « aucun antivirus » ;
+- `ProtectionCollector.ProgrammePresent` vérifie que le programme déclaré
+  existe ; `AntivirusInscrit.EstDefender` reconnaît Defender à son chemin
+  `windowsdefender://` ;
+- six tests de plus dans `ProtectionTests`, dont les deux configurations
+  réellement mesurées (24/09 et 09/10).
+
+**Lot 2b — à faire : les conclusions.** « Deux protections temps réel actives »
+(orphelines exclues), « aucune protection temps réel », « inscription orpheline
+d'un antivirus » — chacune seulement si les deux lectures ont réussi.
 
 ### Point 82 — un verdict que ses propres mesures contredisent
 

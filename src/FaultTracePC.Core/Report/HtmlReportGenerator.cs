@@ -716,6 +716,8 @@ public static class HtmlReportGenerator
                 ? Lang.T($"membre de {H(res.Domain)}", $"member of {H(res.Domain)}")
                 : Lang.T("hors domaine (groupe de travail)", "not domain-joined (workgroup)"));
 
+        Card(sb, Lang.T("Protection antivirus", "Antivirus protection"), LignesProtection(s.Protection));
+
         Card(sb, Lang.T("Cartes graphiques", "Graphics cards"),
             s.Gpus.Count == 0 ? Lang.T("aucune détectée", "none detected")
             : string.Join("<br>", s.Gpus.Select(g =>
@@ -978,6 +980,66 @@ public static class HtmlReportGenerator
     }
 
     // ------------------------------------------------------------------
+
+    /// <summary>
+    /// POINT 81 — ce qui protège réellement la machine, lu et non deviné.
+    ///
+    /// Defender est décrit d'après SA PROPRE lecture (mode et temps réel), pas
+    /// d'après le Centre de sécurité, dont le code d'état n'est pas documenté. Les
+    /// autres antivirus ne sont connus que par le Centre de sécurité : c'est dit.
+    /// Un antivirus déclaré dont le programme a disparu est nommé comme tel —
+    /// « inscription orpheline » — et jamais présenté comme une protection.
+    /// </summary>
+    internal static string LignesProtection(EtatProtection p)
+    {
+        var lignes = new List<string>();
+
+        if (!p.DefenderLu)
+            lignes.Add(Lang.T("Windows Defender : état non lu", "Windows Defender: status not read"));
+        else
+        {
+            var mode = string.IsNullOrEmpty(p.DefenderMode) ? "" : Lang.T($" (mode {H(p.DefenderMode)})", $" ({H(p.DefenderMode)} mode)");
+            if (p.DefenderTempsReel == true)
+                lignes.Add(Lang.T($"Windows Defender : protection en temps réel <strong>active</strong>{mode}", $"Windows Defender: real-time protection <strong>on</strong>{mode}"));
+            else
+            {
+                var retrait = p.DefenderMode.Contains("Passive", StringComparison.OrdinalIgnoreCase)
+                    ? Lang.T(" — en retrait : c'est le fonctionnement prévu quand un autre antivirus est installé", " — standing back: this is the intended behaviour when another antivirus is installed")
+                    : "";
+                lignes.Add(Lang.T($"Windows Defender : <strong>pas de protection en temps réel</strong>{mode}{retrait}", $"Windows Defender: <strong>no real-time protection</strong>{mode}{retrait}"));
+            }
+        }
+
+        if (!p.CentreSecuriteLu)
+            lignes.Add(Lang.T("Autres antivirus : inconnus (Centre de sécurité Windows non lu)", "Other antivirus products: unknown (Windows Security Center not read)"));
+        else
+        {
+            var tiers = p.Antivirus.Where(a => !a.EstDefender).ToList();
+            if (tiers.Count == 0)
+                lignes.Add(Lang.T("Aucun autre antivirus inscrit", "No other antivirus registered"));
+            foreach (var a in tiers)
+            {
+                if (a.ProgrammePresent == false)
+                {
+                    var declare = a.Actif ? Lang.T("actif", "active") : Lang.T("inactif", "inactive");
+                    lignes.Add(Lang.T(
+                        $"{H(a.Nom)} : <strong>inscription orpheline</strong> — déclaré {declare} au Centre de sécurité, mais son programme n'existe plus ({H(a.CheminProduit)}). C'est la trace typique d'une désinstallation incomplète : ce logiciel ne protège pas la machine.",
+                        $"{H(a.Nom)}: <strong>orphaned registration</strong> — declared {declare} to the Security Center, but its program no longer exists ({H(a.CheminProduit)}). This is the typical trace of an incomplete uninstall: this software does not protect the machine."));
+                }
+                else if (a.Actif)
+                    lignes.Add(a.SignaturesAJour
+                        ? Lang.T($"{H(a.Nom)} : actif, signatures à jour", $"{H(a.Nom)}: active, signatures up to date")
+                        : Lang.T($"{H(a.Nom)} : actif, <strong>signatures périmées</strong>", $"{H(a.Nom)}: active, <strong>signatures out of date</strong>"));
+                else
+                    lignes.Add(Lang.T($"{H(a.Nom)} : inactif", $"{H(a.Nom)}: inactive"));
+            }
+            if (tiers.Count > 0)
+                lignes.Add(Lang.T("<em>État des autres antivirus : tel qu'ils le déclarent au Centre de sécurité de Windows.</em>",
+                                  "<em>Status of other antivirus products: as they declare it to the Windows Security Center.</em>"));
+        }
+
+        return string.Join("<br>", lignes);
+    }
 
     private static void Card(StringBuilder sb, string title, string html) =>
         sb.Append($"<div class=\"syscard\"><h4>{H(title)}</h4><p>{html}</p></div>");

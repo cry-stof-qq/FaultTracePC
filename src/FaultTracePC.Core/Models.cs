@@ -253,6 +253,26 @@ public sealed class AntivirusInscrit
     /// <summary>Valeur brute de <c>productState</c>.</summary>
     public uint EtatBrut { get; set; }
 
+    /// <summary>
+    /// Le programme déclaré (<see cref="CheminProduit"/>) existe-t-il encore sur le
+    /// disque ? Null quand la question n'a pas de sens (Defender, dont le « chemin »
+    /// est un nom réservé) ou n'a pas pu être posée.
+    ///
+    /// Mesuré le 09/10/2026 sur le poste de l'auteur : Trend Micro Apex One, mal
+    /// désinstallé, restait déclaré ACTIF au Centre de sécurité alors que son
+    /// programme n'existait plus — seul son service d'inscription au Centre
+    /// (« Apex One NT WSC Service ») restait, arrêté. Sans cette vérification, le
+    /// rapport aurait compté deux antivirus actifs sur ce poste.
+    /// </summary>
+    public bool? ProgrammePresent { get; set; }
+
+    /// <summary>
+    /// Windows Defender se reconnaît à son chemin <c>windowsdefender://</c> — mesuré
+    /// le 09/10/2026 (nom affiché : « Windows Defender »). Le nom affiché n'est pas
+    /// utilisé : il peut changer d'une version à l'autre.
+    /// </summary>
+    public bool EstDefender => CheminProduit.StartsWith("windowsdefender:", StringComparison.OrdinalIgnoreCase);
+
     // DÉCODAGE NON DOCUMENTÉ PAR MICROSOFT. C'est le décodage d'usage courant :
     // le bit 0x1000 indique un antivirus actif, le bit 0x10 des signatures périmées.
     // Il n'est retenu que parce qu'il a concordé avec Defender lui-même sur la
