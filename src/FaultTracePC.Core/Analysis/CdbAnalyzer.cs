@@ -15,11 +15,13 @@ namespace FaultTracePC.Core.Analysis;
 /// sautée et le rapport l'indique avec la commande d'installation.
 ///
 /// TROUVÉ NE VEUT PAS DIRE UTILISABLE (point 80, constaté le 24/09/2026). Le
-/// WinDbg du Microsoft Store range son cdb.exe sous <c>Program Files\WindowsApps</c> :
-/// le fichier se voit, mais Windows refuse de le lancer par son chemin — cinq fois
-/// « Accès refusé » sur cinq dumps. Les « Debugging Tools for Windows » du Windows
-/// SDK, eux, s'installent dans un dossier ordinaire (<c>Windows Kits\10\Debuggers</c>)
-/// et sont cherchés en premier. Un refus de lancement est traité comme un état de
+/// WinDbg du Microsoft Store range son cdb.exe sous <c>Program Files\WindowsApps</c>,
+/// un dossier protégé. Sur la machine du 24/09/2026, Windows a refusé de le lancer
+/// — cinq fois « Accès refusé » sur cinq dumps. Sur le poste de l'auteur, le
+/// 09/10/2026, la MÊME version s'est lancée sans difficulté : le refus n'est donc
+/// pas systématique et sa cause n'est pas établie. Les « Debugging Tools for
+/// Windows » du Windows SDK, eux, s'installent dans un dossier ordinaire
+/// (<c>Windows Kits\10\Debuggers</c>) et sont cherchés en premier. Un refus de lancement est traité comme un état de
 /// la machine, dit UNE fois, et non comme un échec répété sur chaque dump.
 ///
 /// Symboles : un cache local est utilisé (%LOCALAPPDATA%\FaultTracePC\Symbols),
@@ -255,8 +257,8 @@ public sealed class CdbAnalyzer
         // a été refusé : les deux ont été constatés ensemble, et seulement ensemble.
         if (cdb.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase))
             message += Lang.T(
-                "C'est la version de WinDbg installée depuis le Microsoft Store : son exécutable est rangé dans un dossier protégé et ne se lance pas par son chemin. ",
-                "This is the version of WinDbg installed from the Microsoft Store: its executable sits in a protected folder and cannot be started by its path. ");
+                "C'est la version de WinDbg installée depuis le Microsoft Store : son exécutable est rangé dans un dossier protégé, et sur certaines machines Windows refuse de le lancer directement. ",
+                "This is the version of WinDbg installed from the Microsoft Store: its executable sits in a protected folder, and on some machines Windows refuses to start it directly. ");
 
         message += Lang.T(
             $"{nonAnalyses.Count} fichier(s) d'incident n'ont donc pas été analysés ; ce n'est pas un défaut de la machine. "

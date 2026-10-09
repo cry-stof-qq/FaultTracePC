@@ -105,7 +105,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine |
 | 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
-| 89 | **Voir qu'un pilote a disparu, et lequel** | demandé le 09/10/2026 — quatre angles morts vérifiés dans le code, voir « Point 89 » plus bas |
+| 89 | **Voir qu'un pilote a disparu, et lequel** | demandé le 09/10/2026 — quatre angles morts vérifiés dans le code ; cas réel (carte graphique sans pilote) et mesure sur machine saine notés, voir « Point 89 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -850,6 +850,21 @@ si bien que le logiciel n'a rien tenté et que le refus de lancement n'y est
 **ni confirmé ni infirmé**. Reste un essai direct de lancement par le chemin,
 en administrateur, avant de toucher au bouton.
 
+**Essai direct fait le même jour, sur le même poste** : lancé par son chemin
+complet, le cdb.exe du Microsoft Store **a démarré**. Le refus du 24/09/2026
+n'est donc **pas** propre à la version du Store : la même version se lance sur
+une machine et pas sur l'autre. La cause du refus n'est pas établie (une piste,
+**non vérifiée** : le paquet du Store est inscrit pour un compte utilisateur
+précis, et l'analyse aurait été lancée sous un autre compte). Deux conséquences :
+
+- **le bouton de la boîte à outils n'est pas changé** — rien ne prouve que
+  l'installateur est en cause ;
+- **la phrase du lot A était trop générale** : elle affirmait que la version du
+  Store « ne se lance pas par son chemin ». Corrigée en « sur certaines
+  machines Windows refuse de le lancer directement », dans `CdbAnalyzer` (texte
+  du rapport et commentaire d'en-tête). Le test qui vérifie que le Store n'est
+  nommé que si le chemin le désigne reste valable tel quel.
+
 **Fait le même jour** : l'avertissement xUnit1051 apparu à la compilation du
 lot A (un appel sans jeton d'annulation dans les tests) est corrigé — les trois
 appels de `AnalyseProfondeTests` passent `TestContext.Current.CancellationToken`.
@@ -1107,6 +1122,46 @@ quel mode de démarrage. L'intuition à vérifier : un pilote en démarrage
 `Boot`, `System` ou `Auto` sans fichier est grave — Windows essaie de le
 charger à chaque démarrage — tandis qu'un pilote `Manual` ou `Disabled` sans
 fichier n'est qu'une inscription orpheline.
+
+### Le cas réel qui motive ce point — angle mort C
+
+Raconté par l'auteur le 09/10/2026, sur un poste qu'il connaissait : affichage
+bloqué en basse résolution, impossible de la changer. Dans le Gestionnaire de
+périphériques : un **matériel sans pilote** et **aucune carte graphique**. À
+première vue on aurait pu croire à du matériel Intel ; l'auteur savait que
+c'était du NVIDIA, a réinstallé le pilote depuis sa sauvegarde réseau, et tout
+est revenu. FaultTracePC n'était pas installé sur ce poste.
+
+**Ce que FaultTracePC aurait dit aujourd'hui sur ce poste — vérifié dans le
+code, pas sur la machine** : **aucune conclusion**. Les cartes graphiques sont
+lues (`Win32_VideoController` : nom, version et date du pilote, état) et
+affichées telles quelles dans la carte « Cartes graphiques » des détails
+techniques. Sur ce poste, on y aurait sans doute lu le nom de l'adaptateur
+d'affichage de base de Microsoft — mais aucune règle ne le relève, et rien ne
+dit de quel fabricant est la vraie carte.
+
+**Ce qu'il faudrait pour répondre « il manque un pilote, et c'est du NVIDIA »** :
+
+1. lire les périphériques en erreur avec leur **code de problème** (le code 28
+   est « pilote non installé ») ;
+2. lire l'**identifiant matériel** de chacun : il contient le code du
+   fabricant, que Windows connaît même sans pilote — `VEN_10DE` NVIDIA,
+   `VEN_8086` Intel, `VEN_1002` AMD. C'est ce qui aurait levé le doute
+   Intel / NVIDIA ;
+3. relever comme anomalie une carte graphique servie par l'adaptateur
+   d'affichage de base de Microsoft.
+
+**Mesure de référence sur une machine saine** (poste de l'auteur, 09/10/2026) :
+
+- angle mort A : **zéro** pilote inscrit dont le fichier manque ;
+- angle mort C : **un** périphérique en erreur, l'adaptateur réseau virtuel
+  d'un client VPN, dont l'identifiant commence par `ROOT\` — un périphérique
+  créé par un logiciel, pas une pièce de la machine. C'est exactement le faux
+  positif à écarter : la règle ne devra retenir que les vrais bus matériels
+  (`PCI\`, `USB\`, `HDAUDIO\`…), ou au moins classer à part les `ROOT\`.
+
+Une seule machine saine ne suffit pas à fixer une règle ; elle suffit à montrer
+que le filtre `ROOT\` est nécessaire.
 
 **Une retombée qui vaut d'être notée.** L'angle mort A est celui qui aurait
 répondu, le 24/09/2026, à la question « ai-je bien fini de désinstaller l'ancien
