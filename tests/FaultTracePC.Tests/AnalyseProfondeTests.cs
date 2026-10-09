@@ -61,7 +61,7 @@ public class AnalyseProfondeTests
             var dumps = new List<DumpFileInfo> { DumpNoyau("a", 1), DumpNoyau("b", 2), DumpNoyau("c", 3) };
             var erreurs = new List<string>();
 
-            var etat = EnFrancais(() => new CdbAnalyzer(erreurs).AnalyzeAll(dumps, 5, default, exe));
+            var etat = EnFrancais(() => new CdbAnalyzer(erreurs).AnalyzeAll(dumps, 5, TestContext.Current.CancellationToken, exe));
 
             Assert.Equal(EtatAnalyseProfonde.Inaccessible, etat);
             // Une ligne pour la machine, pas une par dump : le 24/09/2026 il y en avait cinq.
@@ -84,7 +84,7 @@ public class AnalyseProfondeTests
         try
         {
             var erreurs = new List<string>();
-            EnFrancais(() => new CdbAnalyzer(erreurs).AnalyzeAll([DumpNoyau("a", 1)], 5, default, exe));
+            EnFrancais(() => new CdbAnalyzer(erreurs).AnalyzeAll([DumpNoyau("a", 1)], 5, TestContext.Current.CancellationToken, exe));
 
             Assert.Contains("Microsoft Store", Assert.Single(erreurs));
         }
@@ -102,7 +102,7 @@ public class AnalyseProfondeTests
         };
         var erreurs = new List<string>();
 
-        var etat = new CdbAnalyzer(erreurs).AnalyzeAll(dumps, 5);
+        var etat = new CdbAnalyzer(erreurs).AnalyzeAll(dumps, 5, TestContext.Current.CancellationToken);
 
         Assert.Equal(EtatAnalyseProfonde.SansObjet, etat);
         Assert.Empty(erreurs);

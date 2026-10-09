@@ -105,6 +105,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine |
 | 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
+| 89 | **Voir qu'un pilote a disparu, et lequel** | demandé le 09/10/2026 — quatre angles morts vérifiés dans le code, voir « Point 89 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -840,6 +841,19 @@ l'auteur quelle version de WinDbg est présente, si l'alias existe, et si
 l'analyse profonde y a déjà fonctionné. On ne change pas un installateur sur la
 foi d'une seule machine.
 
+**Mesuré le 09/10/2026 sur le poste de l'auteur** : WinDbg du Microsoft Store
+présent, **même version** que sur la machine du 24/09/2026 (1.2606.22001.0) ;
+**pas** d'alias `cdb.exe` ; **pas** de Debugging Tools du SDK. Même
+configuration, donc. Mais le rapport du jour ne contient aucun dump noyau —
+seulement deux « Live Kernel Reports », que l'analyse profonde ne traite pas —
+si bien que le logiciel n'a rien tenté et que le refus de lancement n'y est
+**ni confirmé ni infirmé**. Reste un essai direct de lancement par le chemin,
+en administrateur, avant de toucher au bouton.
+
+**Fait le même jour** : l'avertissement xUnit1051 apparu à la compilation du
+lot A (un appel sans jeton d'annulation dans les tests) est corrigé — les trois
+appels de `AnalyseProfondeTests` passent `TestContext.Current.CancellationToken`.
+
 ### Point 81 — quel antivirus protège réellement la machine ?
 
 **Une fausse piste d'abord, gardée ici parce qu'elle est instructive.** À la
@@ -1060,6 +1074,44 @@ qu'on a** — et c'est là que ses silences se voient.
 
 C'est le meilleur banc d'essai que ce logiciel ait rencontré. Il faudrait en
 chercher d'autres.
+
+---
+
+## Point 89 — voir qu'un pilote a disparu, et lequel
+
+Question posée le 09/10/2026 : « sur un PC le pilote avait disparu — est-ce que
+la correction permet de voir qu'un pilote est manquant et lequel ? »
+
+**Réponse : non.** Le lot A du point 80 dit pourquoi le pilote fautif d'un écran
+bleu n'est pas nommé ; il ne cherche pas de pilote manquant. Et en vérifiant le
+code, le logiciel ne sait aujourd'hui voir un pilote disparu **par aucun
+chemin**. Quatre angles morts, chacun constaté dans le code le 09/10/2026 :
+
+| # | Angle mort | Où | Donnée déjà là ? |
+|---|---|---|---|
+| A | **Un pilote inscrit dont le fichier `.sys` a disparu est collecté… puis jeté sans un mot.** Le collecteur lit tous les pilotes inscrits (`Win32_SystemDriver`, quel que soit leur état), constate que le fichier n'existe pas (`File.Exists` faux), n'en lit donc pas la version — et le résumé d'historique écarte ensuite toute ligne sans version. | `DriverCollector`, `ScanHistory.Summarize` | **oui** |
+| B | **La comparaison entre deux analyses ignore les pilotes apparus ou disparus.** Elle ne parcourt que les pilotes présents aujourd'hui, et saute ceux qu'elle ne retrouve pas hier (`continue`). Un pilote présent hier et absent aujourd'hui n'est jamais parcouru. | `ScanHistory`, comparaison des versions | **oui** |
+| C | **Les périphériques sans pilote ou en erreur** — le point d'exclamation jaune du Gestionnaire de périphériques — ne sont pas lus du tout. | aucun collecteur | non |
+| D | **L'événement 7026** (« les pilotes de démarrage suivants n'ont pas pu être chargés ») n'est pas collecté ; seuls 7000, 7001, 7031 et 7034 le sont. | `EventLogCollector` | non |
+
+**A et B relèvent exactement du thème de la 1.8.0** : la donnée est collectée,
+il manque de la dire. C et D demandent une lecture nouvelle.
+
+**Le risque à ne pas courir : les faux positifs.** Sur une machine saine, des
+pilotes inscrits sans fichier peuvent exister — restes d'un logiciel désinstallé,
+composants optionnels jamais posés. Leur nombre sur un Windows sain n'est **pas
+connu** à ce jour. Les signaler tous ferait crier le rapport sur une machine en
+bonne santé, ce que la 1.6.1 a appris à ne plus faire. Avant d'écrire la règle,
+il faut **mesurer** sur au moins une machine saine combien il y en a, et avec
+quel mode de démarrage. L'intuition à vérifier : un pilote en démarrage
+`Boot`, `System` ou `Auto` sans fichier est grave — Windows essaie de le
+charger à chaque démarrage — tandis qu'un pilote `Manual` ou `Disabled` sans
+fichier n'est qu'une inscription orpheline.
+
+**Une retombée qui vaut d'être notée.** L'angle mort A est celui qui aurait
+répondu, le 24/09/2026, à la question « ai-je bien fini de désinstaller l'ancien
+antivirus ? » si une inscription de pilote était restée derrière lui. Il
+rejoint le point 85.
 
 ---
 
