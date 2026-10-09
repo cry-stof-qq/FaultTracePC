@@ -954,6 +954,29 @@ rapport : la donnée est collectée, pas encore affichée.
 **Lot 2 — à faire : l'affichage**, et la conclusion « deux protections temps
 réel actives » seulement quand elle est mesurée.
 
+**Mesuré le 09/10/2026 sur le poste de l'auteur, avant d'écrire le lot 2 :**
+
+| Source | Résultat |
+|---|---|
+| `Get-MpComputerStatus` | `AMRunningMode` = **Normal**, `RealTimeProtectionEnabled` = **True** |
+| Centre de sécurité | `Windows Defender`, `397568` (0x061100), chemin `windowsdefender://` |
+| Centre de sécurité | `Trend Micro Apex One Antivirus`, `266240` (0x041000), chemin `C:\Program Files (x86)\Trend Micro\Security Agent\Pccntmon.exe` |
+
+Ce que cette mesure établit :
+
+- **Defender se reconnaît par son chemin** `windowsdefender://` — ce n'est pas
+  un fichier mais un nom réservé ; et son nom affiché est « Windows Defender ».
+  C'est la mesure qui manquait pour ne pas le deviner ;
+- **deuxième concordance du décodage** de `productState` : 0x061100 se décode
+  « actif, à jour », et Defender dit lui-même « Normal », temps réel actif ;
+- **et un cas qui met la future règle à l'épreuve** : sur ce poste, les deux
+  sources réunies donnent **deux** antivirus actifs — Defender (mesuré chez
+  lui) et Apex One (décodé). Si la règle « deux protections temps réel » était
+  écrite telle quelle, elle se déclencherait ici. Avant de conclure, il faut
+  savoir ce qu'est réellement Apex One sur ce poste : installé et actif, ou
+  inscription restée derrière un logiciel retiré. **Non établi à ce jour** —
+  mesure demandée le même jour.
+
 ### Point 82 — un verdict que ses propres mesures contredisent
 
 Verdict rendu : « Cause la plus probable : **STOCKAGE** (disque/SSD, câblage ou
