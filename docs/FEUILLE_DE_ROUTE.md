@@ -1043,6 +1043,11 @@ Ces outils réparent les fichiers de Windows, ils ne retirent pas un antivirus.
 (« Général »), qui n'annonce aucun outil et n'ajoute rien au script de
 réparation — sans quoi un avertissement « deux antivirus » y aurait ajouté les
 sections prévues pour une corruption système. Un test de plus.
+**Correction vérifiée en réel le même soir** : la conclusion porte le badge
+« Général » et plus aucune indication de boîte à outils. (Premier essai faussé :
+la fenêtre de l'essai précédent était restée ouverte, `dotnet build` n'avait pas
+pu remplacer `FaultTracePC.Core.dll` — erreur MSB3027 — et c'est l'ancienne
+version qui avait été relancée. Fermer FaultTracePC avant de recompiler.)
 
 **Le point 81 est terminé.**
 
