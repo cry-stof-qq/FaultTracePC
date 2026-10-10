@@ -8,20 +8,21 @@ namespace FaultTracePC.Tests;
 /// POINT 83 — les plantages regroupés en séries dans le temps.
 ///
 /// Reproduit le profil de la machine du 24/09/2026 : trois plantages en juillet,
-/// 74 jours sans rien, puis quatre en septembre. Les jours exacts de juillet ne
-/// sont pas ceux de la machine (seul le 09/07 est relevé dans le rapport) ; seul
-/// compte l'écart.
+/// 74 jours sans rien, puis quatre en septembre — dates, heures et codes relevés
+/// dans le tableau des écrans bleus de son rapport. (Première version de ce test,
+/// le 10/10/2026 : jours de juillet et début de septembre reconstitués à tort,
+/// la série de septembre y commençait le 21/09 au lieu du 22/09.)
 /// </summary>
 [Collection("Langue")]
 public class SeriesDePlantagesTests
 {
-    private static BsodIncident P(int mois, int jour, uint code) =>
-        new() { TimeLocal = new DateTime(2026, mois, jour, 12, 0, 0), BugCheckCode = code };
+    private static BsodIncident P(int mois, int jour, uint code, int heure = 12, int minute = 0) =>
+        new() { TimeLocal = new DateTime(2026, mois, jour, heure, minute, 0), BugCheckCode = code };
 
-    private static List<BsodIncident> ProfilDu24Septembre() =>
+    internal static List<BsodIncident> ProfilDu24Septembre() =>
     [
-        P(7, 5, 0x1A), P(7, 7, 0x154), P(7, 9, 0x1A),
-        P(9, 21, 0x154), P(9, 22, 0x154), P(9, 22, 0x7A), P(9, 24, 0x154),
+        P(7, 6, 0x154, 18, 49), P(7, 6, 0x1A, 22, 45), P(7, 9, 0x1A, 22, 7),
+        P(9, 22, 0x7A, 20, 35), P(9, 22, 0x154, 20, 57), P(9, 23, 0x154, 10, 34), P(9, 24, 0x154, 7, 49),
     ];
 
     private static Finding? Conclure(List<BsodIncident> plantages)
@@ -52,7 +53,7 @@ public class SeriesDePlantagesTests
         Assert.Contains("74 jours", f.Title);
         Assert.Contains("— 74 jours sans plantage —", f.Details);
         Assert.Contains("UNEXPECTED_STORE_EXCEPTION ×3", f.Details);
-        Assert.Contains("le 21/09/2026", f.Recommendation);
+        Assert.Contains("le 22/09/2026", f.Recommendation);
     }
 
     [Fact]

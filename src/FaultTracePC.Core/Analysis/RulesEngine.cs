@@ -40,6 +40,7 @@ public sealed class RulesEngine
         ConfronterStockageALaMesure(r);
         ConfronterMemoireAuDiagnostic(r);
         AnalyzeSeriesDePlantages(r);
+        AnalyzePilotesAuDebutDesSeries(r);
 
         if (r.Findings.Count == 0)
         {
@@ -2823,6 +2824,88 @@ public sealed class RulesEngine
                 $"Les plantages ne sont pas répartis au hasard : ils reprennent le {reprise:dd/MM/yyyy}. Chercher ce qui a changé juste avant cette date — mise à jour Windows, logiciel ou pilote installé, intervention sur le matériel, déplacement de la machine.",
                 $"The crashes are not spread at random: they resume on {reprise:yyyy-MM-dd}. Look for what changed just before that date — a Windows update, software or a driver installed, work on the hardware, the machine being moved."),
         });
+    }
+
+    /// <summary>
+    /// POINT 84 — rapprocher la date des pilotes tiers du début d'une série de plantages.
+    ///
+    /// Constaté le 24/09/2026 : quatorze pilotes du même éditeur portaient la date du
+    /// 22/09/2026, jour du premier plantage de la série de septembre (20 h 35) ; un
+    /// seul pilote du même éditeur gardait une date ancienne. Le rapport donnait ces
+    /// dates dans son inventaire, sans jamais les rapprocher des plantages.
+    ///
+    /// UNE PISTE, JAMAIS UNE PREUVE. La date retenue est celle du fichier .sys : elle
+    /// correspond le plus souvent à l'installation ou à la mise à jour du pilote,
+    /// parfois à sa fabrication. Et une coïncidence de dates n'est pas une cause.
+    /// D'où la confiance « faible » et la catégorie neutre : aucun outil de
+    /// réparation n'est proposé sur cette seule base.
+    ///
+    /// Fenêtre retenue (CHOIX, pas mesure) : fichier daté du jour du premier plantage
+    /// de la série ou des deux jours précédents. On compare des DATES, pas des heures :
+    /// l'inventaire ne garde que le jour, et un pilote posé le soir même reste une piste.
+    /// Seules les séries d'au moins deux plantages sont examinées.
+    /// </summary>
+    internal static void AnalyzePilotesAuDebutDesSeries(DiagnosticReport r)
+    {
+        var tiers = r.System.Drivers
+            .Where(d => !d.IsMicrosoft && d.FileDate is not null && d.CompanyName.Length > 0)
+            .ToList();
+        if (tiers.Count == 0 || r.Bsods.Count < 2) return;
+
+        foreach (var serie in SeriesDePlantages(r.Bsods).Where(s => s.Count >= 2))
+        {
+            var debut = serie[0].TimeLocal;
+            var poses = tiers
+                .Where(d => d.FileDate!.Value.Date <= debut.Date && d.FileDate.Value.Date >= debut.Date.AddDays(-2))
+                .GroupBy(d => d.CompanyName)
+                .OrderByDescending(g => g.Count())
+                .ToList();
+            if (poses.Count == 0) continue;
+
+            var parEditeur = new List<string>();
+            foreach (var g in poses)
+            {
+                var fichiers = g.Select(d => System.IO.Path.GetFileName(d.Path)).Where(f => f.Length > 0).OrderBy(f => f).ToList();
+                var liste = fichiers.Count <= 6
+                    ? string.Join(", ", fichiers)
+                    : string.Join(", ", fichiers.Take(6)) + Lang.T($" et {fichiers.Count - 6} autre(s)", $" and {fichiers.Count - 6} more");
+                var jours = string.Join(", ", g.Select(d => d.FileDate!.Value.Date).Distinct().OrderBy(j => j)
+                    .Select(j => Lang.T($"{j:dd/MM/yyyy}", $"{j:yyyy-MM-dd}")));
+                var texte = Lang.T(
+                    $"{g.Count()} pilote(s) de {g.Key} daté(s) du {jours} ({liste}).",
+                    $"{g.Count()} driver(s) from {g.Key} dated {jours} ({liste}).");
+
+                var anciens = tiers.Where(d => d.CompanyName == g.Key && !g.Contains(d)).ToList();
+                if (anciens.Count > 0)
+                    texte += Lang.T(
+                        $" {anciens.Count} autre(s) pilote(s) du même éditeur garde(nt) une date différente ({string.Join(", ", anciens.Select(d => $"{System.IO.Path.GetFileName(d.Path)}, {d.FileDate:dd/MM/yyyy}"))}).",
+                        $" {anciens.Count} other driver(s) from the same vendor keep a different date ({string.Join(", ", anciens.Select(d => $"{System.IO.Path.GetFileName(d.Path)}, {d.FileDate:yyyy-MM-dd}"))}).");
+                parEditeur.Add(texte);
+            }
+
+            var titreEditeurs = string.Join(", ", poses.Select(g => $"{g.Key} ({g.Count()})"));
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Warning,
+                Confidence = Confidence.Low,
+                Category = FaultCategory.None,
+                Code = "pilotes.debut_serie",
+                Subject = string.Join(", ", poses.Select(g => g.Key)),
+                Title = Lang.T(
+                    $"Pilotes posés juste avant le début des plantages : {titreEditeurs}",
+                    $"Drivers installed just before the crashes began: {titreEditeurs}"),
+                Details = Lang.T(
+                    $"Une série de {serie.Count} plantages commence le {debut:dd/MM/yyyy} à {debut:HH:mm}. Le même jour ou dans les deux jours précédents : ",
+                    $"A series of {serie.Count} crashes begins on {debut:yyyy-MM-dd} at {debut:HH:mm}. On the same day or in the two days before: ")
+                    + string.Join(" ", parEditeur)
+                    + Lang.T(
+                        " La date retenue est celle du fichier du pilote : elle correspond le plus souvent à son installation ou à sa mise à jour, parfois à sa fabrication.",
+                        " The date used is that of the driver file: it usually matches its installation or update, sometimes its build."),
+                Recommendation = Lang.T(
+                    "Piste à vérifier, pas une preuve : quel logiciel de cet éditeur a été installé ou mis à jour ce jour-là ? Si les plantages cessent après l'avoir désinstallé ou remis à sa version précédente, la piste est confirmée.",
+                    "A lead to check, not a proof: which software from this vendor was installed or updated that day? If the crashes stop after uninstalling it or rolling it back to its previous version, the lead is confirmed."),
+            });
+        }
     }
 
     /// <summary>Découpe les plantages, triés par date, là où l'écart dépasse <see cref="EcartEntreSeries"/>.</summary>

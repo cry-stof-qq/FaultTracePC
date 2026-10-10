@@ -100,7 +100,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **✔ terminé le 09/10/2026** : lecture, carte « Protection antivirus », trois conclusions, voir la section |
 | 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **✔ terminé le 10/10/2026** : stockage contre SMART, mémoire contre diagnostic mémoire |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (séries) livré le 10/10/2026 |
-| 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
+| 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée — **lot 1 livré le 10/10/2026** (pilotes datés du début d'une série) |
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine |
@@ -1169,9 +1169,17 @@ technicien pose : **qu'est-ce qui a changé ce jour-là ?**
   codes d'arrêt et leur nombre, écart entre séries), et la question à poser
   avec sa date : « ils reprennent le 21/09/2026 — chercher ce qui a changé juste
   avant » ;
-- cinq tests (`SeriesDePlantagesTests`), dont le profil du 24/09/2026. Les
-  jours exacts de juillet y sont reconstitués : seul le 09/07 figure dans le
-  rapport ; l'écart de 74 jours, lui, est exact.
+- cinq tests (`SeriesDePlantagesTests`), dont le profil du 24/09/2026.
+
+**Erreur corrigée le même jour.** La première version de ce test disait les
+jours de juillet « reconstitués, seul le 09/07 figurant dans le rapport ». C'était
+faux : le tableau des écrans bleus du rapport donne les sept plantages, date,
+heure et code — mal relu. La série de septembre y était aussi placée à partir du
+21/09 au lieu du **22/09** ; l'exemple donné en conversation (« ils reprennent le
+21/09/2026 ») était donc faux d'un jour. Le test reprend désormais les valeurs
+réelles : 06/07 18:49 (`0x154`), 06/07 22:45 (`0x1A`), 09/07 22:07 (`0x1A`) ;
+22/09 20:35 (`0x7A`), 22/09 20:57, 23/09 10:34, 24/09 07:49 (`0x154`). L'écart
+de 74 jours, lui, était juste.
 
 **Lot 2 — à décider** : rapprocher des séries les autres événements de la même
 fenêtre (les 10 réinitialisations du contrôleur, toutes dans les 48 heures du
@@ -1191,6 +1199,30 @@ une réécriture de masse par Windows.
 **Ce qu'il faut :** rapprocher la date de pose des pilotes du début d'un amas de
 plantages. À énoncer comme une **piste**, jamais comme une preuve : une date de
 fichier est une date de pose, pas une causalité.
+
+**Précision du 10/10/2026 sur cette dernière phrase.** « Une date de fichier est
+une date de pose » est trop affirmatif : la date relevée est celle de la
+dernière modification du fichier `.sys`. Elle correspond le plus souvent à
+l'installation ou à la mise à jour, mais peut aussi être celle de sa
+fabrication. Le rapport le dit.
+
+**Lot 1 ✔ — livré le 10/10/2026** (`RulesEngine.AnalyzePilotesAuDebutDesSeries`).
+
+- pour chaque série d'**au moins deux** plantages (point 83), les pilotes
+  **tiers** dont le fichier est daté du jour du premier plantage ou des **deux
+  jours précédents** — fenêtre choisie, pas mesurée ; on compare des dates, pas
+  des heures, l'inventaire ne gardant que le jour ;
+- regroupés par éditeur, avec la liste des fichiers (six au plus, puis « et N
+  autre(s) ») et les pilotes du même éditeur qui gardent une date différente ;
+- **avertissement en confiance « faible »** et **catégorie neutre** : c'est une
+  piste, aucun outil de réparation n'est proposé sur cette base. La
+  recommandation dit « piste à vérifier, pas une preuve » et donne le moyen de
+  la confirmer : désinstaller ou revenir à la version précédente, et voir si
+  les plantages cessent ;
+- cinq tests (`PilotesDebutSerieTests`), avec les données réelles du 24/09/2026 :
+  la conclusion y donne « Pilotes posés juste avant le début des plantages :
+  Gen Digital Inc. (14) », série commencée le 22/09/2026 à 20:35, et signale
+  `aswElam.sys` resté au 07/10/2025.
 
 ### Point 85 — les logiciels installés n'apparaissent pas
 
