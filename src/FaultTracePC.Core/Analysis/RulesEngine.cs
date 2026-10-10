@@ -1210,25 +1210,66 @@ public sealed class RulesEngine
         // Des plantages sans fichier d'analyse : c'est la conséquence qui compte.
         var sansVidage = r.Bsods.Count(b => string.IsNullOrEmpty(b.DumpPath));
 
+        // POINT 87 : ce que disent les réglages LUS. Jusqu'au 10/10/2026, ce texte
+        // affirmait « la destination du vidage manque ou est trop petite » et
+        // recommandait « d'activer les petits vidages », sans avoir rien lu — sur une
+        // machine réglée d'origine, qui écrivait ses petits vidages.
+        var os = r.System.Os;
+        bool desactive = os.CrashDumpEnabled == 0;
+        bool echangeManuel = os.FichierEchangeGereParWindows == false;
+        bool reglagesBons = os.CrashDumpEnabled is not null && !desactive && os.FichierEchangeGereParWindows == true;
+        bool reglageEnCause = desactive || echangeManuel;
+
         var details = Lang.T(
-            $"Windows a signalé {events.Count} fois qu'il ne parvenait pas à préparer ou à écrire le fichier de diagnostic de plantage ({string.Join(", ", ids)}). CE NE SONT PAS DES ERREURS DE DISQUE : le disque n'est pas mis en cause, c'est la destination du vidage qui manque ou qui est trop petite.",
-            $"Windows reported {events.Count} times that it could not prepare or write the crash diagnostic file ({string.Join(", ", ids)}). THESE ARE NOT DISK ERRORS: the drive is not implicated — the destination for the dump is missing or too small.")
-            + Lang.T($" Fichier d'échange déclaré : {r.System.Os.PageFileInfo}.", $" Declared page file: {r.System.Os.PageFileInfo}.")
-            + (sansVidage > 0
-                ? Lang.T($" Conséquence directe : {sansVidage} écran(s) bleu(s) ne disposent d'aucun fichier d'analyse, leur cause restera indéterminée tant que ce réglage n'est pas corrigé.",
-                         $" Direct consequence: {sansVidage} blue screen(s) have no analysis file, and their cause will stay unknown until this setting is fixed.")
-                : "");
+            $"Windows a signalé {events.Count} fois qu'il ne parvenait pas à préparer ou à écrire le fichier de diagnostic de plantage ({string.Join(", ", ids)}). CE NE SONT PAS DES ERREURS DE DISQUE.",
+            $"Windows reported {events.Count} times that it could not prepare or write the crash diagnostic file ({string.Join(", ", ids)}). THESE ARE NOT DISK ERRORS.")
+            + Lang.T($" Réglage lu : {ReglageVidage.Nom(os)} ; fichier d'échange : {ReglageVidage.FichierEchange(os)} ({os.PageFileInfo}).",
+                     $" Setting read: {ReglageVidage.Nom(os)}; page file: {ReglageVidage.FichierEchange(os)} ({os.PageFileInfo}).");
+
+        if (desactive)
+            details += Lang.T(" Le réglage est sur « aucun » : Windows n'écrit aucun fichier de plantage, c'est la cause.",
+                              " The setting is “none”: Windows writes no crash file, that is the cause.");
+        else if (echangeManuel)
+            details += Lang.T(" Le fichier d'échange est réglé à la main : Microsoft attribue l'événement 46 à un fichier d'échange absent ou mal configuré.",
+                              " The page file is set manually: Microsoft attributes event 46 to a missing or misconfigured page file.");
+        else if (reglagesBons)
+            details += Lang.T(" Les deux réglages lus sont en place : ce n'est pas un réglage à corriger. Un fichier de plantage s'écrit sur le disque au moment même du plantage ; l'échec est à rapprocher de ce qui se passait alors, en particulier sur le stockage.",
+                              " Both settings read are in place: this is not a setting to fix. A crash file is written to the drive at the very moment of the crash; the failure should be related to what was happening then, storage in particular.");
+        else
+            details += Lang.T(" Les réglages n'ont pas pu être lus entièrement : rien ne permet d'affirmer qu'ils sont en cause.",
+                              " The settings could not be fully read: nothing allows claiming they are to blame.");
+
+        if (sansVidage > 0)
+            details += reglageEnCause
+                ? Lang.T($" Conséquence directe : {sansVidage} écran(s) bleu(s) ne disposent d'aucun fichier d'analyse, et les suivants n'en auront pas non plus tant que ce réglage n'est pas corrigé.",
+                         $" Direct consequence: {sansVidage} blue screen(s) have no analysis file, and the next ones will not either until this setting is fixed.")
+                : Lang.T($" {sansVidage} écran(s) bleu(s) ne disposent d'aucun fichier d'analyse.",
+                         $" {sansVidage} blue screen(s) have no analysis file.");
+
+        var recommandation =
+            desactive ? Lang.T(
+                "Remettre le réglage d'origine de Windows : Paramètres système avancés → Démarrage et récupération → Écriture des informations de débogage → « Vidage mémoire automatique ».",
+                "Restore the Windows default: Advanced system settings → Startup and Recovery → Write debugging information → “Automatic memory dump”.")
+            : echangeManuel ? Lang.T(
+                "Laisser Windows gérer le fichier d'échange : Paramètres système avancés → Performances → Paramètres → Avancé → Mémoire virtuelle → gestion automatique.",
+                "Let Windows manage the page file: Advanced system settings → Performance → Settings → Advanced → Virtual memory → automatic management.")
+            : reglagesBons ? Lang.T(
+                "Ne pas modifier ces réglages : ils sont corrects. Regarder plutôt les alertes de stockage du rapport, s'il y en a, à la date des plantages sans fichier.",
+                "Do not change these settings: they are correct. Look instead at the report's storage alerts, if any, at the dates of the crashes with no file.")
+            : Lang.T(
+                "Vérifier les deux réglages : Paramètres système avancés → Démarrage et récupération (Windows est réglé d'origine sur « Vidage mémoire automatique »), et Performances → Mémoire virtuelle (gestion automatique d'origine).",
+                "Check both settings: Advanced system settings → Startup and Recovery (Windows defaults to “Automatic memory dump”), and Performance → Virtual memory (automatic management by default).");
 
         r.Findings.Add(new Finding
         {
             Severity = sansVidage > 0 ? Severity.Warning : Severity.Info,
             Confidence = Confidence.High,
-            Category = FaultCategory.Software,
+            // Catégorie neutre (point 87, même défaut qu'au point 81) : en « Logiciel »,
+            // la carte recevait l'indication « sfc /scannow, puis DISM », sans rapport.
+            Category = FaultCategory.None,
             Title = Lang.T($"Le vidage de plantage n'a pas pu être écrit ({events.Count} événement(s) volmgr)", $"The crash dump could not be written ({events.Count} volmgr event(s))"),
             Details = details,
-            Recommendation = Lang.T(
-                "Deux réglages, et aucun n'est risqué : activer les petits vidages mémoire (Paramètres système avancés → Démarrage et récupération → Écriture des informations de débogage → « Petit vidage mémoire »), et laisser le fichier d'échange géré automatiquement par Windows sur le disque système. Sans cela, chaque nouveau plantage sera aussi muet que les précédents.",
-                "Two settings, neither of them risky: enable small memory dumps (Advanced system settings → Startup and Recovery → Write debugging information → “Small memory dump”), and let Windows manage the page file automatically on the system drive. Without this, every new crash will be as silent as the last.")
+            Recommendation = recommandation,
         });
     }
 

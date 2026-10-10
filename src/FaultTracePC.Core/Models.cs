@@ -22,6 +22,24 @@ public sealed class OsInfo
     public ulong TotalVirtualMemoryKB { get; set; }
     public ulong FreeVirtualMemoryKB { get; set; }
     public string PageFileInfo { get; set; } = "";
+
+    /// <summary>
+    /// POINT 87 — le réglage des fichiers de plantage, LU et non deviné.
+    /// Valeur de <c>HKLM\SYSTEM\CurrentControlSet\Control\CrashControl\CrashDumpEnabled</c>
+    /// (documentation Microsoft « Overview of memory dump file options for Windows ») :
+    /// 0 aucun, 1 complet (actif si <see cref="FilterPages"/>), 2 noyau, 3 petit
+    /// vidage, 7 automatique. Null si la clé n'a pas pu être lue.
+    /// </summary>
+    public int? CrashDumpEnabled { get; set; }
+
+    /// <summary><c>FilterPages</c> = 1 avec <c>CrashDumpEnabled</c> = 1 : vidage « actif ».</summary>
+    public bool FilterPages { get; set; }
+
+    /// <summary>
+    /// <c>Win32_ComputerSystem.AutomaticManagedPagefile</c> : le fichier d'échange est-il
+    /// géré par Windows ? Null si non lu.
+    /// </summary>
+    public bool? FichierEchangeGereParWindows { get; set; }
 }
 
 /// <summary>Instantané d'un processus en cours (au moment du scan).</summary>

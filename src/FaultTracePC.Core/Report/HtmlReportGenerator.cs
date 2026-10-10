@@ -765,6 +765,9 @@ public static class HtmlReportGenerator
                 Lang.T($"{H(v.Letter)} {H(v.Label)} ({H(v.FileSystem)}) : {RulesEngine.FormatBytes(v.FreeBytes)} libres / {RulesEngine.FormatBytes(v.SizeBytes)} ({v.PercentFree} %)", $"{H(v.Letter)} {H(v.Label)} ({H(v.FileSystem)}): {RulesEngine.FormatBytes(v.FreeBytes)} free / {RulesEngine.FormatBytes(v.SizeBytes)} ({v.PercentFree}%)"))));
 
         Card(sb, Lang.T("Fichier d'échange", "Page file"), H(s.Os.PageFileInfo));
+        Card(sb, Lang.T("Fichiers de plantage", "Crash files"),
+            Lang.T($"Réglage : {H(Analysis.ReglageVidage.Nom(s.Os))}<br>Fichier d'échange : {H(Analysis.ReglageVidage.FichierEchange(s.Os))}",
+                   $"Setting: {H(Analysis.ReglageVidage.Nom(s.Os))}<br>Page file: {H(Analysis.ReglageVidage.FichierEchange(s.Os))}"));
 
         sb.Append("</div></section>");
     }

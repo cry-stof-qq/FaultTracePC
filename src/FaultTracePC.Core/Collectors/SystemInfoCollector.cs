@@ -96,6 +96,23 @@ public sealed class SystemInfoCollector
             os.PageFileInfo = parts.Count > 0 ? string.Join(Lang.T(" ; ", "; "), parts) : Lang.T("géré automatiquement / aucun", "managed automatically / none");
         }
         catch { /* non bloquant */ }
+
+        // Point 87 : le réglage des fichiers de plantage, pour ne plus en recommander
+        // la correction sans l'avoir lu. Null = pas pu lire, jamais « réglage absent ».
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\CrashControl");
+            if (key?.GetValue("CrashDumpEnabled") is int reglage) os.CrashDumpEnabled = reglage;
+            os.FilterPages = key?.GetValue("FilterPages") is int filtre && filtre == 1;
+        }
+        catch { /* non bloquant : reste null */ }
+
+        try
+        {
+            foreach (var mo in Query("SELECT AutomaticManagedPagefile FROM Win32_ComputerSystem"))
+                if (mo["AutomaticManagedPagefile"] is bool auto) os.FichierEchangeGereParWindows = auto;
+        }
+        catch { /* non bloquant : reste null */ }
     }
 
     private void CollectBios(BiosInfo b)

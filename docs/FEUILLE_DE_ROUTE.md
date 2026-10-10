@@ -103,7 +103,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée — **lot 1 livré le 10/10/2026** (pilotes datés du début d'une série) |
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
-| 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine |
+| 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine — **✔ terminé le 10/10/2026** |
 | 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
 | 89 | **Voir qu'un pilote a disparu, et lequel** | demandé le 09/10/2026 — **noté pour plus tard, rien n'est commencé** ; quatre angles morts vérifiés dans le code ; cas réel (carte graphique sans pilote) et mesure sur machine saine notés, voir « Point 89 » plus bas |
 
@@ -1318,6 +1318,31 @@ plantage. Ce n'est pas un réglage à corriger.
 Cinquième occurrence en une semaine du même pli : **conclure plus loin que ce
 qui a été mesuré** — et la troisième fois qu'il est commis aussi par celui qui
 relit, en reprenant la conclusion du logiciel sans la vérifier.
+
+**Livré le 10/10/2026.**
+
+- **lecture** (`SystemInfoCollector`) : `CrashDumpEnabled` et `FilterPages` dans
+  `HKLM\SYSTEM\CurrentControlSet\Control\CrashControl`, et
+  `AutomaticManagedPagefile` (`Win32_ComputerSystem`). Valeurs selon la
+  documentation Microsoft « Overview of memory dump file options for Windows » :
+  0 aucun, 1 complet (actif avec `FilterPages` = 1), 2 noyau, 3 petit, 7
+  automatique. Non lu = null, jamais confondu avec « absent » ;
+- **affichage** : carte « Fichiers de plantage » dans les informations système
+  (réglage lu, et gestion du fichier d'échange) — `ReglageVidage.Nom` ;
+- **la carte `volmgr` ne recommande plus rien sans avoir lu** :
+  - réglage sur « aucun » → c'est la cause, remettre « Vidage mémoire automatique » ;
+  - fichier d'échange réglé à la main → le laisser gérer par Windows ;
+  - **réglages d'origine** (le cas du 24/09) → « ce n'est pas un réglage à
+    corriger », l'échec est à rapprocher de ce qui se passait au moment du
+    plantage, en particulier sur le stockage ; recommandation « ne pas modifier
+    ces réglages » ;
+  - réglages non lus → rien n'est affirmé, on dit de vérifier ;
+  - la phrase « la destination du vidage manque ou est trop petite », affirmée
+    sans mesure, est retirée ;
+- **catégorie neutre** : en « Logiciel », la carte recevait l'indication
+  « sfc /scannow, puis DISM » et ajoutait au script de réparation des sections
+  sans rapport — le même défaut qu'au point 81 ;
+- onze cas de test (`ReglageVidageTests`), dont la configuration du 24/09/2026.
 
 ### L'issue, pour la machine
 
