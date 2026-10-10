@@ -337,6 +337,18 @@ public sealed class DriverInfo
 }
 
 /// <summary>
+/// POINT 85, LOT 2b — un pilote-filtre chargé : il s'intercale entre Windows et le
+/// système de fichiers (antivirus, sauvegarde, chiffrement…). Lu par « fltmc filters ».
+/// </summary>
+public sealed class FiltreDisque
+{
+    public string Nom { get; set; } = "";
+    public int? Instances { get; set; }
+    /// <summary>Altitude telle qu'affichée : elle fixe l'ordre dans la pile, plus haut = plus tôt.</summary>
+    public string Altitude { get; set; } = "";
+}
+
+/// <summary>
 /// POINT 85, LOT 2 — un service inscrit auprès de Windows dont le programme n'existe
 /// plus. Constaté le 09/10/2026 sur le poste de l'auteur : Apex One mal désinstallé
 /// laissait son service « Apex One NT WSC Service », arrêté.
@@ -460,6 +472,12 @@ public sealed class SystemSnapshot
     public List<InstalledApp> InstalledApps { get; set; } = new();
     /// <summary>État du réseau : cartes, profils Wi-Fi, services, domaine.</summary>
     public NetworkInfo Network { get; set; } = new();
+
+    /// <summary>Pilotes-filtres chargés (point 85, lot 2b).</summary>
+    public List<FiltreDisque> Filtres { get; set; } = new();
+
+    /// <summary>Vrai si « fltmc filters » a pu être lu.</summary>
+    public bool FiltresLus { get; set; }
 
     /// <summary>Services dont le programme n'existe plus (point 85, lot 2).</summary>
     public List<ServiceOrphelin> ServicesOrphelins { get; set; } = new();

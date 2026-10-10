@@ -718,6 +718,7 @@ public static class HtmlReportGenerator
                 : Lang.T("hors domaine (groupe de travail)", "not domain-joined (workgroup)"));
 
         Card(sb, Lang.T("Protection antivirus", "Antivirus protection"), LignesProtection(s.Protection));
+        Card(sb, Lang.T("Pilotes-filtres (entre Windows et les fichiers)", "Filter drivers (between Windows and the files)"), LignesFiltres(s));
 
         Card(sb, Lang.T("Cartes graphiques", "Graphics cards"),
             s.Gpus.Count == 0 ? Lang.T("aucune détectée", "none detected")
@@ -1068,6 +1069,31 @@ public static class HtmlReportGenerator
                                   "<em>Status of other antivirus products: as they declare it to the Windows Security Center.</em>"));
         }
 
+        return string.Join("<br>", lignes);
+    }
+
+    /// <summary>
+    /// POINT 85, LOT 2b — la pile des pilotes-filtres, avec l'éditeur de chacun (pris
+    /// dans l'inventaire des pilotes). Ceux d'un autre éditeur que Microsoft sont en
+    /// gras : c'est là qu'on cherche un reste d'antivirus ou de logiciel de sauvegarde.
+    /// </summary>
+    internal static string LignesFiltres(SystemSnapshot s)
+    {
+        if (!s.FiltresLus) return Lang.T("non lus", "not read");
+        if (s.Filtres.Count == 0) return Lang.T("aucun", "none");
+
+        var lignes = new List<string>();
+        foreach (var f in s.Filtres)
+        {
+            var pilote = s.Drivers.FirstOrDefault(d => d.Name.Equals(f.Nom, StringComparison.OrdinalIgnoreCase));
+            var editeur = pilote is not null && pilote.CompanyName.Length > 0 ? pilote.CompanyName : Lang.T("éditeur inconnu", "unknown vendor");
+            var altitude = f.Altitude.Length > 0 ? Lang.T($" — altitude {H(f.Altitude)}", $" — altitude {H(f.Altitude)}") : "";
+            var texte = $"{H(f.Nom)}{altitude} — {H(editeur)}";
+            lignes.Add(pilote is { IsMicrosoft: true } ? texte : $"<strong>{texte}</strong>");
+        }
+        lignes.Add(Lang.T(
+            "<em>Un antivirus, un outil de sauvegarde ou de chiffrement installe ce genre de pilote. En gras : ceux d'un autre éditeur que Microsoft, ou dont l'éditeur n'a pas pu être lu.</em>",
+            "<em>Antivirus, backup or encryption tools install this kind of driver. In bold: those from a vendor other than Microsoft, or whose vendor could not be read.</em>"));
         return string.Join("<br>", lignes);
     }
 

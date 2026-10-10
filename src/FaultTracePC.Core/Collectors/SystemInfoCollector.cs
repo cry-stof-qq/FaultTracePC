@@ -29,6 +29,7 @@ public sealed class SystemInfoCollector
         Safe(Lang.T("Logiciels installés", "Installed software"), () => s.InstalledApps.AddRange(InstalledSoftwareCollector.Collect(_errors)));
         Safe(Lang.T("Protection antivirus", "Antivirus protection"), () => s.Protection = ProtectionCollector.Collect(_errors));
         Safe("Services", () => { s.ServicesOrphelins.AddRange(ServiceCollector.Orphelins()); s.ServicesLus = true; });
+        Safe(Lang.T("Filtres de disque", "File system filters"), () => FiltreCollector.Collect(s, _errors));
         if (includeDrivers)
             Safe("Pilotes", () => s.Drivers.AddRange(DriverCollector.Collect()));
 

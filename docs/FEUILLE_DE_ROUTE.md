@@ -102,7 +102,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **✔ terminé le 10/10/2026** : stockage contre SMART, mémoire contre diagnostic mémoire |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (séries) livré le 10/10/2026 |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée — **lot 1 livré le 10/10/2026** (pilotes datés du début d'une série) |
-| 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible — **lot 1 livré le 10/10/2026** (conclusions + liste repliée) |
+| 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible — **✔ terminé le 10/10/2026** : logiciels au début d'une série, liste repliée, services et pilotes sans programme, pilotes-filtres |
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine — **✔ terminé le 10/10/2026** |
 | 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
@@ -1333,8 +1333,20 @@ de TmWSCSvc n'existe plus », ou, si le programme est là, « ce n'est pas une
 inscription restée derrière une désinstallation » ; l'ancienne phrase ne reste
 que si les services n'ont pas pu être lus. Deux tests de plus.
 
-**Lot 2b — à faire : la pile des pilotes-filtres** (`fltmc filters`) décrite
-ci-dessus.
+**Lot 2b ✔ — la pile des pilotes-filtres, livré le 10/10/2026.**
+
+- `FiltreCollector` lance `fltmc filters` (droits administrateur, déjà acquis)
+  et lit les lignes qui suivent le **trait de tirets** — jamais un mot d'en-tête,
+  ces en-têtes étant traduits selon la langue de Windows. Sans trait (droits
+  insuffisants, message d'erreur), la pile est « non lue », jamais « vide » ;
+- carte « Pilotes-filtres (entre Windows et les fichiers) » dans les
+  informations système : nom, altitude, éditeur (pris dans l'inventaire des
+  pilotes). **En gras** : les filtres d'un autre éditeur que Microsoft, ou dont
+  l'éditeur n'a pas pu être lu — on ne présume pas sain ce qu'on n'a pas lu ;
+- quatre tests (`FiltresDisqueTests`). **La sortie de fltmc qui y sert est
+  reconstituée, pas capturée** — à remplacer par une sortie réelle.
+
+**Le point 85 est terminé** (lot 1, lots 2a et 2b), à l'essai réel du lot 2b près.
 
 ### Point 86 — la boîte noire sans charge processeur
 
