@@ -20,7 +20,7 @@
 | 1.6.2 | **publiée** le 18/09/2026 — sept correctifs constatés sur un rapport 1.6.1 réel, dont **deux créés par la 1.6.1 elle-même** — points 72 à 78, 616 tests verts |
 | 1.7.0 | **jamais publiée** — construite et éprouvée sur un parc réel les 19, 20 et 21/09/2026. Cinq défauts en sont sortis, dont trois qu'aucune relecture de code n'aurait trouvés. Publier 1.7.0 puis 1.7.1 à trois jours d'intervalle n'aurait rien appris à personne |
 | 1.7.1 | **publiée** le 21/09/2026 — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔. C'est la 1.7.0 corrigée : voir « La matinée du 21/09/2026 », défauts A à E |
-| 1.8.0 | **en préparation de publication depuis le 10/10/2026** (numéro de version passé à 1.8.0, notes de version écrites ; MSI construit et **installé par-dessus la 1.7.1 sur le poste de l'auteur le 10/10/2026** — version affichée 1.8.0, service redémarré, rapport complet avec toutes les nouvelles cartes et conclusions ; un défaut trouvé et corrigé à cette occasion, voir point 86 ; reste l'essai sur un poste du parc. Constaté en préparant la construction : `build\publish.ps1` portait encore `1.6.2` comme version par défaut de l'archive portable — passé à 1.8.0) — en cours depuis le 09/10/2026 — thème **le rapport rapproche ce qu'il sait** — points 80 à 87, ce qu'un rapport sur une machine inconnue a montré. Décidé le 09/10/2026 : passe AVANT winget, parce qu'il touche à la promesse même du logiciel — trouver la cause d'une panne — et sert tous les utilisateurs, pas seulement un parc |
+| 1.8.0 | **en préparation de publication depuis le 10/10/2026** (numéro de version passé à 1.8.0, notes de version écrites ; MSI construit et **installé par-dessus la 1.7.1 sur le poste de l'auteur le 10/10/2026** — version affichée 1.8.0, service redémarré, rapport complet avec toutes les nouvelles cartes et conclusions ; un défaut trouvé et corrigé à cette occasion, voir point 86. **Essai sur un poste en mode parc réussi le 10/10/2026** : poste hors domaine en 1.7.1, mis à jour en 1.8.0 par installation locale du MSI — réglage du mode parc présent avant et après, service redémarré, console : version 1.8.0, « surveillance active », boîte noire ouverte à distance. Reste, en confirmation, une mise à jour par le déploiement de la console sur un poste du domaine. Constaté en préparant la construction : `build\publish.ps1` portait encore `1.6.2` comme version par défaut de l'archive portable — passé à 1.8.0) — en cours depuis le 09/10/2026 — thème **le rapport rapproche ce qu'il sait** — points 80 à 87, ce qu'un rapport sur une machine inconnue a montré. Décidé le 09/10/2026 : passe AVANT winget, parce qu'il touche à la promesse même du logiciel — trouver la cause d'une panne — et sert tous les utilisateurs, pas seulement un parc |
 | 1.9.0 | prévue — thème **deux publics, un seul paquet** — point 79 : le mode parc devient une case à cocher de l'installation, absente par défaut, **sans qu'un poste déjà en mode parc le perde**. Décidé le 10/10/2026 : juste après la 1.8.0 et **avant winget**, pour que les particuliers qui installeront par winget n'aient déjà plus le mode parc |
 | 1.10.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026. Décalé d'une version le 09/10/2026, puis d'une autre le 10/10/2026 (point 79 placé avant) |
 
@@ -107,6 +107,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine — **✔ terminé le 10/10/2026** |
 | 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
 | 89 | **Voir qu'un pilote a disparu, et lequel** | demandé le 09/10/2026 — **noté pour plus tard, rien n'est commencé** ; quatre angles morts vérifiés dans le code ; cas réel (carte graphique sans pilote) et mesure sur machine saine notés, voir « Point 89 » plus bas |
+| 90 | **Le relevé « toutes les 10 secondes » a lieu toutes les 12 secondes environ** | constaté le 10/10/2026 sur la boîte noire distante d'un poste — à décider, voir « Point 90 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1529,6 +1530,26 @@ qu'on a** — et c'est là que ses silences se voient.
 
 C'est le meilleur banc d'essai que ce logiciel ait rencontré. Il faudrait en
 chercher d'autres.
+
+---
+
+## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
+
+Constaté le 10/10/2026 en ouvrant à distance la boîte noire d'un poste mis à
+jour en 1.8.0 : les relevés tombent à 12:24:40, 12:24:51, 12:25:04, 12:25:16,
+12:25:28… — un écart de **12 secondes environ**, alors que la fenêtre annonce en
+tête « UN RELEVÉ TOUTES LES 10 SECONDES », et que les notes de la 1.7.1 le
+disaient aussi.
+
+**Cause, lue dans le code** : le service attend 10 secondes **après** chaque
+relevé (`Task.Delay(SampleInterval)` en fin de boucle), et un relevé lui-même
+prend du temps — lecture des capteurs, mémoire, et toutes les quelques fois la
+liste des processus. L'intervalle réel est donc 10 secondes **plus** la durée du
+relevé. Ce n'est pas une panne ; c'est une affirmation inexacte.
+
+**Deux corrections possibles, à décider** : caler la boucle sur une horloge à
+10 secondes fixes (le texte redevient vrai), ou corriger le texte (« un relevé
+toutes les 10 à 15 secondes environ »). Rien n'est fait à ce jour.
 
 ---
 

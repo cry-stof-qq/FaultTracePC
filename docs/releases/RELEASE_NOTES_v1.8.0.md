@@ -72,7 +72,7 @@ Des cartes affichaient « sfc /scannow, puis DISM » — qui réparent les fichi
 
 ## Ce qui ne change pas
 
-- **Le mode parc reste inclus**, comme en 1.7.1. Le rendre facultatif à l'installation est prévu pour la 1.9.0, avec l'exigence qu'aucun poste déjà en mode parc ne le perde.
+- **Le mode parc reste inclus**, comme en 1.7.1, et une mise à jour depuis la 1.7.1 le conserve : vérifié avant publication sur un poste en mode parc, qui a gardé son réglage, est resté joignable depuis la console et a rouvert sa boîte noire à distance. Le rendre facultatif à l'installation est prévu pour la 1.9.0, avec l'exigence qu'aucun poste déjà en mode parc ne le perde.
 - Les analyses enregistrées par les versions précédentes restent lisibles : les nouvelles informations s'ajoutent, aucune n'est retirée.
 
 812 tests, aucun échec.
