@@ -1291,9 +1291,35 @@ lignes sans rapport avec la panne.
 « Afficher les 71 logiciels installés », plus récents d'abord. Aucun plantage
 sur ce poste, donc aucune conclusion « installé juste avant » : attendu.
 
-**Lot 2 — à faire : les restes d'un logiciel désinstallé** — inscription
-orpheline (déjà faite pour les antivirus au point 81), dossiers restés sur le
-disque, et la pile des pilotes-filtres (`fltmc filters`) décrite ci-dessus.
+**Lot 2 — les restes d'un logiciel désinstallé, limité le 10/10/2026 à ce qui se
+mesure.** Décidé avec l'auteur : les **dossiers restés sur le disque** sont
+écartés — les rattacher à un logiciel disparu demanderait de deviner d'après
+leur nom, avec trop de fausses alertes possibles. Restent deux mesures, livrées
+en deux petits lots.
+
+**Lot 2a ✔ — services et pilotes inscrits sans programme, livré le 10/10/2026.**
+
+- `ServiceCollector` lit tous les services (`Win32_Service`), isole le chemin du
+  programme dans leur ligne de commande (entre guillemets, sinon jusqu'à
+  `.exe` / `.sys` — un chemin sans guillemets peut contenir des espaces) et
+  vérifie que le fichier existe ; un chemin illisible n'est pas conclu ;
+- `DriverCollector` note désormais si le fichier `.sys` inscrit existe
+  (`DriverInfo.FichierPresent`) — c'est l'**angle mort A du point 89** : un
+  pilote dont le fichier a disparu était collecté puis jeté sans un mot ;
+- conclusion en **information**, catégorie neutre : « N service(s) ou pilote(s)
+  inscrit(s) dont le programme n'existe plus », avec nom, mode de démarrage,
+  état et chemin ; recommandation de passer par l'outil de l'éditeur, et
+  **garde-fou** : ne pas effacer une inscription à la main sans savoir à quoi
+  elle sert — retirer un pilote de démarrage peut empêcher Windows de démarrer ;
+- huit cas de test (`InscriptionsOrphelinesTests`).
+
+Mesure de référence déjà faite le 09/10/2026 sur le poste de l'auteur (point 89) :
+**zéro** pilote inscrit dont le fichier manque. Pour les services, pas encore de
+référence : le premier rapport le dira — on y attend au moins le service
+d'Apex One si son programme a disparu.
+
+**Lot 2b — à faire : la pile des pilotes-filtres** (`fltmc filters`) décrite
+ci-dessus.
 
 ### Point 86 — la boîte noire sans charge processeur
 
@@ -1440,6 +1466,9 @@ chemin**. Quatre angles morts, chacun constaté dans le code le 09/10/2026 :
 
 **A et B relèvent exactement du thème de la 1.8.0** : la donnée est collectée,
 il manque de la dire. C et D demandent une lecture nouvelle.
+
+**Angle mort A traité le 10/10/2026** par le lot 2a du point 85 : un pilote inscrit
+dont le fichier manque est désormais signalé. B, C et D restent à faire.
 
 **Le risque à ne pas courir : les faux positifs.** Sur une machine saine, des
 pilotes inscrits sans fichier peuvent exister — restes d'un logiciel désinstallé,

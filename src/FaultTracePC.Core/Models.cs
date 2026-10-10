@@ -327,6 +327,27 @@ public sealed class DriverInfo
     public string CompanyName { get; set; } = "";
     public DateTime? FileDate { get; set; }
     public bool IsMicrosoft { get; set; }
+
+    /// <summary>
+    /// Le fichier .sys inscrit existe-t-il ? Null si aucun chemin n'est inscrit.
+    /// Point 85, lot 2 (et angle mort A du point 89) : jusqu'au 10/10/2026, un pilote
+    /// inscrit dont le fichier avait disparu était collecté puis jeté sans un mot.
+    /// </summary>
+    public bool? FichierPresent { get; set; }
+}
+
+/// <summary>
+/// POINT 85, LOT 2 — un service inscrit auprès de Windows dont le programme n'existe
+/// plus. Constaté le 09/10/2026 sur le poste de l'auteur : Apex One mal désinstallé
+/// laissait son service « Apex One NT WSC Service », arrêté.
+/// </summary>
+public sealed class ServiceOrphelin
+{
+    public string Nom { get; set; } = "";
+    public string NomAffiche { get; set; } = "";
+    public string Chemin { get; set; } = "";
+    public string Demarrage { get; set; } = "";
+    public string Etat { get; set; } = "";
 }
 
 /// <summary>
@@ -439,6 +460,12 @@ public sealed class SystemSnapshot
     public List<InstalledApp> InstalledApps { get; set; } = new();
     /// <summary>État du réseau : cartes, profils Wi-Fi, services, domaine.</summary>
     public NetworkInfo Network { get; set; } = new();
+
+    /// <summary>Services dont le programme n'existe plus (point 85, lot 2).</summary>
+    public List<ServiceOrphelin> ServicesOrphelins { get; set; } = new();
+
+    /// <summary>Vrai si la liste des services a pu être lue — « rien trouvé » n'est pas « rien pu lire ».</summary>
+    public bool ServicesLus { get; set; }
 
     /// <summary>Protection antivirus : état de Defender et antivirus inscrits (point 81).</summary>
     public EtatProtection Protection { get; set; } = new();

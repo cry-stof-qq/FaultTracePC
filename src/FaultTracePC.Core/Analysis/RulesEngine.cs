@@ -42,6 +42,7 @@ public sealed class RulesEngine
         AnalyzeSeriesDePlantages(r);
         AnalyzePilotesAuDebutDesSeries(r);
         AnalyzeLogicielsAuDebutDesSeries(r);
+        AnalyzeInscriptionsOrphelines(r);
 
         if (r.Findings.Count == 0)
         {
@@ -3000,6 +3001,47 @@ public sealed class RulesEngine
                     "A lead to check, not a proof: if the crashes stop after uninstalling this software, or rolling it back to its previous version, the lead is confirmed."),
             });
         }
+    }
+
+    /// <summary>
+    /// POINT 85, LOT 2 — services et pilotes inscrits dont le programme n'existe plus.
+    ///
+    /// Une INFORMATION : c'est une trace de désinstallation incomplète, pas une panne
+    /// en soi. Le seul effet établi est qu'un service en démarrage automatique dont
+    /// le fichier manque ne peut pas démarrer, ce que Windows note dans son journal.
+    /// La recommandation interdit d'effacer une inscription à la main sans savoir à
+    /// quoi elle sert : retirer un pilote de démarrage peut empêcher Windows de
+    /// démarrer.
+    /// </summary>
+    internal static void AnalyzeInscriptionsOrphelines(DiagnosticReport r)
+    {
+        var lignes = new List<string>();
+        foreach (var sv in r.System.ServicesOrphelins.OrderBy(x => x.NomAffiche, StringComparer.OrdinalIgnoreCase))
+            lignes.Add(Lang.T(
+                $"service « {sv.NomAffiche} » ({sv.Nom}), démarrage {sv.Demarrage}, {sv.Etat} — {sv.Chemin}",
+                $"service “{sv.NomAffiche}” ({sv.Nom}), start mode {sv.Demarrage}, {sv.Etat} — {sv.Chemin}"));
+        foreach (var d in r.System.Drivers.Where(d => d.FichierPresent == false).OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase))
+            lignes.Add(Lang.T(
+                $"pilote « {d.DisplayName} » ({d.Name}), démarrage {d.StartMode} — {d.Path}",
+                $"driver “{d.DisplayName}” ({d.Name}), start mode {d.StartMode} — {d.Path}"));
+        if (lignes.Count == 0) return;
+
+        r.Findings.Add(new Finding
+        {
+            Severity = Severity.Info,
+            Confidence = Confidence.High,
+            Category = FaultCategory.None,
+            Code = "inscriptions.orphelines",
+            Title = Lang.T(
+                $"{lignes.Count} service(s) ou pilote(s) inscrit(s) dont le programme n'existe plus",
+                $"{lignes.Count} registered service(s) or driver(s) whose program no longer exists"),
+            Details = Lang.T(
+                $"Windows garde l'inscription de ces éléments, mais le fichier qu'elle désigne a disparu : {string.Join(" ; ", lignes)}. C'est en général la trace d'une désinstallation incomplète.",
+                $"Windows keeps these entries, but the file they point to is gone: {string.Join("; ", lignes)}. This is usually the trace of an incomplete uninstall."),
+            Recommendation = Lang.T(
+                "Terminer la désinstallation du logiciel concerné avec l'outil de nettoyage de son éditeur. Ne pas effacer une inscription à la main sans savoir à quoi elle sert : retirer un pilote de démarrage peut empêcher Windows de démarrer.",
+                "Finish uninstalling the software concerned with its vendor's cleanup tool. Do not delete an entry by hand without knowing what it is for: removing a boot driver can stop Windows from starting."),
+        });
     }
 
     /// <summary>Découpe les plantages, triés par date, là où l'écart dépasse <see cref="EcartEntreSeries"/>.</summary>

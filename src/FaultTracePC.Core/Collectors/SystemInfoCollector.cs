@@ -28,6 +28,7 @@ public sealed class SystemInfoCollector
         Safe("Batterie", () => s.Batteries.AddRange(new BatteryCollector(_errors).Collect()));
         Safe(Lang.T("Logiciels installés", "Installed software"), () => s.InstalledApps.AddRange(InstalledSoftwareCollector.Collect(_errors)));
         Safe(Lang.T("Protection antivirus", "Antivirus protection"), () => s.Protection = ProtectionCollector.Collect(_errors));
+        Safe("Services", () => { s.ServicesOrphelins.AddRange(ServiceCollector.Orphelins()); s.ServicesLus = true; });
         if (includeDrivers)
             Safe("Pilotes", () => s.Drivers.AddRange(DriverCollector.Collect()));
 

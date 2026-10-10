@@ -26,7 +26,8 @@ public static class DriverCollector
                 StartMode = mo["StartMode"]?.ToString() ?? "",
             };
 
-            if (!string.IsNullOrEmpty(d.Path) && File.Exists(d.Path))
+            if (!string.IsNullOrEmpty(d.Path)) d.FichierPresent = File.Exists(d.Path);
+            if (d.FichierPresent == true)
             {
                 try
                 {
@@ -46,7 +47,7 @@ public static class DriverCollector
     }
 
     /// <summary>Convertit les chemins noyau (\SystemRoot\..., \??\C:\...) en chemins Win32.</summary>
-    private static string NormalizePath(string raw)
+    internal static string NormalizePath(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return "";
         var p = raw.Trim().Trim('"');
