@@ -37,6 +37,7 @@ public sealed class RulesEngine
         AnalyzeReseau(r);
         AnalyzeDiskSpace(r);
         AnalyzeProtection(r);
+        ConfronterStockageALaMesure(r);
 
         if (r.Findings.Count == 0)
         {
@@ -270,6 +271,10 @@ public sealed class RulesEngine
             {
                 Severity = Severity.Critical,
                 Confidence = n >= 2 ? Confidence.High : Confidence.Medium,
+                // Un code par code d'arrêt — donc jamais deux conclusions du même code,
+                // et rien à fusionner. Sert à reconnaître ce qui vient des SEULS codes
+                // d'arrêt, pour le confronter à la mesure (point 82).
+                Code = $"{PrefixeCodeArret}{group.Key:X}",
                 Category = allDriverIdentified ? FaultCategory.Driver : entry?.Category ?? FaultCategory.Driver,
                 Title = n >= 2
                     ? Lang.T($"BSOD récurrent : {BugCheckCatalog.NameOf(group.Key)} ({n}×)", $"Recurring BSOD: {BugCheckCatalog.NameOf(group.Key)} ({n}×)")
@@ -2532,7 +2537,7 @@ public sealed class RulesEngine
         }
     }
 
-    private static void ComputeVerdict(DiagnosticReport r)
+    internal static void ComputeVerdict(DiagnosticReport r)
     {
         var critical = r.Findings.Where(f => f.Severity == Severity.Critical).ToList();
         if (critical.Count == 0)
@@ -2590,6 +2595,16 @@ public sealed class RulesEngine
 
         var top = critical.GroupBy(f => f.Category).OrderByDescending(g => g.Count()).First().Key;
         r.VerdictCategory = top;
+
+        // POINT 82 : un verdict « stockage » ne se prononce pas sans avoir regardé le disque.
+        var nuanceStockage = "";
+        if (top == FaultCategory.Storage && MesureDisqueSystemeSaine(r) is not null)
+            nuanceStockage = AutresAlertesStockage(r)
+                ? Lang.T(" Le disque système ne montre pourtant aucun défaut dans ses propres compteurs (SMART) : examiner les autres alertes de stockage avant d'envisager de le remplacer.",
+                         " Yet the system drive shows no defect in its own counters (SMART): examine the other storage alerts before considering replacing it.")
+                : Lang.T(" Mais le disque système ne montre aucun défaut mesurable : piste à confirmer — ne pas remplacer le disque sur la seule foi des codes d'arrêt.",
+                         " But the system drive shows no measurable defect: a lead to confirm — do not replace the drive on the strength of the stop codes alone.");
+
         r.Verdict = top switch
         {
             FaultCategory.Hardware => Lang.T("Cause la plus probable : MATÉRIELLE (CPU/carte mère/alimentation ou surchauffe). Les erreurs WHEA et/ou codes STOP matériels dominent.", "Most likely cause: HARDWARE (CPU/motherboard/power supply or overheating). WHEA errors and/or hardware STOP codes dominate."),
@@ -2601,8 +2616,92 @@ public sealed class RulesEngine
             FaultCategory.Software => Lang.T("Cause la plus probable : LOGICIELLE (corruption système ou application).", "Most likely cause: SOFTWARE (system corruption or an application)."),
             FaultCategory.Network => Lang.T("Cause la plus probable : RÉSEAU (configuration, profils ou services — pas le matériel).", "Most likely cause: NETWORK (configuration, profiles or services — not the hardware)."),
             _ => Lang.T("Pannes détectées — voir le détail des conclusions ci-dessous.", "Failures detected — see the detail of the conclusions below."),
-        } + $" ({critical.Count} conclusion(s) critique(s))";
+        } + nuanceStockage + $" ({critical.Count} conclusion(s) critique(s))";
     }
+
+    /// <summary>Préfixe du <see cref="Finding.Code"/> des conclusions tirées des seuls codes d'arrêt.</summary>
+    internal const string PrefixeCodeArret = "bsod.0x";
+
+    /// <summary>
+    /// POINT 82 — confronter les codes d'arrêt « stockage » à la mesure du disque.
+    ///
+    /// Constaté le 24/09/2026 : verdict « Cause la plus probable : STOCKAGE »,
+    /// alors que le même rapport mesurait un SSD sans aucun défaut (0 secteur
+    /// réalloué, 0 erreur de transfert, 0 % d'usure). Les codes 0x154 et 0x7A
+    /// désignent le stockage ; ils ne disent pas que le DISQUE est usé.
+    ///
+    /// Deux cas, selon ce que le reste du rapport mesure :
+    /// - AUCUNE autre alerte de stockage : rien ne confirme les codes. La confiance
+    ///   tombe à « faible » et le rapport dit que la piste est à confirmer ;
+    /// - D'AUTRES alertes de stockage existent (le cas réel du 24/09/2026 : 10
+    ///   réinitialisations signalées par le contrôleur) : la piste du stockage tient,
+    ///   la confiance est gardée, mais le rapport dit que le disque lui-même ne
+    ///   montre rien et renvoie vers ces alertes avant tout remplacement.
+    ///
+    /// Rien n'est dit si le disque système n'est pas identifié ou si ses compteurs
+    /// n'ont pas été lus : une mesure absente n'est pas une mesure saine.
+    /// </summary>
+    internal static void ConfronterStockageALaMesure(DiagnosticReport r, string? lettreSysteme = null)
+    {
+        var parCodes = r.Findings
+            .Where(f => f.Code.StartsWith(PrefixeCodeArret, StringComparison.Ordinal) && f.Category == FaultCategory.Storage)
+            .ToList();
+        if (parCodes.Count == 0) return;
+
+        if (MesureDisqueSystemeSaine(r, lettreSysteme) is not { } mesure) return;
+
+        bool autres = AutresAlertesStockage(r);
+        foreach (var f in parCodes)
+        {
+            if (!autres)
+            {
+                f.Confidence = Confidence.Low;
+                f.Details += Lang.T(
+                    $" Mais la mesure ne le confirme pas : {mesure}. Les codes d'arrêt désignent le stockage ; le disque lui-même ne montre aucun défaut mesurable. Un défaut peut échapper à ces compteurs — la piste n'est pas exclue, mais elle n'est pas confirmée. Ne pas remplacer le disque sur la seule foi de ces codes.",
+                    $" But the measurements do not confirm it: {mesure}. The stop codes point to storage; the drive itself shows no measurable defect. A defect can escape these counters — the lead is not ruled out, but it is not confirmed. Do not replace the drive on the strength of these codes alone.");
+            }
+            else
+            {
+                f.Details += Lang.T(
+                    $" Le disque lui-même ne montre aucun défaut dans ses compteurs : {mesure}. D'autres alertes de stockage existent (voir les conclusions « Stockage ») : ce sont elles qui permettront de dire si le disque, sa liaison ou son contrôleur est en cause.",
+                    $" The drive itself shows no defect in its counters: {mesure}. Other storage alerts exist (see the “Storage” conclusions): they are what will tell whether the drive, its link or its controller is at fault.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Résumé lisible de la mesure du disque système s'il est MESURÉ et SAIN, sinon null.
+    ///
+    /// « Sain » veut dire : au moins un compteur de défauts réellement lu, et aucun
+    /// signal contraire — ni alerte du disque, ni secteur défectueux, ni erreur de
+    /// transfert, ni réserve épuisée, ni état Windows « avertissement » ou « défaillant ».
+    /// </summary>
+    internal static string? MesureDisqueSystemeSaine(DiagnosticReport r, string? lettreSysteme = null)
+    {
+        var lettre = (lettreSysteme ?? Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").TrimEnd('\\');
+        var d = r.System.Disks.FirstOrDefault(x => x.Letters.Contains(lettre, StringComparer.OrdinalIgnoreCase));
+        if (d?.Smart is not { } s) return null;
+
+        bool compteurLu = s.ReallocatedSectors is not null || s.PendingSectors is not null
+                       || s.UncorrectableSectors is not null || s.CriticalWarning is not null;
+        if (!compteurLu) return null;
+
+        if (s.PredictedFailure == true || s.BadSectors > 0 || s.UdmaCrcErrors is > 0
+            || s.ReportedUncorrectable is > 0 || s.CriticalWarning is > 0 || s.SpareExhausted
+            || d.Health is DiskHealth.Warning or DiskHealth.Failing)
+            return null;
+
+        var faits = new List<string> { Lang.T("aucun secteur défectueux ni alerte du disque", "no bad sector and no alert from the drive") };
+        if (s.UdmaCrcErrors is 0) faits.Add(Lang.T("aucune erreur de transfert", "no transfer error"));
+        var usure = d.WearPercent ?? (s.SsdLifeLeftPercent is { } vie ? 100 - vie : null);
+        if (usure is { } u) faits.Add(Lang.T($"usure {u} %", $"wear {u}%"));
+        return Lang.T($"{d.Model} (disque système) — ", $"{d.Model} (system drive) — ") + string.Join(", ", faits);
+    }
+
+    /// <summary>Y a-t-il une alerte de stockage qui ne vient PAS des seuls codes d'arrêt ?</summary>
+    private static bool AutresAlertesStockage(DiagnosticReport r) =>
+        r.Findings.Any(f => f.Category == FaultCategory.Storage && f.Severity != Severity.Info
+                         && !f.Code.StartsWith(PrefixeCodeArret, StringComparison.Ordinal));
 
     /// <summary>Liste marque/modèle des barrettes RAM installées, pour les conclusions mémoire.</summary>
     private static string HardwareRamList(DiagnosticReport r) =>

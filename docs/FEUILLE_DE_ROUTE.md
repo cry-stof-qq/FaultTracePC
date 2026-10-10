@@ -98,7 +98,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
 | 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — **✔ terminé le 09/10/2026** : lot A (le rapport dit pourquoi le pilote n'est pas nommé), lot B (la fenêtre après analyse), lot C (mesuré : le WinDbg du Store se lance sur un autre poste, le bouton d'installation reste tel quel) — voir « Ce qu'un rapport sur une machine inconnue a montré » |
 | 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **✔ terminé le 09/10/2026** : lecture, carte « Protection antivirus », trois conclusions, voir la section |
-| 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée |
+| 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (stockage contre SMART) livré le 10/10/2026 |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
@@ -1069,6 +1069,41 @@ la mesure de cet organe ne montre rien, la confiance baisse et le rapport le
 dit — « les codes pointent vers le stockage, mais le disque ne montre aucun
 défaut mesurable ; chercher au-dessus du disque ». Ne pas se taire, ne pas
 affirmer : nommer la contradiction.
+
+**Une correction d'abord, à la relecture du rapport du 24/09/2026 le
+10/10/2026.** La phrase « le verdict vient des seuls codes d'arrêt » était
+**trop forte**. Le même rapport contenait une autre conclusion critique de
+stockage : « Erreurs signalées par le contrôleur de stockage (10) », dix
+événements `storahci 129` — des réinitialisations du disque demandées par le
+contrôleur. La piste du stockage n'était donc pas sans appui mesuré. Ce qui
+manquait, c'est de dire que le **disque lui-même** — ses secteurs, son usure —
+ne montrait rien, et que la question restait ouverte entre le disque, sa
+liaison et son contrôleur. C'est ce que fait le lot 1.
+
+**Lot 1 ✔ — livré le 10/10/2026.**
+
+- les conclusions tirées des seuls codes d'arrêt portent désormais un code
+  stable (`bsod.0x…`), un par code d'arrêt — pour les reconnaître sans lire
+  leur titre, qui est traduit ;
+- `RulesEngine.ConfronterStockageALaMesure` : pour un code d'arrêt « stockage »,
+  si le disque système est **mesuré et sain** (au moins un compteur de défauts
+  réellement lu ; aucun secteur défectueux, aucune erreur de transfert, aucune
+  alerte du disque, aucune réserve épuisée, état Windows ni « avertissement »
+  ni « défaillant ») :
+  - **aucune autre alerte de stockage** → confiance « faible », et le rapport dit
+    « la mesure ne le confirme pas… ne pas remplacer le disque sur la seule foi
+    de ces codes » ;
+  - **d'autres alertes de stockage** (le cas du 24/09) → la confiance est
+    gardée, le rapport dit que le disque ne montre rien dans ses compteurs et
+    renvoie vers ces alertes pour départager disque, liaison et contrôleur ;
+- **le verdict** reçoit la même nuance quand il conclut « STOCKAGE » ;
+- rien n'est dit si le disque système n'est pas identifié ou si ses compteurs
+  n'ont pas été lus : une mesure absente n'est pas une mesure saine ;
+- le disque système est celui qui porte la lettre de `SystemDrive` ;
+- six tests (`StockageContreMesureTests`).
+
+**Restent pour ce point** : les autres familles de codes (mémoire contre
+diagnostic mémoire, par exemple) — à décider après l'essai réel de ce lot.
 
 ### Point 83 — sept plantages, deux amas, aucun regroupement
 
