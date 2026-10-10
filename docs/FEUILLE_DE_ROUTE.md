@@ -98,8 +98,8 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
 | 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — **✔ terminé le 09/10/2026** : lot A (le rapport dit pourquoi le pilote n'est pas nommé), lot B (la fenêtre après analyse), lot C (mesuré : le WinDbg du Store se lance sur un autre poste, le bouton d'installation reste tel quel) — voir « Ce qu'un rapport sur une machine inconnue a montré » |
 | 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **✔ terminé le 09/10/2026** : lecture, carte « Protection antivirus », trois conclusions, voir la section |
-| 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (stockage contre SMART) et lot 2 (mémoire contre diagnostic mémoire) livrés le 10/10/2026 |
-| 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée |
+| 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **✔ terminé le 10/10/2026** : stockage contre SMART, mémoire contre diagnostic mémoire |
+| 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (séries) livré le 10/10/2026 |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
@@ -1135,6 +1135,11 @@ et flamingo.run (« windows-memory-diagnostic-results »).
 Sur la machine du 24/09/2026, aucun diagnostic mémoire n'avait été lancé : le
 rapport y aurait ajouté « la mémoire n'a pas été testée ».
 
+**Le point 82 est terminé le 10/10/2026** : stockage et mémoire, les deux
+familles de codes rencontrées le 24/09/2026. D'autres familles (pilote
+graphique, matériel) pourront suivre le même principe si un cas réel le
+demande.
+
 ### Point 83 — sept plantages, deux amas, aucun regroupement
 
 Les plantages n'étaient pas répartis dans le temps :
@@ -1152,6 +1157,26 @@ Le rapport liste les sept plantages dans un tableau chronologique et s'arrête
 là. « Sept plantages en deux amas séparés de 74 jours » est une phrase qu'il a
 de quoi écrire et qu'il n'écrit pas — et c'est la première question qu'un
 technicien pose : **qu'est-ce qui a changé ce jour-là ?**
+
+**Lot 1 ✔ — les séries, livré le 10/10/2026** (`RulesEngine.AnalyzeSeriesDePlantages`).
+
+- les plantages sont triés par date et coupés en **séries** là où deux
+  plantages successifs sont séparés de **14 jours ou plus** — un **choix**, pas
+  une mesure, à revoir sur des cas réels ;
+- à partir de **trois plantages et deux séries**, une conclusion en
+  **information** (elle ne change pas le verdict) : « 7 plantages en 2 séries,
+  jusqu'à 74 jours sans rien entre deux », le détail série par série (dates,
+  codes d'arrêt et leur nombre, écart entre séries), et la question à poser
+  avec sa date : « ils reprennent le 21/09/2026 — chercher ce qui a changé juste
+  avant » ;
+- cinq tests (`SeriesDePlantagesTests`), dont le profil du 24/09/2026. Les
+  jours exacts de juillet y sont reconstitués : seul le 09/07 figure dans le
+  rapport ; l'écart de 74 jours, lui, est exact.
+
+**Lot 2 — à décider** : rapprocher des séries les autres événements de la même
+fenêtre (les 10 réinitialisations du contrôleur, toutes dans les 48 heures du
+second amas), et ce qui a changé juste avant — c'est le point 84 (dates de pose
+des pilotes) et le point 85 (logiciels installés).
 
 ### Point 84 — les dates de pose des pilotes ne servent à rien
 

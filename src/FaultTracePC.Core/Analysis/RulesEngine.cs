@@ -39,6 +39,7 @@ public sealed class RulesEngine
         AnalyzeProtection(r);
         ConfronterStockageALaMesure(r);
         ConfronterMemoireAuDiagnostic(r);
+        AnalyzeSeriesDePlantages(r);
 
         if (r.Findings.Count == 0)
         {
@@ -2766,6 +2767,91 @@ public sealed class RulesEngine
         return (true,
                 resultats.Any(e => e.Extracted["HasErrors"] == "True"),
                 resultats.Max(e => e.TimeLocal));
+    }
+
+    /// <summary>
+    /// Écart à partir duquel deux plantages appartiennent à deux séries distinctes.
+    /// CHOIX, pas mesure : deux semaines sans plantage sur une machine qui en fait
+    /// plusieurs est déjà un fait remarquable. À revoir sur des cas réels.
+    /// </summary>
+    internal static readonly TimeSpan EcartEntreSeries = TimeSpan.FromDays(14);
+
+    /// <summary>
+    /// POINT 83 — regrouper les plantages en séries dans le temps.
+    ///
+    /// Constaté le 24/09/2026 : sept plantages, trois en juillet puis quatre en
+    /// septembre, séparés de 74 jours sans rien. Le rapport les listait dans un
+    /// tableau et s'arrêtait là. La première question d'un technicien devant ce
+    /// profil est « qu'est-ce qui a changé juste avant la reprise ? » : le rapport
+    /// la pose désormais, avec la date.
+    ///
+    /// Une information seulement : elle ne change pas le verdict. Rien n'est dit
+    /// s'il y a moins de trois plantages ou une seule série.
+    /// </summary>
+    internal static void AnalyzeSeriesDePlantages(DiagnosticReport r)
+    {
+        if (r.Bsods.Count < 3) return;
+        var series = SeriesDePlantages(r.Bsods);
+        if (series.Count < 2) return;
+
+        var morceaux = new List<string>();
+        for (int i = 0; i < series.Count; i++)
+        {
+            if (i > 0)
+            {
+                var jours = (int)(series[i][0].TimeLocal - series[i - 1][^1].TimeLocal).TotalDays;
+                morceaux.Add(Lang.T($"— {jours} jours sans plantage —", $"— {jours} days without a crash —"));
+            }
+            morceaux.Add(DecrireSerie(i + 1, series[i]));
+        }
+
+        var plusLongEcart = Enumerable.Range(1, series.Count - 1)
+            .Max(i => (int)(series[i][0].TimeLocal - series[i - 1][^1].TimeLocal).TotalDays);
+        var reprise = series[^1][0].TimeLocal;
+
+        r.Findings.Add(new Finding
+        {
+            Severity = Severity.Info,
+            Confidence = Confidence.High,
+            Category = FaultCategory.None,
+            Code = "plantages.series",
+            Title = Lang.T(
+                $"{r.Bsods.Count} plantages en {series.Count} séries, jusqu'à {plusLongEcart} jours sans rien entre deux",
+                $"{r.Bsods.Count} crashes in {series.Count} series, up to {plusLongEcart} days without anything in between"),
+            Details = string.Join(" ", morceaux),
+            Recommendation = Lang.T(
+                $"Les plantages ne sont pas répartis au hasard : ils reprennent le {reprise:dd/MM/yyyy}. Chercher ce qui a changé juste avant cette date — mise à jour Windows, logiciel ou pilote installé, intervention sur le matériel, déplacement de la machine.",
+                $"The crashes are not spread at random: they resume on {reprise:yyyy-MM-dd}. Look for what changed just before that date — a Windows update, software or a driver installed, work on the hardware, the machine being moved."),
+        });
+    }
+
+    /// <summary>Découpe les plantages, triés par date, là où l'écart dépasse <see cref="EcartEntreSeries"/>.</summary>
+    internal static List<List<BsodIncident>> SeriesDePlantages(IEnumerable<BsodIncident> plantages)
+    {
+        var series = new List<List<BsodIncident>>();
+        foreach (var b in plantages.OrderBy(b => b.TimeLocal))
+        {
+            if (series.Count == 0 || b.TimeLocal - series[^1][^1].TimeLocal >= EcartEntreSeries)
+                series.Add(new List<BsodIncident>());
+            series[^1].Add(b);
+        }
+        return series;
+    }
+
+    private static string DecrireSerie(int numero, List<BsodIncident> serie)
+    {
+        var codes = string.Join(", ", serie
+            .GroupBy(b => b.BugCheckCode)
+            .OrderByDescending(g => g.Count())
+            .Select(g => (g.Key is { } c ? BugCheckCatalog.NameOf(c) : Lang.T("sans code", "no code")) + $" ×{g.Count()}"));
+        var debut = serie[0].TimeLocal;
+        var fin = serie[^1].TimeLocal;
+        var quand = debut.Date == fin.Date
+            ? Lang.T($"le {debut:dd/MM/yyyy}", $"on {debut:yyyy-MM-dd}")
+            : Lang.T($"du {debut:dd/MM/yyyy} au {fin:dd/MM/yyyy}", $"from {debut:yyyy-MM-dd} to {fin:yyyy-MM-dd}");
+        return Lang.T(
+            $"Série {numero} : {serie.Count} plantage(s) {quand} ({codes}).",
+            $"Series {numero}: {serie.Count} crash(es) {quand} ({codes}).");
     }
 
     /// <summary>Y a-t-il une alerte de stockage qui ne vient PAS des seuls codes d'arrêt ?</summary>
