@@ -60,7 +60,7 @@ public sealed class SensorReader : IDisposable
             }
             catch (Exception ex) { erreur ??= ex.Message; }
         }
-        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.Decrire(erreur, processeurs, autres); }
+        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.Encoder(erreur, processeurs, autres); }
         catch { return ""; }
     }
 

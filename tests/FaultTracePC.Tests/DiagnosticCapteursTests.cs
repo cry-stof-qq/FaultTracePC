@@ -83,4 +83,40 @@ public class DiagnosticCapteursTests
     {
         Assert.Equal("", HtmlReportGenerator.NoteChargeAbsente(new FlightInfo(), Contexte(12.5)));
     }
+
+    [Fact]
+    public void Le_service_ecrit_sans_langue_le_rapport_lit_dans_la_sienne()
+    {
+        // Constaté le 10/10/2026 : le service, sous SYSTEM, écrivait en anglais.
+        var brut = DiagnosticCapteurs.Encoder(null, Processeur("Processeur de test", "CPU Core #1", "CPU Total"), new List<string>());
+        Assert.Equal("v1|cpu=Processeur de test|charge=CPU Core #1,CPU Total", brut);
+
+        Assert.Equal(EnFrancais(() => DiagnosticCapteurs.Decrire(null, Processeur("Processeur de test", "CPU Core #1", "CPU Total"), new List<string>())),
+                     EnFrancais(() => DiagnosticCapteurs.Lire(brut)));
+
+        var initial = Lang.Current;
+        try
+        {
+            Lang.Apply(AppLanguage.English);
+            Assert.StartsWith("processor “Processeur de test”; load sensors: CPU Core #1, CPU Total", DiagnosticCapteurs.Lire(brut));
+        }
+        finally { Lang.Apply(initial); }
+    }
+
+    [Fact]
+    public void Les_trois_situations_survivent_a_l_aller_retour()
+    {
+        Assert.Contains("non ouverte : Accès refusé",
+            EnFrancais(() => DiagnosticCapteurs.Lire(DiagnosticCapteurs.Encoder("Accès refusé", AucunProcesseur, new List<string>()))));
+        Assert.Contains("GpuAmd (Carte de test)",
+            EnFrancais(() => DiagnosticCapteurs.Lire(DiagnosticCapteurs.Encoder(null, AucunProcesseur, new List<string> { "GpuAmd (Carte de test)" }))));
+        Assert.Contains("pas de sonde « Total »",
+            EnFrancais(() => DiagnosticCapteurs.Lire(DiagnosticCapteurs.Encoder(null, Processeur("Processeur de test", "CPU Core #1"), new List<string>()))));
+    }
+
+    [Fact]
+    public void Un_texte_d_une_version_de_developpement_est_rendu_tel_quel()
+    {
+        Assert.Equal("texte libre", DiagnosticCapteurs.Lire("texte libre"));
+    }
 }

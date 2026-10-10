@@ -11,9 +11,66 @@ namespace FaultTracePC.Core.Analysis;
 /// montre quand la charge manque. La prochaine machine concernée dira la cause.
 ///
 /// Placé dans Core pour être testé : le service, lui, n'est pas chargé par les tests.
+///
+/// ÉCRIT SANS LANGUE, LU DANS LA LANGUE DU RAPPORT. Constaté le 10/10/2026 à la
+/// première installation de la 1.8.0 sur le poste de l'auteur : le service tourne
+/// sous le compte SYSTEM, dont la langue n'est pas celle de l'utilisateur, et avait
+/// écrit son diagnostic EN ANGLAIS — qu'un rapport en français aurait cité tel quel.
+/// Le service écrit donc des faits bruts (<see cref="Encoder"/>), et le rapport les
+/// met en phrases dans sa propre langue (<see cref="Lire"/>).
 /// </summary>
 public static class DiagnosticCapteurs
 {
+    private const string Version = "v1";
+
+    /// <summary>
+    /// Forme brute, sans langue, écrite dans le journal par le service. Exemple :
+    /// <c>v1|cpu=Nom du processeur|charge=CPU Core #1,CPU Total</c>.
+    /// </summary>
+    public static string Encoder(string? erreurOuverture,
+                                 IReadOnlyList<(string Nom, IReadOnlyList<string> SondesCharge)> processeurs,
+                                 IReadOnlyList<string> autresMateriels)
+    {
+        static string Net(string v) => v.Replace('|', ' ').Replace(',', ' ').Replace('=', ' ').Trim();
+
+        if (erreurOuverture is not null) return $"{Version}|erreur={Net(erreurOuverture)}";
+        if (processeurs.Count == 0) return $"{Version}|materiel={string.Join(",", autresMateriels.Select(Net))}";
+        return Version + string.Concat(processeurs.Select(p =>
+            $"|cpu={Net(p.Nom)}|charge={string.Join(",", p.SondesCharge.Select(Net))}"));
+    }
+
+    /// <summary>
+    /// Met la forme brute en phrase, dans la langue courante. Un texte qui n'est pas
+    /// dans la forme brute (journal d'une version de développement) est rendu tel quel.
+    /// </summary>
+    public static string Lire(string brut)
+    {
+        if (!brut.StartsWith(Version + "|", StringComparison.Ordinal)) return brut;
+
+        string? erreur = null;
+        var autres = new List<string>();
+        var processeurs = new List<(string Nom, IReadOnlyList<string> SondesCharge)>();
+        string? cpu = null;
+
+        static List<string> Liste(string v) => v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        foreach (var champ in brut.Split('|').Skip(1))
+        {
+            var i = champ.IndexOf('=');
+            if (i < 0) continue;
+            var (cle, val) = (champ[..i], champ[(i + 1)..]);
+            switch (cle)
+            {
+                case "erreur": erreur = val; break;
+                case "materiel": autres = Liste(val); break;
+                case "cpu": cpu = val; break;
+                case "charge" when cpu is not null: processeurs.Add((cpu, Liste(val))); cpu = null; break;
+            }
+        }
+        if (cpu is not null) processeurs.Add((cpu, new List<string>()));
+        return Decrire(erreur, processeurs, autres);
+    }
+
     /// <summary>Nom de la sonde de charge que le service lit (LibreHardwareMonitor).</summary>
     public const string SondeChargeAttendue = "Total";
 

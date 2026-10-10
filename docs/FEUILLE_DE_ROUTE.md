@@ -1405,6 +1405,19 @@ séparateur `" ; "` — espace avant le point-virgule, typographie française �
 pas le test) : la règle du garde-fou désigne exactement ce littéral, et c'est
 le seul de la livraison qui y tombe.
 
+**Première installation réelle, 10/10/2026** (MSI 1.8.0 par-dessus la 1.7.1, poste
+de l'auteur) : le service a redémarré et a bien écrit la ligne de début de
+session avec son diagnostic — processeur AMD Ryzen 7 7735U, seize sondes « CPU
+Core #n », **« CPU Total »** et « CPU Core Max ». Sur ce poste la sonde lue existe :
+c'est cohérent avec une charge mesurée. **Mais le diagnostic était écrit en
+anglais**, sur un Windows en français : le service tourne sous le compte SYSTEM,
+dont la langue n'est pas celle de l'utilisateur (même cause qu'au point sur la
+langue du service, voir plus haut). Un rapport en français l'aurait cité tel quel.
+**Corrigé le même jour** : le service écrit des faits bruts, sans langue
+(`v1|cpu=…|charge=…`, `DiagnosticCapteurs.Encoder`), et le rapport les met en
+phrases dans sa propre langue (`DiagnosticCapteurs.Lire`) ; un texte qui n'a pas
+cette forme est rendu tel quel. Trois tests de plus. Le MSI est à reconstruire.
+
 **Lot 2 — à décider sur pièce** : la prochaine machine concernée, avec un
 service 1.8.0, dira laquelle des trois situations est en cause. Une piste
 indépendante de la bibliothèque existe — Windows calcule lui-même la charge

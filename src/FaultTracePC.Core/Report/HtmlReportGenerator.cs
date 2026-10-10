@@ -503,7 +503,7 @@ public static class HtmlReportGenerator
     internal static string NoteChargeAbsente(FlightInfo f, FlightCrashContext ctx)
     {
         if (ctx.Samples.Count == 0 || ctx.Samples.Any(x => x.CpuLoad is not null)) return "";
-        return f.DiagnosticCapteurs is { Length: > 0 } diag
+        return f.DiagnosticCapteurs is { Length: > 0 } brut && Analysis.DiagnosticCapteurs.Lire(brut) is var diag
             ? Lang.T($"<p class=\"small\"><strong>Charge processeur non mesurée</strong> : un tiret n'est pas un zéro. Ce que le service de surveillance a vu à son dernier démarrage : {H(diag)}.</p>",
                      $"<p class=\"small\"><strong>Processor load not measured</strong>: a dash is not a zero. What the monitoring service saw at its last start: {H(diag)}.</p>")
             : Lang.T("<p class=\"small\"><strong>Charge processeur non mesurée</strong> : un tiret n'est pas un zéro. La raison n'a pas été enregistrée : le service de surveillance de cette machine est antérieur à la version 1.8.0.</p>",
