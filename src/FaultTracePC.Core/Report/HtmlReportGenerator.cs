@@ -488,10 +488,26 @@ public static class HtmlReportGenerator
                 sb.Append($"<td class=\"small\">{H(s.TopProcesses ?? "")}</td></tr>");
             }
             sb.Append("</tbody></table>");
+            sb.Append(NoteChargeAbsente(f, ctx));
         }
         if (f.Contexts.Count == 0)
             sb.Append(Lang.T("<p class=\"empty\">Aucun crash pendant la période couverte par le journal — la boîte noire veille.</p>", "<p class=\"empty\">No crash during the period covered by the log — the flight recorder is watching.</p>"));
         sb.Append("</section>");
+    }
+
+    /// <summary>
+    /// POINT 86 — un tiret dans la colonne CPU % ressemble à « rien à signaler ». Quand
+    /// AUCUN relevé n'a de charge processeur, le rapport dit que la mesure manque, et
+    /// pourquoi si le service l'a écrit (journaux 1.8.0 et suivants).
+    /// </summary>
+    internal static string NoteChargeAbsente(FlightInfo f, FlightCrashContext ctx)
+    {
+        if (ctx.Samples.Count == 0 || ctx.Samples.Any(x => x.CpuLoad is not null)) return "";
+        return f.DiagnosticCapteurs is { Length: > 0 } diag
+            ? Lang.T($"<p class=\"small\"><strong>Charge processeur non mesurée</strong> : un tiret n'est pas un zéro. Ce que le service de surveillance a vu à son dernier démarrage : {H(diag)}.</p>",
+                     $"<p class=\"small\"><strong>Processor load not measured</strong>: a dash is not a zero. What the monitoring service saw at its last start: {H(diag)}.</p>")
+            : Lang.T("<p class=\"small\"><strong>Charge processeur non mesurée</strong> : un tiret n'est pas un zéro. La raison n'a pas été enregistrée : le service de surveillance de cette machine est antérieur à la version 1.8.0.</p>",
+                     "<p class=\"small\"><strong>Processor load not measured</strong>: a dash is not a zero. The reason was not recorded: this machine's monitoring service predates version 1.8.0.</p>");
     }
 
     private static string Fmt(double? v, string suffix = "") =>

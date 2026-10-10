@@ -83,6 +83,11 @@ public sealed class FlightJournalCollector
                     catch { continue; }
                     if (entry is null) continue;
 
+                    // Point 86 : le diagnostic des capteurs du DERNIER démarrage l'emporte
+                    // (les fichiers sont lus dans l'ordre chronologique).
+                    if (entry.Kind == "b" && !string.IsNullOrWhiteSpace(entry.Diagnostic))
+                        info.DiagnosticCapteurs = entry.Diagnostic;
+
                     switch (entry.Kind)
                     {
                         case "b" when entry.PreviousEndedAbruptly == true:

@@ -103,7 +103,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (séries) livré le 10/10/2026 |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée — **lot 1 livré le 10/10/2026** (pilotes datés du début d'une série) |
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible — **✔ terminé le 10/10/2026** : logiciels au début d'une série, liste repliée, services et pilotes sans programme, pilotes-filtres |
-| 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
+| 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie — **lot 1 (instrumenter) livré le 10/10/2026** ; la suite attend une machine concernée |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine — **✔ terminé le 10/10/2026** |
 | 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
 | 89 | **Voir qu'un pilote a disparu, et lequel** | demandé le 09/10/2026 — **noté pour plus tard, rien n'est commencé** ; quatre angles morts vérifiés dans le code ; cas réel (carte graphique sans pilote) et mesure sur machine saine notés, voir « Point 89 » plus bas |
@@ -1370,6 +1370,37 @@ mesure qui aurait servi, et c'est la seule absente.
 parc, en français aussi, la colonne est remplie. À instrumenter avant toute
 hypothèse : journaliser la raison pour laquelle la mesure échoue, plutôt que
 d'afficher un tiret qui ressemble à « rien à signaler ».
+
+**Ce qui est lu, vérifié dans le code le 10/10/2026.** Le service prend la
+charge processeur dans la bibliothèque de capteurs LibreHardwareMonitor, sur
+la sonde de charge dont le nom contient « Total ». Si la bibliothèque ne
+s'ouvre pas, ne voit pas le processeur, ou si le processeur n'a pas cette
+sonde, la valeur reste vide — sans que rien ne dise laquelle de ces trois
+situations s'est produite. Sur la machine du 24/09/2026, la température du GPU
+était lue : la bibliothèque s'était donc ouverte. Les deux autres causes
+restent possibles ; aucune n'est établie.
+
+**Lot 1 ✔ — instrumenter, livré le 10/10/2026.** Aucune hypothèse n'est
+corrigée « au cas où » :
+
+- `SensorReader` (service) note à l'ouverture ce que la bibliothèque a vu —
+  erreur d'ouverture, ou chaque processeur avec ses sondes de charge, ou, si
+  aucun processeur n'est vu, les autres matériels — et le service l'écrit dans
+  la ligne de **début de session** du journal (`diag`) ; les capteurs sont donc
+  ouverts juste avant cette ligne, et non plus juste après ;
+- le texte est construit par `Analysis.DiagnosticCapteurs` (dans Core, pour être
+  testé) ;
+- `FlightJournalCollector` garde le diagnostic du dernier démarrage ;
+- le rapport, sous chaque tableau « Dernières secondes avant l'incident » où
+  **aucun** relevé n'a de charge : « Charge processeur non mesurée : un tiret
+  n'est pas un zéro », suivi de ce que le service a vu — ou, pour un journal
+  écrit avant la 1.8.0, « la raison n'a pas été enregistrée » ;
+- sept tests (`DiagnosticCapteursTests`).
+
+**Lot 2 — à décider sur pièce** : la prochaine machine concernée, avec un
+service 1.8.0, dira laquelle des trois situations est en cause. Une piste
+indépendante de la bibliothèque existe — Windows calcule lui-même la charge
+processeur — mais elle ne sera retenue qu'une fois la cause connue.
 
 ### Point 87 — une recommandation sur un réglage jamais lu
 

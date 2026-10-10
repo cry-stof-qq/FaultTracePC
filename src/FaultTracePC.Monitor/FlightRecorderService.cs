@@ -49,9 +49,11 @@ public sealed class FlightRecorderService : BackgroundService
         CleanupOldFiles();
 
         bool abrupt = PreviousSessionEndedAbruptly();
-        WriteLine(new FlightSample { Time = DateTime.Now, Kind = "b", PreviousEndedAbruptly = abrupt });
-
+        // Point 86 : les capteurs sont ouverts AVANT la ligne de début de session, pour
+        // qu'elle porte ce qu'ils ont vu — c'est ce qui dira, sur la prochaine machine
+        // sans charge processeur, pourquoi elle manque.
         using var sensors = new SensorReader();
+        WriteLine(new FlightSample { Time = DateTime.Now, Kind = "b", PreviousEndedAbruptly = abrupt, Diagnostic = sensors.Diagnostic });
         var alertSettings = AlertSettings.Load();
         // Écrit alerts.json au premier démarrage : les seuils deviennent visibles et modifiables.
         try { if (!File.Exists(AlertSettings.SettingsPath)) alertSettings.Save(); } catch { }

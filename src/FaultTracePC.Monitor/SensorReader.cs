@@ -11,8 +11,16 @@ public sealed class SensorReader : IDisposable
 {
     private readonly Computer? _computer;
 
+    /// <summary>
+    /// Point 86 — ce que la bibliothèque de capteurs a vu à l'ouverture : écrit dans la
+    /// ligne de début de session du journal, montré par le rapport quand la charge
+    /// processeur manque.
+    /// </summary>
+    public string Diagnostic { get; }
+
     public SensorReader()
     {
+        string? erreur = null;
         try
         {
             _computer = new Computer
@@ -25,10 +33,35 @@ public sealed class SensorReader : IDisposable
             };
             _computer.Open();
         }
-        catch
+        catch (Exception ex)
         {
             _computer = null; // capteurs indisponibles : le service continue sans températures
+            erreur = ex.Message;
         }
+        Diagnostic = Decrire(erreur);
+    }
+
+    private string Decrire(string? erreur)
+    {
+        var processeurs = new List<(string, IReadOnlyList<string>)>();
+        var autres = new List<string>();
+        if (_computer is not null)
+        {
+            try
+            {
+                foreach (var hw in _computer.Hardware)
+                {
+                    try { hw.Update(); } catch { }
+                    if (hw.HardwareType == HardwareType.Cpu)
+                        processeurs.Add((hw.Name, hw.Sensors.Where(s => s.SensorType == SensorType.Load).Select(s => s.Name).ToList()));
+                    else
+                        autres.Add($"{hw.HardwareType} ({hw.Name})");
+                }
+            }
+            catch (Exception ex) { erreur ??= ex.Message; }
+        }
+        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.Decrire(erreur, processeurs, autres); }
+        catch { return ""; }
     }
 
     public (double? CpuLoad, double? CpuTemp, double? GpuTemp, double? GpuLoad) Read()

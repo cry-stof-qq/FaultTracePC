@@ -842,6 +842,13 @@ public sealed class FlightSample
     [JsonPropertyName("ec")] public string? EventCategory { get; set; }
     [JsonPropertyName("em")] public string? EventMessage { get; set; }
     [JsonPropertyName("ab")] public bool? PreviousEndedAbruptly { get; set; }
+
+    /// <summary>
+    /// Point 86 — sur la ligne de début de session (« b ») : ce que la bibliothèque de
+    /// capteurs a vu au démarrage (processeur, sondes de charge). Absent des journaux
+    /// écrits avant la 1.8.0.
+    /// </summary>
+    [JsonPropertyName("diag")] public string? Diagnostic { get; set; }
 }
 
 /// <summary>Les dernières secondes enregistrées avant un crash/arrêt brutal.</summary>
@@ -935,6 +942,9 @@ public sealed class FlightInfo
     /// <summary>true si un échantillon date de moins de 2 minutes (service actif).</summary>
     public bool Active { get; set; }
     public int AbruptSessionEnds { get; set; }
+
+    /// <summary>Point 86 — dernier diagnostic des capteurs écrit par le service (null si journal antérieur à la 1.8.0).</summary>
+    public string? DiagnosticCapteurs { get; set; }
     public int DaysCovered { get; set; }
     public List<FlightCrashContext> Contexts { get; set; } = new();
     /// <summary>Alertes préventives émises par le service sur la période analysée.</summary>
