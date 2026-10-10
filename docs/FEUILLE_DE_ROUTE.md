@@ -101,7 +101,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **✔ terminé le 10/10/2026** : stockage contre SMART, mémoire contre diagnostic mémoire |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (séries) livré le 10/10/2026 |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée — **lot 1 livré le 10/10/2026** (pilotes datés du début d'une série) |
-| 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
+| 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible — **lot 1 livré le 10/10/2026** (conclusions + liste repliée) |
 | 86 | **Charge processeur absente de la boîte noire sur une machine** | constaté le 24/09/2026, cause non établie |
 | 87 | **Lire le réglage de vidage mémoire avant de recommander de le changer** | constaté le 24/09/2026 — le réglage était celui d'origine — **✔ terminé le 10/10/2026** |
 | 88 | **Réveiller un poste par le réseau depuis la console, sans rien déployer** | demandé le 05/10/2026, choix arrêtés le même jour (bouton dans les deux onglets, confirmation), à faire plus tard — voir « Point 88 » plus bas |
@@ -1265,6 +1265,31 @@ La liste des programmes installés est **déjà collectée** — elle sert au co
 « ce logiciel est-il toujours installé ? » de la 1.6.0. Elle n'est simplement
 pas affichée.
 
+**Décidé le 10/10/2026** (choix de l'auteur entre deux options) : le rapport
+n'affiche **dans ses conclusions que ce qui sert au diagnostic**, et la **liste
+complète, repliée**, en bas du rapport pour qui veut la consulter. L'option
+écartée — toute la liste dans les détails techniques — noyait une centaine de
+lignes sans rapport avec la panne.
+
+**Lot 1 ✔ — livré le 10/10/2026.**
+
+- `RulesEngine.AnalyzeLogicielsAuDebutDesSeries` : les logiciels dont la date
+  d'installation déclarée tombe le jour du premier plantage d'une série ou dans
+  les deux jours précédents — même principe et même fenêtre que les pilotes
+  (point 84). Avertissement en confiance faible, catégorie neutre, « piste à
+  vérifier, pas une preuve » ;
+- la date est celle que le logiciel déclare dans le registre (`InstallDate`) :
+  certains n'en déclarent aucune, et une mise à jour ne la change pas toujours —
+  le rapport le dit ;
+- section « Logiciels installés », **repliée**, plus récents d'abord
+  (`HtmlReportGenerator.SectionLogicielsInstalles`) ;
+- quatre tests (`LogicielsInstallesTests`) ; les logiciels y sont des données de
+  test, la liste de la machine du 24/09/2026 n'apparaissant pas dans son rapport.
+
+**Lot 2 — à faire : les restes d'un logiciel désinstallé** — inscription
+orpheline (déjà faite pour les antivirus au point 81), dossiers restés sur le
+disque, et la pile des pilotes-filtres (`fltmc filters`) décrite ci-dessus.
+
 ### Point 86 — la boîte noire sans charge processeur
 
 Sur cette machine, **tous** les relevés de la boîte noire portent « — » dans la
@@ -1607,6 +1632,15 @@ pour le parc.
 
 **Quand :** pas tout de suite. La 1.7.1 a trois jours d'usage réel. Cette
 décision attend une version ultérieure, sans date.
+
+**Question de l'auteur le 10/10/2026** : « la 1.8.0 demandera-t-elle à
+l'installation d'activer le mode parc ? ». **Réponse : non, pas en l'état.** Le
+contenu de la 1.8.0 est arrêté aux points 80 à 87 ; ce point (79) reste « version
+ultérieure, sans date ». La 1.8.0 garde donc le mode parc **inclus comme en
+1.7.1**. Précision au passage : la décision ne prévoit pas une **question** posée
+pendant l'installation, mais une **fonctionnalité absente par défaut**, ajoutée
+par une option de ligne de commande (déploiement, stratégie de groupe). Décision
+de l'auteur attendue : l'ajouter à la 1.8.0, ou la laisser à plus tard.
 
 ### Les deux options écartées, et pourquoi
 

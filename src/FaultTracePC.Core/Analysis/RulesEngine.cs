@@ -41,6 +41,7 @@ public sealed class RulesEngine
         ConfronterMemoireAuDiagnostic(r);
         AnalyzeSeriesDePlantages(r);
         AnalyzePilotesAuDebutDesSeries(r);
+        AnalyzeLogicielsAuDebutDesSeries(r);
 
         if (r.Findings.Count == 0)
         {
@@ -2945,6 +2946,58 @@ public sealed class RulesEngine
                 Recommendation = Lang.T(
                     "Piste à vérifier, pas une preuve : quel logiciel de cet éditeur a été installé ou mis à jour ce jour-là ? Si les plantages cessent après l'avoir désinstallé ou remis à sa version précédente, la piste est confirmée.",
                     "A lead to check, not a proof: which software from this vendor was installed or updated that day? If the crashes stop after uninstalling it or rolling it back to its previous version, the lead is confirmed."),
+            });
+        }
+    }
+
+    /// <summary>
+    /// POINT 85, LOT 1 — les logiciels installés juste avant le début d'une série de
+    /// plantages. Même principe et même fenêtre que les pilotes (point 84).
+    ///
+    /// Décidé le 10/10/2026 : le rapport n'affiche, dans ses conclusions, que les
+    /// logiciels qui servent au diagnostic ; la liste complète est repliée en bas
+    /// du rapport.
+    ///
+    /// La date est celle que le logiciel déclare dans le registre de désinstallation
+    /// (InstallDate) : certains n'en déclarent aucune, et une mise à jour ne la
+    /// change pas toujours. Une piste, jamais une preuve.
+    /// </summary>
+    internal static void AnalyzeLogicielsAuDebutDesSeries(DiagnosticReport r)
+    {
+        var dates = r.System.InstalledApps.Where(a => a.InstallDate is not null).ToList();
+        if (dates.Count == 0 || r.Bsods.Count < 2) return;
+
+        foreach (var serie in SeriesDePlantages(r.Bsods).Where(s => s.Count >= 2))
+        {
+            var debut = serie[0].TimeLocal;
+            var poses = dates
+                .Where(a => a.InstallDate!.Value.Date <= debut.Date && a.InstallDate.Value.Date >= debut.Date.AddDays(-2))
+                .OrderBy(a => a.Name)
+                .ToList();
+            if (poses.Count == 0) continue;
+
+            var liste = string.Join(Lang.T(" ; ", "; "), poses.Select(a =>
+                a.Name
+                + (a.Version.Length > 0 ? $" {a.Version}" : "")
+                + (a.Publisher.Length > 0 ? $" ({a.Publisher})" : "")
+                + Lang.T($", le {a.InstallDate:dd/MM/yyyy}", $", on {a.InstallDate:yyyy-MM-dd}")));
+
+            r.Findings.Add(new Finding
+            {
+                Severity = Severity.Warning,
+                Confidence = Confidence.Low,
+                Category = FaultCategory.None,
+                Code = "logiciels.debut_serie",
+                Subject = string.Join(", ", poses.Select(a => a.Name)),
+                Title = Lang.T(
+                    $"Logiciel(s) installé(s) juste avant le début des plantages : {string.Join(", ", poses.Select(a => a.Name))}",
+                    $"Software installed just before the crashes began: {string.Join(", ", poses.Select(a => a.Name))}"),
+                Details = Lang.T(
+                    $"Une série de {serie.Count} plantages commence le {debut:dd/MM/yyyy} à {debut:HH:mm}. Le même jour ou dans les deux jours précédents : {liste}. La date est celle que le logiciel déclare à Windows : certains n'en déclarent aucune, et une mise à jour ne la change pas toujours.",
+                    $"A series of {serie.Count} crashes begins on {debut:yyyy-MM-dd} at {debut:HH:mm}. On the same day or in the two days before: {liste}. The date is the one the software declares to Windows: some declare none, and an update does not always change it."),
+                Recommendation = Lang.T(
+                    "Piste à vérifier, pas une preuve : si les plantages cessent après avoir désinstallé ce logiciel, ou l'avoir remis à sa version précédente, la piste est confirmée.",
+                    "A lead to check, not a proof: if the crashes stop after uninstalling this software, or rolling it back to its previous version, the lead is confirmed."),
             });
         }
     }

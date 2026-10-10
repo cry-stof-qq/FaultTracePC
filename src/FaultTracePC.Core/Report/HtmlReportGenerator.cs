@@ -76,6 +76,7 @@ public static class HtmlReportGenerator
         SystemSection(sb, r);
         SmartSection(sb, r);
         DriversSection(sb, r);
+        sb.Append(SectionLogicielsInstalles(r));
         ReliabilitySection(sb, r);
         ErrorsSection(sb, r);
 
@@ -950,6 +951,32 @@ public static class HtmlReportGenerator
             + "“(family)” marks an identification by platform: the advice holds but is generic, unlike a by-name "
             + "match, which gives the proven fix. A dash does not mean suspect — only undocumented.</p>"));
         sb.Append("</section>");
+    }
+
+    /// <summary>
+    /// POINT 85 — la liste complète des logiciels installés, REPLIÉE : décidé le
+    /// 10/10/2026, le rapport ne met en avant que ce qui sert au diagnostic, et garde
+    /// le reste à portée de main pour qui veut le consulter. Plus récents d'abord.
+    /// </summary>
+    internal static string SectionLogicielsInstalles(DiagnosticReport r)
+    {
+        var apps = r.System.InstalledApps;
+        if (apps.Count == 0) return "";
+
+        var sb = new StringBuilder();
+        sb.Append(Lang.T("<section class=\"tech\"><h2>Logiciels installés</h2>", "<section class=\"tech\"><h2>Installed software</h2>"));
+        sb.Append(Lang.T(
+            "<p class=\"explain\">Liste lue dans le registre de désinstallation de Windows. La date est celle que chaque logiciel déclare : certains n'en déclarent aucune, et une mise à jour ne la change pas toujours.</p>",
+            "<p class=\"explain\">List read from the Windows uninstall registry. The date is the one each program declares: some declare none, and an update does not always change it.</p>"));
+        sb.Append("<details class=\"fold\"><summary>")
+          .Append(H(Lang.T($"Afficher les {apps.Count} logiciels installés", $"Show the {apps.Count} installed programs")))
+          .Append("</summary>");
+        sb.Append(Lang.T("<table><thead><tr><th>Installé le</th><th>Nom</th><th>Version</th><th>Éditeur</th></tr></thead><tbody>",
+                         "<table><thead><tr><th>Installed on</th><th>Name</th><th>Version</th><th>Publisher</th></tr></thead><tbody>"));
+        foreach (var a in apps.OrderByDescending(a => a.InstallDate ?? DateTime.MinValue).ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase))
+            sb.Append($"<tr><td>{(a.InstallDate is { } d ? Lang.Date(d) : "—")}</td><td>{H(a.Name)}</td><td class=\"small\">{H(a.Version)}</td><td class=\"small\">{H(a.Publisher)}</td></tr>");
+        sb.Append("</tbody></table></details></section>");
+        return sb.ToString();
     }
 
     private static void ReliabilitySection(StringBuilder sb, DiagnosticReport r)
