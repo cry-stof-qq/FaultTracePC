@@ -35,7 +35,7 @@ public static class DiagnosticCapteurs
                           $"no processor seen by the sensor library (hardware seen: {vus})");
         }
 
-        return string.Join(" ; ", processeurs.Select(p =>
+        return string.Join(Lang.T(" ; ", "; "), processeurs.Select(p =>
         {
             var aLaSonde = p.SondesCharge.Any(n => n.Contains(SondeChargeAttendue, StringComparison.OrdinalIgnoreCase));
             var sondes = p.SondesCharge.Count == 0

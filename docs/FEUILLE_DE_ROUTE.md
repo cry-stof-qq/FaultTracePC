@@ -1397,6 +1397,14 @@ corrigée « au cas où » :
   écrit avant la 1.8.0, « la raison n'a pas été enregistrée » ;
 - sept tests (`DiagnosticCapteursTests`).
 
+**CI rouge à la première livraison, corrigé le même jour.** Un test sur 812 en
+échec : le garde-fou de traduction (`Aucun_texte_francais_hors_de_Lang_T`). Le
+séparateur `" ; "` — espace avant le point-virgule, typographie française —
+était écrit en dur dans `DiagnosticCapteurs`, hors de `Lang.T`. Il passe par
+`Lang.T(" ; ", "; ")`. Cause déduite du code (le journal de la CI ne nommait
+pas le test) : la règle du garde-fou désigne exactement ce littéral, et c'est
+le seul de la livraison qui y tombe.
+
 **Lot 2 — à décider sur pièce** : la prochaine machine concernée, avec un
 service 1.8.0, dira laquelle des trois situations est en cause. Une piste
 indépendante de la bibliothèque existe — Windows calcule lui-même la charge
