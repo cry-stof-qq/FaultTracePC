@@ -1343,10 +1343,17 @@ que si les services n'ont pas pu être lus. Deux tests de plus.
   informations système : nom, altitude, éditeur (pris dans l'inventaire des
   pilotes). **En gras** : les filtres d'un autre éditeur que Microsoft, ou dont
   l'éditeur n'a pas pu être lu — on ne présume pas sain ce qu'on n'a pas lu ;
-- quatre tests (`FiltresDisqueTests`). **La sortie de fltmc qui y sert est
-  reconstituée, pas capturée** — à remplacer par une sortie réelle.
+- quatre tests (`FiltresDisqueTests`).
 
-**Le point 85 est terminé** (lot 1, lots 2a et 2b), à l'essai réel du lot 2b près.
+**Vérifié en réel le 10/10/2026** sur le poste de l'auteur : sa sortie de
+`fltmc filters` (Windows en français) et la carte de son rapport donnent la
+**même liste** — quatorze filtres, mêmes altitudes, tous Microsoft, aucun en
+gras. Cette sortie réelle remplace dans les tests celle, reconstituée, de la
+première version. Deux détails qu'elle a appris : l'en-tête français
+« Nom. d’instn. » porte une apostrophe typographique, et une altitude peut avoir
+une décimale (`385250.5`) — tous deux sans effet sur la lecture.
+
+**Le point 85 est terminé** (lot 1, lots 2a et 2b).
 
 ### Point 86 — la boîte noire sans charge processeur
 
