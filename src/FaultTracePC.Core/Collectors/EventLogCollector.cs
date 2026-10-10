@@ -199,8 +199,8 @@ public sealed class EventLogCollector
             }
             case EventCategory.MemoryDiag:
             {
-                // 1201 = aucun problème ; 1202 = erreurs détectées.
-                e.Extracted["HasErrors"] = (rec.Id == 1202).ToString();
+                if (DiagnosticMemoireEnErreur(rec.Id) is { } enErreur)
+                    e.Extracted["HasErrors"] = enErreur.ToString();
                 break;
             }
             case EventCategory.ResourceExhaustion:
@@ -235,6 +235,27 @@ public sealed class EventLogCollector
     /// Méthode à part, et non un bloc dans le switch : elle ne dépend que du texte,
     /// donc elle se teste sans fabriquer un EventRecord.
     /// </summary>
+    /// <summary>
+    /// Résultat du diagnostic mémoire Windows d'après l'identifiant de l'événement
+    /// (source Microsoft-Windows-MemoryDiagnostics-Results) : 1101 et 1201 = aucune
+    /// erreur ; 1102 et 1202 = erreurs matérielles détectées. Chaque passage écrit
+    /// les deux événements de sa paire. Null pour un identifiant non répertorié.
+    ///
+    /// CORRIGÉ LE 10/10/2026. Seul 1202 comptait comme erreur : un 1102 était lu
+    /// « aucune erreur ». Sur un passage en échec, le rapport voyait donc à la fois
+    /// une erreur (1202) et un résultat sain (1102). La conclusion « RAM défectueuse
+    /// confirmée » l'emportait, mais la phrase « le dernier diagnostic n'avait rien
+    /// détecté » pouvait s'y ajouter à tort. Sources consultées (pas de page
+    /// Microsoft trouvée) : tenforums.com, tutoriel 91178 ; flamingo.run,
+    /// « windows-memory-diagnostic-results » — concordants.
+    /// </summary>
+    internal static bool? DiagnosticMemoireEnErreur(int eventId) => eventId switch
+    {
+        1101 or 1201 => false,
+        1102 or 1202 => true,
+        _ => null,
+    };
+
     internal static void ExtraireWhea(WinEvent e, string message)
     {
         var bdf = WheaBdfRx.Match(message ?? "");

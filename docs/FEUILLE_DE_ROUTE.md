@@ -98,7 +98,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
 | 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — **✔ terminé le 09/10/2026** : lot A (le rapport dit pourquoi le pilote n'est pas nommé), lot B (la fenêtre après analyse), lot C (mesuré : le WinDbg du Store se lance sur un autre poste, le bouton d'installation reste tel quel) — voir « Ce qu'un rapport sur une machine inconnue a montré » |
 | 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **✔ terminé le 09/10/2026** : lecture, carte « Protection antivirus », trois conclusions, voir la section |
-| 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (stockage contre SMART) livré le 10/10/2026 |
+| 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **en cours** : lot 1 (stockage contre SMART) et lot 2 (mémoire contre diagnostic mémoire) livrés le 10/10/2026 |
 | 83 | **Regrouper les plantages dans le temps et nommer les amas** | constaté le 24/09/2026, donnée déjà collectée |
 | 84 | **Exploiter les dates de pose des pilotes** | constaté le 24/09/2026, donnée déjà collectée |
 | 85 | **Lister les logiciels installés dans le rapport** | constaté le 24/09/2026 — un antivirus désinstallé de la veille était invisible |
@@ -1102,8 +1102,38 @@ liaison et son contrôleur. C'est ce que fait le lot 1.
 - le disque système est celui qui porte la lettre de `SystemDrive` ;
 - six tests (`StockageContreMesureTests`).
 
-**Restent pour ce point** : les autres familles de codes (mémoire contre
-diagnostic mémoire, par exemple) — à décider après l'essai réel de ce lot.
+**Lot 2 ✔ — la mémoire contre le diagnostic mémoire Windows, livré le 10/10/2026.**
+
+**Un défaut trouvé d'abord, en vérifiant où Windows range ce résultat.** Le
+diagnostic mémoire (mdsched) écrit dans le journal Système, source
+`Microsoft-Windows-MemoryDiagnostics-Results` : **1101 et 1201** = aucune
+erreur, **1102 et 1202** = erreurs matérielles, chaque passage écrivant les
+deux événements de sa paire. Le logiciel collectait bien ces événements, mais
+ne comptait que **1202** comme erreur : un **1102 était lu « aucune erreur »**.
+Sur un passage en échec, il voyait donc à la fois une erreur et un résultat
+sain. Corrigé (`EventLogCollector.DiagnosticMemoireEnErreur`) ; un identifiant
+inconnu n'est plus interprété du tout. Sources consultées — aucune page
+Microsoft trouvée, deux sources concordantes : tenforums.com (tutoriel 91178)
+et flamingo.run (« windows-memory-diagnostic-results »).
+
+**Ce que fait le lot**, pour un code d'arrêt « mémoire » (`RulesEngine.ConfronterMemoireAuDiagnostic`) :
+
+- **diagnostic sans erreur sur la période** → confiance « faible », et le
+  rapport dit que rien ne confirme une mémoire défectueuse, en rappelant que ce
+  test ne voit pas tout (MemTest86, plusieurs passes, est plus sensible) ;
+- **aucun diagnostic sur la période** → le rapport dit que la mémoire n'a pas
+  été testée, sans toucher à la confiance — rien n'a été mesuré ;
+- **diagnostic en erreur** → rien à ajouter : la conclusion « RAM défectueuse
+  confirmée » le dit déjà ;
+- la conclusion existante « Suspicion de RAM défectueuse » passe aussi en
+  confiance « faible » quand le diagnostic n'a rien trouvé (elle le disait déjà
+  dans son texte, sans en tirer la conséquence) ;
+- **le verdict « MÉMOIRE RAM »** reçoit la nuance correspondante : diagnostic
+  sans erreur et sa date, ou « la mémoire n'a pas été testée sur la période ».
+- onze cas de test (`MemoireContreDiagnosticTests`).
+
+Sur la machine du 24/09/2026, aucun diagnostic mémoire n'avait été lancé : le
+rapport y aurait ajouté « la mémoire n'a pas été testée ».
 
 ### Point 83 — sept plantages, deux amas, aucun regroupement
 

@@ -38,6 +38,7 @@ public sealed class RulesEngine
         AnalyzeDiskSpace(r);
         AnalyzeProtection(r);
         ConfronterStockageALaMesure(r);
+        ConfronterMemoireAuDiagnostic(r);
 
         if (r.Findings.Count == 0)
         {
@@ -437,7 +438,8 @@ public sealed class RulesEngine
             r.Findings.Add(new Finding
             {
                 Severity = Severity.Critical,
-                Confidence = vmHeavy ? Confidence.Low : Confidence.Medium,
+                // Point 82 : un diagnostic mémoire Windows sans erreur ne confirme pas la RAM.
+                Confidence = vmHeavy || diagOk ? Confidence.Low : Confidence.Medium,
                 Category = FaultCategory.Memory,
                 Title = vmHeavy
                     ? Lang.T("BSOD mémoire récurrents — RAM défectueuse OU pénurie causée par la virtualisation", "Recurring memory BSODs — faulty RAM OR a shortage caused by virtualisation")
@@ -2596,10 +2598,23 @@ public sealed class RulesEngine
         var top = critical.GroupBy(f => f.Category).OrderByDescending(g => g.Count()).First().Key;
         r.VerdictCategory = top;
 
-        // POINT 82 : un verdict « stockage » ne se prononce pas sans avoir regardé le disque.
-        var nuanceStockage = "";
+        // POINT 82 : un verdict « stockage » ne se prononce pas sans avoir regardé le disque,
+        // ni un verdict « mémoire » sans avoir regardé le diagnostic mémoire.
+        var nuance = "";
+        if (top == FaultCategory.Memory)
+        {
+            var (teste, enErreur, date) = DiagnosticMemoire(r);
+            if (teste && !enErreur)
+                nuance = Lang.T(
+                    $" Mais le diagnostic mémoire Windows du {date:dd/MM/yyyy} n'a trouvé aucune erreur : piste à confirmer par un test plus poussé (MemTest86) avant de remplacer une barrette.",
+                    $" But the Windows memory diagnostic of {date:yyyy-MM-dd} found no error: a lead to confirm with a deeper test (MemTest86) before replacing a module.");
+            else if (!teste)
+                nuance = Lang.T(
+                    " La mémoire n'a pas été testée sur la période : lancer le diagnostic mémoire avant de conclure.",
+                    " The memory was not tested over the period: run the memory diagnostic before concluding.");
+        }
         if (top == FaultCategory.Storage && MesureDisqueSystemeSaine(r) is not null)
-            nuanceStockage = AutresAlertesStockage(r)
+            nuance = AutresAlertesStockage(r)
                 ? Lang.T(" Le disque système ne montre pourtant aucun défaut dans ses propres compteurs (SMART) : examiner les autres alertes de stockage avant d'envisager de le remplacer.",
                          " Yet the system drive shows no defect in its own counters (SMART): examine the other storage alerts before considering replacing it.")
                 : Lang.T(" Mais le disque système ne montre aucun défaut mesurable : piste à confirmer — ne pas remplacer le disque sur la seule foi des codes d'arrêt.",
@@ -2616,7 +2631,7 @@ public sealed class RulesEngine
             FaultCategory.Software => Lang.T("Cause la plus probable : LOGICIELLE (corruption système ou application).", "Most likely cause: SOFTWARE (system corruption or an application)."),
             FaultCategory.Network => Lang.T("Cause la plus probable : RÉSEAU (configuration, profils ou services — pas le matériel).", "Most likely cause: NETWORK (configuration, profiles or services — not the hardware)."),
             _ => Lang.T("Pannes détectées — voir le détail des conclusions ci-dessous.", "Failures detected — see the detail of the conclusions below."),
-        } + nuanceStockage + $" ({critical.Count} conclusion(s) critique(s))";
+        } + nuance + $" ({critical.Count} conclusion(s) critique(s))";
     }
 
     /// <summary>Préfixe du <see cref="Finding.Code"/> des conclusions tirées des seuls codes d'arrêt.</summary>
@@ -2696,6 +2711,61 @@ public sealed class RulesEngine
         var usure = d.WearPercent ?? (s.SsdLifeLeftPercent is { } vie ? 100 - vie : null);
         if (usure is { } u) faits.Add(Lang.T($"usure {u} %", $"wear {u}%"));
         return Lang.T($"{d.Model} (disque système) — ", $"{d.Model} (system drive) — ") + string.Join(", ", faits);
+    }
+
+    /// <summary>
+    /// POINT 82, LOT 2 — confronter les codes d'arrêt « mémoire » au diagnostic
+    /// mémoire Windows (mdsched), quand il a été lancé.
+    ///
+    /// - diagnostic SANS erreur sur la période : la confiance tombe à « faible » et
+    ///   le rapport dit que la mesure ne met pas la mémoire en cause — en rappelant
+    ///   que ce test ne voit pas tout ;
+    /// - AUCUN diagnostic sur la période : le rapport dit que la mémoire n'a pas été
+    ///   testée (sans toucher à la confiance : rien n'a été mesuré) ;
+    /// - diagnostic EN ERREUR : rien à ajouter, la conclusion « RAM défectueuse
+    ///   confirmée » le dit déjà.
+    /// </summary>
+    internal static void ConfronterMemoireAuDiagnostic(DiagnosticReport r)
+    {
+        var parCodes = r.Findings
+            .Where(f => f.Code.StartsWith(PrefixeCodeArret, StringComparison.Ordinal) && f.Category == FaultCategory.Memory)
+            .ToList();
+        if (parCodes.Count == 0) return;
+
+        var (teste, enErreur, date) = DiagnosticMemoire(r);
+        if (enErreur) return;
+
+        foreach (var f in parCodes)
+        {
+            if (teste)
+            {
+                f.Confidence = Confidence.Low;
+                f.Details += Lang.T(
+                    $" Le diagnostic mémoire Windows du {date:dd/MM/yyyy} n'a trouvé aucune erreur. Ce test ne voit pas tout — MemTest86, sur plusieurs passes, est plus sensible —, mais en l'état rien ne confirme que la mémoire soit défectueuse.",
+                    $" The Windows memory diagnostic of {date:yyyy-MM-dd} found no error. This test does not see everything — MemTest86, over several passes, is more sensitive — but as things stand nothing confirms that the memory is faulty.");
+            }
+            else
+            {
+                f.Details += Lang.T(
+                    " Aucun diagnostic mémoire Windows n'a été lancé sur la période analysée : la mémoire n'a pas été testée.",
+                    " No Windows memory diagnostic was run over the period analysed: the memory has not been tested.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Le diagnostic mémoire Windows a-t-il été lancé sur la période, a-t-il trouvé
+    /// des erreurs, et quand a eu lieu le dernier passage.
+    /// </summary>
+    private static (bool Teste, bool EnErreur, DateTime? Date) DiagnosticMemoire(DiagnosticReport r)
+    {
+        var resultats = r.Events
+            .Where(e => e.Category == EventCategory.MemoryDiag && e.Extracted.ContainsKey("HasErrors"))
+            .ToList();
+        if (resultats.Count == 0) return (false, false, null);
+        return (true,
+                resultats.Any(e => e.Extracted["HasErrors"] == "True"),
+                resultats.Max(e => e.TimeLocal));
     }
 
     /// <summary>Y a-t-il une alerte de stockage qui ne vient PAS des seuls codes d'arrêt ?</summary>
