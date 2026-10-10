@@ -1344,6 +1344,11 @@ relit, en reprenant la conclusion du logiciel sans la vérifier.
   sans rapport — le même défaut qu'au point 81 ;
 - onze cas de test (`ReglageVidageTests`), dont la configuration du 24/09/2026.
 
+**Vérifié en réel le 10/10/2026** sur le poste de l'auteur : la carte affiche
+« Réglage : vidage mémoire automatique (réglage d'origine de Windows) » et
+« Fichier d'échange : géré par Windows ». Pas d'événement `volmgr` sur ce poste :
+la carte d'échec d'écriture n'y apparaît pas, ce qui est attendu.
+
 ### L'issue, pour la machine
 
 Le jour même, après la fin de la désinstallation de l'ancien antivirus et sans
