@@ -1318,6 +1318,21 @@ Mesure de référence déjà faite le 09/10/2026 sur le poste de l'auteur (point
 référence : le premier rapport le dira — on y attend au moins le service
 d'Apex One si son programme a disparu.
 
+**Vérifié en réel le 10/10/2026** sur le poste de l'auteur : **une seule**
+inscription signalée, « Apex One NT WSC Service » (TmWSCSvc), démarrage
+**automatique**, arrêté, programme `C:\Program Files (x86)\Trend Micro\Security
+Agent\TmWSCSvc.exe` disparu. Aucun autre service ni pilote signalé : pas de fausse
+alerte sur ce poste.
+
+**Et une incohérence trouvée dans le même rapport, corrigée le même jour.** La
+carte « Échecs de services Windows répétés » citait TmWSCSvc (7 échecs de
+démarrage) et concluait : « le point à vérifier est donc l'existence du
+fichier » — alors que la nouvelle carte, trois lignes plus haut, venait de
+l'établir. Elle dit désormais ce qui a été **mesuré** : « Vérifié : le programme
+de TmWSCSvc n'existe plus », ou, si le programme est là, « ce n'est pas une
+inscription restée derrière une désinstallation » ; l'ancienne phrase ne reste
+que si les services n'ont pas pu être lus. Deux tests de plus.
+
 **Lot 2b — à faire : la pile des pilotes-filtres** (`fltmc filters`) décrite
 ci-dessus.
 

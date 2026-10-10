@@ -7,9 +7,8 @@ namespace FaultTracePC.Tests;
 
 /// <summary>
 /// POINT 85, LOT 2 — services et pilotes inscrits dont le programme n'existe plus.
-/// Le service « Apex One NT WSC Service » (TmWSCSvc) est celui constaté le
-/// 09/10/2026 sur le poste de l'auteur ; son chemin, lui, n'a pas été relevé : celui
-/// du test est une donnée de test.
+/// Le service « Apex One NT WSC Service » (TmWSCSvc), son chemin et son mode de
+/// démarrage sont ceux relevés le 10/10/2026 dans le rapport du poste de l'auteur.
 /// </summary>
 [Collection("Langue")]
 public class InscriptionsOrphelinesTests
@@ -41,8 +40,8 @@ public class InscriptionsOrphelinesTests
         r.System.ServicesOrphelins.Add(new ServiceOrphelin
         {
             Nom = "TmWSCSvc", NomAffiche = "Apex One NT WSC Service",
-            Chemin = @"C:\Program Files (x86)\Trend Micro\Security Agent\service-de-test.exe",
-            Demarrage = "Manual", Etat = "Stopped",
+            Chemin = @"C:\Program Files (x86)\Trend Micro\Security Agent\TmWSCSvc.exe",
+            Demarrage = "Auto", Etat = "Stopped",
         });
         r.System.Drivers.Add(new DriverInfo { Name = "pilotetest", DisplayName = "Pilote de test", Path = @"C:\Windows\System32\drivers\pilotetest.sys", StartMode = "System", FichierPresent = false });
         r.System.Drivers.Add(new DriverInfo { Name = "present", Path = @"C:\Windows\System32\drivers\present.sys", FichierPresent = true });
@@ -64,5 +63,55 @@ public class InscriptionsOrphelinesTests
         var r = new DiagnosticReport();
         r.System.Drivers.Add(new DriverInfo { Name = "sanschemin", FichierPresent = null });
         Assert.Null(Conclure(r));
+    }
+
+    private static DiagnosticReport ServiceQuiNeDemarrePas(int fois)
+    {
+        var r = new DiagnosticReport { ScanPeriodDays = 30, System = new SystemSnapshot { MachineName = "POSTE-TEST" } };
+        for (int i = 0; i < fois; i++)
+        {
+            var e = new WinEvent
+            {
+                Category = EventCategory.ServiceFailure, Provider = "Service Control Manager", EventId = 7000,
+                TimeLocal = new DateTime(2026, 9, 24 + i % 6, 8, 27, 0), Message = "Echec.",
+            };
+            e.Extracted["Service"] = "TmWSCSvc";
+            r.Events.Add(e);
+        }
+        r.System.ServicesLus = true;
+        return r;
+    }
+
+    private static Finding CarteServices(DiagnosticReport r)
+    {
+        var initial = Lang.Current;
+        try { Lang.Apply(AppLanguage.French); new RulesEngine().Analyze(r); }
+        finally { Lang.Apply(initial); }
+        return r.Findings.Single(f => f.Title.Contains("services Windows"));
+    }
+
+    [Fact]
+    public void La_carte_des_services_dit_ce_qui_a_ete_verifie_au_lieu_de_le_demander()
+    {
+        // Constaté le 10/10/2026 : la carte demandait de vérifier le programme de
+        // TmWSCSvc alors qu'une autre carte établissait qu'il n'existait plus.
+        var r = ServiceQuiNeDemarrePas(7);
+        r.System.ServicesOrphelins.Add(new ServiceOrphelin
+        {
+            Nom = "TmWSCSvc", NomAffiche = "Apex One NT WSC Service",
+            Chemin = @"C:\Program Files (x86)\Trend Micro\Security Agent\TmWSCSvc.exe", Demarrage = "Auto", Etat = "Stopped",
+        });
+
+        var f = CarteServices(r);
+        Assert.Contains("Vérifié : le programme de TmWSCSvc n'existe plus", f.Details);
+        Assert.DoesNotContain("Le point à vérifier", f.Details);
+    }
+
+    [Fact]
+    public void Programme_present_la_piste_de_l_inscription_orpheline_est_ecartee()
+    {
+        var f = CarteServices(ServiceQuiNeDemarrePas(7));
+        Assert.Contains("existe encore", f.Details);
+        Assert.DoesNotContain("Le point à vérifier", f.Details);
     }
 }

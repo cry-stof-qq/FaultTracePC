@@ -2326,9 +2326,30 @@ public sealed class RulesEngine
             // peut pas faire à la place de l'utilisateur ; on lui dit donc où porter son
             // attention, sans lui promettre une solution qui n'existe pas toujours.
             if (fails.Any(e => IdsDemarrageEchoue.Contains(e.EventId)))
-                details += Lang.T(
-                    " Un service qui ne parvient pas à DÉMARRER de façon répétée est souvent une inscription restée derrière une désinstallation incomplète : l'entrée existe encore, son exécutable non, et Windows retente à chaque déclenchement. Le point à vérifier est donc l'existence du fichier avant de chercher plus loin.",
-                    " A service that repeatedly fails to START is often a registration left behind by an incomplete uninstall: the entry is still there, its executable is not, and Windows retries at every trigger. The thing to check is therefore whether the file still exists, before looking any further.");
+            {
+                // POINT 85, LOT 2a. L'existence du fichier, que cette phrase demandait de
+                // vérifier, est désormais MESURÉE (ServiceCollector). Constaté le
+                // 10/10/2026 sur le poste de l'auteur : la carte demandait de vérifier
+                // le programme de TmWSCSvc, alors qu'une autre carte du même rapport
+                // établissait qu'il n'existait plus.
+                var nonDemarres = parService.Where(g => g.Any(e => IdsDemarrageEchoue.Contains(e.EventId))).Select(g => g.Key).ToList();
+                var orphelins = r.System.ServicesOrphelins
+                    .Where(o => nonDemarres.Any(n => n.Equals(o.Nom, StringComparison.OrdinalIgnoreCase) || n.Equals(o.NomAffiche, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                if (orphelins.Count > 0)
+                    details += Lang.T(
+                        $" Vérifié : le programme de {string.Join(" et ", orphelins.Select(o => o.Nom))} n'existe plus ({string.Join(" ; ", orphelins.Select(o => o.Chemin))}). C'est une inscription restée derrière une désinstallation incomplète, et Windows retente de la démarrer à chaque déclenchement — voir la conclusion sur les services et pilotes sans programme.",
+                        $" Checked: the program of {string.Join(" and ", orphelins.Select(o => o.Nom))} no longer exists ({string.Join("; ", orphelins.Select(o => o.Chemin))}). It is a registration left behind by an incomplete uninstall, and Windows retries starting it at every trigger — see the conclusion on services and drivers with no program.");
+                else if (r.System.ServicesLus && nonDemarres.Count > 0)
+                    details += Lang.T(
+                        " Vérifié : le programme des services qui ne démarrent pas existe encore — ce n'est pas une inscription restée derrière une désinstallation.",
+                        " Checked: the program of the services that fail to start still exists — this is not a registration left behind by an uninstall.");
+                else
+                    details += Lang.T(
+                        " Un service qui ne parvient pas à DÉMARRER de façon répétée est souvent une inscription restée derrière une désinstallation incomplète : l'entrée existe encore, son exécutable non, et Windows retente à chaque déclenchement. Le point à vérifier est donc l'existence du fichier avant de chercher plus loin.",
+                        " A service that repeatedly fails to START is often a registration left behind by an incomplete uninstall: the entry is still there, its executable is not, and Windows retries at every trigger. The thing to check is therefore whether the file still exists, before looking any further.");
+            }
 
             reco = concentre
                 ? Lang.T($"Ouvrir services.msc et y chercher {nomsCoupables} : les propriétés d'un service donnent son compte de démarrage et ses actions de récupération. Un service TIERS qui tombe se met à jour ou se désinstalle ; un service de WINDOWS qui tombe est un symptôme et pas une cause — chercher alors du côté des pilotes et des fichiers système.",
