@@ -21,7 +21,8 @@
 | 1.7.0 | **jamais publiée** — construite et éprouvée sur un parc réel les 19, 20 et 21/09/2026. Cinq défauts en sont sortis, dont trois qu'aucune relecture de code n'aurait trouvés. Publier 1.7.0 puis 1.7.1 à trois jours d'intervalle n'aurait rien appris à personne |
 | 1.7.1 | **publiée** le 21/09/2026 — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔. C'est la 1.7.0 corrigée : voir « La matinée du 21/09/2026 », défauts A à E |
 | 1.8.0 | **en cours depuis le 09/10/2026** — thème **le rapport rapproche ce qu'il sait** — points 80 à 87, ce qu'un rapport sur une machine inconnue a montré. Décidé le 09/10/2026 : passe AVANT winget, parce qu'il touche à la promesse même du logiciel — trouver la cause d'une panne — et sert tous les utilisateurs, pas seulement un parc |
-| 1.9.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026. Décalé d'une version le 09/10/2026 |
+| 1.9.0 | prévue — thème **deux publics, un seul paquet** — point 79 : le mode parc devient une case à cocher de l'installation, absente par défaut, **sans qu'un poste déjà en mode parc le perde**. Décidé le 10/10/2026 : juste après la 1.8.0 et **avant winget**, pour que les particuliers qui installeront par winget n'aient déjà plus le mode parc |
+| 1.10.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026. Décalé d'une version le 09/10/2026, puis d'une autre le 10/10/2026 (point 79 placé avant) |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
 
@@ -95,7 +96,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 14 | ~~**ACL sur `remote.json`**~~ | **fait** — `FileProtection` : héritage coupé, accès réduit à SYSTEM et Administrateurs par SID, échec journalisé dans `erreurs.log` ; 4 tests posent et relisent l'ACL réelle |
 | 15 | **Bloc winget** : section du rapport + boutons « tout mettre à jour » / choix par logiciel | validé — **planifié 1.8.0**, plan arrêté le 19/09/2026, plus bas |
 | 16 | **Hiérarchie du rapport pour un débutant** | ton observation, pas encore un plan |
-| 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026, à faire dans une version ultérieure — voir « Deux publics, un seul paquet » plus bas |
+| 79 | **Le mode parc devient une fonctionnalité facultative du paquet** | décidé le 21/09/2026 ; **placé en 1.9.0 le 10/10/2026**, avant winget — voir « Deux publics, un seul paquet » plus bas |
 | 80 | **Lancer WinDbg quand il vient du Microsoft Store** | constaté le 24/09/2026 — **✔ terminé le 09/10/2026** : lot A (le rapport dit pourquoi le pilote n'est pas nommé), lot B (la fenêtre après analyse), lot C (mesuré : le WinDbg du Store se lance sur un autre poste, le bouton d'installation reste tel quel) — voir « Ce qu'un rapport sur une machine inconnue a montré » |
 | 81 | **Dire quel antivirus protège réellement la machine** | reformulé le 24/09/2026 après vérification sur la machine : la liste des processus ne suffit pas — **✔ terminé le 09/10/2026** : lecture, carte « Protection antivirus », trois conclusions, voir la section |
 | 82 | **Confronter le verdict aux mesures qui le contredisent** | constaté le 24/09/2026, donnée déjà collectée — **✔ terminé le 10/10/2026** : stockage contre SMART, mémoire contre diagnostic mémoire |
@@ -1286,6 +1287,10 @@ lignes sans rapport avec la panne.
 - quatre tests (`LogicielsInstallesTests`) ; les logiciels y sont des données de
   test, la liste de la machine du 24/09/2026 n'apparaissant pas dans son rapport.
 
+**Vérifié en réel le 10/10/2026** sur le poste de l'auteur : section repliée
+« Afficher les 71 logiciels installés », plus récents d'abord. Aucun plantage
+sur ce poste, donc aucune conclusion « installé juste avant » : attendu.
+
 **Lot 2 — à faire : les restes d'un logiciel désinstallé** — inscription
 orpheline (déjà faite pour les antivirus au point 81), dossiers restés sur le
 disque, et la pile des pilotes-filtres (`fltmc filters`) décrite ci-dessus.
@@ -1641,6 +1646,33 @@ ultérieure, sans date ». La 1.8.0 garde donc le mode parc **inclus comme en
 pendant l'installation, mais une **fonctionnalité absente par défaut**, ajoutée
 par une option de ligne de commande (déploiement, stratégie de groupe). Décision
 de l'auteur attendue : l'ajouter à la 1.8.0, ou la laisser à plus tard.
+
+**Réponse de l'auteur, même jour** : d'accord sur le fond — un particulier n'a
+pas besoin du mode parc ; la version n'avait simplement pas été fixée. Deux
+exigences : **le mode parc déjà en place sur les postes ne doit pas être
+perdu** ; et il trouverait pratique de pouvoir **l'activer à l'installation**.
+
+**Ce que dit l'installateur actuel, vérifié dans `installer/FaultTracePC.wxs`** :
+l'installation interactive affiche **déjà** la liste des fonctionnalités avec
+des cases à cocher (`WixUI_FeatureTree` — c'est là qu'apparaît le raccourci du
+Bureau). Une fonctionnalité « Mode parc » y apparaîtrait donc comme **une case
+à cocher pendant l'installation**, non cochée par défaut — ce que l'auteur
+souhaite — **et** resterait pilotable en silencieux par `ADDLOCAL` pour un
+déploiement. Les deux formes ne s'opposent pas : c'est le même mécanisme.
+
+**Le piège à traiter le jour venu, noté pour ne pas l'oublier.** À une mise à
+jour, Windows Installer reporte l'état des fonctionnalités qui existaient dans
+l'ancienne version. Or en 1.7.1 le parc fait partie de « Main » : une nouvelle
+fonctionnalité « Mode parc », absente par défaut, **ne serait pas posée** sur un
+poste mis à jour — il sortirait de la supervision sans prévenir. Il faudra que
+l'installateur détecte un poste déjà en mode parc et coche la fonctionnalité
+d'office, puis l'éprouver sur un vrai poste du parc avant toute publication.
+Comportement exact de la migration à **vérifier** dans la documentation de WiX
+et à l'essai, pas à supposer.
+
+**Version décidée le 10/10/2026 par l'auteur : la 1.9.0**, juste après la 1.8.0
+et avant winget (qui passe en 1.10.0). Motif : winget ouvre le logiciel au
+grand public ; il vaut mieux que le mode parc y soit déjà facultatif.
 
 ### Les deux options écartées, et pourquoi
 
