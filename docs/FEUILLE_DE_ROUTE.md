@@ -1418,6 +1418,11 @@ langue du service, voir plus haut). Un rapport en français l'aurait cité tel q
 phrases dans sa propre langue (`DiagnosticCapteurs.Lire`) ; un texte qui n'a pas
 cette forme est rendu tel quel. Trois tests de plus. Le MSI est à reconstruire.
 
+**Vérifié après reconstruction et réinstallation, même jour** : la ligne de début
+de session porte désormais `"diag":"v1|cpu=AMD Ryzen 7 7735U with Radeon
+Graphics|charge=CPU Core #1,…,CPU Core #16,CPU Total,CPU Core Max"` — des faits
+bruts, plus aucune phrase anglaise.
+
 **Lot 2 — à décider sur pièce** : la prochaine machine concernée, avec un
 service 1.8.0, dira laquelle des trois situations est en cause. Une piste
 indépendante de la bibliothèque existe — Windows calcule lui-même la charge
