@@ -61,9 +61,18 @@ public sealed class FlightRecorderService : BackgroundService
         StartEventWatchers();
 
         int counter = 0;
+        // Point 90 (1.8.1) : une HORLOGE FIXE de 10 secondes. Avant, la boucle
+        // attendait 10 secondes APRÈS chaque relevé ; le relevé lui-même prenant
+        // du temps (capteurs, mémoire, liste des processus), les relevés tombaient
+        // toutes les 12 secondes environ — constaté le 10/10/2026 sur la boîte
+        // noire d'un poste, alors que la fenêtre annonce « un relevé toutes les
+        // 10 secondes ». PeriodicTimer bat la mesure indépendamment de la durée
+        // du relevé ; si un relevé dépasse 10 secondes, les battements manqués ne
+        // s'accumulent pas : un seul est rattrapé, jamais une rafale.
+        using var horloge = new PeriodicTimer(SampleInterval);
         try
         {
-            while (!stoppingToken.IsCancellationRequested)
+            do
             {
                 try
                 {
@@ -91,9 +100,8 @@ public sealed class FlightRecorderService : BackgroundService
                         WriteAlertMarker(alert);
                 }
                 catch { /* un échantillon raté ne doit jamais arrêter la boîte noire */ }
-
-                await Task.Delay(SampleInterval, stoppingToken);
             }
+            while (await horloge.WaitForNextTickAsync(stoppingToken));
         }
         catch (OperationCanceledException) { /* arrêt demandé */ }
     }
