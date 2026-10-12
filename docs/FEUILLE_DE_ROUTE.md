@@ -1542,7 +1542,9 @@ chercher d'autres.
 **Demande de l'auteur, 12/10/2026**, après la mise à jour du parc en 1.8.0 :
 pouvoir actualiser seulement la sélection, et pas tout le parc ; pouvoir faire
 un clic droit sur un poste pour mettre à jour ce poste-là seulement. Version
-laissée au choix : **placée en 1.9.0**.
+laissée au choix : **placée en 1.9.0**. **Précisé par l'auteur le même jour :
+la demande porte sur l'onglet Supervision** ; l'onglet Inventaire n'est pas
+concerné et garde ses cases à cocher et son bouton « Déployer ».
 
 **Pourquoi la 1.9.0.** Le point 79 oblige déjà à reprendre le déploiement par
 la console : le paquet devra y demander explicitement le mode parc. Mettre à
@@ -1577,7 +1579,7 @@ autre thème.
   actions déjà présentes en bas de la fenêtre — boîte noire du poste,
   historique des alertes, diagnostic à distance — ainsi qu'« Actualiser ce
   poste ». Les boutons du bas restent en place : le menu est un raccourci de
-  plus, pas un remplacement.
+  plus, pas un remplacement (confirmé par l'auteur le même jour).
 
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
