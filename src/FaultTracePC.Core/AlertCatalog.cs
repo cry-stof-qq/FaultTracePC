@@ -30,6 +30,16 @@ public static class AlertCatalog
     private const string DiskPrefix = "disk_health_";
 
     /// <summary>
+    /// Point 98 : gravité d'une alerte WHEA d'après le niveau que Windows a donné
+    /// à l'événement (1 critique, 2 erreur, 3 avertissement, 4 information).
+    /// Windows enregistre en avertissement les erreurs que le matériel a
+    /// corrigées : elles deviennent « à surveiller ». Niveau absent ou inconnu :
+    /// « critique », comme avant — on ne baisse pas une alarme sans savoir.
+    /// </summary>
+    public static string NiveauWhea(int? niveauWindows) =>
+        niveauWindows is 3 or 4 ? "warn" : "crit";
+
+    /// <summary>
     /// Réécrit Titre, Détail et Recommandation dans la langue en cours.
     /// Renvoie false — sans rien modifier — si la règle est inconnue ou si la
     /// donnée nécessaire manque.
@@ -62,6 +72,27 @@ public static class AlertCatalog
                 a.Recommendation = Lang.T("Fermer les applications les plus gourmandes ; si la virtualisation (vmmem/WSL/Docker) est en tête, lui fixer une limite via %USERPROFILE%\\.wslconfig ([wsl2] puis memory=8GB), puis « wsl --shutdown ».", "Close the most demanding applications; if virtualisation (vmmem/WSL/Docker) is at the top, cap it through %USERPROFILE%\\.wslconfig ([wsl2] then memory=8GB), then “wsl --shutdown”.");
                 return true;
 
+            // Point 98 (12/10/2026) : une alerte écrite depuis la 1.8.1 porte le
+            // numéro de l'événement (Value) et un niveau tiré de celui que Windows
+            // a donné à l'événement — voir NiveauWhea. Une erreur CORRIGÉE ne dit
+            // plus « défaillance » ni « par le processeur » : sur le poste mesuré,
+            // les 50 événements étaient des 17 (lien PCI Express), tous corrigés.
+            case "whea" when a.Value is { } numero && a.Level != "crit":
+                a.Title = Lang.T($"Erreur matérielle corrigée (WHEA, événement {numero:0})", $"Corrected hardware error (WHEA, event {numero:0})");
+                a.Details = Lang.T("Le matériel a signalé une erreur qu'il a corrigée lui-même : rien n'a été perdu et le poste a continué de fonctionner. Isolée, elle est sans conséquence ; répétée, elle désigne un composant ou un lien à surveiller.",
+                                   "The hardware reported an error that it corrected by itself: nothing was lost and the machine kept running. On its own it has no consequence; repeated, it points to a component or a link to keep an eye on.");
+                a.Recommendation = Lang.T("Lancer un diagnostic du poste : il nomme le composant ou le lien PCI Express en cause. Tant que les erreurs restent corrigées et qu'aucun plantage ne les accompagne, ce n'est pas une urgence.",
+                                          "Run a diagnosis of the machine: it names the component or the PCI Express link involved. As long as the errors stay corrected and no crash comes with them, it is not urgent.");
+                return true;
+
+            case "whea" when a.Value is { } numero:
+                a.Title = Lang.T($"Erreur matérielle grave signalée (WHEA, événement {numero:0})", $"Serious hardware error reported (WHEA, event {numero:0})");
+                a.Details = Lang.T("Le matériel a signalé une erreur que Windows classe comme grave : elle n'a pas été corrigée. Répétées, ces erreurs annoncent une défaillance CPU, mémoire, carte mère ou alimentation.",
+                                   "The hardware reported an error that Windows classes as serious: it was not corrected. Repeated, these errors announce a failure of the CPU, memory, motherboard or power supply.");
+                a.Recommendation = Lang.T("Vérifier températures et alimentation, retirer tout overclocking/XMP, mettre à jour le BIOS. Si les erreurs persistent, faire tester le matériel.", "Check temperatures and power supply, remove any overclocking/XMP, update the BIOS. If the errors persist, have the hardware tested.");
+                return true;
+
+            // Alerte écrite avant la 1.8.1 : ni numéro ni niveau fiable. Texte d'origine.
             case "whea":
                 a.Title = Lang.T("Erreur matérielle signalée par le processeur (WHEA)", "Hardware error reported by the processor (WHEA)");
                 a.Details = Lang.T("Le matériel vient de signaler une erreur corrigée ou fatale. Répétées, ces erreurs annoncent une défaillance CPU, mémoire, carte mère ou alimentation.", "The hardware has just reported a corrected or fatal error. Repeated, these errors announce a failure of the CPU, memory, motherboard or power supply.");

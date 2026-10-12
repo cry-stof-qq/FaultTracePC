@@ -764,7 +764,13 @@ public sealed class RulesEngine
         {
             if (covered.Contains(g.Key)) continue;
 
-            var latest = g.OrderByDescending(a => a.Time).First();
+            // Le texte de la carte vient de l'alerte la plus GRAVE (la plus récente
+            // d'entre elles), pas simplement de la plus récente : depuis le point
+            // 98, une même règle WHEA peut mêler erreurs corrigées (« à surveiller »)
+            // et erreurs graves. Une carte critique titrée « erreur corrigée »
+            // se contredirait.
+            var latest = g.OrderBy(a => a.Level == "crit" ? 0 : 1)
+                          .ThenByDescending(a => a.Time).First();
             r.Findings.Add(new Finding
             {
                 Severity = g.Any(a => a.Level == "crit") ? Severity.Critical : Severity.Warning,

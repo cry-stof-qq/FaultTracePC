@@ -1635,6 +1635,32 @@ conseille de vérifier chez l'éditeur. La phrase « une version majoritaire et
 quelques retardataires » disparaît. Dix tests (`ParcDivergenceTests`, dont le
 cas réel du 12/10/2026).
 
+**Lot 2 — point 98, livré le 12/10/2026.**
+
+- `AlertCatalog.NiveauWhea` (Core, pour être testé) : la gravité d'une alerte
+  WHEA suit le niveau que Windows a donné à l'événement — avertissement ou
+  information → « à surveiller » ; erreur, critique ou niveau inconnu →
+  « critique », comme avant.
+- `AlertEngine.EvaluateEvent` (service) reçoit le numéro et le niveau de
+  l'événement (`FlightRecorderService` les lui passe) ; le numéro est gardé
+  dans la valeur de l'alerte (`va`). L'anti-répétition est tenue **par niveau** :
+  une erreur corrigée ne fait plus taire une erreur grave qui la suivrait dans
+  le délai.
+- `AlertCatalog.Localize` : une erreur corrigée s'intitule « Erreur matérielle
+  corrigée (WHEA, événement 17) », sans « défaillance » ni « par le processeur »,
+  et conseille de lancer un diagnostic du poste, qui nomme le lien en cause
+  (points 48 et 49). Une erreur grave s'intitule « Erreur matérielle grave
+  signalée (WHEA, événement N) » et garde l'ancien conseil. Une alerte écrite
+  avant la 1.8.1 (sans numéro) garde son texte d'origine.
+- `RulesEngine` : la carte « Alerte préventive répétée » prend son texte dans
+  l'alerte la plus grave, et non plus dans la plus récente — sans quoi une
+  carte critique pourrait s'intituler « erreur corrigée ».
+- Neuf tests (`AlerteWheaTests`).
+
+**Limite connue** : les alertes déjà archivées par la console avant la 1.8.1
+restent « critiques » — elles ne portent ni numéro ni niveau, rien ne permet de
+les reclasser après coup. Elles sortent du compte des 90 jours en vieillissant.
+
 ## Points 93 et 94 — agir sur un seul poste depuis la Supervision
 
 **Demande de l'auteur, 12/10/2026**, après la mise à jour du parc en 1.8.0 :

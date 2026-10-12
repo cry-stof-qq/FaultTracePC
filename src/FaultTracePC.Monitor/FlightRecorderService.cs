@@ -260,7 +260,7 @@ public sealed class FlightRecorderService : BackgroundService
                     });
 
                     // Certains événements méritent une alerte préventive immédiate.
-                    if (_alerts?.EvaluateEvent(category, msg) is { } alert)
+                    if (_alerts?.EvaluateEvent(category, msg, rec.Id, rec.Level) is { } alert)
                         WriteAlertMarker(alert);
                 }
                 catch { }

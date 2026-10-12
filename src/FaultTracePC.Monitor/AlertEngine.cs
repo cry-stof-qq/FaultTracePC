@@ -41,12 +41,23 @@ public sealed class AlertEngine
     }
 
     /// <summary>Alerte immédiate sur un événement critique observé en direct (WHEA, disque).</summary>
-    public PreventiveAlert? EvaluateEvent(string providerAndId, string message)
+    /// <param name="eventId">Numéro de l'événement Windows (17, 18, 19…).</param>
+    /// <param name="niveauWindows">Niveau donné par Windows : 1 critique, 2 erreur, 3 avertissement, 4 information.</param>
+    public PreventiveAlert? EvaluateEvent(string providerAndId, string message, int eventId, int? niveauWindows)
     {
         if (!_settings.Enabled) return null;
 
+        // Point 98 : avant la 1.8.1, toute erreur WHEA était « critique », qu'elle
+        // ait été corrigée par le matériel ou non, et l'alerte ne gardait pas le
+        // numéro de l'événement. Le niveau suit maintenant celui de Windows, et le
+        // numéro est conservé dans Value.
         if (providerAndId.Contains("WHEA-Logger", StringComparison.OrdinalIgnoreCase))
-            return Emit("whea", "crit", null, null);
+        {
+            // Anti-répétition PAR NIVEAU : une erreur corrigée ne doit pas faire
+            // taire, pendant le délai, une erreur grave qui la suivrait.
+            var niveau = AlertCatalog.NiveauWhea(niveauWindows);
+            return Emit("whea", niveau, eventId, null, cleAntiRepetition: $"whea_{niveau}");
+        }
 
         // Resource-Exhaustion-Detector 2004 : Windows lui-même constate que la mémoire
         // virtuelle est épuisée et nomme les processus responsables. Signal en or.
@@ -122,13 +133,15 @@ public sealed class AlertEngine
     }
 
     /// <summary>Crée l'alerte si le délai anti-répétition est écoulé, sinon retourne null.</summary>
-    private PreventiveAlert? Emit(string ruleId, string level, double? value, string? extract)
+    private PreventiveAlert? Emit(string ruleId, string level, double? value, string? extract,
+                                  string? cleAntiRepetition = null)
     {
-        if (_lastEmitted.TryGetValue(ruleId, out var last) &&
+        var cle = cleAntiRepetition ?? ruleId;
+        if (_lastEmitted.TryGetValue(cle, out var last) &&
             DateTime.Now - last < TimeSpan.FromMinutes(_settings.RepeatMinutes))
             return null;
 
-        _lastEmitted[ruleId] = DateTime.Now;
+        _lastEmitted[cle] = DateTime.Now;
         var alert = new PreventiveAlert
         {
             Time = DateTime.Now,
