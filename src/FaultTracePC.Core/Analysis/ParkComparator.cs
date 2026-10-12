@@ -110,20 +110,7 @@ public static class ParkComparator
                                   .GroupBy(e => e.Version)
                                   .OrderByDescending(g => g.Count()).ToList();
             if (versions.Count >= 2 && entries.Count >= 3)
-            {
-                var behind = versions.Skip(1).SelectMany(g => g.Select(e => e.Machine)).Distinct().OrderBy(x => x).ToList();
-                a.Correlations.Add(new Correlation
-                {
-                    Kind = "divergence",
-                    Severity = "info",
-                    Title = Lang.T($"{file} existe en {versions.Count} versions différentes sur le parc", $"{file} exists in {versions.Count} different versions across the fleet"),
-                    Details = Lang.T("Répartition : ", "Spread: ") + string.Join(" · ", versions.Select(g => Lang.T($"{g.Key} sur {g.Count()} poste(s)", $"{g.Key} on {g.Count()} machine(s)")))
-                            + Lang.T(". Une version majoritaire et quelques retardataires : ce sont en général ces derniers qui remontent des incidents.", ". One majority version and a few stragglers: it is usually the latter that report incidents."),
-                    Action = Lang.T($"Aligner les postes en retard sur la version majoritaire ({versions[0].Key}), ", $"Bring the lagging machines up to the majority version ({versions[0].Key}), ")
-                           + Lang.T("sauf si c'est justement la version récente qui a introduit le problème — le rapport de chaque poste le dira.", "unless it is precisely the newer version that introduced the problem — each machine's own report will say."),
-                    Machines = behind,
-                });
-            }
+                a.Correlations.Add(Divergence(file, versions));
         }
 
         // ---------------------------------------------------------------
@@ -232,6 +219,70 @@ public static class ParkComparator
 
         a.Correlations.Sort((x, y) => Rank(x.Severity).CompareTo(Rank(y.Severity)));
         return a;
+    }
+
+    /// <summary>
+    /// Point 95, constaté le 12/10/2026 sur un rapport réel : la version
+    /// « majoritaire » était la plus fréquente, et tous les autres postes étaient
+    /// dits « en retard ». Le poste qui avait un mois de mises à jour Windows
+    /// d'avance était ainsi désigné comme retardataire, et le conseil revenait à
+    /// lui faire installer une version plus ancienne. Avec trois versions sur
+    /// trois postes, la « majorité » dépendait de l'ordre de lecture.
+    ///
+    /// Désormais : si toutes les versions se comparent, les postes en retard sont
+    /// ceux qui n'ont pas la PLUS RÉCENTE. Sinon, on ne désigne personne : on
+    /// donne la répartition et on dit qu'il faut vérifier laquelle est à jour.
+    /// </summary>
+    private static Correlation Divergence(string file, List<IGrouping<string, (string Machine, string Version, DateTime? Date)>> versions)
+    {
+        var repartition = Lang.T("Répartition : ", "Spread: ")
+            + string.Join(" · ", versions.Select(g => Lang.T($"{g.Key} sur {g.Count()} poste(s)", $"{g.Key} on {g.Count()} machine(s)")));
+        var titre = Lang.T($"{file} existe en {versions.Count} versions différentes sur le parc", $"{file} exists in {versions.Count} different versions across the fleet");
+
+        var numeros = versions.Select(g => (Groupe: g, Numero: NumeroDeVersion(g.Key))).ToList();
+        if (numeros.All(x => x.Numero is not null))
+        {
+            var plusRecente = numeros.OrderByDescending(x => x.Numero).First();
+            var enRetard = numeros.Where(x => x.Numero < plusRecente.Numero)
+                                  .SelectMany(x => x.Groupe.Select(e => e.Machine))
+                                  .Distinct().OrderBy(x => x).ToList();
+            return new Correlation
+            {
+                Kind = "divergence",
+                Severity = "info",
+                Title = titre,
+                Details = repartition
+                        + Lang.T($". La plus récente est {plusRecente.Groupe.Key}, présente sur {plusRecente.Groupe.Count()} poste(s) ; les postes nommés ci-dessous ont une version plus ancienne.",
+                                 $". The newest is {plusRecente.Groupe.Key}, found on {plusRecente.Groupe.Count()} machine(s); the machines named below have an older version."),
+                Action = Lang.T($"Mettre à jour les postes en retard vers la version la plus récente ({plusRecente.Groupe.Key}), ", $"Update the lagging machines to the newest version ({plusRecente.Groupe.Key}), ")
+                       + Lang.T("sauf si c'est justement cette version qui a introduit le problème — le rapport de chaque poste le dira.", "unless it is precisely this version that introduced the problem — each machine's own report will say."),
+                Machines = enRetard,
+            };
+        }
+
+        return new Correlation
+        {
+            Kind = "divergence",
+            Severity = "info",
+            Title = titre,
+            Details = repartition
+                    + Lang.T(". Ces numéros de version ne se comparent pas entre eux : le logiciel ne peut pas dire lequel est le plus récent.",
+                             ". These version numbers cannot be compared with each other: the software cannot tell which one is the newest."),
+            Action = Lang.T("Vérifier chez l'éditeur quelle version est la plus récente, puis aligner les autres postes dessus.",
+                            "Check with the vendor which version is the newest, then bring the other machines in line with it."),
+            Machines = versions.SelectMany(g => g.Select(e => e.Machine)).Distinct().OrderBy(x => x).ToList(),
+        };
+    }
+
+    /// <summary>
+    /// Le numéro en tête d'une version de fichier : « 10.0.26100.9549 (WinBuild…) »,
+    /// « 6.0.8923.1 built by: WinDDK », « 4.18.26080.4 (empreinte) ». Null si la
+    /// chaîne ne commence pas par un numéro à deux à quatre parties.
+    /// </summary>
+    internal static Version? NumeroDeVersion(string texte)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(texte ?? "", @"^\s*(\d+(?:\.\d+){1,3})");
+        return m.Success && Version.TryParse(m.Groups[1].Value, out var v) ? v : null;
     }
 
     private static int Rank(string severity) => severity switch { "crit" => 0, "warn" => 1, _ => 2 };

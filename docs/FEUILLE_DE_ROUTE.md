@@ -21,7 +21,8 @@
 | 1.7.0 | **jamais publiée** — construite et éprouvée sur un parc réel les 19, 20 et 21/09/2026. Cinq défauts en sont sortis, dont trois qu'aucune relecture de code n'aurait trouvés. Publier 1.7.0 puis 1.7.1 à trois jours d'intervalle n'aurait rien appris à personne |
 | 1.7.1 | **publiée** le 21/09/2026 — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔. C'est la 1.7.0 corrigée : voir « La matinée du 21/09/2026 », défauts A à E |
 | 1.8.0 | **publiée le 10/10/2026** — release créée par le travail « Publication » sur le tag `v1.8.0` (commit `32e924d`) ; empreintes publiées : MSI `1eb0a293…5ade09`, ZIP `dbfd4caf…62d60b8`. Articles palisser.fr mis à jour le même jour : article 30 (français) et 31 (anglais) — section « Nouveau en 1.8.0 », version actuelle, commandes `msiexec` ; articles 32, 33 et 34 vérifiés, sans mention de version à changer. — publication décidée le 10/10/2026 — par le tag `v1.8.0` : c'est le travail « Publication » de GitHub qui construit le MSI et le ZIP à partir du commit tagué, et qui ajoute lui-même les sommes SHA-256 au corps de la release. Les fichiers essayés sur les deux postes ont été construits localement à partir des mêmes sources ; ce ne sont pas, octet pour octet, ceux qui sont publiés. (Erreur corrigée le même jour : une section SHA-256 calculée sur les fichiers locaux avait été ajoutée aux notes — elle aurait donné des empreintes fausses pour les fichiers publiés, et a été retirée avant le tag.) — **en préparation de publication depuis le 10/10/2026** (numéro de version passé à 1.8.0, notes de version écrites ; MSI construit et **installé par-dessus la 1.7.1 sur le poste de l'auteur le 10/10/2026** — version affichée 1.8.0, service redémarré, rapport complet avec toutes les nouvelles cartes et conclusions ; un défaut trouvé et corrigé à cette occasion, voir point 86. **Essai sur un poste en mode parc réussi le 10/10/2026** : poste hors domaine en 1.7.1, mis à jour en 1.8.0 par installation locale du MSI — réglage du mode parc présent avant et après, service redémarré, console : version 1.8.0, « surveillance active », boîte noire ouverte à distance. **Confirmation faite le 12/10/2026** depuis la console, sur les postes du domaine : les 8 postes joignables sur 10 affichent la version 1.8.0 et « surveillance active » ; les deux autres étaient éteints (« délai dépassé »), dont un poste hors de l'établissement. Constaté en préparant la construction : `build\publish.ps1` portait encore `1.6.2` comme version par défaut de l'archive portable — passé à 1.8.0) — en cours depuis le 09/10/2026 — thème **le rapport rapproche ce qu'il sait** — points 80 à 87, ce qu'un rapport sur une machine inconnue a montré. Décidé le 09/10/2026 : passe AVANT winget, parce qu'il touche à la promesse même du logiciel — trouver la cause d'une panne — et sert tous les utilisateurs, pas seulement un parc |
-| 1.9.0 | prévue — thème **deux publics, un seul paquet** — point 79 : le mode parc devient une case à cocher de l'installation, absente par défaut, **sans qu'un poste déjà en mode parc le perde**. Décidé le 10/10/2026 : juste après la 1.8.0 et **avant winget**, pour que les particuliers qui installeront par winget n'aient déjà plus le mode parc. **Avec les points 93 et 94** (console : actualiser seulement la sélection, mettre à jour un seul poste par clic droit), placés le 12/10/2026 : la 1.9.0 touche déjà au déploiement par la console (le paquet devra y demander le mode parc), le même chemin n'est donc éprouvé qu'une fois |
+| 1.8.1 | **en cours depuis le 12/10/2026** — thème **un rapport de parc qui ne se trompe pas** — correctifs constatés sur le rapport du parc du 12/10/2026, dans cet ordre : 95 (conseil de divergence) → 98 (gravité des erreurs WHEA) → 97 (postes comparés nommés) → 92 (barre d'état coupée) → 90 (horloge fixe de 10 s). Ordre et répartition choisis le 12/10/2026, l'auteur ayant donné son accord sur tous les points et laissé l'ordre au choix : d'abord ce qui donne un conseil faux ou une alarme exagérée, puis ce qui manque au rapport, puis le confort. Lot 1 (point 95) livré le 12/10/2026 |
+| 1.9.0 | prévue — thème **deux publics, un seul paquet** — point 79 : le mode parc devient une case à cocher de l'installation, absente par défaut, **sans qu'un poste déjà en mode parc le perde**. Décidé le 10/10/2026 : juste après la 1.8.0 et **avant winget**, pour que les particuliers qui installeront par winget n'aient déjà plus le mode parc. **Avec les points 93 et 94** (console : actualiser seulement la sélection, mettre à jour un seul poste par clic droit), placés le 12/10/2026 : la 1.9.0 touche déjà au déploiement par la console (le paquet devra y demander le mode parc), le même chemin n'est donc éprouvé qu'une fois. **Avec aussi les points 96 et 99** (comparateur : regrouper les pilotes de Windows et de Defender, rapprocher une même alerte sur plusieurs postes), placés le 12/10/2026 : ce sont des ajouts au comparateur, pas des correctifs |
 | 1.10.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026. Décalé d'une version le 09/10/2026, puis d'une autre le 10/10/2026 (point 79 placé avant) |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
@@ -1606,6 +1607,33 @@ sont identiques. Proposé : une carte « même alerte sur N postes », avec le
 modèle de chaque poste quand il est connu.
 
 **Également relevé, déjà noté** : colonne « T° CPU » vide partout (point 91).
+
+**Mesure sur un des trois postes, 12/10/2026** (commande lancée par l'auteur,
+50 derniers événements WHEA du journal Système) : **50 événements, tous
+d'identifiant 17, tous de niveau « Avertissement »** — des erreurs que le
+matériel a corrigées lui-même, aucune fatale. L'« alerte critique » de ce poste
+était donc exagérée. C'est aussi une **incohérence interne** : les points 48 et
+49 (1.6.0) ont déjà appris au **rapport** de diagnostic à ne pas classer en
+critique des erreurs WHEA corrigées ; la **surveillance temps réel** du service,
+elle, n'en a pas tenu compte. Point 98 placé en 1.8.1 pour cette raison.
+
+**Répartition décidée le 12/10/2026** (accord de l'auteur sur tous les points,
+ordre laissé au choix) :
+
+- **1.8.1** — 95, puis 98, puis 97, puis 92 et 90. Ce sont des correctifs : un
+  conseil faux, une alarme exagérée, une information qui manque.
+- **1.9.0** — 96 et 99, avec 79, 93 et 94. Ce sont des ajouts au comparateur.
+
+**Lot 1 — point 95, livré le 12/10/2026.** `ParkComparator.Divergence` remplace
+le calcul en ligne : si tous les numéros de version se comparent
+(`ParkComparator.NumeroDeVersion`, qui lit le numéro en tête de chaîne, de deux
+à quatre parties), les postes nommés sont ceux qui n'ont pas la **plus
+récente**, et le conseil est de les mettre à jour vers elle ; la comparaison est
+numérique (`6.0.10016.1` est plus récente que `6.0.9496.1`). Si un numéro ne se
+lit pas, personne n'est désigné en retard : la carte donne la répartition et
+conseille de vérifier chez l'éditeur. La phrase « une version majoritaire et
+quelques retardataires » disparaît. Dix tests (`ParcDivergenceTests`, dont le
+cas réel du 12/10/2026).
 
 ## Points 93 et 94 — agir sur un seul poste depuis la Supervision
 
