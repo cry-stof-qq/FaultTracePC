@@ -21,7 +21,7 @@
 | 1.7.0 | **jamais publiée** — construite et éprouvée sur un parc réel les 19, 20 et 21/09/2026. Cinq défauts en sont sortis, dont trois qu'aucune relecture de code n'aurait trouvés. Publier 1.7.0 puis 1.7.1 à trois jours d'intervalle n'aurait rien appris à personne |
 | 1.7.1 | **publiée** le 21/09/2026 — thème **le parc entre dans le logiciel** — points 64 (déploiement, quatre lots) ✔, 43 (archivage des alertes) ✔ et 46 (boîte noire distante) ✔. C'est la 1.7.0 corrigée : voir « La matinée du 21/09/2026 », défauts A à E |
 | 1.8.0 | **publiée le 10/10/2026** — release créée par le travail « Publication » sur le tag `v1.8.0` (commit `32e924d`) ; empreintes publiées : MSI `1eb0a293…5ade09`, ZIP `dbfd4caf…62d60b8`. Articles palisser.fr mis à jour le même jour : article 30 (français) et 31 (anglais) — section « Nouveau en 1.8.0 », version actuelle, commandes `msiexec` ; articles 32, 33 et 34 vérifiés, sans mention de version à changer. — publication décidée le 10/10/2026 — par le tag `v1.8.0` : c'est le travail « Publication » de GitHub qui construit le MSI et le ZIP à partir du commit tagué, et qui ajoute lui-même les sommes SHA-256 au corps de la release. Les fichiers essayés sur les deux postes ont été construits localement à partir des mêmes sources ; ce ne sont pas, octet pour octet, ceux qui sont publiés. (Erreur corrigée le même jour : une section SHA-256 calculée sur les fichiers locaux avait été ajoutée aux notes — elle aurait donné des empreintes fausses pour les fichiers publiés, et a été retirée avant le tag.) — **en préparation de publication depuis le 10/10/2026** (numéro de version passé à 1.8.0, notes de version écrites ; MSI construit et **installé par-dessus la 1.7.1 sur le poste de l'auteur le 10/10/2026** — version affichée 1.8.0, service redémarré, rapport complet avec toutes les nouvelles cartes et conclusions ; un défaut trouvé et corrigé à cette occasion, voir point 86. **Essai sur un poste en mode parc réussi le 10/10/2026** : poste hors domaine en 1.7.1, mis à jour en 1.8.0 par installation locale du MSI — réglage du mode parc présent avant et après, service redémarré, console : version 1.8.0, « surveillance active », boîte noire ouverte à distance. **Confirmation faite le 12/10/2026** depuis la console, sur les postes du domaine : les 8 postes joignables sur 10 affichent la version 1.8.0 et « surveillance active » ; les deux autres étaient éteints (« délai dépassé »), dont un poste hors de l'établissement. Constaté en préparant la construction : `build\publish.ps1` portait encore `1.6.2` comme version par défaut de l'archive portable — passé à 1.8.0) — en cours depuis le 09/10/2026 — thème **le rapport rapproche ce qu'il sait** — points 80 à 87, ce qu'un rapport sur une machine inconnue a montré. Décidé le 09/10/2026 : passe AVANT winget, parce qu'il touche à la promesse même du logiciel — trouver la cause d'une panne — et sert tous les utilisateurs, pas seulement un parc |
-| 1.9.0 | prévue — thème **deux publics, un seul paquet** — point 79 : le mode parc devient une case à cocher de l'installation, absente par défaut, **sans qu'un poste déjà en mode parc le perde**. Décidé le 10/10/2026 : juste après la 1.8.0 et **avant winget**, pour que les particuliers qui installeront par winget n'aient déjà plus le mode parc |
+| 1.9.0 | prévue — thème **deux publics, un seul paquet** — point 79 : le mode parc devient une case à cocher de l'installation, absente par défaut, **sans qu'un poste déjà en mode parc le perde**. Décidé le 10/10/2026 : juste après la 1.8.0 et **avant winget**, pour que les particuliers qui installeront par winget n'aient déjà plus le mode parc. **Avec les points 93 et 94** (console : actualiser seulement la sélection, mettre à jour un seul poste par clic droit), placés le 12/10/2026 : la 1.9.0 touche déjà au déploiement par la console (le paquet devra y demander le mode parc), le même chemin n'est donc éprouvé qu'une fois |
 | 1.10.0 | prévue — thème **mettre à jour sans surprise** — point 15, le bloc winget : voir le plan arrêté le 19/09/2026. Décalé d'une version le 09/10/2026, puis d'une autre le 10/10/2026 (point 79 placé avant) |
 
 **Fait en 1.3.0 :** réglage de langue de portée machine (`ProgramData\FaultTracePC\langue.txt`, propriété MSI `FTPCLANG`, `--set-machine-lang`) ; alertes préventives refabriquées à la lecture à partir de la règle et de la valeur.
@@ -110,6 +110,8 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 90 | **Le relevé « toutes les 10 secondes » a lieu toutes les 12 secondes environ** | constaté le 10/10/2026 sur la boîte noire distante d'un poste — **décidé** : caler le service sur une horloge fixe, après la publication de la 1.8.0 ; voir « Point 90 » plus bas |
 | 91 | **Colonne « T° CPU » vide sur tous les postes de la console** | constaté le 12/10/2026 : vide sur les 8 postes joignables, alors que la colonne « T° GPU » est remplie sur 5 d'entre eux. **Cause non établie** : processeurs qui n'exposent pas leur sonde (fréquent sur les portables, voir point 86), ou lecture impossible par la bibliothèque de capteurs — aucune n'est vérifiée. À établir avant toute correction : la colonne était-elle remplie avant la 1.8.0 ? puis, comme au point 86, faire dire au service pourquoi la mesure manque |
 | 92 | **Texte de la barre d'état de la console coupé** | constaté le 12/10/2026 sur la console en 1.8.0 : « Tous les postes joignables son… » — défaut d'affichage, à corriger avec le prochain lot |
+| 93 | **Actualiser seulement les postes sélectionnés dans la Supervision** | demandé le 12/10/2026 — **placé en 1.9.0** ; voir « Points 93 et 94 » plus bas |
+| 94 | **Mettre à jour un seul poste par un clic droit dans la Supervision** | demandé le 12/10/2026 — **placé en 1.9.0** ; voir « Points 93 et 94 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1534,6 +1536,46 @@ C'est le meilleur banc d'essai que ce logiciel ait rencontré. Il faudrait en
 chercher d'autres.
 
 ---
+
+## Points 93 et 94 — agir sur un seul poste depuis la Supervision
+
+**Demande de l'auteur, 12/10/2026**, après la mise à jour du parc en 1.8.0 :
+pouvoir actualiser seulement la sélection, et pas tout le parc ; pouvoir faire
+un clic droit sur un poste pour mettre à jour ce poste-là seulement. Version
+laissée au choix : **placée en 1.9.0**.
+
+**Pourquoi la 1.9.0.** Le point 79 oblige déjà à reprendre le déploiement par
+la console : le paquet devra y demander explicitement le mode parc. Mettre à
+jour un poste par clic droit emprunte ce même chemin. Les faire ensemble évite
+d'éprouver le déploiement deux fois, sur deux versions. La 1.10.0 (winget) a un
+autre thème.
+
+**Ce qui existe déjà, vérifié dans le code le 12/10/2026.**
+
+- La liste de la Supervision (`LvMachines`) n'accepte qu'**un** poste
+  sélectionné à la fois (`SelectedItem`) ; « Actualiser tout »
+  (`BtnRefresh_Click` → `RefreshAllAsync`) interroge tout le parc.
+- Mettre à jour un seul poste est **déjà possible**, mais depuis l'onglet
+  Inventaire : cocher ce seul poste, puis « Déployer » (`BtnInvDeployer_Click`,
+  50 postes au plus par déploiement, paquet vérifié, confirmation).
+
+**Ce qui est à faire.**
+
+- Point 93 : sélection multiple dans la Supervision (Ctrl / Maj) et un bouton
+  « Actualiser la sélection » à côté de « Actualiser tout ».
+  **Garde-fou** : « Retirer la sélection » agit aujourd'hui sur un seul poste ;
+  avec la sélection multiple, retirer plusieurs postes demandera une
+  confirmation qui annonce leur nombre.
+- Point 94 : menu du clic droit sur un poste, avec « Mettre à jour ce poste ».
+  Même chemin et mêmes contrôles que le déploiement de l'Inventaire (paquet
+  vérifié, confirmation qui annonce la version actuelle du poste et celle du
+  paquet), pas un second mécanisme.
+  **À vérifier avant d'écrire** : le déploiement vise le nom d'ordinateur du
+  domaine ; la Supervision connaît le poste par son adresse et par le nom qu'il
+  annonce. Il faut s'assurer que c'est le bon poste qui est visé.
+- Proposé, pas décidé : le même menu pourrait reprendre les actions déjà
+  présentes en bas de la fenêtre (boîte noire, historique des alertes,
+  diagnostic à distance, actualiser ce poste). À trancher par l'auteur.
 
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
