@@ -1687,6 +1687,17 @@ la barre d'état leur aurait alors attribué une raison fausse.
   vrais formats incompatibles ; sa phrase n'a pas été retouchée.
 - Huit tests (`PerimetreComparaisonTests`).
 
+**Lot 4 — point 92, livré le 12/10/2026.** Vérifié dans `ParkWindow.xaml` : la
+barre du bas de la Supervision partageait une ligne en deux colonnes, le texte
+d'état à gauche, les cinq boutons à droite. Ce choix datait de l'arrivée d'un
+cinquième bouton, pour qu'un texte long ne passe jamais sous les boutons. Mais à
+la taille d'ouverture de la fenêtre, il ne restait au texte qu'environ 250
+pixels : le message courant (« … Tous les postes joignables sont en 1.8.0. »)
+était coupé. Le texte passe sur **sa propre ligne, au-dessus des boutons**, sur
+toute la largeur ; deux lignes au plus, la bulle d'aide garde le texte entier
+au survol. Il ne peut toujours pas chevaucher les boutons. Aucun test : c'est
+de la mise en page, à vérifier à l'œil dans la console.
+
 ## Points 93 et 94 — agir sur un seul poste depuis la Supervision
 
 **Demande de l'auteur, 12/10/2026**, après la mise à jour du parc en 1.8.0 :

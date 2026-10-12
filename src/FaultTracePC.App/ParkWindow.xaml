@@ -110,24 +110,28 @@
                 </ListView>
 
                 <Border Grid.Row="2" Background="#EDF1F6" Padding="14,8">
-                    <!-- DEUX COLONNES, ET PAS DEUX ÉLÉMENTS SUPERPOSÉS. Avec un
-                         cinquième bouton, une barre d'état un peu longue passerait
-                         SOUS les boutons et deviendrait illisible sans qu'on
-                         comprenne pourquoi. La colonne * laisse au texte la place
-                         qui reste, et le reste est tronqué proprement. -->
+                    <!-- DEUX LIGNES : le texte au-dessus, les boutons en dessous.
+                         Avant la 1.8.1, texte et boutons partageaient une ligne en deux
+                         colonnes (pour qu'un texte long ne passe jamais SOUS les
+                         boutons). Avec cinq boutons, la colonne du texte ne gardait
+                         qu'environ 250 pixels à la taille d'ouverture de la fenêtre,
+                         et le message courant était coupé : « Tous les postes
+                         joignables son… », constaté le 12/10/2026 (point 92). Sur sa
+                         propre ligne, le texte a toute la largeur, et ne peut toujours
+                         pas chevaucher les boutons. -->
                     <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <!-- La bulle d'aide reprend le texte de la barre elle-même : la
-                             colonne s'est rétrécie en accueillant un bouton de plus, et un
-                             message tronqué doit rester lisible au survol. -->
-                        <TextBlock x:Name="TxtStatus" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Foreground="#44546A"
-                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="34" Margin="0,0,10,0"
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <!-- La bulle d'aide reprend le texte de la barre elle-même : un
+                             message très long, tronqué malgré la largeur, reste lisible
+                             au survol. -->
+                        <TextBlock x:Name="TxtStatus" Grid.Row="0" VerticalAlignment="Center" FontSize="12" Foreground="#44546A"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="34" Margin="0,0,0,6"
                                    ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"
                                    Text="{x:Static loc:L.ParkHint}"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button x:Name="BtnParkReport" Content="{x:Static loc:L.ParkReport}" Padding="12,6"
                                     FontSize="12" Margin="0,0,8,0" Click="BtnParkReport_Click"
                                     ToolTip="{x:Static loc:L.ParkReportTip}"/>
