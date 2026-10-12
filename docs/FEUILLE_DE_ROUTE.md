@@ -111,7 +111,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 91 | **Colonne « T° CPU » vide sur tous les postes de la console** | constaté le 12/10/2026 : vide sur les 8 postes joignables, alors que la colonne « T° GPU » est remplie sur 5 d'entre eux. **Cause non établie** : processeurs qui n'exposent pas leur sonde (fréquent sur les portables, voir point 86), ou lecture impossible par la bibliothèque de capteurs — aucune n'est vérifiée. À établir avant toute correction : la colonne était-elle remplie avant la 1.8.0 ? puis, comme au point 86, faire dire au service pourquoi la mesure manque |
 | 92 | **Texte de la barre d'état de la console coupé** | constaté le 12/10/2026 sur la console en 1.8.0 : « Tous les postes joignables son… » — défaut d'affichage, à corriger avec le prochain lot |
 | 93 | **Actualiser seulement les postes sélectionnés dans la Supervision** | demandé le 12/10/2026 — **placé en 1.9.0** ; voir « Points 93 et 94 » plus bas |
-| 94 | **Mettre à jour un seul poste par un clic droit dans la Supervision** | demandé le 12/10/2026 — **placé en 1.9.0** ; voir « Points 93 et 94 » plus bas |
+| 94 | **Mettre à jour un seul poste par un clic droit dans la Supervision** | demandé le 12/10/2026 — **placé en 1.9.0** ; le menu reprend aussi boîte noire, historique des alertes, diagnostic à distance et « Actualiser ce poste » (validé le même jour) ; voir « Points 93 et 94 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1573,9 +1573,11 @@ autre thème.
   **À vérifier avant d'écrire** : le déploiement vise le nom d'ordinateur du
   domaine ; la Supervision connaît le poste par son adresse et par le nom qu'il
   annonce. Il faut s'assurer que c'est le bon poste qui est visé.
-- Proposé, pas décidé : le même menu pourrait reprendre les actions déjà
-  présentes en bas de la fenêtre (boîte noire, historique des alertes,
-  diagnostic à distance, actualiser ce poste). À trancher par l'auteur.
+- **Validé par l'auteur le 12/10/2026** : le même menu reprend aussi les
+  actions déjà présentes en bas de la fenêtre — boîte noire du poste,
+  historique des alertes, diagnostic à distance — ainsi qu'« Actualiser ce
+  poste ». Les boutons du bas restent en place : le menu est un raccourci de
+  plus, pas un remplacement.
 
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
