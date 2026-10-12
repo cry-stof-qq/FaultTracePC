@@ -97,6 +97,8 @@ public static class ParkReportGenerator
             sb.Append(Lang.T("<p class=\"explain\">Un diagnostic individuel ne peut pas voir ceci : un pilote ancien identique sur six postes ", "<p class=\"explain\">An individual diagnosis cannot see this: the same old driver on six machines ")
                     + Lang.T("n'est plus un suspect, c'est une image de déploiement à corriger — et la réparation se fait une fois pour tout le parc.</p>", "is no longer a suspect, it is a deployment image to fix — and the repair happens once, for the whole fleet.</p>"));
             sb.Append($"<p class=\"parkverdict\">{H(comparison.Summary)}</p>");
+            // Point 97 : sur quels postes porte la comparaison, et pourquoi les autres n'y sont pas.
+            sb.Append($"<p class=\"small\">{H(FaultTracePC.Core.Analysis.ParkComparator.Perimetre(comparison))}</p>");
 
             foreach (var c in comparison.Correlations)
             {

@@ -1661,6 +1661,32 @@ cas réel du 12/10/2026).
 restent « critiques » — elles ne portent ni numéro ni niveau, rien ne permet de
 les reclasser après coup. Elles sortent du compte des 90 jours en vieillissant.
 
+**Lot 3 — point 97, livré le 12/10/2026.**
+
+**Défaut trouvé en préparant ce lot, vérifié dans le code.** Un poste jamais
+analysé répond à `/api/summary` par `{"available":false,…}`. La console lisait
+cette réponse comme un résumé : format 0, donc refusé, donc compté parmi les
+postes « écartés : résumé produit par une version antérieure ». Sur le parc du
+12/10/2026, c'est probablement le cas des six postes joignables non comparés —
+la barre d'état leur aurait alors attribué une raison fausse.
+
+- `ParkComparator.LireReponse` (Core) classe la réponse : résumé lisible, poste
+  **jamais analysé**, format incompatible, ou réponse illisible.
+- `ParkComparator.MotifAbsence` : jamais analysé, format incompatible,
+  illisible, demande refusée, injoignable, secret maître absent ;
+  `TexteMotif` le dit avec ce qu'il faut faire (« jamais analysé — lancer un
+  diagnostic à distance »).
+- `ParkAnalysis.Compares` (rempli par `Analyze`) et `ParkAnalysis.NonCompares`
+  (rempli par la console, `ParkWindow.BtnParkReport_Click`, qui note la raison
+  de chaque poste resté dehors au lieu de l'ignorer).
+- `ParkComparator.Perimetre` : la phrase affichée dans le rapport du parc, juste
+  sous le verdict de la comparaison — « Comparaison faite sur 3 poste(s) sur
+  10 : … Non comparés (7) : … », et le rappel que les chiffres « N poste(s) sur
+  M » ne comptent que les postes comparés.
+- Le compteur de la barre d'état « version antérieure » ne compte plus que les
+  vrais formats incompatibles ; sa phrase n'a pas été retouchée.
+- Huit tests (`PerimetreComparaisonTests`).
+
 ## Points 93 et 94 — agir sur un seul poste depuis la Supervision
 
 **Demande de l'auteur, 12/10/2026**, après la mise à jour du parc en 1.8.0 :

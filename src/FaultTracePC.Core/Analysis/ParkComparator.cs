@@ -45,7 +45,30 @@ public static class ParkComparator
         public int WithSummary { get; set; }
         public List<Correlation> Correlations { get; } = new();
         public string Summary { get; set; } = "";
+        /// <summary>Point 97 : les postes réellement comparés, nommés.</summary>
+        public List<string> Compares { get; } = new();
+        /// <summary>Point 97 : les postes restés hors de la comparaison, avec la raison. Rempli par la console.</summary>
+        public List<PosteNonCompare> NonCompares { get; } = new();
     }
+
+    /// <summary>Pourquoi un poste du parc n'est pas entré dans la comparaison.</summary>
+    public enum MotifAbsence
+    {
+        /// <summary>Le poste répond, mais n'a jamais eu de diagnostic complet.</summary>
+        JamaisAnalyse,
+        /// <summary>Son dernier diagnostic est dans un format que cette console ne lit pas.</summary>
+        FormatIncompatible,
+        /// <summary>La réponse ne se lit pas du tout.</summary>
+        Illisible,
+        /// <summary>Le poste a refusé la demande (code HTTP d'échec).</summary>
+        Refuse,
+        /// <summary>Pas de réponse réseau.</summary>
+        Injoignable,
+        /// <summary>Ni jeton ni secret maître : la console n'a pas pu signer la demande.</summary>
+        SecretAbsent,
+    }
+
+    public sealed record PosteNonCompare(string Nom, MotifAbsence Motif);
 
     /// <summary>Âge à partir duquel un pilote mérite d'être signalé quand il est partagé.</summary>
     private static readonly TimeSpan OldDriver = TimeSpan.FromDays(4 * 365);
@@ -54,6 +77,7 @@ public static class ParkComparator
     {
         var today = now ?? DateTime.Now;
         var a = new ParkAnalysis { MachineCount = machines.Count, WithSummary = machines.Count };
+        a.Compares.AddRange(machines.Select(m => m.Name).OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
 
         if (machines.Count < 2)
         {
@@ -219,6 +243,65 @@ public static class ParkComparator
 
         a.Correlations.Sort((x, y) => Rank(x.Severity).CompareTo(Rank(y.Severity)));
         return a;
+    }
+
+    /// <summary>
+    /// Point 97, constaté le 12/10/2026 : un poste jamais analysé répond
+    /// <c>{"available":false,…}</c>. Lu comme un résumé, cela donnait un format 0,
+    /// et la console le comptait parmi les postes « écartés : résumé produit par
+    /// une version antérieure » — six postes sur un parc de dix, faussement.
+    /// Ici, la réponse de <c>/api/summary</c> est classée : résumé lisible, poste
+    /// jamais analysé, format incompatible, ou réponse illisible.
+    /// </summary>
+    public static (ScanHistory.ScanSummary? Resume, MotifAbsence? Motif) LireReponse(string json)
+    {
+        if (ScanHistory.Lire(json) is { } resume) return (resume, null);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+                return (null, MotifAbsence.Illisible);
+            foreach (var p in doc.RootElement.EnumerateObject())
+                if (string.Equals(p.Name, "available", StringComparison.OrdinalIgnoreCase)
+                    && p.Value.ValueKind == System.Text.Json.JsonValueKind.False)
+                    return (null, MotifAbsence.JamaisAnalyse);
+            return (null, MotifAbsence.FormatIncompatible);
+        }
+        catch { return (null, MotifAbsence.Illisible); }
+    }
+
+    /// <summary>Le motif d'absence, dit dans la langue en cours, avec ce qu'il faut faire.</summary>
+    public static string TexteMotif(MotifAbsence motif) => motif switch
+    {
+        MotifAbsence.JamaisAnalyse => Lang.T("jamais analysé — lancer un diagnostic à distance", "never analysed — run a remote diagnosis"),
+        MotifAbsence.FormatIncompatible => Lang.T("dernier diagnostic dans un format que cette console ne lit pas — mettre le poste et la console à la même version, puis relancer un diagnostic",
+                                                  "last diagnosis in a format this console cannot read — bring the machine and the console to the same version, then run a new diagnosis"),
+        MotifAbsence.Illisible => Lang.T("réponse illisible", "unreadable answer"),
+        MotifAbsence.Refuse => Lang.T("demande refusée par le poste", "request refused by the machine"),
+        MotifAbsence.Injoignable => Lang.T("injoignable", "unreachable"),
+        _ => Lang.T("secret maître absent", "master secret missing"),
+    };
+
+    /// <summary>
+    /// Point 97 : la phrase qui dit sur quels postes porte la comparaison. Sans
+    /// elle, « 2 poste(s) sur 3 » se lisait « deux tiers du parc » alors qu'il
+    /// s'agissait de 2 des 3 postes comparés, sur un parc de 10.
+    /// </summary>
+    public static string Perimetre(ParkAnalysis a)
+    {
+        var total = a.Compares.Count + a.NonCompares.Count;
+        var texte = Lang.T($"Comparaison faite sur {a.Compares.Count} poste(s) sur {total}", $"Comparison made on {a.Compares.Count} machine(s) out of {total}")
+                  + (a.Compares.Count > 0 ? Lang.T(" : ", ": ") + string.Join(", ", a.Compares) : "")
+                  + ".";
+        if (a.NonCompares.Count == 0) return texte;
+
+        return texte
+             + Lang.T($" Non comparés ({a.NonCompares.Count}) : ", $" Not compared ({a.NonCompares.Count}): ")
+             + string.Join(Lang.T(" ; ", "; "), a.NonCompares
+                   .OrderBy(p => p.Nom, StringComparer.OrdinalIgnoreCase)
+                   .Select(p => $"{p.Nom} ({TexteMotif(p.Motif)})"))
+             + Lang.T(". Les chiffres « N poste(s) sur M » ci-dessous comptent seulement les postes comparés.",
+                      ". The “N machine(s) out of M” figures below count the compared machines only.");
     }
 
     /// <summary>

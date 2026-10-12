@@ -367,29 +367,49 @@ public partial class ParkWindow : Window
             // les relevés temps réel disent l'état, pas l'inventaire.
             TxtStatus.Text = Lang.T("Récupération des résumés d'analyse pour la comparaison…", "Fetching the analysis summaries for the comparison…");
             var summaries = new List<Core.Analysis.ParkComparator.MachineSummary>();
+            // Point 97 : chaque poste qui reste hors de la comparaison est noté avec
+            // sa raison, et le rapport les nomme. Avant, ils disparaissaient sans
+            // trace, et un poste jamais analysé était compté « version antérieure ».
+            var nonCompares = new List<Core.Analysis.ParkComparator.PosteNonCompare>();
             var ignoresFormat = 0;
             foreach (var m in _machines)
             {
                 try
                 {
                     using var req = SignedRequest(m, HttpMethod.Get, "/api/summary");
-                    if (req is null) continue;
+                    if (req is null)
+                    {
+                        nonCompares.Add(new(m.Name, Core.Analysis.ParkComparator.MotifAbsence.SecretAbsent));
+                        continue;
+                    }
                     using var resp = await Http.SendAsync(req);
-                    if (!resp.IsSuccessStatusCode) continue;
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        nonCompares.Add(new(m.Name, Core.Analysis.ParkComparator.MotifAbsence.Refuse));
+                        continue;
+                    }
                     var json = await resp.Content.ReadAsStringAsync();
-                    // Lire() plutôt qu'une désérialisation directe : un poste resté
-                    // en 1.3 renvoie un résumé sans tampon de format. Le lire comme
-                    // s'il était à jour produirait une comparaison fausse, ce qui est
-                    // pire qu'un poste absent du tableau.
-                    if (Core.Report.ScanHistory.Lire(json) is { } sum)
+                    // LireReponse() plutôt qu'une désérialisation directe : un poste
+                    // resté en 1.3 renvoie un résumé sans tampon de format. Le lire
+                    // comme s'il était à jour produirait une comparaison fausse, ce
+                    // qui est pire qu'un poste absent du tableau.
+                    var (sum, motif) = Core.Analysis.ParkComparator.LireReponse(json);
+                    if (sum is not null)
                         summaries.Add(new Core.Analysis.ParkComparator.MachineSummary(m.Name, sum));
                     else
-                        ignoresFormat++;
+                    {
+                        nonCompares.Add(new(m.Name, motif ?? Core.Analysis.ParkComparator.MotifAbsence.Illisible));
+                        if (motif == Core.Analysis.ParkComparator.MotifAbsence.FormatIncompatible) ignoresFormat++;
+                    }
                 }
-                catch { /* poste injoignable ou jamais analysé : il sort simplement de la comparaison */ }
+                catch
+                {
+                    nonCompares.Add(new(m.Name, Core.Analysis.ParkComparator.MotifAbsence.Injoignable));
+                }
             }
 
             var comparison = Core.Analysis.ParkComparator.Analyze(summaries);
+            comparison.NonCompares.AddRange(nonCompares);
             var path = ParkReportGenerator.WriteToDisk(lines, comparison);
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             TxtStatus.Text = Lang.T($"Rapport du parc généré : {path}", $"Fleet report generated: {path}")
