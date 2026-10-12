@@ -112,6 +112,11 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 92 | **Texte de la barre d'état de la console coupé** | constaté le 12/10/2026 sur la console en 1.8.0 : « Tous les postes joignables son… » — défaut d'affichage, à corriger avec le prochain lot |
 | 93 | **Actualiser seulement les postes sélectionnés dans la Supervision** | demandé le 12/10/2026 — **placé en 1.9.0** ; voir « Points 93 et 94 » plus bas |
 | 94 | **Mettre à jour un seul poste par un clic droit dans la Supervision** | demandé le 12/10/2026 — **placé en 1.9.0** ; le menu reprend aussi boîte noire, historique des alertes, diagnostic à distance et « Actualiser ce poste » (validé le même jour) ; voir « Points 93 et 94 » plus bas |
+| 95 | **Divergence de version : le conseil peut dire de revenir en arrière** | constaté le 12/10/2026 — **défaut** : le poste le plus à jour est désigné « en retard » ; voir « Rapport du parc du 12/10/2026 » plus bas |
+| 96 | **Divergence de version : 88 cartes, dont 80 pour un seul poste** | constaté le 12/10/2026 — bruit : pilotes de Windows et de Defender comptés un par un ; voir « Rapport du parc du 12/10/2026 » plus bas |
+| 97 | **Le rapport du parc ne dit pas quels postes il a comparés** | constaté le 12/10/2026 — comparaison faite sur 3 postes sur 10 sans le nommer ; voir « Rapport du parc du 12/10/2026 » plus bas |
+| 98 | **Toute erreur WHEA est une « alerte critique », corrigée ou fatale** | constaté le 12/10/2026 dans le code ; numéro d'événement non conservé ; voir « Rapport du parc du 12/10/2026 » plus bas |
+| 99 | **Même alerte sur plusieurs postes : le comparateur ne la rapproche pas** | constaté le 12/10/2026 — trois postes d'une même série en alerte WHEA ; voir « Rapport du parc du 12/10/2026 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1536,6 +1541,71 @@ C'est le meilleur banc d'essai que ce logiciel ait rencontré. Il faudrait en
 chercher d'autres.
 
 ---
+
+## Rapport du parc du 12/10/2026 — ce qu'il a montré (points 95 à 99)
+
+Rapport du parc généré par la console 1.8.0, 10 postes, 9 joignables. Relu à
+la demande de l'auteur pour voir ce qui pourrait être amélioré en mode parc.
+Noms de postes remplacés ici par leur rôle.
+
+**Point 95 — défaut : le conseil peut dire de revenir en arrière.** Vérifié
+dans `ParkComparator.Analyze` : la version « majoritaire » est simplement la
+plus fréquente, et tous les autres postes sont dits « en retard ». Sur ce
+rapport, le poste de l'auteur porte les pilotes de Windows les **plus récents**
+(`10.0.26100.9549` contre `10.0.26100.9278` sur les deux autres) : il est
+pourtant désigné « en retard », et le conseil revient à lui faire installer une
+version plus ancienne. Quand chaque version n'existe que sur un poste (trois
+versions, trois postes), la « majoritaire » est tirée au hasard de l'ordre, et
+la phrase « une version majoritaire et quelques retardataires » est fausse.
+À corriger : comparer les numéros de version, désigner les postes en retard
+**par rapport à la plus récente**, et ne pas parler de majorité quand il n'y
+en a pas.
+
+**Point 96 — bruit : 88 cartes « divergence de version », dont 80 pour un seul
+poste.** Ce sont des pilotes livrés avec Windows (signature `WinBuild`) : ils
+changent tous ensemble à chaque mise à jour cumulative. Un poste qui a un mois
+de mises à jour d'avance produit donc une carte par fichier. Même chose pour
+les pilotes de Microsoft Defender (`WdFilter`, `WdBoot`, `WdNisDrv`, `KslD`),
+mis à jour avec sa plateforme. Le fait utile tient en une carte : « tel poste
+n'a pas le même niveau de mise à jour de Windows que les autres ». Proposé :
+regrouper les pilotes de Windows en une carte « niveau de mise à jour », ceux
+de Defender en une carte « plateforme Defender », et ne garder une carte par
+fichier que pour les pilotes de constructeurs.
+
+**Point 97 — le rapport ne dit pas quels postes il a comparés.** La
+comparaison ne porte que sur les postes qui ont déjà un diagnostic complet
+(résumé `/api/summary`) : ici **3 postes sur 10**. Les 6 autres postes
+joignables, jamais analysés, sortent de la comparaison sans être nommés ; les
+postes écartés parce que leur résumé vient d'une version plus ancienne ne sont
+signalés que dans la barre d'état de la console, pas dans le rapport. « 2
+poste(s) sur 3 » se lit alors comme « 2 postes sur 3 du parc ». À ajouter dans
+le rapport : la liste des postes comparés, celle des postes non comparés avec
+la raison, et le conseil de lancer un diagnostic à distance sur ces derniers.
+
+**Point 98 — toute erreur WHEA est une « alerte critique ».** Vérifié dans
+`AlertEngine.EvaluateEvent` : tout événement du fournisseur `WHEA-Logger`
+donne une alerte `crit`, que l'erreur ait été **corrigée** par le matériel ou
+qu'elle soit **fatale**. Le texte de l'alerte le reconnaît lui-même (« une
+erreur corrigée ou fatale »). Et l'alerte archivée ne garde **ni le numéro
+d'événement ni son niveau** (`ex` vide) : on ne peut plus savoir après coup ce
+qui s'est passé. Sur ce rapport, trois postes sont en « alerte critique » pour
+cette seule raison (35, 18 et 1 alertes archivées). Proposé : garder le numéro
+et le niveau de l'événement dans l'alerte, et graduer par le **niveau** que
+Windows donne lui-même à l'événement (avertissement → « à surveiller »,
+erreur ou critique → « critique ») plutôt que par une table de numéros.
+**À vérifier d'abord sur un des postes concernés** : quels numéros et quels
+niveaux d'événements WHEA il porte réellement.
+
+**Point 99 — même alerte sur plusieurs postes : le comparateur ne la rapproche
+pas.** Le comparateur croise les pilotes et les codes d'arrêt, pas les alertes
+de la surveillance. Les trois postes en alerte WHEA appartiennent à la même
+série de machines (même convention de nom, même année) : c'est exactement le
+genre de fait qu'un diagnostic individuel ne voit pas. Le rapport du parc
+n'affiche pas non plus le modèle des machines, ce qui empêche de dire si elles
+sont identiques. Proposé : une carte « même alerte sur N postes », avec le
+modèle de chaque poste quand il est connu.
+
+**Également relevé, déjà noté** : colonne « T° CPU » vide partout (point 91).
 
 ## Points 93 et 94 — agir sur un seul poste depuis la Supervision
 
