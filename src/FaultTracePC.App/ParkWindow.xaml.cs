@@ -248,8 +248,49 @@ public partial class ParkWindow : Window
         _ = RefreshAllAsync();
     }
 
+    /// <summary>
+    /// Point 93 : les postes sélectionnés, dans l'ordre de la liste. La liste
+    /// accepte désormais la sélection multiple (Ctrl+clic, Maj+clic).
+    /// </summary>
+    private List<Row> PostesSelectionnes() =>
+        LvMachines.SelectedItems.OfType<Row>()
+            .OrderBy(r => LvMachines.Items.IndexOf(r))
+            .ToList();
+
+    /// <summary>
+    /// Point 93 : pour les actions qui visent UN poste (boîte noire, historique,
+    /// diagnostic à distance, dernier rapport, menu du clic droit). Avec la
+    /// sélection multiple, <c>SelectedItem</c> rendrait le premier poste
+    /// sélectionné — l'action partirait sur un poste choisi au hasard de l'ordre
+    /// des clics. On le dit au lieu de deviner.
+    /// </summary>
+    private Row? UnSeulPoste()
+    {
+        var choisis = PostesSelectionnes();
+        if (choisis.Count == 1) return choisis[0];
+
+        MessageBox.Show(this,
+            choisis.Count == 0
+                ? Lang.T("Sélectionne d'abord une machine dans la liste.", "Select a machine in the list first.")
+                : Lang.T($"Cette action vise un seul poste, et {choisis.Count} sont sélectionnés. Clique sur un seul poste, puis recommence.",
+                         $"This action targets a single machine, and {choisis.Count} are selected. Click a single machine, then try again."),
+            "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
+        return null;
+    }
+
     private void BtnRemove_Click(object sender, RoutedEventArgs e)
     {
+        // Point 93 : plusieurs postes sélectionnés — une confirmation qui fait
+        // TAPER leur nombre, comme pour un déploiement. Retirer se rattrape (on
+        // rajoute le poste), mais retirer dix postes d'un geste malheureux, puis
+        // retrouver leurs noms, adresses et jetons, coûte cher.
+        var choisis = PostesSelectionnes();
+        if (choisis.Count > 1)
+        {
+            RetirerPlusieurs(choisis);
+            return;
+        }
+
         if (LvMachines.SelectedItem is not Row row)
         {
             MessageBox.Show(this,
@@ -287,6 +328,69 @@ public partial class ParkWindow : Window
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => _ = RefreshAllAsync();
 
+    /// <summary>Point 93 : retirer plusieurs postes, après confirmation chiffrée.</summary>
+    private void RetirerPlusieurs(List<Row> choisis)
+    {
+        var noms = string.Join(", ", choisis.Select(r => r.Name));
+        var question = Lang.T($"Retirer {choisis.Count} postes de la console de parc ?", $"Remove {choisis.Count} machines from the fleet console?");
+        var detail = noms;
+        var consequences = Lang.T("Cela retire seulement ces postes de TA liste de supervision :", "This only removes these machines from YOUR monitoring list:") + "\n"
+            + Lang.T("• rien n'est désinstallé sur les postes distants ;", "• nothing is uninstalled on the remote machines;") + "\n"
+            + Lang.T("• leur historique local n'est pas touché ;", "• their local history is untouched;") + "\n"
+            + Lang.T("• tu pourras les rajouter plus tard, un par un, avec leur nom et leur adresse.", "• you can add them back later, one by one, with their name and address.");
+        if (!ConfirmationChiffreeWindow.Demander(this, choisis.Count, question, detail, consequences)) return;
+
+        var cles = new HashSet<string>(choisis.Select(r => $"{r.Name}|{r.Host}"));
+        int retires = _machines.RemoveAll(m => cles.Contains($"{m.Name}|{m.Host}:{m.Port}"));
+        SaveMachines();
+        foreach (var k in _lastResults.Keys.Where(k => cles.Contains($"{k.Name}|{k.Host}:{k.Port}")).ToList())
+            _lastResults.Remove(k);
+        RenderRows(_lastResults);
+
+        TxtStatus.Text = Lang.T($"{retires} poste(s) retiré(s) de la liste. {_machines.Count} machine(s) supervisée(s).",
+                                $"{retires} machine(s) removed from the list. {_machines.Count} machine(s) monitored.");
+    }
+
+    /// <summary>
+    /// Point 93 : « Actualiser la sélection » — interroge seulement les postes
+    /// sélectionnés, archive leurs alertes (point 43), et rend la sélection
+    /// telle qu'elle était après le réaffichage de la liste.
+    /// </summary>
+    private async void BtnRefreshSelection_Click(object sender, RoutedEventArgs e)
+    {
+        var choisis = PostesSelectionnes();
+        if (choisis.Count == 0)
+        {
+            MessageBox.Show(this,
+                Lang.T("Sélectionne d'abord un ou plusieurs postes (Ctrl+clic ou Maj+clic pour en choisir plusieurs).",
+                       "Select one or more machines first (Ctrl+click or Shift+click to pick several)."),
+                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var cles = new HashSet<string>(choisis.Select(r => $"{r.Name}|{r.Host}"));
+        var machines = _machines.Where(m => cles.Contains($"{m.Name}|{m.Host}:{m.Port}")).ToList();
+        if (machines.Count == 0) return;
+
+        TxtStatus.Text = Lang.T($"Interrogation de {machines.Count} poste(s)…", $"Querying {machines.Count} machine(s)…");
+        var resultats = await Task.WhenAll(machines.Select(QueryAsync));
+        foreach (var r in resultats) _lastResults[r.Machine] = r;
+        var archivage = await ArchiverLesAlertes(resultats);
+        RenderRows(_lastResults);
+        Reselectionner(cles);
+
+        TxtStatus.Text = Lang.T($"{machines.Count} poste(s) actualisé(s) à {DateTime.Now:HH:mm:ss} — {resultats.Count(r => r.Ok)} joignable(s).",
+                                $"{machines.Count} machine(s) refreshed at {DateTime.Now:HH:mm:ss} — {resultats.Count(r => r.Ok)} reachable.")
+            + archivage;
+    }
+
+    /// <summary>Après un réaffichage de la liste, resélectionne les postes donnés (clé « nom|hôte:port »).</summary>
+    private void Reselectionner(HashSet<string> cles)
+    {
+        foreach (var r in LvMachines.Items.OfType<Row>().Where(r => cles.Contains($"{r.Name}|{r.Host}")).ToList())
+            LvMachines.SelectedItems.Add(r);
+    }
+
     /// <summary>
     /// Point 94 : le menu ne s'ouvre que sur une LIGNE — chaque entrée agit sur le
     /// poste visé. Un clic droit dans une zone vide, alors qu'un autre poste est
@@ -313,7 +417,7 @@ public partial class ParkWindow : Window
     /// </summary>
     private async void MnuMettreAJourPoste_Click(object sender, RoutedEventArgs e)
     {
-        if (LvMachines.SelectedItem is not Row row) return;
+        if (UnSeulPoste() is not Row row) return;
         var machine = _machines.FirstOrDefault(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
 
         TabsParc.SelectedItem = TabInventaire;
@@ -365,7 +469,7 @@ public partial class ParkWindow : Window
 
     private void MnuActualiserPoste_Click(object sender, RoutedEventArgs e)
     {
-        if (LvMachines.SelectedItem is not Row row) return;
+        if (UnSeulPoste() is not Row row) return;
         var machine = _machines.FirstOrDefault(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
         if (machine is not null) _ = RefreshOneAsync(machine);
     }
@@ -382,6 +486,7 @@ public partial class ParkWindow : Window
         _lastResults[machine] = resultat;
         var archivage = await ArchiverLesAlertes([resultat]);
         RenderRows(_lastResults);
+        Reselectionner([$"{machine.Name}|{machine.Host}:{machine.Port}"]);
         TxtStatus.Text = (resultat.Ok
                 ? Lang.T($"{machine.Name} actualisé à {DateTime.Now:HH:mm:ss} — joignable.", $"{machine.Name} refreshed at {DateTime.Now:HH:mm:ss} — reachable.")
                 : Lang.T($"{machine.Name} actualisé à {DateTime.Now:HH:mm:ss} — injoignable.", $"{machine.Name} refreshed at {DateTime.Now:HH:mm:ss} — unreachable."))
@@ -790,12 +895,8 @@ public partial class ParkWindow : Window
     /// </summary>
     private async void BtnRemoteScan_Click(object sender, RoutedEventArgs e)
     {
-        if (LvMachines.SelectedItem is not Row row)
-        {
-            MessageBox.Show(this, Lang.T("Sélectionne d'abord une machine dans la liste.", "Select a machine in the list first."), "FaultTracePC",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        // Point 93 : cette action vise UN poste — voir UnSeulPoste().
+        if (UnSeulPoste() is not Row row) return;
         var machine = _machines.FirstOrDefault(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
         if (machine is null) return;
 
@@ -870,12 +971,8 @@ public partial class ParkWindow : Window
 
     private async void BtnOpenReport_Click(object sender, RoutedEventArgs e)
     {
-        if (LvMachines.SelectedItem is not Row row)
-        {
-            MessageBox.Show(this, Lang.T("Sélectionne d'abord une machine dans la liste.", "Select a machine in the list first."), "FaultTracePC",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        // Point 93 : cette action vise UN poste — voir UnSeulPoste().
+        if (UnSeulPoste() is not Row row) return;
         var machine = _machines.FirstOrDefault(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
         if (machine is null) return;
         if (SansJeton(machine)) return;

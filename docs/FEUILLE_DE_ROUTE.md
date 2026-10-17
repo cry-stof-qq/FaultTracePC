@@ -1798,6 +1798,26 @@ rien n'est coché et le message de la lecture est gardé à la suite du sien.
 
 **Point 94 terminé le 17/10/2026** — validé par l'auteur à l'écran, CI verte.
 
+**Point 93 — livré le 17/10/2026 (un seul lot).**
+
+- `LvMachines` en `SelectionMode="Extended"` : Ctrl+clic, Maj+clic.
+- Bouton **« 🔄 Actualiser la sélection »** à côté de « Actualiser tout »
+  (`BtnRefreshSelection_Click`) : n'interroge que les postes choisis, archive
+  leurs alertes (point 43), puis **resélectionne** les mêmes postes après le
+  réaffichage de la liste (`Reselectionner`) — sans quoi la sélection
+  disparaîtrait à chaque actualisation. « Actualiser ce poste » (point 94)
+  garde aussi la ligne sélectionnée.
+- **« Retirer la sélection » avec plusieurs postes** : confirmation chiffrée
+  (`ConfirmationChiffreeWindow`, saisie du nombre), avec la liste des noms et ce
+  que le retrait fait et ne fait pas — garde-fou prévu au plan du 12/10/2026.
+  Avec un seul poste, la confirmation d'origine est inchangée.
+- **Les actions qui visent UN poste** (boîte noire, historique des alertes,
+  diagnostic à distance, dernier rapport, menu du clic droit) passent par
+  `UnSeulPoste()` : avec plusieurs postes sélectionnés, elles le disent au lieu
+  d'agir sur le premier de la sélection — que `SelectedItem` aurait rendu sans
+  prévenir.
+- Aucun test automatique (interface WPF) ; à vérifier à l'écran.
+
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
 Constaté le 10/10/2026 en ouvrant à distance la boîte noire d'un poste mis à

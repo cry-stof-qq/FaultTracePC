@@ -351,6 +351,11 @@ public static class L
     public static string ParkRemove => Lang.T("🗑 Retirer la sélection", "🗑 Remove the selection");
     public static string ParkRefreshAll => Lang.T("🔄 Actualiser tout", "🔄 Refresh all");
     // Point 94 : menu du clic droit sur un poste de la Supervision.
+    // Point 93 : sélection de plusieurs postes dans la Supervision.
+    public static string ParkRefreshSelection => Lang.T("🔄 Actualiser la sélection", "🔄 Refresh the selection");
+    public static string ParkRefreshSelectionTip => Lang.T(
+        "Interroge seulement les postes sélectionnés. Ctrl+clic pour ajouter un poste à la sélection, Maj+clic pour une plage.",
+        "Queries only the selected machines. Ctrl+click to add a machine to the selection, Shift+click for a range.");
     public static string ParkMenuRefreshOne => Lang.T("🔄 Actualiser ce poste", "🔄 Refresh this machine");
     public static string ParkMenuUpdateOne => Lang.T("⬆ Mettre à jour ce poste…", "⬆ Update this machine…");
     public static string ParkColMachine => Lang.T("Machine", "Machine");

@@ -129,13 +129,8 @@ public partial class ParkWindow
     /// </summary>
     private void BtnHistoriqueAlertes_Click(object sender, RoutedEventArgs e)
     {
-        if (LvMachines.SelectedItem is not Row row)
-        {
-            MessageBox.Show(this,
-                Lang.T("Sélectionne d'abord une machine dans la liste.", "Select a machine in the list first."),
-                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        // Point 93 : cette action vise UN poste — voir UnSeulPoste().
+        if (UnSeulPoste() is not Row row) return;
 
         new HistoriqueAlertesWindow(this, row.Name).ShowDialog();
 

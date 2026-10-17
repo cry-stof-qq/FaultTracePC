@@ -32,13 +32,8 @@ public partial class ParkWindow
 
     private void BtnBoiteNoire_Click(object sender, RoutedEventArgs e)
     {
-        if (LvMachines.SelectedItem is not Row ligne)
-        {
-            MessageBox.Show(this,
-                Lang.T("Sélectionne d'abord une machine dans la liste.", "Select a machine in the list first."),
-                "FaultTracePC", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        // Point 93 : cette action vise UN poste — voir UnSeulPoste().
+        if (UnSeulPoste() is not Row ligne) return;
 
         var machine = _machines.FirstOrDefault(m => m.Name == ligne.Name && $"{m.Host}:{m.Port}" == ligne.Host);
         if (machine is null) return;
