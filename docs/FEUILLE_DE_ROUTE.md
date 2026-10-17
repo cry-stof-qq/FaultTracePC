@@ -2141,6 +2141,36 @@ l'installateur (fonctionnalité, valeurs de registre, condition de mise à jour)
 lot 3 : notes, article, et la forme `ADDLOCAL` corrigée partout où elle est
 publiée ; puis les essais du tableau sur de vrais postes.
 
+**Lot 1 — livré le 17/10/2026.**
+
+- **Trouvé en préparant ce lot, vérifié dans `installer/FaultTracePC.wxs`** :
+  la fonctionnalité `Main` pose **déjà** une valeur
+  `HKLM\Software\Cry-stof\FaultTracePC\Installed = 1` (composant des
+  raccourcis). Le plan du lot 0 prévoyait une valeur « installé par le MSI »
+  pour distinguer la version portable (D4) : la réutiliser aurait **caché la
+  console à tous les postes en 1.8.x** dès l'arrivée de ce code, puisqu'ils ont
+  `Installed` sans avoir la case. D'où deux valeurs **nouvelles**, sous la même
+  clé : `ParkFeatureManaged` (posée par `Main` d'un installateur qui connaît la
+  case — lot 2) et `ParkFeature` (posée par la fonctionnalité « Mode parc » —
+  lot 2).
+- `Core/ModeParc.cs` : la décision, testable — console visible si la case n'est
+  pas gérée (portable, ou installateur antérieur) ou si elle est cochée ;
+  « Réseau » visible avec la console ou si le poste est en mode Client (D3) ;
+  lecture du registre dans la vue 64 bits, registre illisible traité comme une
+  version portable.
+- `MainWindow` : `AppliquerModeParc()` au démarrage et après la fenêtre
+  « Réseau ».
+- **Aucun changement visible tant que le lot 2 n'est pas fait** : aucun
+  installateur ne pose encore `ParkFeatureManaged`, donc tout reste affiché.
+- Quatorze tests (`ModeParcTests`).
+
+**Bac à sable Windows, proposé par l'auteur le 17/10/2026 pour les essais** :
+Windows Sandbox donne un Windows propre à chaque ouverture — idéal pour les
+installations neuves du tableau, et pour une mise à jour 1.8.1 → 1.9.0 faite
+dans la même séance (installer la 1.8.1, la passer en mode Client, puis
+installer la 1.9.0). Il ne remplace pas l'essai sur un vrai poste du parc,
+déployé par la console.
+
 ### Les deux options écartées, et pourquoi
 
 Elles sont écrites ici parce qu'une piste abandonnée sans motif se represente.

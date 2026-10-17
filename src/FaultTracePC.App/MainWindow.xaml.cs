@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         RefreshLanguageButton();
+        AppliquerModeParc();
         Loaded += (_, _) => RefreshMonitorButton();
         // Version réellement embarquée dans l'assembly : le pied de page ne peut
         // pas mentir sur ce qui tourne.
@@ -394,8 +395,26 @@ public partial class MainWindow : Window
         new MonitorWindow { Owner = this }.Show();
     }
 
-    private void BtnNetwork_Click(object sender, RoutedEventArgs e) =>
+    private void BtnNetwork_Click(object sender, RoutedEventArgs e)
+    {
         new RemoteConfigWindow { Owner = this }.ShowDialog();
+        // Le mode du poste a pu changer dans la fenêtre : « Réseau » en dépend (D3).
+        AppliquerModeParc();
+    }
+
+    /// <summary>
+    /// Point 79 : affiche ou cache « Parc » et « Réseau » selon la case « Mode parc »
+    /// de l'installation (D1), la version portable (D4) et le mode Client du poste
+    /// (D3). Voir <see cref="ModeParc"/>.
+    /// </summary>
+    private void AppliquerModeParc()
+    {
+        var (geree, cochee) = ModeParc.LireInstallation();
+        var console = ModeParc.ConsoleVisible(geree, cochee);
+        BtnPark.Visibility = console ? Visibility.Visible : Visibility.Collapsed;
+        BtnNetwork.Visibility = ModeParc.ReseauVisible(console, RemoteConfig.Load().ModeClientActif)
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     private void BtnPark_Click(object sender, RoutedEventArgs e) =>
         new ParkWindow { Owner = this }.Show();
