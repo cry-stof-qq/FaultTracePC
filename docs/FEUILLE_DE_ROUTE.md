@@ -2235,10 +2235,10 @@ sable. Points de contrôle « Windows propre » et « 1.8.1 ».
 | 1.8.1 publiée installée | « Parc » et « Réseau » présents — conforme |
 | Mise à jour 1.8.1 → MSI du lot 2 (interactive) | rien ne change à l'écran : console et « Réseau » toujours là — **D2 conforme** |
 | Installation de maintenance « Modifier », fonctionnalité « Mode parc » retirée | l'arbre la montrait installée ; une fois retirée, « Parc » et « Réseau » disparaissent — **conforme** |
+| Nouvelle construction du MSI (nouvel identifiant de produit), installée par-dessus le poste sans mode parc | traitée comme une mise à jour, pas comme une réparation ; « Mode parc » **non coché** dans l'arbre, ni « Parc » ni « Réseau » après installation ; registre : `Installed = 1`, `ParkFeatureManaged = 1`, **pas** de `ParkFeature` — **conforme** (la case décochée survit à la mise à jour) |
 
-Non encore vérifiés : les valeurs de registre elles-mêmes, une mise à jour qui
-doit **garder la case décochée**, les installations silencieuses, le poste en
-mode Client mis à jour avec `ADDLOCAL=Main`, la désinstallation.
+Non encore vérifiés : les installations silencieuses, le poste en mode Client
+mis à jour avec `ADDLOCAL=Main` (D1 et D3), la désinstallation.
 
 **Défaut constaté au même essai, corrigé directement** : la carte « Aucune
 protection antivirus en temps réel » du rapport **français** affichait
