@@ -1758,7 +1758,7 @@ sélectionné, aurait sinon agi sur ce poste sans qu'on le vise. « Actualiser c
 poste » (`RefreshOneAsync`) interroge ce seul poste, archive ses alertes comme
 l'actualisation complète (point 43) et ne touche pas à l'état connu des autres.
 « Mettre à jour ce poste » : lot 2. Aucun test automatique — interface WPF, à
-vérifier à l'écran.
+vérifier à l'écran. **Vérifié à l'écran le 17/10/2026** par l'auteur, dans la console compilée : menu présent sur un poste, entrées fonctionnelles.
 
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
