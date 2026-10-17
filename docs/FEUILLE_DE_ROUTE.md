@@ -2236,9 +2236,15 @@ sable. Points de contrôle « Windows propre » et « 1.8.1 ».
 | Mise à jour 1.8.1 → MSI du lot 2 (interactive) | rien ne change à l'écran : console et « Réseau » toujours là — **D2 conforme** |
 | Installation de maintenance « Modifier », fonctionnalité « Mode parc » retirée | l'arbre la montrait installée ; une fois retirée, « Parc » et « Réseau » disparaissent — **conforme** |
 | Nouvelle construction du MSI (nouvel identifiant de produit), installée par-dessus le poste sans mode parc | traitée comme une mise à jour, pas comme une réparation ; « Mode parc » **non coché** dans l'arbre, ni « Parc » ni « Réseau » après installation ; registre : `Installed = 1`, `ParkFeatureManaged = 1`, **pas** de `ParkFeature` — **conforme** (la case décochée survit à la mise à jour) |
+| Poste 1.8.1 passé en mode Client (`--configure-remote`), puis mis à jour en silencieux avec `ADDLOCAL=Main` (forme publiée aujourd'hui) | `remote.json` intact (« Client », même jeton) ; port 58620 en écoute après la mise à jour ; registre sans `ParkFeature` — **D1 conforme** : le poste reste supervisé sans la case. Comme prévu au plan, `ADDLOCAL=Main` **ne pose pas** la case même en venant d'une 1.8.x : la condition de D2 ne joue que sans liste explicite. D3 (« Réseau » visible) : capture attendue |
 
-Non encore vérifiés : les installations silencieuses, le poste en mode Client
-mis à jour avec `ADDLOCAL=Main` (D1 et D3), la désinstallation.
+Note sur cet essai : juste après `--configure-remote`, le port 58620 n'était
+**pas encore** en écoute. Ce n'est pas un défaut : la commande l'annonce
+elle-même (« le service prend cette configuration en compte dans les
+30 secondes »), et la vérification a été faite aussitôt.
+
+Non encore vérifiés : D3 à l'écran, les installations neuves silencieuses, la
+désinstallation.
 
 **Défaut constaté au même essai, corrigé directement** : la carte « Aucune
 protection antivirus en temps réel » du rapport **français** affichait
