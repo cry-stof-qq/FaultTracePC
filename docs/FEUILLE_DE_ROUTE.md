@@ -2200,7 +2200,31 @@ non établie — la recherche de registre ajoutée est une lecture unique, peu
 probable comme cause. À départager en lançant, dans le bac à sable, le MSI
 1.8.1 publié : s'il est aussi lent, ce n'est pas ce lot. **Précision de l'auteur, même jour** : sur une vraie machine, l'installation n'est pas lente — la lenteur tient au bac à sable. Confirmé le même jour : le MSI **1.8.1 publié**, lancé dans le bac à sable, y est tout aussi lent — et le bac à sable s'est ensuite **arrêté de lui-même** (« L'environnement Bac à sable Windows s'est arrêté de manière inattendue », code `0x80370106`). Ce MSI s'installe sans problème sur les postes réels : ni la lenteur ni l'arrêt ne sont imputables à FaultTracePC. Piste non vérifiée : un fil du forum ElevenForum relie des arrêts identiques du bac à sable, après installation de logiciels, à la mise à jour Windows KB5124010 ; un seul témoignage, sans confirmation de Microsoft. **Écartée pour le poste de l'auteur le même jour** : `Get-HotFix -Id KB5124010` ne trouve pas cette mise à jour ; la cause de l'arrêt reste inconnue. **Conséquence pour les essais du point 79** : le bac à sable n'est pas fiable pour une séance longue (installer la 1.8.1 puis la mettre à jour) ; une machine virtuelle Hyper-V avec points de contrôle (retour à l'état d'avant en un clic) convient mieux pour les mises à jour. **Mise en place le même jour par l'auteur** : machine virtuelle Hyper-V sous Windows 10 (environnement d'évaluation proposé par Microsoft), avec points de contrôle.
 
-**Premier essai dans cette machine virtuelle, 17/10/2026 — échec, cause non établie.** Installation de la **1.8.1 publiée** (téléchargée depuis GitHub dans la machine) : message de Windows Installer « Échec du démarrage du service FaultTracePC — Surveillance temps réel (FaultTracePCMonitor) ». La machine est un **Windows 10 Entreprise d'évaluation, build 19041 d'origine (version 2004, décembre 2019), sans mises à jour**. Fait vérifié, sans être encore la cause démontrée : la liste officielle des systèmes pris en charge par .NET 10 (`dotnet/core`, `release-notes/10.0/supported-os.md`) ne cite, pour Windows 10, que les éditions **21H2 (E), 21H2 (IoT), 1809 (E) et 1607 (E)** — pas la 2004, et pas non plus la 22H2 grand public. **Question ouverte pour plus tard** : palisser.fr annonce « Windows 10 et 11 » ; officiellement, .NET 10 ne couvre Windows 10 qu'en éditions longue durée. À décider : le dire sur la page, ou vérifier par l'essai qu'un Windows 10 22H2 à jour fait tourner le logiciel. Les avertissements au téléchargement et au lancement viennent de l'absence de signature numérique (déjà connue, écrite dans les notes de version), pas de la machine.
+**Premier essai dans cette machine virtuelle, 17/10/2026 — échec, cause établie le même jour (voir le paragraphe suivant).** Installation de la **1.8.1 publiée** (téléchargée depuis GitHub dans la machine) : message de Windows Installer « Échec du démarrage du service FaultTracePC — Surveillance temps réel (FaultTracePCMonitor) ». La machine est un **Windows 10 Entreprise d'évaluation, build 19041 d'origine (version 2004, décembre 2019), sans mises à jour**. Fait vérifié, sans être encore la cause démontrée : la liste officielle des systèmes pris en charge par .NET 10 (`dotnet/core`, `release-notes/10.0/supported-os.md`) ne cite, pour Windows 10, que les éditions **21H2 (E), 21H2 (IoT), 1809 (E) et 1607 (E)** — pas la 2004, et pas non plus la 22H2 grand public. **Question ouverte pour plus tard** : palisser.fr annonce « Windows 10 et 11 » ; officiellement, .NET 10 ne couvre Windows 10 qu'en éditions longue durée. À décider : le dire sur la page, ou vérifier par l'essai qu'un Windows 10 22H2 à jour fait tourner le logiciel. Les avertissements au téléchargement et au lancement viennent de l'absence de signature numérique (déjà connue, écrite dans les notes de version), pas de la machine.
+
+**Cause établie, 17/10/2026.** Le service lancé à la main dans la machine
+virtuelle s'arrête aussitôt sur : « Fatal error. Your Windows doesn't fully
+support CET. Please install all available Windows updates. » Le journal
+Application montre le même arrêt toutes les six secondes environ (redémarrages
+du service), `.NET Runtime`, code `0x80131506`, `KERNELBASE.dll` 10.0.19041.1202.
+**CET** (Control-flow Enforcement Technology) est une protection du processeur
+contre le détournement de l'exécution ; depuis .NET 9, les exécutables produits
+par .NET sont déclarés compatibles CET (documentation Microsoft, « CET supported
+by default »), et un Windows 10 2004 sans mises à jour ne la prend pas
+entièrement en charge. **Ce n'est pas un défaut de FaultTracePC, et la 1.8.1
+n'est pas en cause** : c'est la combinaison .NET 10 + Windows très ancien non mis
+à jour. Le message de Windows Installer (« vérifiez que vous disposez de
+privilèges suffisants ») est trompeur : il le dit pour tout service qui ne
+démarre pas.
+
+**Option notée, NON retenue** : `<CETCompat>false</CETCompat>` dans les projets
+ferait tourner le logiciel sur ces Windows-là, au prix d'une protection de
+sécurité retirée sur toutes les machines. Un poste à ce point en retard de
+mises à jour a un problème plus urgent que FaultTracePC. Préférable : dire
+« Windows 10 ou 11 à jour » sur palisser.fr. À trancher par l'auteur.
+
+**Suite décidée par l'auteur** : nouvelle machine virtuelle sur le dernier
+Windows 11, pour reprendre les essais du point 79.
 
 **Défaut constaté au même essai, corrigé directement** : la carte « Aucune
 protection antivirus en temps réel » du rapport **français** affichait
