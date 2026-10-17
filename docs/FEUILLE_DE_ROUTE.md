@@ -1796,6 +1796,8 @@ machine n'est contactée). S'il est déjà affiché, il n'est **pas** relu — u
 relecture effacerait les vérifications faites entre-temps. Si la lecture échoue,
 rien n'est coché et le message de la lecture est gardé à la suite du sien.
 
+**Point 94 terminé le 17/10/2026** — validé par l'auteur à l'écran, CI verte.
+
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
 Constaté le 10/10/2026 en ouvrant à distance la boîte noire d'un poste mis à
