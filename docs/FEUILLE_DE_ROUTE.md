@@ -2164,6 +2164,31 @@ publiée ; puis les essais du tableau sur de vrais postes.
   installateur ne pose encore `ParkFeatureManaged`, donc tout reste affiché.
 - Quatorze tests (`ModeParcTests`).
 
+**Lot 2 — livré le 17/10/2026 (installateur, `installer/FaultTracePC.wxs`).**
+
+- Nouvelle fonctionnalité `ParkFeature`, « Mode parc (administration d'un
+  parc) », `Level="1000"` : non cochée en installation interactive, non
+  installée en silencieux ; installée par la case, `ADDLOCAL=Main,ParkFeature`
+  ou `ADDLOCAL=ALL`. Elle pose `ParkFeature = 1`.
+- `Main` pose désormais `ParkFeatureManaged = 1` (composant
+  `ParkFeatureManagedRegistry`).
+- **D2** : `<Level Value="1" Condition="WIX_UPGRADE_DETECTED AND NOT
+  PARKFEATUREMANAGED" />`. `PARKFEATUREMANAGED` est lue dans le registre par
+  `AppSearch`, **avant** le retrait de l'ancienne version : absente sur une
+  1.8.x ou plus ancienne, la case est cochée d'office ; présente (mise à jour
+  depuis une 1.9.0 ou plus récente), la condition ne joue pas et c'est le report
+  d'état de Windows Installer qui décide. **Pourquoi ne pas s'en tenir à
+  `WIX_UPGRADE_DETECTED`** : une mise à jour 1.9.0 → 1.9.x aurait recoché la
+  case chez qui l'avait décochée, si le report d'état ne s'appliquait pas.
+- Le script de déploiement de la console n'est **pas** modifié : un poste de
+  salle installé neuf en 1.9.0 n'a pas besoin des boutons d'administration (D1),
+  et un poste mis à jour depuis la 1.8.x les garde (D2).
+- Cinq tests (`InstallateurModeParcTests`) lisent le `.wxs` et vérifient qu'il
+  pose exactement les valeurs que lit `ModeParc`, que la fonctionnalité est
+  absente par défaut et que la condition de mise à jour est en place.
+- **Rien de tout cela n'est encore éprouvé** : la construction du MSI et le
+  tableau d'essais restent à faire.
+
 **Bac à sable Windows, proposé par l'auteur le 17/10/2026 pour les essais** :
 Windows Sandbox donne un Windows propre à chaque ouverture — idéal pour les
 installations neuves du tableau, et pour une mise à jour 1.8.1 → 1.9.0 faite

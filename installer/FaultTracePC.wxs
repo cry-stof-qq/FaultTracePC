@@ -136,6 +136,16 @@
          commande n'atteint pas la partie élevée de l'installation. -->
     <Property Id="FTPCLANG" Secure="yes" />
 
+    <!-- Point 79 (1.9.0) : l'installateur déjà présent connaissait-il la case
+         « Mode parc » ? Lu AVANT que la mise à jour ne retire l'ancienne version
+         (AppSearch). Absent sur une 1.8.x ou plus ancienne : la case sera alors
+         cochée d'office (voir la fonctionnalité ParkFeature). -->
+    <Property Id="PARKFEATUREMANAGED" Secure="yes">
+      <RegistrySearch Id="ParkFeatureManagedSearch" Root="HKLM"
+                      Key="Software\Cry-stof\FaultTracePC" Name="ParkFeatureManaged"
+                      Type="raw" Bitness="always64" />
+    </Property>
+
     <!-- Action de type « exécutable désigné par une propriété » : aucune
          extension WiX supplémentaire n'est nécessaire. Le script de construction
          n'installe que WixToolset.UI.wixext ; toute référence à l'extension Util
@@ -206,6 +216,7 @@
       <ComponentGroupRef Id="ProductFiles" />
       <ComponentRef Id="MonitorService" />
       <ComponentRef Id="AppShortcuts" />
+      <ComponentRef Id="ParkFeatureManagedRegistry" />
     </Feature>
 
     <!-- Fonctionnalité séparée = case à cocher dans l'arbre, cochée par défaut
@@ -214,6 +225,32 @@
     <Feature Id="DesktopShortcutFeature" Title="Raccourci sur le Bureau" Level="1"
              Description="Place une icône FaultTracePC sur le Bureau.">
       <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- Point 79 (1.9.0) : le mode parc devient une case à cocher.
+
+         CE QU'ELLE GOUVERNE (décision D1 du 17/10/2026) : seulement l'affichage
+         des boutons « Parc » et « Réseau » (Core/ModeParc.cs). Le service de
+         surveillance n'obéit qu'à C:\ProgramData\FaultTracePC\remote.json, que
+         l'installateur ne crée ni ne supprime : un poste déjà supervisé le reste,
+         que la case soit cochée ou non.
+
+         ABSENTE PAR DÉFAUT : Level="1000", au-dessus du niveau d'installation (1).
+         Installation interactive : case non cochée. Silencieuse (/qn) : non
+         installée. Pour l'avoir : cocher la case, ou ADDLOCAL=Main,ParkFeature
+         (ou ADDLOCAL=ALL) en ligne de commande.
+
+         COCHÉE D'OFFICE à la mise à jour d'une version qui ne la connaissait pas
+         (décision D2) : rien ne disparaît chez qui avait déjà la console. Une
+         mise à jour depuis une 1.9.0 ou plus récente n'est pas concernée par la
+         condition ; l'état choisi est reporté par Windows Installer
+         (MigrateFeatures, posé par défaut par MajorUpgrade). Comportement à
+         ÉPROUVER sur pièce avant publication — voir le tableau d'essais du
+         point 79 dans docs/FEUILLE_DE_ROUTE.md. -->
+    <Feature Id="ParkFeature" Title="Mode parc (administration d'un parc)" Level="1000"
+             Description="Console de parc et configuration réseau, pour administrer plusieurs postes. Inutile sur un PC personnel. Ne modifie pas la surveillance d'un poste déjà supervisé.">
+      <Level Value="1" Condition="WIX_UPGRADE_DETECTED AND NOT PARKFEATUREMANAGED" />
+      <ComponentRef Id="ParkFeatureRegistry" />
     </Feature>
 
     <!-- ===================== Fichiers publiés ===================== -->
@@ -274,6 +311,22 @@
                 Icon="AppIcon.ico" />
       <RegistryValue Root="HKCU" Key="Software\Cry-stof\FaultTracePC"
                      Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- ===================== Mode parc (point 79) ===================== -->
+    <!-- Posée par Main : « cet installateur connaît la case ». Sans elle (version
+         portable, installateur antérieur), le logiciel affiche tout, comme avant. -->
+    <Component Id="ParkFeatureManagedRegistry" Directory="INSTALLFOLDER"
+               Guid="BA0D8B6D-CFC5-4F65-BA8C-5C57D1F22F57">
+      <RegistryValue Root="HKLM" Key="Software\Cry-stof\FaultTracePC"
+                     Name="ParkFeatureManaged" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Posée par la fonctionnalité « Mode parc » : la case est cochée. -->
+    <Component Id="ParkFeatureRegistry" Directory="INSTALLFOLDER"
+               Guid="C890CC9D-58A0-4F0E-8D1B-B7A037CC206B">
+      <RegistryValue Root="HKLM" Key="Software\Cry-stof\FaultTracePC"
+                     Name="ParkFeature" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
   </Package>
