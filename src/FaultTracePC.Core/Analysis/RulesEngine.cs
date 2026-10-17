@@ -2593,7 +2593,7 @@ public sealed class RulesEngine
         var tiersPossibles = tiers.Where(a => a.Actif && a.ProgrammePresent != false).ToList();
         if (!defenderActif && tiersPossibles.Count == 0)
         {
-            var mode = string.IsNullOrEmpty(p.DefenderMode) ? "" : Lang.T($" (mode {p.DefenderMode})", $" ({p.DefenderMode} mode)");
+            var mode = ModeDefender.EntreParentheses(p.DefenderMode);
             r.Findings.Add(new Finding
             {
                 Severity = Severity.Warning,

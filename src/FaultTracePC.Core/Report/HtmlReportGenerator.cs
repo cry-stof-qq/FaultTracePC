@@ -1045,7 +1045,7 @@ public static class HtmlReportGenerator
             lignes.Add(Lang.T("Windows Defender : état non lu", "Windows Defender: status not read"));
         else
         {
-            var mode = string.IsNullOrEmpty(p.DefenderMode) ? "" : Lang.T($" (mode {H(p.DefenderMode)})", $" ({H(p.DefenderMode)} mode)");
+            var mode = H(ModeDefender.EntreParentheses(p.DefenderMode));
             if (p.DefenderTempsReel == true)
                 lignes.Add(Lang.T($"Windows Defender : protection en temps réel <strong>active</strong>{mode}", $"Windows Defender: real-time protection <strong>on</strong>{mode}"));
             else

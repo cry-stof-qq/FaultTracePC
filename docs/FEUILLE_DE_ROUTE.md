@@ -2189,6 +2189,27 @@ publiée ; puis les essais du tableau sur de vrais postes.
 - **Rien de tout cela n'est encore éprouvé** : la construction du MSI et le
   tableau d'essais restent à faire.
 
+**Premier essai, 17/10/2026, bac à sable Windows** (MSI construit à partir du lot
+2, numéro encore 1.8.1) : installation neuve interactive — l'arbre des
+fonctionnalités montre « Mode parc (administration d'un parc) » **non cochée** ;
+après installation, la fenêtre principale n'a **ni « Parc » ni « Réseau »**,
+le reste est intact (analyse, surveillance active, boîte noire, outils, « Je ne
+sais pas ce que j'ai »). Premier cas du tableau : **conforme**. L'auteur a
+trouvé long l'affichage du premier écran de l'assistant d'installation ; cause
+non établie — la recherche de registre ajoutée est une lecture unique, peu
+probable comme cause. À départager en lançant, dans le bac à sable, le MSI
+1.8.1 publié : s'il est aussi lent, ce n'est pas ce lot.
+
+**Défaut constaté au même essai, corrigé directement** : la carte « Aucune
+protection antivirus en temps réel » du rapport **français** affichait
+« (mode Not running) » — la valeur brute `AMRunningMode` de Windows, en
+anglais. `Analysis/ModeDefender.cs` traduit les valeurs connues (Normal,
+Passive, SxS Passive Mode, EDR Block Mode, Not running) et rend une valeur
+inconnue telle quelle ; employé par la conclusion (`RulesEngine`) et par la
+carte « Protection antivirus » (`HtmlReportGenerator`). Neuf tests
+(`ModeDefenderTests`). La conclusion elle-même est juste : dans le bac à
+sable, Defender ne tourne pas.
+
 **Bac à sable Windows, proposé par l'auteur le 17/10/2026 pour les essais** :
 Windows Sandbox donne un Windows propre à chaque ouverture — idéal pour les
 installations neuves du tableau, et pour une mise à jour 1.8.1 → 1.9.0 faite
