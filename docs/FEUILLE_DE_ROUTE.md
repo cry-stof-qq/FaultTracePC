@@ -1820,6 +1820,16 @@ rien n'est coché et le message de la lecture est gardé à la suite du sien.
   17/10/2026** (actualisation de la sélection, message « un seul poste »,
   confirmation chiffrée du retrait multiple), CI verte. **Point 93 terminé.**
 
+**Point 100 — livré le 17/10/2026.** La colonne « Version » coupait
+« ⬆ 1.8.0 — à mettre à jour ». Plutôt que d'élargir la colonne (le total des
+largeurs est déjà calé sous la largeur utile de la fenêtre, voir le commentaire
+de `ParkWindow.xaml`), le texte est raccourci et dit **plus** : « ⬆ 1.8.0 →
+1.9.0 » (le poste, et la version vers laquelle le mettre à jour) ;
+« ⚠ 1.9.1, console 1.9.0 » quand c'est la console qui est en retard. Le sens
+des flèches est expliqué dans une bulle d'aide sur l'en-tête de la colonne.
+La logique sort de `ParkWindow` vers `Core/VersionDuPoste.cs`, pour être testée :
+six tests (`VersionDuPosteTests`), dont un sur la longueur.
+
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
 Constaté le 10/10/2026 en ouvrant à distance la boîte noire d'un poste mis à

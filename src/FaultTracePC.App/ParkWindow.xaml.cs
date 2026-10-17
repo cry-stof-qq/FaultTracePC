@@ -837,19 +837,8 @@ public partial class ParkWindow : Window
     /// une colonne qui ne saurait dire que « le poste est vieux » ferait mettre à
     /// jour la mauvaise machine — exactement la question qu'on se pose devant un parc.
     /// </summary>
-    private static string DescribeVersion(QueryResult? r)
-    {
-        if (r is null || !r.Ok) return "";
-        if (string.IsNullOrEmpty(r.Version)) return Lang.T("⬆ antérieure à 1.2.2", "⬆ older than 1.2.2");
-
-        if (!Version.TryParse(r.Version, out var remote) || !Version.TryParse(ConsoleVersion, out var local))
-            return r.Version;
-
-        var cmp = remote.CompareTo(local);
-        return cmp < 0 ? Lang.T($"⬆ {r.Version} — à mettre à jour", $"⬆ {r.Version} — to be updated")
-             : cmp > 0 ? Lang.T($"⚠ {r.Version} — console en retard", $"⚠ {r.Version} — console is behind")
-             : r.Version;
-    }
+    private static string DescribeVersion(QueryResult? r) =>
+        VersionDuPoste.Decrire(r is { Ok: true }, r?.Version, ConsoleVersion);   // point 100 : voir Core/VersionDuPoste.cs
 
     private void RenderRows(Dictionary<ParkMachine, QueryResult>? results)
     {

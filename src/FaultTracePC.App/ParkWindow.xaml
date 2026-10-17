@@ -116,7 +116,13 @@
                             <GridViewColumn Header="{x:Static loc:L.ParkColMachine}" Width="130" DisplayMemberBinding="{Binding Name}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkColHost}" Width="120" DisplayMemberBinding="{Binding Host}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkColState}" Width="150" DisplayMemberBinding="{Binding Etat}"/>
-                            <GridViewColumn Header="{x:Static loc:L.ParkColVersion}" Width="150" DisplayMemberBinding="{Binding Version}"/>
+                            <!-- POINT 100 : forme courte « ⬆ 1.8.0 → 1.9.0 », expliquée par la bulle d'aide de l'en-tête. -->
+                            <GridViewColumn Width="150" DisplayMemberBinding="{Binding Version}">
+                                <GridViewColumn.Header>
+                                    <TextBlock Text="{x:Static loc:L.ParkColVersion}"
+                                               ToolTip="{x:Static loc:L.ParkColVersionTip}"/>
+                                </GridViewColumn.Header>
+                            </GridViewColumn>
                             <GridViewColumn Header="{x:Static loc:L.ParkColLast}" Width="115" DisplayMemberBinding="{Binding DernierReleve}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkColCpu}" Width="55" DisplayMemberBinding="{Binding Cpu}"/>
                             <GridViewColumn Header="{x:Static loc:L.ParkColCpuTemp}" Width="60" DisplayMemberBinding="{Binding TempCpu}"/>

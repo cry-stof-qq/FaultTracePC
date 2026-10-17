@@ -362,6 +362,10 @@ public static class L
     public static string ParkColHost => Lang.T("Hôte", "Host");
     public static string ParkColState => Lang.T("État", "State");
     public static string ParkColVersion => Lang.T("Version", "Version");
+    // Point 100 : le sens des flèches de la colonne, que la forme courte ne dit plus en toutes lettres.
+    public static string ParkColVersionTip => Lang.T(
+        "⬆ 1.8.0 → 1.9.0 : poste plus ancien que cette console, à mettre à jour vers la version indiquée. ⚠ : poste plus récent que cette console — c'est elle qu'il faut mettre à jour.",
+        "⬆ 1.8.0 → 1.9.0: machine older than this console, to be updated to the version shown. ⚠: machine newer than this console — it is the console that needs updating.");
     public static string ParkColLast => Lang.T("Dernier relevé", "Last reading");
     public static string ParkColCpu => Lang.T("CPU %", "CPU %");
     public static string ParkColCpuTemp => Lang.T("T° CPU", "CPU temp.");
