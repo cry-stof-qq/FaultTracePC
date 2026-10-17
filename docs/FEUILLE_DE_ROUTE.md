@@ -2250,7 +2250,25 @@ elle-même (« le service prend cette configuration en compte dans les
 | Version portable construite à partir du code actuel (`build\publish.ps1 -Zip`), dézippée et lancée sur un Windows propre, sans MSI | « Parc » et « Réseau » présents — **D4 conforme**. (La version portable du 10/10/2026, antérieure au lot 1, n'aurait rien prouvé : elle affiche tout dans tous les cas.) |
 
 **Bilan du tableau d'essais, 17/10/2026** : **tous les cas sont conformes** sur
-Windows 11, D1 à D4 compris. Cas limite noté : une version portable lancée sur une machine où
+Windows 11, D1 à D4 compris.
+
+**Lot 3 — documentation, livré le 17/10/2026.**
+
+- `docs/DEPLOIEMENT.md` : deux lignes au tableau des variantes
+  (`ADDLOCAL=Main,ParkFeature`, `ADDLOCAL=ALL`) et un paragraphe « Le mode parc,
+  à partir de la 1.9.0 » — ce que la case gouverne, les règles de mise à jour,
+  le piège d'`ADDLOCAL=Main`, le comportement du déploiement par la console.
+- `installer/FaultTracePC.wxs` : les exemples `ADDLOCAL` du commentaire de
+  l'interface d'installation complétés.
+- `installer/build-msi.ps1` : un bloc « MODE PARC » dans l'en-tête.
+- `docs/releases/RELEASE_NOTES_v1.9.0.md` : **brouillon** commencé, avec le
+  point 79, le correctif du mode de Defender et la mention « Windows à jour ».
+  Un commentaire en tête rappelle qu'il reste à compléter avec les autres
+  points de la 1.9.0 avant le tag.
+- **Pas encore fait, volontairement** : les articles 30 et 31 de palisser.fr
+  (au moment de la publication) ; la décision sur `CETCompat` reste à l'auteur
+  — le brouillon des notes suit la recommandation « Windows à jour », à
+  retirer si l'auteur en décide autrement. Cas limite noté : une version portable lancée sur une machine où
 le MSI est installé **sans** la case lira le registre de cette machine et cachera
 la console — c'est le choix fait sur cette machine, il paraît cohérent de le
 respecter.

@@ -93,7 +93,36 @@ Variantes utiles :
 |---|---|
 | Sans raccourci sur le Bureau | `msiexec /i $msi /qn ADDLOCAL=Main` |
 | Avec raccourci | `msiexec /i $msi /qn ADDLOCAL=Main,DesktopShortcutFeature` |
+| Avec la console de parc, sans raccourci (1.9.0 et après) | `msiexec /i $msi /qn ADDLOCAL=Main,ParkFeature` |
+| Tout installer (1.9.0 et après) | `msiexec /i $msi /qn ADDLOCAL=ALL` |
 | Imposer l'anglais au parc | `msiexec /i $msi FTPCLANG=en /qn` |
+
+#### Le mode parc, à partir de la 1.9.0
+
+Le « mode parc » de l'installation est une **case à cocher**, « Mode parc
+(administration d'un parc) », **non cochée par défaut**. Elle n'affiche ou ne
+cache que deux boutons de la fenêtre principale : **« Parc »** (la console) et
+**« Réseau »**. Elle ne change **rien** à la surveillance d'un poste : un poste
+déjà configuré en mode Client (fichier `C:\ProgramData\FaultTracePC\remote.json`,
+que l'installateur ne crée ni ne supprime) reste joignable par la console, que
+la case soit cochée ou non.
+
+- **Installation neuve** : sans la case, sauf à la cocher ou à passer
+  `ADDLOCAL=…,ParkFeature` (ou `ADDLOCAL=ALL`).
+- **Mise à jour depuis une 1.8.x ou plus ancienne** : la case est cochée
+  d'office — rien ne disparaît chez qui avait la console.
+- **Mise à jour depuis une 1.9.0 ou plus récente** : le choix précédent est
+  conservé, case cochée ou non.
+- **Attention à `ADDLOCAL`** : une liste explicite remplace ces règles.
+  `ADDLOCAL=Main` installe **sans** la case, même en venant d'une 1.8.x ;
+  ajouter `ParkFeature` à la liste pour la garder.
+- Un poste en mode Client montre toujours « Réseau », même sans la case : qui
+  s'assoit devant doit pouvoir voir que le poste est exposé.
+- La version portable (ZIP) affiche toujours la console.
+
+Le déploiement depuis la console installe sans `ADDLOCAL` : un poste de salle
+installé neuf n'a pas les boutons d'administration (il n'en a pas besoin pour
+être supervisé), un poste mis à jour depuis une 1.8.x les garde.
 
 `FTPCLANG` accepte `fr`, `en` ou `auto`, et écrit
 `C:\ProgramData\FaultTracePC\langue.txt`. C'est un **défaut**, pas une

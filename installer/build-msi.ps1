@@ -25,6 +25,14 @@
     Installation silencieuse manuelle :  msiexec /i FaultTracePC-1.8.1.msi /qn
     Désinstallation silencieuse :        msiexec /x FaultTracePC-1.8.1.msi /qn
 
+    MODE PARC (1.9.0 et après) — case « Mode parc », non cochée par défaut :
+        msiexec /i FaultTracePC-1.9.0.msi /qn ADDLOCAL=Main,ParkFeature
+        msiexec /i FaultTracePC-1.9.0.msi /qn ADDLOCAL=ALL
+    Elle n'affiche que les boutons « Parc » et « Réseau » ; la surveillance d'un
+    poste en mode Client n'en dépend pas. Mise à jour d'une 1.8.x : cochée
+    d'office, SAUF si une liste ADDLOCAL est passée (ADDLOCAL=Main l'écarte).
+    Détail : docs\DEPLOIEMENT.md.
+
     LANGUE IMPOSÉE AU POSTE (facultatif) :
         msiexec /i FaultTracePC-1.8.1.msi FTPCLANG=en /qn
     Écrit C:\ProgramData\FaultTracePC\langue.txt, valable pour tous les comptes.

@@ -62,6 +62,11 @@
          Les deux restent pilotables en installation silencieuse (GPO) :
              msiexec /i FaultTracePC.msi /qn ADDLOCAL=Main,DesktopShortcutFeature
              msiexec /i FaultTracePC.msi /qn ADDLOCAL=Main          (sans raccourci Bureau)
+             msiexec /i FaultTracePC.msi /qn ADDLOCAL=Main,ParkFeature  (avec la console de parc)
+             msiexec /i FaultTracePC.msi /qn ADDLOCAL=ALL           (tout)
+         Une liste ADDLOCAL explicite installe EXACTEMENT ce qu'elle nomme :
+         ADDLOCAL=Main installe sans le mode parc, même en mise à jour d'une
+         1.8.x — voir la fonctionnalité ParkFeature plus bas.
          En mode /qn l'écran final n'existe pas : rien n'est lancé, ce qui est
          le comportement attendu d'un déploiement automatisé. -->
     <UI>
