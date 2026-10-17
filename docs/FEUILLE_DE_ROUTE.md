@@ -2247,10 +2247,10 @@ elle-même (« le service prend cette configuration en compte dans les
 | Installation neuve silencieuse (`/qn`) | registre : `Installed = 1`, `ParkFeatureManaged = 1`, pas de `ParkFeature` — conforme (la commande elle-même n'a pas été recopiée, mais la clé, absente juste avant, est réapparue sans la case) |
 | Ajout silencieux par `ADDLOCAL=ALL` | `ParkFeature = 1` — conforme |
 
-**Bilan du tableau d'essais, 17/10/2026** : tous les cas sont conformes sur
-Windows 11, sauf la **version portable (D4)**, pas encore essayée. Sa règle (pas
-de valeur `ParkFeatureManaged` → console visible) est couverte par les tests
-automatiques. Cas limite noté : une version portable lancée sur une machine où
+| Version portable construite à partir du code actuel (`build\publish.ps1 -Zip`), dézippée et lancée sur un Windows propre, sans MSI | « Parc » et « Réseau » présents — **D4 conforme**. (La version portable du 10/10/2026, antérieure au lot 1, n'aurait rien prouvé : elle affiche tout dans tous les cas.) |
+
+**Bilan du tableau d'essais, 17/10/2026** : **tous les cas sont conformes** sur
+Windows 11, D1 à D4 compris. Cas limite noté : une version portable lancée sur une machine où
 le MSI est installé **sans** la case lira le registre de cette machine et cachera
 la console — c'est le choix fait sur cette machine, il paraît cohérent de le
 respecter.
