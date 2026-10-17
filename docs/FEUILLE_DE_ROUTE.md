@@ -2198,7 +2198,7 @@ sais pas ce que j'ai »). Premier cas du tableau : **conforme**. L'auteur a
 trouvé long l'affichage du premier écran de l'assistant d'installation ; cause
 non établie — la recherche de registre ajoutée est une lecture unique, peu
 probable comme cause. À départager en lançant, dans le bac à sable, le MSI
-1.8.1 publié : s'il est aussi lent, ce n'est pas ce lot.
+1.8.1 publié : s'il est aussi lent, ce n'est pas ce lot. **Précision de l'auteur, même jour** : sur une vraie machine, l'installation n'est pas lente — la lenteur tient au bac à sable.
 
 **Défaut constaté au même essai, corrigé directement** : la carte « Aucune
 protection antivirus en temps réel » du rapport **français** affichait
