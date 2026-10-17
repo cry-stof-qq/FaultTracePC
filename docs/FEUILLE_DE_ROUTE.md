@@ -2041,6 +2041,100 @@ et à l'essai, pas à supposer.
 et avant winget (qui passe en 1.10.0). Motif : winget ouvre le logiciel au
 grand public ; il vaut mieux que le mode parc y soit déjà facultatif.
 
+### Plan du point 79 — lot 0 (lecture seule), 17/10/2026
+
+Rien n'est codé à ce stade. Ce qui suit vient de la lecture du code et de
+l'installateur actuels ; les décisions marquées « à valider » attendent l'auteur.
+
+**Ce qu'est le « mode parc » aujourd'hui, vérifié dans le code.** Ce ne sont pas
+une, mais deux choses distinctes, qui ne vivent pas au même endroit :
+
+1. **Le côté poste client** — le service de surveillance ouvre son API en
+   lecture seule **si et seulement si** `C:\ProgramData\FaultTracePC\remote.json`
+   dit `"Mode": "Client"` (`RemoteConfig`, `TelemetryService`). Ce fichier est
+   écrit par `FaultTracePC.Cli.exe --configure-remote` (étape « mise en mode
+   parc » du script de déploiement, qui pose aussi la règle de pare-feu) ou par
+   la fenêtre « Réseau ». **L'installateur ne le crée ni ne le supprime** : il
+   survit déjà aux mises à jour.
+2. **Le côté administrateur** — les boutons « Parc » (console) et « Réseau »
+   (`RemoteConfigWindow`) de la fenêtre principale, toujours visibles.
+
+L'installateur (`installer/FaultTracePC.wxs`) n'a que deux fonctionnalités :
+`Main` (obligatoire : fichiers, service, raccourcis) et `DesktopShortcutFeature`.
+L'interface `WixUI_FeatureTree` affiche déjà l'arbre avec des cases. Le script de
+déploiement installe par `msiexec /i … /qn FTPCLANG=…`, **sans `ADDLOCAL`**.
+`MajorUpgrade` est en place, avec `AllowSameVersionUpgrades="yes"`.
+
+**Proposition (à valider) — D1 : la fonctionnalité ne gouverne que l'interface
+d'administration.** Une fonctionnalité « Mode parc » (absente par défaut) pose
+une valeur de registre sous `HKLM\SOFTWARE\FaultTracePC` ; l'application lit
+cette valeur pour afficher ou non les boutons « Parc » et « Réseau ». **Le
+service, lui, continue de n'obéir qu'à `remote.json`.** Conséquence voulue : un
+poste client déjà en mode parc **ne peut pas** sortir de la supervision à cause
+de cette fonctionnalité, quelle que soit la façon dont il est mis à jour — le
+piège noté plus haut disparaît par construction au lieu d'être rattrapé par
+une migration. Option écartée : faire dépendre l'API du service de la
+fonctionnalité — c'est exactement ce qui ferait perdre la supervision à un
+poste mis à jour sans la case.
+
+**D2 — mise à jour depuis une 1.8.x ou plus ancienne (à valider).** Proposé :
+toute mise à jour depuis une version qui ne connaissait pas la fonctionnalité
+la **coche d'office** (condition de niveau sur la détection d'une mise à
+jour). Rien ne disparaît chez personne ; seule une **installation neuve** l'a
+absente par défaut. Variante plus fine, non retenue d'emblée : ne la cocher que
+si `remote.json` existe — mais un administrateur qui n'utilise que la console
+n'a pas forcément ce fichier, et le perdrait.
+
+**D3 — affichage de « Réseau » sur un poste client sans la fonctionnalité (à
+valider).** Proposé : si `remote.json` dit « Client », le bouton « Réseau » reste
+visible même sans la fonctionnalité — un poste exposé sur le réseau doit pouvoir
+le montrer à qui s'assoit devant.
+
+**D4 — la version portable (ZIP), qui n'a ni installateur ni registre (à
+valider).** Proposé : elle garde la console visible, comme aujourd'hui — c'est
+l'outil de l'administrateur sur clé USB. Il faut donc que `Main` pose aussi une
+valeur « installé par le MSI », pour distinguer « portable » de « installé sans
+la case ».
+
+**D5 — hors de ce point, noté pour plus tard.** `System.DirectoryServices.dll`
+reste dans `Main` : déplacer des fichiers d'une fonctionnalité à l'autre ajoute
+un risque de mise à jour pour un gain de quelques centaines de kilo-octets.
+
+**À vérifier dans la documentation et à l'essai, pas à supposer.**
+
+- `MigrateFeatureStates` reporte l'état des fonctionnalités **de même nom** que
+  dans la version installée, et **ne s'exécute pas si la propriété `Preselected`
+  est posée** (documentation Microsoft, page « MigrateFeatureStates Action »).
+  Ce que Windows Installer fait d'une fonctionnalité **nouvelle** lors d'une
+  mise à jour n'y est pas écrit : c'est la condition de niveau (D2) qui doit en
+  décider, et c'est à éprouver.
+- Si une ligne de commande passe `ADDLOCAL=Main` (forme publiée sur palisser.fr
+  pour se passer du raccourci du Bureau), la fonctionnalité « Mode parc »
+  **ne sera pas posée**. Avec D1, le poste reste supervisé ; seuls les boutons
+  d'administration disparaissent. La documentation devra donner la forme
+  `ADDLOCAL=Main,ParkFeature`.
+
+**Essais à faire avant toute publication de la 1.9.0.**
+
+| Cas | Attendu |
+|---|---|
+| Installation neuve interactive, case laissée vide | ni « Parc » ni « Réseau » |
+| Installation neuve interactive, case cochée | « Parc » et « Réseau » présents |
+| Installation neuve silencieuse `/qn` | sans mode parc |
+| Installation neuve silencieuse `ADDLOCAL=ALL` | avec mode parc |
+| Mise à jour 1.8.1 → 1.9.0 interactive, poste de l'auteur | console toujours là |
+| Mise à jour 1.8.1 → 1.9.0 par le déploiement de la console, poste client | toujours « surveillance active », boîte noire distante ouverte, `remote.json` inchangé |
+| Mise à jour 1.8.1 → 1.9.0 silencieuse `ADDLOCAL=Main`, poste client | toujours supervisé (D1) ; boutons d'administration absents |
+| Mise à jour 1.9.0 → version suivante | l'état choisi (avec ou sans) est conservé |
+| Désinstallation | `remote.json` laissé en place, comme aujourd'hui |
+| Version portable | console visible (D4) |
+
+**Découpage proposé une fois les décisions prises** — lot 1 : la lecture de
+l'état (Core, testée) et l'affichage conditionnel des boutons ; lot 2 :
+l'installateur (fonctionnalité, valeurs de registre, condition de mise à jour) ;
+lot 3 : notes, article, et la forme `ADDLOCAL` corrigée partout où elle est
+publiée ; puis les essais du tableau sur de vrais postes.
+
 ### Les deux options écartées, et pourquoi
 
 Elles sont écrites ici parce qu'une piste abandonnée sans motif se represente.
