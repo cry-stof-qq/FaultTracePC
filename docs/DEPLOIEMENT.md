@@ -124,6 +124,23 @@ Le déploiement depuis la console installe sans `ADDLOCAL` : un poste de salle
 installé neuf n'a pas les boutons d'administration (il n'en a pas besoin pour
 être supervisé), un poste mis à jour depuis une 1.8.x les garde.
 
+#### Retirer un poste de la console
+
+« Retirer la sélection » (onglet Supervision) agit **uniquement sur la console**
+où l'on clique : le poste sort de la liste supervisée de cette console
+(`parc.json`). **Rien n'est fait sur le poste distant** : FaultTracePC y reste
+installé, son service de surveillance continue de tourner, et son mode Client
+(`remote.json`, règle de pare-feu) reste en place — une autre console munie du
+même secret maître le verrait toujours. L'historique d'alertes déjà archivé par
+la console (`Alertes\<poste>.jsonl`) n'est pas effacé. Le poste se rajoute en
+saisissant son nom et son adresse : le jeton se déduit du secret maître.
+
+Pour **sortir réellement un poste du mode parc**, il faut agir sur le poste
+lui-même : bouton « Réseau » de FaultTracePC, mode « Local ». Pour **retirer le
+logiciel**, le désinstaller (`msiexec /x … /qn`, ou « Applications »
+de Windows) — `remote.json` est alors conservé, comme pour toute
+désinstallation.
+
 `FTPCLANG` accepte `fr`, `en` ou `auto`, et écrit
 `C:\ProgramData\FaultTracePC\langue.txt`. C'est un **défaut**, pas une
 contrainte : l'utilisateur qui choisit une autre langue dans l'application garde
