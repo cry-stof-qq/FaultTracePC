@@ -2129,6 +2129,12 @@ un risque de mise à jour pour un gain de quelques centaines de kilo-octets.
 | Désinstallation | `remote.json` laissé en place, comme aujourd'hui |
 | Version portable | console visible (D4) |
 
+**Décisions de l'auteur, 17/10/2026** : D1, D2, D3 et D4 **validées** ; la
+forme `ADDLOCAL=Main,ParkFeature` à publier partout où `ADDLOCAL=Main` l'est
+aujourd'hui **validée**. D5 n'appelait pas de décision : c'est un report
+(`System.DirectoryServices.dll` reste dans `Main`), noté pour qu'il ne soit pas
+pris pour un oubli.
+
 **Découpage proposé une fois les décisions prises** — lot 1 : la lecture de
 l'état (Core, testée) et l'affichage conditionnel des boutons ; lot 2 :
 l'installateur (fonctionnalité, valeurs de registre, condition de mise à jour) ;
