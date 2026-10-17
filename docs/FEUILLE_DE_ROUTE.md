@@ -1816,7 +1816,9 @@ rien n'est coché et le message de la lecture est gardé à la suite du sien.
   `UnSeulPoste()` : avec plusieurs postes sélectionnés, elles le disent au lieu
   d'agir sur le premier de la sélection — que `SelectedItem` aurait rendu sans
   prévenir.
-- Aucun test automatique (interface WPF) ; à vérifier à l'écran.
+- Aucun test automatique (interface WPF). **Vérifié à l'écran par l'auteur le
+  17/10/2026** (actualisation de la sélection, message « un seul poste »,
+  confirmation chiffrée du retrait multiple), CI verte. **Point 93 terminé.**
 
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
