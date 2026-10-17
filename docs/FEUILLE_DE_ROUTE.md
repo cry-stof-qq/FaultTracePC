@@ -2198,7 +2198,7 @@ sais pas ce que j'ai »). Premier cas du tableau : **conforme**. L'auteur a
 trouvé long l'affichage du premier écran de l'assistant d'installation ; cause
 non établie — la recherche de registre ajoutée est une lecture unique, peu
 probable comme cause. À départager en lançant, dans le bac à sable, le MSI
-1.8.1 publié : s'il est aussi lent, ce n'est pas ce lot. **Précision de l'auteur, même jour** : sur une vraie machine, l'installation n'est pas lente — la lenteur tient au bac à sable.
+1.8.1 publié : s'il est aussi lent, ce n'est pas ce lot. **Précision de l'auteur, même jour** : sur une vraie machine, l'installation n'est pas lente — la lenteur tient au bac à sable. Confirmé le même jour : le MSI **1.8.1 publié**, lancé dans le bac à sable, y est tout aussi lent — et le bac à sable s'est ensuite **arrêté de lui-même** (« L'environnement Bac à sable Windows s'est arrêté de manière inattendue », code `0x80370106`). Ce MSI s'installe sans problème sur les postes réels : ni la lenteur ni l'arrêt ne sont imputables à FaultTracePC. Piste non vérifiée : un fil du forum ElevenForum relie des arrêts identiques du bac à sable, après installation de logiciels, à la mise à jour Windows KB5124010 ; un seul témoignage, sans confirmation de Microsoft. **Conséquence pour les essais du point 79** : le bac à sable n'est pas fiable pour une séance longue (installer la 1.8.1 puis la mettre à jour) ; une machine virtuelle Hyper-V avec points de contrôle (retour à l'état d'avant en un clic) convient mieux pour les mises à jour.
 
 **Défaut constaté au même essai, corrigé directement** : la carte « Aucune
 protection antivirus en temps réel » du rapport **français** affichait
