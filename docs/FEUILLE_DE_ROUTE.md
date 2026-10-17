@@ -2226,6 +2226,20 @@ mises à jour a un problème plus urgent que FaultTracePC. Préférable : dire
 **Suite décidée par l'auteur** : nouvelle machine virtuelle sur le dernier
 Windows 11, pour reprendre les essais du point 79.
 
+**Essais sur la machine virtuelle Windows 11 (dernière version, à jour), 17/10/2026.**
+L'auteur confirme que l'installation y est bien plus fluide que dans le bac à
+sable. Points de contrôle « Windows propre » et « 1.8.1 ».
+
+| Cas | Résultat |
+|---|---|
+| 1.8.1 publiée installée | « Parc » et « Réseau » présents — conforme |
+| Mise à jour 1.8.1 → MSI du lot 2 (interactive) | rien ne change à l'écran : console et « Réseau » toujours là — **D2 conforme** |
+| Installation de maintenance « Modifier », fonctionnalité « Mode parc » retirée | l'arbre la montrait installée ; une fois retirée, « Parc » et « Réseau » disparaissent — **conforme** |
+
+Non encore vérifiés : les valeurs de registre elles-mêmes, une mise à jour qui
+doit **garder la case décochée**, les installations silencieuses, le poste en
+mode Client mis à jour avec `ADDLOCAL=Main`, la désinstallation.
+
 **Défaut constaté au même essai, corrigé directement** : la carte « Aucune
 protection antivirus en temps réel » du rapport **français** affichait
 « (mode Not running) » — la valeur brute `AMRunningMode` de Windows, en
