@@ -287,6 +287,47 @@ public partial class ParkWindow : Window
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => _ = RefreshAllAsync();
 
+    /// <summary>
+    /// Point 94 : le menu ne s'ouvre que sur une LIGNE — chaque entrée agit sur le
+    /// poste visé. Un clic droit dans une zone vide, alors qu'un autre poste est
+    /// resté sélectionné, aurait sinon agi sur ce poste-là sans qu'on l'ait visé.
+    /// (WPF sélectionne la ligne sous le pointeur au clic droit, avant ce moment.)
+    /// </summary>
+    private void LvMachines_ContextMenuOpening(object sender, System.Windows.Controls.ContextMenuEventArgs e)
+    {
+        DependencyObject? noeud = e.OriginalSource as DependencyObject;
+        while (noeud is not null and not System.Windows.Controls.ListViewItem)
+            noeud = noeud is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                ? System.Windows.Media.VisualTreeHelper.GetParent(noeud)
+                : LogicalTreeHelper.GetParent(noeud);   // un Run dans un texte n'est pas un Visual
+        if (noeud is null || LvMachines.SelectedItem is not Row) e.Handled = true;
+    }
+
+    private void MnuActualiserPoste_Click(object sender, RoutedEventArgs e)
+    {
+        if (LvMachines.SelectedItem is not Row row) return;
+        var machine = _machines.FirstOrDefault(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
+        if (machine is not null) _ = RefreshOneAsync(machine);
+    }
+
+    /// <summary>
+    /// Point 94 : interroge UN poste au lieu de tout le parc. Mêmes étapes que
+    /// <see cref="RefreshAllAsync"/> pour ce poste — archivage des alertes
+    /// compris (point 43) —, sans toucher à l'état connu des autres.
+    /// </summary>
+    private async Task RefreshOneAsync(ParkMachine machine)
+    {
+        TxtStatus.Text = Lang.T($"Interrogation de {machine.Name}…", $"Querying {machine.Name}…");
+        var resultat = await QueryAsync(machine);
+        _lastResults[machine] = resultat;
+        var archivage = await ArchiverLesAlertes([resultat]);
+        RenderRows(_lastResults);
+        TxtStatus.Text = (resultat.Ok
+                ? Lang.T($"{machine.Name} actualisé à {DateTime.Now:HH:mm:ss} — joignable.", $"{machine.Name} refreshed at {DateTime.Now:HH:mm:ss} — reachable.")
+                : Lang.T($"{machine.Name} actualisé à {DateTime.Now:HH:mm:ss} — injoignable.", $"{machine.Name} refreshed at {DateTime.Now:HH:mm:ss} — unreachable."))
+            + archivage;
+    }
+
     /// <summary>Dernier état connu, réutilisé pour le rapport de parc.</summary>
     private Dictionary<ParkMachine, QueryResult> _lastResults = new();
 

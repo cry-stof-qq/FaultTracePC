@@ -65,7 +65,23 @@
                   </StackPanel>
                 </Border>
 
-                <ListView x:Name="LvMachines" Grid.Row="1" Margin="0,10" BorderThickness="1" BorderBrush="#DBE2EC" FontSize="12">
+                <ListView x:Name="LvMachines" Grid.Row="1" Margin="0,10" BorderThickness="1" BorderBrush="#DBE2EC" FontSize="12"
+                          ContextMenuOpening="LvMachines_ContextMenuOpening">
+                    <!-- POINT 94 (1.9.0) — LE CLIC DROIT SUR UN POSTE. Un raccourci de
+                         plus, pas un remplacement : les boutons du bas restent (décision
+                         de l'auteur du 12/10/2026). Les entrées reprennent les mêmes
+                         gestionnaires que ces boutons ; le clic droit sélectionne la
+                         ligne visée avant d'ouvrir le menu. « Mettre à jour ce poste »
+                         viendra dans un second lot. -->
+                    <ListView.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="{x:Static loc:L.ParkMenuRefreshOne}" Click="MnuActualiserPoste_Click"/>
+                            <Separator/>
+                            <MenuItem Header="{x:Static loc:L.FlightOpen}" Click="BtnBoiteNoire_Click"/>
+                            <MenuItem Header="{x:Static loc:L.ParkHistoAlertes}" Click="BtnHistoriqueAlertes_Click"/>
+                            <MenuItem Header="{x:Static loc:L.ParkRemoteScan}" Click="BtnRemoteScan_Click"/>
+                        </ContextMenu>
+                    </ListView.ContextMenu>
                     <!-- LE SURVOL DIT CE QUE LA COLONNE NE PEUT PAS DIRE. « État » fait
                          150 pixels ; un refus a quatre causes possibles, et les nommer
                          demande un paragraphe. Le tronquer reviendrait a ne rien dire. -->

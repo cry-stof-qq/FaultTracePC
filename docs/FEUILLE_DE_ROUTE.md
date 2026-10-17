@@ -1743,6 +1743,23 @@ autre thème.
   poste ». Les boutons du bas restent en place : le menu est un raccourci de
   plus, pas un remplacement (confirmé par l'auteur le même jour).
 
+**Décisions de l'auteur du 17/10/2026 sur la 1.9.0** (à la fin du point 79) :
+la section « Windows à jour » des notes est validée — `CETCompat` reste actif ;
+les articles de palisser.fr seront mis à jour à la publication.
+
+**Point 94, lot 1 — livré le 17/10/2026.** Menu du clic droit sur un poste de
+la Supervision (`ParkWindow.xaml`, `ListView.ContextMenu`) : « Actualiser ce
+poste », puis « Boîte noire du poste », « Historique des alertes », « Lancer un
+diagnostic à distance » — ces trois-là appellent les **mêmes gestionnaires**
+que les boutons du bas, qui restent. Le menu ne s'ouvre que sur une ligne
+(`LvMachines_ContextMenuOpening` remonte l'arbre visuel jusqu'à un
+`ListViewItem`) : un clic droit dans une zone vide, un autre poste restant
+sélectionné, aurait sinon agi sur ce poste sans qu'on le vise. « Actualiser ce
+poste » (`RefreshOneAsync`) interroge ce seul poste, archive ses alertes comme
+l'actualisation complète (point 43) et ne touche pas à l'état connu des autres.
+« Mettre à jour ce poste » : lot 2. Aucun test automatique — interface WPF, à
+vérifier à l'écran.
+
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
 Constaté le 10/10/2026 en ouvrant à distance la boîte noire d'un poste mis à
