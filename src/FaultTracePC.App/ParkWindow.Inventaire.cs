@@ -234,7 +234,15 @@ public partial class ParkWindow
     // Construire l'inventaire
     // ------------------------------------------------------------------
 
-    private async void BtnInvActualiser_Click(object sender, RoutedEventArgs e)
+    private async void BtnInvActualiser_Click(object sender, RoutedEventArgs e) => await ActualiserInventaireAsync();
+
+    /// <summary>
+    /// Le corps du bouton « Actualiser l'inventaire », sorti en méthode pour que
+    /// « Mettre à jour ce poste » (point 94) puisse le lancer lui-même quand
+    /// l'inventaire n'est pas encore affiché. Aucune machine n'est contactée :
+    /// lecture de l'annuaire, de la liste de la console et des fichiers.
+    /// </summary>
+    private async Task ActualiserInventaireAsync()
     {
         if (_inventaireOccupe) return;
 

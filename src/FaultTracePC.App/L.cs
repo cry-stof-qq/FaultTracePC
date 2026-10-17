@@ -352,6 +352,7 @@ public static class L
     public static string ParkRefreshAll => Lang.T("🔄 Actualiser tout", "🔄 Refresh all");
     // Point 94 : menu du clic droit sur un poste de la Supervision.
     public static string ParkMenuRefreshOne => Lang.T("🔄 Actualiser ce poste", "🔄 Refresh this machine");
+    public static string ParkMenuUpdateOne => Lang.T("⬆ Mettre à jour ce poste…", "⬆ Update this machine…");
     public static string ParkColMachine => Lang.T("Machine", "Machine");
     public static string ParkColHost => Lang.T("Hôte", "Host");
     public static string ParkColState => Lang.T("État", "State");

@@ -19,7 +19,7 @@
                        FontSize="15" FontWeight="SemiBold"/>
         </Border>
 
-        <TabControl Grid.Row="1" Margin="8,8,8,0" Background="Transparent" BorderThickness="0">
+        <TabControl x:Name="TabsParc" Grid.Row="1" Margin="8,8,8,0" Background="Transparent" BorderThickness="0">
 
             <!-- ============================================================
                  SUPERVISION — les machines déjà suivies, interrogées en direct.
@@ -72,9 +72,13 @@
                          de l'auteur du 12/10/2026). Les entrées reprennent les mêmes
                          gestionnaires que ces boutons ; le clic droit sélectionne la
                          ligne visée avant d'ouvrir le menu. « Mettre à jour ce poste »
-                         viendra dans un second lot. -->
+                         (lot 2) ne déploie RIEN lui-même : il prépare l'onglet
+                         Inventaire, ce seul poste coché — option A choisie par
+                         l'auteur le 17/10/2026, pour garder un seul chemin de
+                         déploiement et sa confirmation. -->
                     <ListView.ContextMenu>
                         <ContextMenu>
+                            <MenuItem Header="{x:Static loc:L.ParkMenuUpdateOne}" Click="MnuMettreAJourPoste_Click"/>
                             <MenuItem Header="{x:Static loc:L.ParkMenuRefreshOne}" Click="MnuActualiserPoste_Click"/>
                             <Separator/>
                             <MenuItem Header="{x:Static loc:L.FlightOpen}" Click="BtnBoiteNoire_Click"/>
@@ -177,7 +181,7 @@
                  parc.json et postes.csv, et rien d'autre : il répond à « quels
                  postes existent », pas à « lesquels vont bien ».
                  ============================================================ -->
-            <TabItem Header="{x:Static loc:L.ParkTabInventory}" Padding="14,6">
+            <TabItem x:Name="TabInventaire" Header="{x:Static loc:L.ParkTabInventory}" Padding="14,6">
               <Grid Background="#F4F6F9">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

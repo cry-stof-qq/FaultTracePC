@@ -303,6 +303,66 @@ public partial class ParkWindow : Window
         if (noeud is null || LvMachines.SelectedItem is not Row) e.Handled = true;
     }
 
+    /// <summary>
+    /// Point 94, lot 2 (option A, choisie par l'auteur le 17/10/2026) : NE
+    /// DÉPLOIE RIEN. Lit l'inventaire s'il n'est pas encore affiché. Ouvre l'onglet Inventaire avec CE SEUL poste coché, tous les
+    /// autres décochés ; le déploiement reste celui du bouton « Déployer la
+    /// sélection », avec la vérification du paquet, le choix du mode parc et la
+    /// confirmation par saisie du nombre. Un seul chemin pour une opération qui
+    /// installe un logiciel sur une machine distante.
+    /// </summary>
+    private async void MnuMettreAJourPoste_Click(object sender, RoutedEventArgs e)
+    {
+        if (LvMachines.SelectedItem is not Row row) return;
+        var machine = _machines.FirstOrDefault(m => m.Name == row.Name && $"{m.Host}:{m.Port}" == row.Host);
+
+        TabsParc.SelectedItem = TabInventaire;
+        var lignes = LignesAffichees().ToList();
+
+        // Demandé par l'auteur le 17/10/2026, après essai : devoir d'abord
+        // actualiser l'inventaire à la main n'était pas intuitif. S'il n'est pas
+        // encore affiché, on le lit ici — c'est sans risque, aucune machine n'est
+        // contactée. S'il l'est déjà, on n'y touche pas : une actualisation
+        // effacerait les vérifications faites entre-temps.
+        if (lignes.Count == 0)
+        {
+            await ActualiserInventaireAsync();
+            lignes = LignesAffichees().ToList();
+        }
+
+        if (lignes.Count == 0)
+        {
+            // Le message de la lecture (unité mal saisie, annuaire injoignable…)
+            // est gardé à la suite : c'est lui qui dit quoi corriger.
+            var raison = (TxtInvStatus.Text ?? "").Trim();
+            TxtInvStatus.Text = Lang.T(
+                $"Impossible de cocher {row.Name} : l'inventaire n'a pas pu être affiché. ",
+                $"Could not tick {row.Name}: the inventory could not be displayed. ") + raison;
+            return;
+        }
+
+        // Le nom affiché d'abord, l'hôte ensuite : un poste inscrit par le
+        // déploiement porte le même nom aux deux endroits, un poste ajouté à la
+        // main peut n'avoir que l'un des deux sous la forme de l'annuaire.
+        var cibles = lignes.Where(l => ListeDePostes.MemePoste(l.Nom, row.Name)).ToList();
+        if (cibles.Count == 0 && machine is not null)
+            cibles = lignes.Where(l => ListeDePostes.MemePoste(l.Nom, machine.Host)).ToList();
+
+        if (cibles.Count == 0)
+        {
+            TxtInvStatus.Text = Lang.T(
+                $"{row.Name} n'apparaît pas dans l'inventaire affiché — aucun poste n'a été coché. Vérifie la source de l'inventaire (unité d'organisation, fichier de postes), ou coche-le à la main.",
+                $"{row.Name} does not appear in the displayed inventory — no computer was ticked. Check the inventory source (organisational unit, computer list file), or tick it by hand.");
+            return;
+        }
+
+        foreach (var l in lignes) l.Coche = cibles.Contains(l);
+        LvInventaire.ScrollIntoView(cibles[0]);
+        TxtInvStatus.Text = Lang.T(
+            $"{row.Name} est coché, et lui seul. Vérifie le paquet, puis clique sur « Déployer la sélection » : la confirmation habituelle suivra.",
+            $"{row.Name} is ticked, and nothing else. Check the package, then click “Deploy the selection”: the usual confirmation will follow.");
+    }
+
     private void MnuActualiserPoste_Click(object sender, RoutedEventArgs e)
     {
         if (LvMachines.SelectedItem is not Row row) return;

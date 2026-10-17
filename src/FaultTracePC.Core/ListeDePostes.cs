@@ -46,6 +46,28 @@ public static class ListeDePostes
     /// comme partout ailleurs, dédoublonnés, et les invalides sont écartés — leur
     /// compte part dans <paramref name="ecartes"/> plutôt que dans le silence.
     /// </summary>
+    /// <summary>
+    /// Point 94 : le poste de la Supervision et la ligne de l'Inventaire
+    /// désignent-ils la même machine ? Les deux onglets n'écrivent pas forcément
+    /// le nom de la même façon (casse, forme longue « poste.domaine », « $ » d'un
+    /// compte d'ordinateur) : on compare les noms normalisés comme partout
+    /// ailleurs (<see cref="ParkInventory.NomWindows"/>).
+    ///
+    /// UNE ADRESSE IP N'EST PAS UN NOM : « 10.0.0.5 » normalisé deviendrait
+    /// « 10 », et pourrait désigner à tort un poste qui s'appellerait ainsi. Le
+    /// poste coché est celui qui sera mis à jour : dans le doute, on ne coche rien.
+    /// </summary>
+    public static bool MemePoste(string? a, string? b)
+    {
+        if (EstAdresseIp(a) || EstAdresseIp(b)) return false;
+        var x = ParkInventory.NomWindows(a);
+        var y = ParkInventory.NomWindows(b);
+        return x.Length > 0 && EstNomValide(x) && string.Equals(x, y, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool EstAdresseIp(string? s) =>
+        System.Net.IPAddress.TryParse((s ?? "").Trim(), out _);
+
     public static int Ecrire(string chemin, IEnumerable<string> noms, List<string>? ecartes = null)
     {
         var retenus = Retenir(noms, ecartes);

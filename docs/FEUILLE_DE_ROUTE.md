@@ -1760,6 +1760,42 @@ l'actualisation complète (point 43) et ne touche pas à l'état connu des autre
 « Mettre à jour ce poste » : lot 2. Aucun test automatique — interface WPF, à
 vérifier à l'écran. **Vérifié à l'écran le 17/10/2026** par l'auteur, dans la console compilée : menu présent sur un poste, entrées fonctionnelles.
 
+**Point 94, lot 2 — livré le 17/10/2026. Choix de l'auteur : option A.**
+Deux façons étaient possibles : (A) « Mettre à jour ce poste » ouvre l'onglet
+Inventaire avec ce seul poste coché, et le déploiement reste celui du bouton
+« Déployer la sélection » ; (B) déployer directement depuis le clic droit, avec
+sa propre confirmation. **B écartée** : elle aurait dupliqué la vérification du
+paquet, le choix du mode parc, la liste des conséquences et la confirmation par
+saisie du nombre — deux chemins pour une opération qui installe un logiciel sur
+une machine distante.
+
+- Menu : « ⬆ Mettre à jour ce poste… » en tête (les points de suspension disent
+  qu'une étape suit). `MnuMettreAJourPoste_Click` **ne déploie rien** : il
+  bascule sur l'onglet Inventaire, décoche tout, coche la ou les lignes du même
+  poste, fait défiler jusqu'à elle et dit quoi faire ensuite.
+- Correspondance des noms : `ListeDePostes.MemePoste` (Core, testée) compare les
+  noms normalisés (`ParkInventory.NomWindows` : casse, forme longue, « $ ») ;
+  **une adresse IP n'est jamais un nom** (« 10.0.0.5 » aurait donné « 10 »), et
+  un nom invalide ne correspond jamais. Le nom affiché est essayé d'abord, puis
+  l'hôte.
+- Inventaire pas encore affiché, ou poste absent : **rien n'est coché**, et la
+  barre d'état dit pourquoi et quoi faire.
+- Onze tests (`MemePosteTests`).
+
+**Essai à l'écran par l'auteur, 17/10/2026** : sans inventaire affiché, la barre
+d'état demandait de l'actualiser d'abord ; après actualisation (et la connexion
+VPN, sans laquelle l'annuaire n'est pas lu — seule la liste de la console
+l'est), « Mettre à jour ce poste » coche bien **ce seul poste**, aussi bien pour
+un poste du domaine que pour un poste hors domaine.
+
+**Demande de l'auteur, même jour, traitée aussitôt** : actualiser l'inventaire
+d'abord n'était pas intuitif. Le corps du bouton « Actualiser l'inventaire »
+devient `ActualiserInventaireAsync()` ; « Mettre à jour ce poste » l'appelle lui-
+même **si l'inventaire n'est pas encore affiché** (lecture sans risque : aucune
+machine n'est contactée). S'il est déjà affiché, il n'est **pas** relu — une
+relecture effacerait les vérifications faites entre-temps. Si la lecture échoue,
+rien n'est coché et le message de la lecture est gardé à la suite du sien.
+
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
 Constaté le 10/10/2026 en ouvrant à distance la boîte noire d'un poste mis à
