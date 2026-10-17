@@ -2243,8 +2243,17 @@ Note sur cet essai : juste après `--configure-remote`, le port 58620 n'était
 elle-même (« le service prend cette configuration en compte dans les
 30 secondes »), et la vérification a été faite aussitôt.
 
-Non encore vérifiés : les installations neuves silencieuses (`/qn` seul, puis
-ajout par `ADDLOCAL=ALL`), la désinstallation.
+| Désinstallation silencieuse (`/x … /qn`) du poste en mode Client | `remote.json` **conservé** ; service `FaultTracePCMonitor` supprimé ; clé `HKLM\Software\Cry-stof\FaultTracePC` **supprimée** — conforme |
+| Installation neuve silencieuse (`/qn`) | registre : `Installed = 1`, `ParkFeatureManaged = 1`, pas de `ParkFeature` — conforme (la commande elle-même n'a pas été recopiée, mais la clé, absente juste avant, est réapparue sans la case) |
+| Ajout silencieux par `ADDLOCAL=ALL` | `ParkFeature = 1` — conforme |
+
+**Bilan du tableau d'essais, 17/10/2026** : tous les cas sont conformes sur
+Windows 11, sauf la **version portable (D4)**, pas encore essayée. Sa règle (pas
+de valeur `ParkFeatureManaged` → console visible) est couverte par les tests
+automatiques. Cas limite noté : une version portable lancée sur une machine où
+le MSI est installé **sans** la case lira le registre de cette machine et cachera
+la console — c'est le choix fait sur cette machine, il paraît cohérent de le
+respecter.
 
 **Défaut constaté au même essai, corrigé directement** : la carte « Aucune
 protection antivirus en temps réel » du rapport **français** affichait
