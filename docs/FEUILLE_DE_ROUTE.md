@@ -2019,6 +2019,17 @@ non, et vue ou non par WMI (`Win32_SystemDriver` / `Win32_Service`). Si une
 inscription dont le fichier manque n'est pas vue par WMI, la correction est
 établie : lire les clés `Services` du registre en plus de WMI.
 
+**Mesure du 19/10/2026 sur deux postes encore équipés de l'agent Trend
+(Endpoint Basecamp), nom du poste affiché.** Résultat identique sur les deux :
+une clé `tmWfp` **sans chemin de programme** (`ImagePath` absent), ni fichier, ni
+vue par WMI ; les deux services de Basecamp, présents et vus par WMI. Ce n'est PAS
+le cas du point 103 (TmPreFilter avait un chemin, un démarrage automatique et des
+échecs « fichier introuvable » à chaque démarrage). Une clé sans chemin n'est
+vraisemblablement pas chargée comme service par Windows — d'où son absence dans
+WMI —, mais ce n'est pas vérifié : reste à savoir si elle produit des échecs de
+démarrage dans le journal. Mesure complémentaire demandée (contenu de la clé et
+événements du Gestionnaire de services qui la citent). Point 103 toujours ouvert.
+
 **Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
 de compter la dispersion, les services et pilotes dont le programme est MESURÉ
 comme disparu (`ProgrammeDisparu` : liste des services orphelins, ou pilote avec
