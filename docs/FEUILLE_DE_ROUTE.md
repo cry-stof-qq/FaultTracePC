@@ -120,6 +120,11 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 99 | **Même alerte sur plusieurs postes : le comparateur ne la rapproche pas** | constaté le 12/10/2026 — trois postes d'une même série en alerte WHEA ; voir « Rapport du parc du 12/10/2026 » plus bas |
 | 100 | **Colonne « Version » de la Supervision trop étroite** | constaté le 12/10/2026 sur la console 1.8.1 : « 1.8.0 — à mettre à jou… » — défaut d'affichage, sans conséquence sur la donnée ; à corriger avec la 1.9.0 (points 93 et 94 touchent déjà cette liste) |
 | 101 | **Échecs répétés d'un service tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 sur le rapport d'un poste du parc — **défaut, corrigé le même jour** ; voir « Déploiement du 19/10/2026 » plus bas |
+| 102 | **Un même plantage compté deux fois (variante « _M » d'un code d'arrêt)** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » plus bas |
+| 103 | **Les pilotes dont le fichier a disparu ne sont pas recherchés** | constaté le 19/10/2026 — la carte annonce « service(s) ou pilote(s) », la collecte ne lit que les services ; **mesure demandée avant correction** ; voir « Trois diagnostics du 19/10/2026 » |
+| 104 | **Échecs dispersés : des services déjà expliqués comptent comme « le système »** | constaté le 19/10/2026 — dépend du point 103 ; voir « Trois diagnostics du 19/10/2026 » |
+| 105 | **Un plantage ancien, hors période, décide du verdict** | relevé le 19/10/2026 — **proposition, pas un défaut établi** : demande l'accord de l'auteur ; voir « Trois diagnostics du 19/10/2026 » |
+| 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | relevé le 19/10/2026 — touche des textes français existants : demande l'accord de l'auteur ; voir « Trois diagnostics du 19/10/2026 » |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1902,6 +1907,68 @@ par `git rm --cached` (il reste sur le disque). Vérifié le même jour : plus a
 fichier du dossier n'est à la fois non suivi et non ignoré. L'historique, lui,
 garde le fichier : le réécrire (`git filter-repo`, puis envoi forcé) est une
 décision de l'auteur.
+
+## Trois diagnostics du 19/10/2026 — points 102 à 106
+
+Diagnostics à distance de trois postes du parc encore jamais analysés, faits par
+des services en 1.8.1 (le correctif du point 101 n'y est donc pas encore : la
+ligne sfc/DISM sur les échecs d'un service tiers y figure toujours, c'est attendu).
+
+**Point 102 — corrigé le 19/10/2026.** Sur un poste, le même plantage du
+10/03/2026 14:52 figurait deux fois : le minidump portait `0x1000007E`,
+`MEMORY.DMP` portait `0x7E` — même heure, mêmes quatre paramètres. Le
+dédoublonnage comparait les codes bruts. Conséquences : deux cartes critiques,
+« 3 plantages en 2 séries » et « 3 crash(s) antérieurs » au lieu de 2, et la
+carte du `0x1000007E` sans description (code absent du catalogue). Microsoft
+documente `0x1000007E` comme la variante « _M » de `0x7E`
+(learn.microsoft.com, « Bug Check 0x1000007E SYSTEM_THREAD_EXCEPTION_NOT_HANDLED_M »).
+Correctif : `BugCheckCatalog.Canonique` ramène la plage `0x10000001`–`0x10000FFF`
+à son code de base, appliqué aux trois sources d'incident (vidages, Kernel-Power
+41, BugCheck 1001). Volontairement limité à cette plage : `0xDEADDEAD` (plantage
+provoqué à la main) a aussi ce bit levé et ne doit pas changer. Le tableau des
+fichiers de vidage montre toujours le code tel qu'il est écrit dans le fichier.
+Tests : `VarianteMTests` (11 cas).
+
+**Point 103 — constaté, mesure demandée.** Sur le même poste, `TmPreFilter`
+(pilote de filtrage de Trend Micro) échoue à chaque démarrage avec « Le fichier
+spécifié est introuvable », mais la carte « service(s) ou pilote(s) inscrit(s)
+dont le programme n'existe plus » ne le cite pas. Cause vérifiée dans le code :
+`ServiceCollector` n'interroge que `Win32_Service` ; les pilotes noyau sont dans
+`Win32_SystemDriver`, jamais lu pour cette vérification. Correction possible :
+lire aussi `Win32_SystemDriver`. **Non faite à l'aveugle** : Windows peut garder
+inscrits des pilotes livrés avec lui dont le fichier n'est pas présent, ce qui
+ferait une fausse alerte sur chaque poste. Mesure en lecture seule demandée à
+l'auteur sur son poste avant d'écrire le code.
+
+**Point 104 — dépend du 103.** Sur ce poste, 93 échecs se répartissent sur
+quatre services (31, 31, 30, 1) : la règle des quatre cinquièmes conclut
+« aucun ne domine, ce qui désigne plutôt le système » et propose sfc et DISM.
+Or deux des trois premiers sont des inscriptions sans fichier (un service déjà
+établi comme tel, et `TmPreFilter`), le troisième est GLPI Agent. Aucun ne
+désigne Windows. Piste : retirer du calcul de dispersion les services dont la
+cause est déjà établie (programme disparu), avant de compter.
+
+**Point 105 — proposition.** Deux postes reçoivent le verdict « PILOTE
+défectueux » à partir de plantages tous antérieurs à la période analysée : un
+seul plantage vieux de dix mois sur l'un, des plantages de février et mars 2026
+sur l'autre — dont le problème actuel, mesuré, est une série d'erreurs WHEA
+corrigées sur un lien PCI Express. Le rapport le dit lui-même (« crash(s)
+antérieurs à la période analysée », « le diagnostic de ces crashs est
+incomplet »), mais la carte reste « Critique » et décide du verdict. À discuter :
+garder la carte, mais ne plus la laisser porter le verdict quand le dernier
+plantage est hors période.
+
+**Point 106 — proposition (textes existants).** La recommandation de repli
+d'un code d'arrêt inconnu dit encore « automatisé en Phase 2 », et la section
+des processus « le futur mode surveillance (Phase 3) » : l'analyse WinDbg et la
+surveillance existent, ce sont des mots de la feuille de route, sans sens pour
+le lecteur. Par ailleurs `0x23` (FAT_FILE_SYSTEM, un plantage d'un poste du
+parc) n'est pas au catalogue.
+
+**Au passage, pour le retrait de Trend Micro** (non lié au code) : l'agent Trend
+(`EndpointBasecamp`) tourne sur les quatre postes analysés ce jour ; le service
+de l'antivirus de remplacement, qui pèse une centaine de Mo ailleurs, n'apparaît
+dans la liste des processus que sur un seul d'entre eux.
 
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 

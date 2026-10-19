@@ -37,6 +37,23 @@ public static class BugCheckCatalog
     public static BugCheckEntry? Lookup(uint code) =>
         Entries.TryGetValue(code, out var e) ? e : null;
 
+    /// <summary>
+    /// Ramène une variante « _M » à son code de base : 0x1000007E → 0x7E.
+    ///
+    /// Microsoft documente ces variantes à part (par exemple « Bug Check 0x1000007E
+    /// SYSTEM_THREAD_EXCEPTION_NOT_HANDLED_M »), mais c'est le même arrêt, avec les
+    /// mêmes paramètres. Constaté le 19/10/2026 sur un poste du parc : le minidump
+    /// portait 0x1000007E et MEMORY.DMP 0x7E pour le MÊME plantage — même heure,
+    /// mêmes quatre paramètres. Le dédoublonnage comparait les codes bruts : un seul
+    /// plantage devenait deux, avec deux cartes critiques.
+    ///
+    /// Seule la plage 0x10000000–0x10000FFF est concernée. Un masque appliqué à tout
+    /// code dont ce bit est levé changerait aussi 0xDEADDEAD (plantage provoqué à la
+    /// main) en un code qui n'existe pas.
+    /// </summary>
+    public static uint Canonique(uint code) =>
+        (code & 0xFFFFF000u) == 0x10000000u && (code & 0xFFFu) != 0 ? code & 0xFFFu : code;
+
     public static string NameOf(uint code) =>
         // Repli : on affiche le code brut, pas un nom fabriqué. « BUGCODE_0x141 »
         // ressemblait à s'y méprendre à un nom officiel Microsoft et donnait à croire

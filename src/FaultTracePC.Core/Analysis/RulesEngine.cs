@@ -146,9 +146,11 @@ public sealed class RulesEngine
             incidents.Add(new BsodIncident
             {
                 TimeLocal = d.CrashTimeFromHeader ?? d.LastWriteTime,
-                BugCheckCode = d.BugCheckCode,
+                // Code ramené à sa base (0x1000007E → 0x7E) : sans cela, le minidump et
+                // MEMORY.DMP d'un même plantage ne se reconnaissent pas — voir Canonique.
+                BugCheckCode = BugCheckCatalog.Canonique(d.BugCheckCode!.Value),
                 Parameters = d.BugCheckParameters,
-                BugCheckName = BugCheckCatalog.NameOf(d.BugCheckCode!.Value),
+                BugCheckName = BugCheckCatalog.NameOf(BugCheckCatalog.Canonique(d.BugCheckCode!.Value)),
                 DumpPath = d.Path,
                 // Analyse symbolique (Phase 2) : le module fautif nommé par CDB fait foi.
                 SuspectDriver = d.FaultingModule,
@@ -168,6 +170,7 @@ public sealed class RulesEngine
         foreach (var e in r.Events.Where(e => e.Category == EventCategory.PowerLoss))
         {
             if (!uint.TryParse(e.Extracted.GetValueOrDefault("BugcheckCode"), out var codeKp) || codeKp == 0) continue;
+            codeKp = BugCheckCatalog.Canonique(codeKp);
 
             // L'événement 41 est journalisé au REDÉMARRAGE : il suit le plantage de
             // quelques instants. On regroupe donc large plutôt que de compter double.
@@ -190,7 +193,7 @@ public sealed class RulesEngine
 
         foreach (var e in r.Events.Where(e => e.Category == EventCategory.Bsod))
         {
-            uint? code = ParseHex(e.Extracted.GetValueOrDefault("BugCheckCode"));
+            uint? code = ParseHex(e.Extracted.GetValueOrDefault("BugCheckCode")) is uint brut ? BugCheckCatalog.Canonique(brut) : null;
             var existing = incidents.FirstOrDefault(i =>
                 Math.Abs((i.TimeLocal - e.TimeLocal).TotalMinutes) < 10 &&
                 (code is null || i.BugCheckCode == code));
