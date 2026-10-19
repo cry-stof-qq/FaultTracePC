@@ -57,6 +57,33 @@ public sealed class EventLogCollector
         return events.OrderByDescending(e => e.TimeLocal).ToList();
     }
 
+    /// <summary>
+    /// POINT 109 — heures des arrêts de Windows (EventLog 6006) sur la période. Un
+    /// simple repère horaire, voir <see cref="DiagnosticReport.ArretsDeWindows"/>.
+    /// En cas d'échec de lecture, liste vide : aucun échec de service n'est alors
+    /// mis à part, ce qui revient au comportement d'avant.
+    /// </summary>
+    public List<DateTime> ArretsDeWindows(int days)
+    {
+        var heures = new List<DateTime>();
+        long ms = (long)TimeSpan.FromDays(days).TotalMilliseconds;
+        try
+        {
+            var query = new EventLogQuery("System", PathType.LogName,
+                $"*[System[Provider[@Name='EventLog'] and (EventID=6006) and TimeCreated[timediff(@SystemTime) <= {ms}]]]") { ReverseDirection = true };
+            using var reader = new EventLogReader(query);
+            for (EventRecord? rec = reader.ReadEvent(); rec is not null && heures.Count < MaxEvenementsParRequete * 4; rec = reader.ReadEvent())
+                using (rec)
+                    if (rec.TimeCreated is DateTime t) heures.Add(t.ToLocalTime());
+        }
+        catch (EventLogNotFoundException) { /* journal absent : ignoré */ }
+        catch (Exception ex)
+        {
+            _errors.Add(Lang.T($"Journal System (arrêts de Windows) : {ex.Message}", $"System log (Windows shutdowns): {ex.Message}"));
+        }
+        return heures;
+    }
+
     private void Collect(List<WinEvent> target, string logName, string xpath, EventCategory category)
     {
         try

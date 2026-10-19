@@ -2281,9 +2281,22 @@ public sealed class RulesEngine
                                   && (nom.Equals(d.Name, StringComparison.OrdinalIgnoreCase)
                                       || nom.Equals(d.DisplayName, StringComparison.OrdinalIgnoreCase)));
 
+    /// <summary>
+    /// POINT 109 — ce service a-t-il « planté » au moment même où Windows s'arrêtait ?
+    /// Seuls les arrêts inattendus (7031, 7034) sont concernés : un service qui ne
+    /// DÉMARRE pas (7000) n'a rien à voir avec un arrêt. Fenêtre : de 1 seconde après
+    /// à 10 secondes avant le 6006 — mesuré : même seconde dans les 9 cas relevés.
+    /// </summary>
+    internal static bool CoupePendantUnArret(DiagnosticReport r, WinEvent e) =>
+        IdsArretInattendu.Contains(e.EventId)
+        && r.ArretsDeWindows.Any(a => (a - e.TimeLocal).TotalSeconds is >= -1.0 and <= 10.0);
+
     private static void AnalyzeServiceFailures(DiagnosticReport r)
     {
-        var fails = r.Events.Where(e => e.Category == EventCategory.ServiceFailure).ToList();
+        var tous = r.Events.Where(e => e.Category == EventCategory.ServiceFailure).ToList();
+        // Un service coupé pendant l'arrêt de Windows n'a pas échoué : il ne compte pas.
+        var coupes = tous.Where(e => CoupePendantUnArret(r, e)).ToList();
+        var fails = tous.Except(coupes).ToList();
         if (fails.Count < 5) return;
 
         var parService = fails
@@ -2323,6 +2336,11 @@ public sealed class RulesEngine
 
             details = Lang.T($"Services concernés, du plus touché au moins touché : {nommes}{reste}.",
                              $"Services involved, from the most affected to the least: {nommes}{reste}.");
+
+            if (coupes.Count > 0)
+                details += Lang.T(
+                    $" {coupes.Count} autre(s) arrêt(s) ne sont pas comptés : ils sont survenus au moment où Windows s'arrêtait ou redémarrait — le service a été coupé, il n'a pas planté.",
+                    $" {coupes.Count} other stop(s) are not counted: they happened as Windows was shutting down or restarting — the service was cut off, it did not crash.");
 
             // COMBIEN DE SERVICES FAUT-IL POUR EXPLIQUER L'ESSENTIEL DES ÉCHECS ?
             //

@@ -801,6 +801,18 @@ public sealed class DiagnosticReport
     public HashSet<EventCategory> TruncatedEventCategories { get; set; } = new();
 
     /// <summary>
+    /// POINT 109 — heures des arrêts de Windows (événement 6006 du journal Système :
+    /// « le service d'Enregistrement d'événement a été arrêté »).
+    ///
+    /// Ce ne sont pas des événements à montrer, mais un repère : un service qui
+    /// « s'est terminé de manière inattendue » dans la seconde où Windows s'arrête
+    /// n'a pas planté, il a été coupé. Mesuré le 19/10/2026 sur un poste du parc :
+    /// les 9 arrêts de GLPI Agent de la semaine tombaient tous dans la même seconde
+    /// qu'un 6006 — tâches planifiées de redémarrage et d'extinction, mise à jour.
+    /// </summary>
+    public List<DateTime> ArretsDeWindows { get; set; } = new();
+
+    /// <summary>
     /// Actions d'entretien effectuées pendant l'analyse — purge de l'historique
     /// notamment.
     ///

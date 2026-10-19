@@ -32,6 +32,7 @@ public sealed class ScanOrchestrator
         var journal = new EventLogCollector(errors);
         report.Events = journal.Collect(options.Days);
         report.TruncatedEventCategories = journal.CategoriesTronquees;
+        report.ArretsDeWindows = journal.ArretsDeWindows(options.Days);
         ct.ThrowIfCancellationRequested();
 
         Step(progress, Lang.T("Lecture du Moniteur de fiabilité…", "Reading the Reliability Monitor…"), 60);

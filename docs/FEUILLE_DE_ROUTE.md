@@ -127,7 +127,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | **validé le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
 | 107 | **Plantages d'un logiciel tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
 | 108 | **« Le problème principal vient d'un pilote » sous un verdict matériel** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
-| 109 | **Un service arrêté pendant l'arrêt de Windows compté comme un échec (cas de GLPI Agent)** | relevé le 19/10/2026 — **confirmé le même jour par mesure** ; défaut à corriger ; voir « Trois diagnostics du 19/10/2026 » |
+| 109 | **Un service arrêté pendant l'arrêt de Windows compté comme un échec (cas de GLPI Agent)** | relevé le 19/10/2026 — **confirmé le même jour par mesure, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -2039,7 +2039,21 @@ ces tâches sont les siennes, mises en place pour les postes que les utilisateur
 oublient d'éteindre. Ce n'est donc pas une panne de l'agent : FaultTracePC compte à
 tort comme « échec de service » un service coupé pendant l'arrêt de Windows, et en
 fait une conclusion sur chaque poste. La signature mesurable à retenir : 7031 à
-quelques secondes d'un 6006 du même journal.
+quelques secondes d'un 6006 du même journal. Précision de l'auteur : 19:30 et
+20:00 sont les horaires de l'ancien master (anciens postes), 20:30 et 21:00 ceux
+du nouveau, repoussés à la demande — d'où les deux séries d'heures relevées.
+
+**Point 109 — corrigé le 19/10/2026.** `EventLogCollector.ArretsDeWindows` relève
+les heures des 6006 de la période (`DiagnosticReport.ArretsDeWindows`, simple
+repère, non affiché). `AnalyzeServiceFailures` met de côté les arrêts inattendus
+(7031, 7034) survenus entre 10 secondes avant et 1 seconde après un 6006
+(`CoupePendantUnArret`) ; les échecs de DÉMARRAGE (7000, 7001) restent comptés.
+La carte dit combien d'arrêts ont été mis de côté et pourquoi. Si les échecs
+restants passent sous le seuil de 5, pas de carte. Effet attendu sur le parc :
+plus de conclusion « GLPI Agent » sur les postes où il n'est coupé que par les
+arrêts du soir. Quatre tests dans `ServicesEnEchecTests`. Ne prend effet sur un
+poste qu'une fois la 1.9.0 installée (c'est le service du poste qui fait
+l'analyse à distance).
 
 **CI rouge du 19/10/2026 (commit `16479fc`), corrigé le même jour.** Le lot
 104/107/108 ne compilait pas : la variable `reste` ajoutée au point 104 existait

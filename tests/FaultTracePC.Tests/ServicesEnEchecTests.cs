@@ -279,4 +279,57 @@ public class ServicesEnEchecTests
         Assert.Contains("Terminer la désinstallation", f.Recommendation);
         Assert.Equal(FaultCategory.None, f.Category);
     }
+
+    // ── Point 109, confirmé par mesure le 19/10/2026 ───────────────────────────
+    // Les 9 arrêts de GLPI Agent d'une semaine tombaient tous dans la même seconde
+    // qu'un 6006 (arrêt de Windows) : coupé, pas planté.
+
+    [Fact]
+    public void Un_service_coupe_pendant_l_arret_de_Windows_n_est_pas_un_echec()
+    {
+        var r = RapportAvecIds(("GLPI Agent", 7031, 9));
+        foreach (var e in r.Events) r.ArretsDeWindows.Add(e.TimeLocal);
+
+        var initial = Lang.Current;
+        try { Lang.Apply(AppLanguage.French); new RulesEngine().Analyze(r); }
+        finally { Lang.Apply(initial); }
+
+        Assert.DoesNotContain(r.Findings, f => f.Code == "service_failure");
+    }
+
+    [Fact]
+    public void Les_arrets_coupes_sont_annonces_et_les_vrais_echecs_restent_comptes()
+    {
+        var r = RapportAvecIds(("GLPI Agent", 7031, 9));
+        // Trois des neuf tombent à l'arrêt de Windows (même seconde) ; six non.
+        foreach (var e in r.Events.Take(3)) r.ArretsDeWindows.Add(e.TimeLocal);
+
+        var f = Conclusion(r);
+
+        Assert.Contains("GLPI Agent (6×", f.Details);
+        Assert.Contains("3 autre(s) arrêt(s) ne sont pas comptés", f.Details);
+    }
+
+    [Fact]
+    public void Un_service_qui_ne_demarre_pas_reste_compte_meme_a_l_heure_d_un_arret()
+    {
+        var r = RapportAvecIds(("Service A", 7000, 6));
+        foreach (var e in r.Events) r.ArretsDeWindows.Add(e.TimeLocal);
+
+        var f = Conclusion(r);
+
+        Assert.Contains("Service A (6×", f.Details);
+    }
+
+    [Fact]
+    public void Un_arret_de_Windows_trop_eloigne_ne_met_rien_a_part()
+    {
+        var r = RapportAvecIds(("GLPI Agent", 7031, 6));
+        foreach (var e in r.Events) r.ArretsDeWindows.Add(e.TimeLocal.AddMinutes(2));
+
+        var f = Conclusion(r);
+
+        Assert.Contains("GLPI Agent (6×", f.Details);
+        Assert.DoesNotContain("ne sont pas comptés", f.Details);
+    }
 }
