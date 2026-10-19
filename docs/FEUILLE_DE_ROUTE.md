@@ -2030,6 +2030,17 @@ WMI —, mais ce n'est pas vérifié : reste à savoir si elle produit des éche
 démarrage dans le journal. Mesure complémentaire demandée (contenu de la clé et
 événements du Gestionnaire de services qui la citent). Point 103 toujours ouvert.
 
+**Mesure complémentaire du 19/10/2026, sur les deux postes** : la clé `tmWfp` ne
+contient **aucune valeur** (ni chemin, ni type, ni mode de démarrage) et une seule
+sous-clé ; aucun événement du journal Système (5 000 derniers) ne la cite. C'est
+une coquille vide que Windows ignore : elle ne produit aucun échec, et
+FaultTracePC a raison de ne pas en parler. **Conclusion : ce n'est pas le cas du
+point 103**, qui reste ouvert faute d'un poste dans l'état de TmPreFilter (chemin
+présent, fichier absent, échec à chaque démarrage). Relevé au passage par
+l'auteur : Trend n'apparaît plus dans « Ajout/suppression de programmes » sur ces
+deux postes, alors que l'agent Endpoint Basecamp y est toujours installé comme
+service.
+
 **Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
 de compter la dispersion, les services et pilotes dont le programme est MESURÉ
 comme disparu (`ProgrammeDisparu` : liste des services orphelins, ou pilote avec
