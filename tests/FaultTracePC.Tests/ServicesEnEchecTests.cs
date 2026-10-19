@@ -192,4 +192,40 @@ public class ServicesEnEchecTests
 
         Assert.DoesNotContain(r.Findings, f => f.Code == "service_failure");
     }
+
+    // ── Constaté le 19/10/2026 sur un poste du parc ────────────────────────────
+    // 27 échecs, tous de GLPI Agent (un service tiers) : la boîte à outils, tirée
+    // de la catégorie Logiciel, renvoyait vers sfc et DISM. La catégorie ne vaut
+    // Logiciel que lorsque la dispersion désigne le système.
+
+    [Fact]
+    public void Un_seul_service_en_cause_ne_renvoie_pas_vers_sfc_et_DISM()
+    {
+        var f = Conclusion(RapportAvecIds(("GLPI Agent", 7031, 27)));
+        Assert.Equal(FaultCategory.None, f.Category);
+    }
+
+    [Fact]
+    public void Deux_services_en_cause_ne_renvoient_pas_vers_sfc_et_DISM()
+    {
+        var f = Conclusion(Rapport(("GLPI Agent", 14), ("TmWSCSvc", 14), ("Agent tiers", 1)));
+        Assert.Equal(FaultCategory.None, f.Category);
+    }
+
+    [Fact]
+    public void Des_echecs_disperses_gardent_la_categorie_Logiciel()
+    {
+        var f = Conclusion(Rapport(("Service A", 2), ("Service B", 2), ("Service C", 2), ("Service D", 2), ("Service E", 2)));
+        Assert.Equal(FaultCategory.Software, f.Category);
+        Assert.Contains("fichiers système", f.Recommendation);
+    }
+
+    [Fact]
+    public void Sans_nom_de_service_aucune_reparation_n_est_proposee_d_avance()
+    {
+        // La recommandation demande d'abord de retrouver les services : proposer
+        // sfc avant de savoir de quoi il s'agit serait conclure sans preuve.
+        var f = Conclusion(Rapport(("", 6)));
+        Assert.Equal(FaultCategory.None, f.Category);
+    }
 }

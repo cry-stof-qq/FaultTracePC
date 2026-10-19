@@ -119,6 +119,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 98 | **Toute erreur WHEA est une « alerte critique », corrigée ou fatale** | constaté le 12/10/2026 dans le code ; numéro d'événement non conservé ; voir « Rapport du parc du 12/10/2026 » plus bas |
 | 99 | **Même alerte sur plusieurs postes : le comparateur ne la rapproche pas** | constaté le 12/10/2026 — trois postes d'une même série en alerte WHEA ; voir « Rapport du parc du 12/10/2026 » plus bas |
 | 100 | **Colonne « Version » de la Supervision trop étroite** | constaté le 12/10/2026 sur la console 1.8.1 : « 1.8.0 — à mettre à jou… » — défaut d'affichage, sans conséquence sur la donnée ; à corriger avec la 1.9.0 (points 93 et 94 touchent déjà cette liste) |
+| 101 | **Échecs répétés d'un service tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 sur le rapport d'un poste du parc — **défaut, corrigé le même jour** ; voir « Déploiement du 19/10/2026 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1829,6 +1830,41 @@ de `ParkWindow.xaml`), le texte est raccourci et dit **plus** : « ⬆ 1.8.0 →
 des flèches est expliqué dans une bulle d'aide sur l'en-tête de la colonne.
 La logique sort de `ParkWindow` vers `Core/VersionDuPoste.cs`, pour être testée :
 six tests (`VersionDuPosteTests`), dont un sur la longueur.
+
+## Déploiement du 19/10/2026 — et ce qu'un rapport de poste a montré (point 101)
+
+**Déploiement de la 1.8.1 par la console, 19/10/2026.** Sept postes cochés dans
+l'onglet Inventaire, tous « installé et visible de la console », service en cours
+d'exécution sur chacun. Supervision : 8 postes joignables sur 10, tous en 1.8.1.
+Un portable non retrouvé n'a pas été mis à jour — choix de l'auteur, pas un échec.
+
+**Point 98 vu sur le parc.** Les alertes apparues depuis la 1.8.1 sur les postes
+en alerte WHEA sont en majorité non critiques, là où celles de la 1.8.0 étaient
+toutes « crit » : même constat que sur le poste de l'auteur le 17/10/2026.
+
+**Rapport d'un poste du parc (diagnostic à distance, 19/10/2026).** Verdict
+« système sain ». Une carte « Échecs de services Windows répétés (27) » portait
+sur un seul service, GLPI Agent — un service **tiers**. Le texte disait bien
+« c'est lui qu'il faut traiter », mais la ligne « Dans FaultTracePC », tirée de la
+catégorie Logiciel, renvoyait vers sfc /scannow et DISM : la réparation de Windows
+pour la panne d'un autre éditeur. C'est le défaut corrigé en 1.8.0 sur d'autres
+cartes (catégorie « aucune »).
+
+**Point 101 — corrigé le 19/10/2026.** Dans `AnalyzeServiceFailures`, la
+catégorie ne vaut plus Logiciel que lorsque les échecs sont **dispersés** (trois
+services ou plus pour couvrir les quatre cinquièmes) : c'est le seul cas où la
+recommandation désigne elle-même les fichiers système. Un ou deux services en
+cause, ou aucun nom lisible : catégorie « aucune », donc ni sfc ni DISM dans la
+boîte à outils ni dans le script de réparation. Quatre tests ajoutés dans
+`ServicesEnEchecTests`.
+
+**Relevé, non conclu.** Deux événements disque 51 (« erreur lors d'une opération
+de pagination ») sur un deuxième disque le 01/10, sans carte de conclusion qui les
+reprenne — à vérifier avant d'en faire un point : la nature de ce disque n'est pas
+établie. Un agent antivirus tiers figure dans la liste des processus alors que la
+carte Protection dit « aucun autre antivirus inscrit » — ce n'est pas forcément
+faux (un agent peut ne pas s'inscrire auprès du Centre de sécurité), à ne pas
+corriger sans preuve.
 
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 

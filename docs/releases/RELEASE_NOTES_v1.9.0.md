@@ -41,6 +41,7 @@ Un particulier veut diagnostiquer sa machine ; un administrateur veut piloter un
 ## Corrigé au passage
 
 - Dans le rapport français, la carte antivirus affichait le mode de Windows Defender en anglais (« mode Not running »). Il est désormais traduit (« arrêté », « passif », « normal »…) ; une valeur inconnue est rendue telle quelle.
+- Quand des échecs répétés de services viennent d'un ou deux services seulement — souvent un logiciel tiers —, la carte ne propose plus sfc /scannow et DISM, qui réparent Windows et non ce logiciel. Ils restent proposés quand les échecs se dispersent sur de nombreux services, ce qui désigne plutôt le système.
 
 ## Windows à jour
 

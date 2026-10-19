@@ -2272,6 +2272,14 @@ public sealed class RulesEngine
 
         string details, reco;
 
+        // CONSTATÉ LE 19/10/2026 sur un poste du parc : 27 échecs, tous de GLPI Agent,
+        // un service TIERS. La carte disait bien « c'est lui qu'il faut traiter », puis
+        // la boîte à outils, tirée de la catégorie Logiciel, renvoyait vers sfc et DISM
+        // — la réparation de Windows pour la panne d'un autre éditeur. Seule la
+        // dispersion sur plusieurs services désigne le système : c'est le seul cas où la
+        // catégorie Logiciel, et donc sfc et DISM, est juste. Sinon, aucune catégorie.
+        var categorie = FaultCategory.None;
+
         if (parService.Count == 0)
         {
             // Aucun nom lisible : on le DIT, au lieu de laisser croire qu'on n'a pas cherché.
@@ -2357,6 +2365,8 @@ public sealed class RulesEngine
                         " A service that repeatedly fails to START is often a registration left behind by an incomplete uninstall: the entry is still there, its executable is not, and Windows retries at every trigger. The thing to check is therefore whether the file still exists, before looking any further.");
             }
 
+            if (!concentre) categorie = FaultCategory.Software;
+
             reco = concentre
                 ? Lang.T($"Ouvrir services.msc et y chercher {nomsCoupables} : les propriétés d'un service donnent son compte de démarrage et ses actions de récupération. Un service TIERS qui tombe se met à jour ou se désinstalle ; un service de WINDOWS qui tombe est un symptôme et pas une cause — chercher alors du côté des pilotes et des fichiers système.",
                          $"Open services.msc and look for {nomsCoupables}: a service's properties show its startup account and its recovery actions. A THIRD-PARTY service that keeps failing gets updated or uninstalled; a WINDOWS service that keeps failing is a symptom and not a cause — look at drivers and system files instead.")
@@ -2368,7 +2378,7 @@ public sealed class RulesEngine
         {
             Severity = Severity.Info,
             Confidence = Confidence.Medium,
-            Category = FaultCategory.Software,
+            Category = categorie,
             Code = "service_failure",
             Title = Lang.T($"Échecs de services Windows répétés ({fails.Count})", $"Repeated Windows service failures ({fails.Count})"),
             Details = details,
