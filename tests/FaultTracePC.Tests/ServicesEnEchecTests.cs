@@ -332,4 +332,20 @@ public class ServicesEnEchecTests
         Assert.Contains("GLPI Agent (6×", f.Details);
         Assert.DoesNotContain("ne sont pas comptés", f.Details);
     }
+
+    [Fact]
+    public void Un_echec_isole_qui_reste_apres_la_mise_a_part_n_est_pas_designe_coupable()
+    {
+        // Poste de l'auteur, 19/10/2026 au soir : 8 échecs d'un service sans programme,
+        // et UN échec d'un autre service — que la carte disait « à traiter en premier ».
+        var r = RapportAvecIds(("TmWSCSvc", 7000, 8), ("Service isole", 7031, 1));
+        r.System.ServicesOrphelins.Add(new ServiceOrphelin { Nom = "TmWSCSvc", Chemin = @"C:\Program Files\Editeur\service.exe" });
+
+        var f = Conclusion(r);
+
+        Assert.Contains("Les 1 autre(s) échec(s) sont trop peu nombreux pour désigner un coupable", f.Details);
+        Assert.DoesNotContain("traiter en premier", f.Details);
+        Assert.Contains("Terminer la désinstallation", f.Recommendation);
+        Assert.Equal(FaultCategory.None, f.Category);
+    }
 }

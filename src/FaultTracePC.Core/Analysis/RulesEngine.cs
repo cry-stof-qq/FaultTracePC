@@ -2382,6 +2382,13 @@ public sealed class RulesEngine
                 noyau++;
                 if (cumul * 5 >= aCompterTotal * 4) break;
             }
+            // Constaté le 19/10/2026 au soir sur le poste de l'auteur : 9 échecs, dont 8
+            // d'un service sans programme mis à part ; restait UN échec d'un autre
+            // service, et la carte concluait « c'est lui qu'il faut traiter en
+            // premier ». Ce qui reste après la mise à part doit lui-même atteindre le
+            // seuil de la carte (5) pour désigner un coupable ; en dessous, on le dit.
+            bool resteIsole = expliques.Count > 0 && aCompterTotal is > 0 and < 5;
+            if (resteIsole) noyau = 0;
             bool concentre = noyau <= 2;
             var coupables = aCompter.Take(noyau).ToList();
             var nomsCoupables = string.Join(Lang.T(" et ", " and "), coupables.Select(g => g.Key));
@@ -2399,7 +2406,10 @@ public sealed class RulesEngine
             // sinon — le lecteur doit pouvoir refaire le compte.
             var surQuoi = expliques.Count > 0 ? Lang.T($"{aCompterTotal} autres", $"{aCompterTotal} other") : $"{aCompterTotal}";
 
-            details += noyau == 0
+            details += resteIsole
+                ? Lang.T($" Les {aCompterTotal} autre(s) échec(s) sont trop peu nombreux pour désigner un coupable : rien ne désigne le système, ni un autre service.",
+                         $" The {aCompterTotal} other failure(s) are too few to point at a culprit: nothing points at the system, nor at another service.")
+                : noyau == 0
                 ? Lang.T(" Tous ces échecs ont donc une cause établie : rien ne désigne le système.",
                          " All of these failures therefore have an established cause: nothing points at the system.")
                 : !concentre
