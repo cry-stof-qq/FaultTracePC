@@ -42,6 +42,10 @@ Un particulier veut diagnostiquer sa machine ; un administrateur veut piloter un
 
 Les pilotes livrés avec Windows changent tous ensemble à chaque mise à jour, ceux de Microsoft Defender avec sa plateforme. Le rapport du parc en faisait une carte par fichier — 175 cartes sur un parc de dix postes, dont 145 pour Windows. Ils tiennent désormais en **une carte par famille**, qui nomme les postes en retard et dit sur combien de fichiers. Les pilotes de constructeurs (réseau, son, graphique…) gardent chacun leur carte : ce sont eux qui méritent un regard.
 
+## Rapport du parc : une même erreur matérielle sur plusieurs postes — point 99
+
+Quand plusieurs postes signalent des erreurs matérielles (WHEA) sur leur période d'analyse, le rapport du parc les rapproche désormais en une carte qui les nomme, du plus touché au moins touché, et conseille de chercher d'abord une cause commune — même modèle, même BIOS, même pilote de chipset. Cette carte fonctionne aussi avec des postes encore en 1.8.1.
+
 ## Corrigé au passage
 
 - Dans le rapport français, la carte antivirus affichait le mode de Windows Defender en anglais (« mode Not running »). Il est désormais traduit (« arrêté », « passif », « normal »…) ; une valeur inconnue est rendue telle quelle.

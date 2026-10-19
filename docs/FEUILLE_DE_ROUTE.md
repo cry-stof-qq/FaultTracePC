@@ -1619,6 +1619,24 @@ le nombre de fichiers en retard, et cite cinq fichiers en exemple. Les pilotes d
 constructeurs gardent une carte par fichier. Effet attendu sur le cas réel : de
 175 cartes à environ 25. Tests : `ParcRegroupementTests` (7 cas).
 
+**Point 99 — plan validé le 19/10/2026 (« go pour 99a et 99b »).** 99a : une
+carte de parc à partir du nombre d'événements WHEA déjà présent dans le résumé
+(vérifié dans le code de la 1.8.1 : `WheaEvents` y est), donc valable tout de
+suite pour tout le parc. 99b : ajouter au résumé le modèle du poste et le
+composant WHEA désigné (lien PCI Express et adresse), champs AJOUTÉS sans changer
+le numéro de format — une console plus ancienne les ignore, un poste plus ancien
+ne les envoie pas ; visibles une fois les postes en 1.9.0.
+
+**Lot 99a — livré le 19/10/2026.** `ParkComparator.Analyze`, section « 5 bis » :
+dès que deux postes comparés ont au moins un événement WHEA sur leur période,
+une carte « Erreurs matérielles (WHEA) sur N postes sur M » (« à surveiller »),
+qui les nomme du plus touché au moins touché avec leur nombre, et conseille de
+comparer modèle et version du BIOS, puis de tester une mise à jour sur UN poste en
+mesurant les erreurs par jour avant et après. Limite connue : le résumé compte
+tous les événements du fournisseur WHEA-Logger, sans distinguer corrigé et fatal
+— d'où la gravité « à surveiller » ; 99b permettra de la préciser. Tests :
+`ParcMemeAlerteTests` (2).
+
 **Point 99 — même alerte sur plusieurs postes : le comparateur ne la rapproche
 pas.** Le comparateur croise les pilotes et les codes d'arrêt, pas les alertes
 de la surveillance. Les trois postes en alerte WHEA appartiennent à la même

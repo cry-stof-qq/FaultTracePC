@@ -236,6 +236,38 @@ public static class ParkComparator
         }
 
         // ---------------------------------------------------------------
+        // 5 bis. Erreurs matérielles (WHEA) sur plusieurs postes — POINT 99, lot 99a
+        //
+        // Constaté sur les rapports du parc des 12/10 et 19/10/2026 : quatre postes
+        // d'une même série signalaient des erreurs WHEA corrigées sur un lien PCI
+        // Express, chacune sur sa carte, et rien ne les rapprochait. Le nombre
+        // d'erreurs WHEA est dans le résumé depuis avant la 1.8.1 : cette carte vaut
+        // donc dès aujourd'hui pour tout le parc, sans réinstaller les postes.
+        // ---------------------------------------------------------------
+        var avecWhea = machines.Where(m => m.Summary.WheaEvents > 0)
+                               .OrderByDescending(m => m.Summary.WheaEvents)
+                               .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+                               .ToList();
+        if (avecWhea.Count >= 2)
+        {
+            var liste = string.Join(", ", avecWhea.Select(m => $"{m.Name} ({m.Summary.WheaEvents})"));
+            a.Correlations.Add(new Correlation
+            {
+                Kind = "commun",   // pas-de-traduction : clé interne, lue par ParkReportGenerator.
+                Severity = "warn",
+                Title = Lang.T($"Erreurs matérielles (WHEA) sur {avecWhea.Count} postes sur {machines.Count}",
+                               $"Hardware errors (WHEA) on {avecWhea.Count} machines out of {machines.Count}"),
+                Details = Lang.T($"Nombre d'événements WHEA sur la période analysée de chaque poste : {liste}. ",
+                                 $"Number of WHEA events over each machine's analysed period: {liste}. ")
+                        + Lang.T("Plusieurs postes qui signalent des erreurs matérielles sur la même période font chercher d'abord une cause commune — même modèle, même version de BIOS, même pilote de chipset — avant une panne propre à chacun. Le rapport de chaque poste dit quel composant est en cause.",
+                                 "Several machines reporting hardware errors over the same period call for a shared cause first — same model, same BIOS version, same chipset driver — before a fault specific to each. Each machine's report says which component is involved."),
+                Action = Lang.T("Comparer le modèle et la version du BIOS de ces postes. S'ils sont identiques, chercher chez le fabricant une mise à jour du BIOS ou du pilote de chipset, l'appliquer d'abord sur un seul poste, et comparer son nombre d'erreurs par jour avant et après.",
+                                "Compare the model and BIOS version of these machines. If they are identical, look for a BIOS or chipset driver update from the manufacturer, apply it to one machine first, and compare its number of errors per day before and after."),
+                Machines = avecWhea.Select(m => m.Name).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+            });
+        }
+
+        // ---------------------------------------------------------------
         // 6. Poste isolé qui accumule — là, c'est la machine
         // ---------------------------------------------------------------
         var avgCritical = machines.Average(m => m.Summary.CriticalFindings.Count);
