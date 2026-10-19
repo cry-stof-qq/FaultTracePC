@@ -121,10 +121,12 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 100 | **Colonne « Version » de la Supervision trop étroite** | constaté le 12/10/2026 sur la console 1.8.1 : « 1.8.0 — à mettre à jou… » — défaut d'affichage, sans conséquence sur la donnée ; à corriger avec la 1.9.0 (points 93 et 94 touchent déjà cette liste) |
 | 101 | **Échecs répétés d'un service tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 sur le rapport d'un poste du parc — **défaut, corrigé le même jour** ; voir « Déploiement du 19/10/2026 » plus bas |
 | 102 | **Un même plantage compté deux fois (variante « _M » d'un code d'arrêt)** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » plus bas |
-| 103 | **Les pilotes dont le fichier a disparu ne sont pas recherchés** | constaté le 19/10/2026 — la carte annonce « service(s) ou pilote(s) », la collecte ne lit que les services ; **mesure demandée avant correction** ; voir « Trois diagnostics du 19/10/2026 » |
-| 104 | **Échecs dispersés : des services déjà expliqués comptent comme « le système »** | constaté le 19/10/2026 — dépend du point 103 ; voir « Trois diagnostics du 19/10/2026 » |
-| 105 | **Un plantage ancien, hors période, décide du verdict** | relevé le 19/10/2026 — **proposition, pas un défaut établi** : demande l'accord de l'auteur ; voir « Trois diagnostics du 19/10/2026 » |
-| 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | relevé le 19/10/2026 — touche des textes français existants : demande l'accord de l'auteur ; voir « Trois diagnostics du 19/10/2026 » |
+| 103 | **Un pilote de Trend Micro en échec « fichier introuvable » n'est pas reconnu comme orphelin** | constaté le 19/10/2026 — **premier diagnostic faux, corrigé le même jour** (les pilotes SONT vérifiés) ; cause non établie, mesure demandée sur le poste concerné ; voir « Trois diagnostics du 19/10/2026 » |
+| 104 | **Échecs dispersés : des services déjà expliqués comptent comme « le système »** | validé le 19/10/2026 — **livré le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
+| 105 | **Un plantage ancien, hors période, décide du verdict** | **validé le 19/10/2026** — garder la carte, ne plus la laisser porter le verdict ; voir « Trois diagnostics du 19/10/2026 » |
+| 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | **validé le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
+| 107 | **Plantages d'un logiciel tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
+| 108 | **« Le problème principal vient d'un pilote » sous un verdict matériel** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1929,16 +1931,33 @@ provoqué à la main) a aussi ce bit levé et ne doit pas changer. Le tableau de
 fichiers de vidage montre toujours le code tel qu'il est écrit dans le fichier.
 Tests : `VarianteMTests` (11 cas).
 
-**Point 103 — constaté, mesure demandée.** Sur le même poste, `TmPreFilter`
+**Point 103 — constaté, cause non établie.** Sur le même poste, `TmPreFilter`
 (pilote de filtrage de Trend Micro) échoue à chaque démarrage avec « Le fichier
 spécifié est introuvable », mais la carte « service(s) ou pilote(s) inscrit(s)
-dont le programme n'existe plus » ne le cite pas. Cause vérifiée dans le code :
-`ServiceCollector` n'interroge que `Win32_Service` ; les pilotes noyau sont dans
-`Win32_SystemDriver`, jamais lu pour cette vérification. Correction possible :
-lire aussi `Win32_SystemDriver`. **Non faite à l'aveugle** : Windows peut garder
-inscrits des pilotes livrés avec lui dont le fichier n'est pas présent, ce qui
-ferait une fausse alerte sur chaque poste. Mesure en lecture seule demandée à
-l'auteur sur son poste avant d'écrire le code.
+dont le programme n'existe plus » ne le cite pas.
+
+**Premier diagnostic FAUX, à ne pas reprendre** : il disait que seuls les services
+étaient vérifiés. C'est inexact — `DriverCollector` lit `Win32_SystemDriver` et
+note `FichierPresent` pour chaque pilote, et `AnalyzeInscriptionsOrphelines` cite
+les pilotes dont le fichier manque (test `InscriptionsOrphelinesTests`). L'erreur
+venait d'une lecture du seul `ServiceCollector`. Mesure faite par l'auteur le
+19/10/2026 sur SON poste avec une commande reprenant la même logique : aucune
+ligne — donc pas de fausse alerte des pilotes de Windows, mais rien non plus sur
+le cas en cause, qui est sur un autre poste. Hypothèses, non vérifiées :
+inscription sans chemin (`ImagePath` absent — Windows prend alors un chemin par
+défaut que `Win32_SystemDriver` ne rend pas), ou pilote absent de
+`Win32_SystemDriver`. Mesure en lecture seule demandée sur le poste concerné.
+
+**Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
+de compter la dispersion, les services et pilotes dont le programme est MESURÉ
+comme disparu (`ProgrammeDisparu` : liste des services orphelins, ou pilote avec
+`FichierPresent == false`, comparé au nom court et au nom d'affichage). La carte
+le dit (« N de ces échecs viennent d'une inscription dont le programme n'existe
+plus… ils sont mis à part ») et compte le reste (« des 62 autres échecs »). Si
+tout est expliqué : « rien ne désigne le système », recommandation de terminer
+les désinstallations. Sur le cas réel, la carte aurait conclu « deux services
+concentrent 61 des 62 autres échecs » au lieu de « aucun ne domine ». Trois tests
+dans `ServicesEnEchecTests`.
 
 **Point 104 — dépend du 103.** Sur ce poste, 93 échecs se répartissent sur
 quatre services (31, 31, 30, 1) : la règle des quatre cinquièmes conclut
@@ -1964,6 +1983,29 @@ des processus « le futur mode surveillance (Phase 3) » : l'analyse WinDbg et l
 surveillance existent, ce sont des mots de la feuille de route, sans sens pour
 le lecteur. Par ailleurs `0x23` (FAT_FILE_SYSTEM, un plantage d'un poste du
 parc) n'est pas au catalogue.
+
+**Point 107 — corrigé le 19/10/2026.** Sur le quatrième poste diagnostiqué ce
+jour, 10 plantages d'un logiciel tiers de prise en main de classe (module fautif :
+une DLL de ce logiciel) : la carte « Application instable » était de catégorie
+Logiciel, donc la boîte à outils proposait sfc et DISM. Même défaut que le point
+101, sur une autre carte. Désormais : catégorie Logiciel seulement si le programme
+qui plante est un composant de Windows (liste `BinairesSysteme`), Pilote graphique
+s'il touche l'affichage (inchangé), aucune sinon.
+
+**Point 108 — corrigé le 19/10/2026.** Même poste : verdict « MATÉRIELLE »
+(erreurs WHEA sur un lien PCI Express) et, deux lignes plus bas, « Dans ton cas,
+le problème principal vient d'un pilote » — parce qu'une carte critique Pilote
+existait (un écran bleu de juin 2026). La phrase dépend désormais du verdict
+(`HtmlReportGenerator.PiloteEnCause`). Tests : `ConseilSelonLeVerdictTests`
+(4 tests, avec le point 107).
+
+**Rapport du parc du 19/10/2026, 10:15** — 8 postes comparés sur 10 (les deux
+injoignables sont le portable laissé de côté et le poste de l'auteur à son
+domicile). Confirme à nouveau : point 96 (175 cartes « divergence de version »)
+et point 99 (quatre postes d'une même série avec des erreurs WHEA corrigées sur
+un lien PCI Express — 12, 3, 34 erreurs et l'alerte du quatrième —, sans carte qui
+les rapproche). Un point commun utile est en revanche bien trouvé : un même pilote
+réseau ancien sur cinq postes.
 
 **Au passage, pour le retrait de Trend Micro** (non lié au code) : l'agent Trend
 (`EndpointBasecamp`) tourne sur les quatre postes analysés ce jour ; le service

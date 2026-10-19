@@ -228,4 +228,55 @@ public class ServicesEnEchecTests
         var f = Conclusion(Rapport(("", 6)));
         Assert.Equal(FaultCategory.None, f.Category);
     }
+
+    // ── Point 104, validé le 19/10/2026 ─────────────────────────────────────────
+    // Un service dont le programme a disparu a une cause établie : il ne compte pas
+    // dans la dispersion. Cas réel d'un poste du parc, 19/10/2026 : 31, 31, 30 et 1.
+
+    [Fact]
+    public void Un_service_sans_programme_est_mis_a_part_avant_de_compter()
+    {
+        var r = RapportAvecIds(("SynTPEnhService", 7000, 31), ("TmPreFilter", 7000, 31),
+                               ("GLPI Agent", 7031, 30), ("Surveillance", 7031, 1));
+        r.System.ServicesLus = true;
+        r.System.ServicesOrphelins.Add(new ServiceOrphelin
+        {
+            Nom = "SynTPEnhService", NomAffiche = "SynTPEnh Caller Service",
+            Chemin = @"C:\Program Files\Editeur\service.exe", Demarrage = "Auto", Etat = "Stopped",
+        });
+
+        var f = Conclusion(r);
+
+        Assert.Contains("31 de ces échecs viennent d'une inscription dont le programme n'existe plus (SynTPEnhService)", f.Details);
+        Assert.Contains("Deux services concentrent 61 des 62 autres échecs", f.Details);
+        Assert.DoesNotContain("aucun ne domine", f.Details);
+        Assert.Equal(FaultCategory.None, f.Category);
+    }
+
+    [Fact]
+    public void Un_pilote_sans_fichier_est_mis_a_part_lui_aussi()
+    {
+        var r = RapportAvecIds(("PiloteTiers", 7000, 20), ("Service A", 7031, 3), ("Service B", 7031, 3), ("Service C", 7031, 3));
+        r.System.Drivers.Add(new DriverInfo { Name = "PiloteTiers", Path = @"C:\Windows\System32\drivers\pilotetiers.sys", FichierPresent = false });
+
+        var f = Conclusion(r);
+
+        Assert.Contains("20 de ces échecs viennent d'une inscription", f.Details);
+        // Restent 3, 3 et 3 : là, la dispersion est réelle, et elle seule désigne le système.
+        Assert.Contains("se répartissent sur 3 services différents", f.Details);
+        Assert.Equal(FaultCategory.Software, f.Category);
+    }
+
+    [Fact]
+    public void Si_tous_les_echecs_ont_une_cause_etablie_le_systeme_n_est_pas_designe()
+    {
+        var r = RapportAvecIds(("SynTPEnhService", 7000, 12));
+        r.System.ServicesOrphelins.Add(new ServiceOrphelin { Nom = "SynTPEnhService", Chemin = @"C:\Program Files\Editeur\service.exe" });
+
+        var f = Conclusion(r);
+
+        Assert.Contains("rien ne désigne le système", f.Details);
+        Assert.Contains("Terminer la désinstallation", f.Recommendation);
+        Assert.Equal(FaultCategory.None, f.Category);
+    }
 }

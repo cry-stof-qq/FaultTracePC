@@ -2101,7 +2101,14 @@ public sealed class RulesEngine
             {
                 Severity = graphique ? Severity.Warning : (stillActive ? Severity.Warning : Severity.Info),
                 Confidence = Confidence.High,
-                Category = graphique ? FaultCategory.GpuDriver : FaultCategory.Software,
+                // POINT 107. Constaté le 19/10/2026 sur un poste du parc : 10 plantages de
+                // veyon-server.exe (module windows-platform.dll, celui de Veyon), et la
+                // boîte à outils, tirée de la catégorie Logiciel, proposait sfc et DISM
+                // — la réparation de Windows pour un logiciel d'un autre éditeur. Seul
+                // un composant de Windows qui plante justifie la catégorie Logiciel.
+                Category = graphique ? FaultCategory.GpuDriver
+                         : BinairesSysteme.Contains(g.Key) ? FaultCategory.Software
+                         : FaultCategory.None,
                 Title = titre,
                 Details = Lang.T($"{g.Count()} plantages sur la période, dernier le {lastCrash:dd/MM/yyyy}", $"{g.Count()} crashes over the period, the last on {lastCrash:yyyy-MM-dd}")
                           + (modules.Count > 0 ? Lang.T($", module(s) fautif(s) : {string.Join(", ", modules!)}", $", faulting module(s): {string.Join(", ", modules!)}") : "")
@@ -2261,6 +2268,19 @@ public sealed class RulesEngine
         return Lang.T("en échec", "failing");
     }
 
+    /// <summary>
+    /// Le programme de ce service (ou pilote) est-il mesuré comme disparu ? Le nom
+    /// relevé dans l'événement peut être le nom court ou le nom d'affichage : on
+    /// compare aux deux. Ne conclut que sur une MESURE (ServiceCollector,
+    /// DriverCollector) — jamais sur le texte de l'événement.
+    /// </summary>
+    internal static bool ProgrammeDisparu(DiagnosticReport r, string nom) =>
+        r.System.ServicesOrphelins.Any(o => nom.Equals(o.Nom, StringComparison.OrdinalIgnoreCase)
+                                         || nom.Equals(o.NomAffiche, StringComparison.OrdinalIgnoreCase))
+        || r.System.Drivers.Any(d => d.FichierPresent == false
+                                  && (nom.Equals(d.Name, StringComparison.OrdinalIgnoreCase)
+                                      || nom.Equals(d.DisplayName, StringComparison.OrdinalIgnoreCase)));
+
     private static void AnalyzeServiceFailures(DiagnosticReport r)
     {
         var fails = r.Events.Where(e => e.Category == EventCategory.ServiceFailure).ToList();
@@ -2318,25 +2338,52 @@ public sealed class RulesEngine
             // services qu'il faut réunir pour couvrir les quatre cinquièmes. Un ou deux :
             // on les nomme, ce sont eux qu'on traite. Trois ou plus : la dispersion est
             // réelle, et c'est le système qu'il faut regarder.
+            //
+            // POINT 104 (validé le 19/10/2026). Un service dont le programme a DISPARU a
+            // une cause établie : il ne désigne pas le système et ne doit pas compter
+            // dans la dispersion. Constaté le 19/10/2026 sur un poste du parc : 31, 31,
+            // 30 et 1 échecs, dont un service sans programme ; la règle concluait
+            // « aucun ne domine, ce qui désigne plutôt le système » et proposait sfc et
+            // DISM. On met donc ces services à part AVANT de compter.
+            var expliques = parService.Where(g => ProgrammeDisparu(r, g.Key)).ToList();
+            var aCompter = parService.Where(g => !ProgrammeDisparu(r, g.Key)).ToList();
+            int reste = aCompter.Sum(g => g.Count());
+
             int cumul = 0, noyau = 0;
-            foreach (var g in parService)
+            foreach (var g in aCompter)
             {
                 cumul += g.Count();
                 noyau++;
-                if (cumul * 5 >= fails.Count * 4) break;
+                if (cumul * 5 >= reste * 4) break;
             }
             bool concentre = noyau <= 2;
-            var coupables = parService.Take(noyau).ToList();
+            var coupables = aCompter.Take(noyau).ToList();
             var nomsCoupables = string.Join(Lang.T(" et ", " and "), coupables.Select(g => g.Key));
 
-            details += !concentre
-                ? Lang.T($" Les échecs se répartissent sur {parService.Count} services différents — aucun ne domine, ce qui désigne plutôt le système que l'un d'eux.",
-                         $" The failures are spread over {parService.Count} different services — none dominates, which points at the system rather than at any one of them.")
+            if (expliques.Count > 0)
+            {
+                var nomsExpliques = string.Join(", ", expliques.Select(g => g.Key));
+                int nbExpliques = expliques.Sum(g => g.Count());
+                details += Lang.T(
+                    $" {nbExpliques} de ces échecs viennent d'une inscription dont le programme n'existe plus ({nomsExpliques}) : leur cause est établie, ils sont mis à part dans ce qui suit.",
+                    $" {nbExpliques} of these failures come from an entry whose program no longer exists ({nomsExpliques}): their cause is established, so they are set aside in what follows.");
+            }
+
+            // « des 23 échecs » quand rien n'est mis à part ; « des 62 autres échecs »
+            // sinon — le lecteur doit pouvoir refaire le compte.
+            var surQuoi = expliques.Count > 0 ? Lang.T($"{reste} autres", $"{reste} other") : $"{reste}";
+
+            details += noyau == 0
+                ? Lang.T(" Tous ces échecs ont donc une cause établie : rien ne désigne le système.",
+                         " All of these failures therefore have an established cause: nothing points at the system.")
+                : !concentre
+                ? Lang.T($" Les échecs se répartissent sur {aCompter.Count} services différents — aucun ne domine, ce qui désigne plutôt le système que l'un d'eux.",
+                         $" The failures are spread over {aCompter.Count} different services — none dominates, which points at the system rather than at any one of them.")
                 : noyau == 1
-                    ? Lang.T($" {coupables[0].Key} concentre {cumul} des {fails.Count} échecs : c'est lui qu'il faut traiter en premier.",
-                             $" {coupables[0].Key} accounts for {cumul} of the {fails.Count} failures: that is the one to deal with first.")
-                    : Lang.T($" Deux services concentrent {cumul} des {fails.Count} échecs — {nomsCoupables} : ce sont eux qu'il faut traiter, pas le système.",
-                             $" Two services account for {cumul} of the {fails.Count} failures — {nomsCoupables}: those are what to deal with, not the system.");
+                    ? Lang.T($" {coupables[0].Key} concentre {cumul} des {surQuoi} échecs : c'est lui qu'il faut traiter en premier.",
+                             $" {coupables[0].Key} accounts for {cumul} of the {surQuoi} failures: that is the one to deal with first.")
+                    : Lang.T($" Deux services concentrent {cumul} des {surQuoi} échecs — {nomsCoupables} : ce sont eux qu'il faut traiter, pas le système.",
+                             $" Two services account for {cumul} of the {surQuoi} failures — {nomsCoupables}: those are what to deal with, not the system.");
 
             // UN SERVICE QUI NE DÉMARRE PAS ET UN SERVICE QUI MEURT NE SE REGARDENT PAS
             // AU MÊME ENDROIT. Le premier appelle une vérification que le logiciel ne
@@ -2370,7 +2417,10 @@ public sealed class RulesEngine
 
             if (!concentre) categorie = FaultCategory.Software;
 
-            reco = concentre
+            reco = noyau == 0
+                ? Lang.T("Terminer la désinstallation des logiciels concernés — voir la conclusion sur les services et pilotes sans programme. Windows cessera alors de retenter leur démarrage.",
+                         "Finish uninstalling the software concerned — see the conclusion on services and drivers with no program. Windows will then stop retrying to start them.")
+                : concentre
                 ? Lang.T($"Ouvrir services.msc et y chercher {nomsCoupables} : les propriétés d'un service donnent son compte de démarrage et ses actions de récupération. Un service TIERS qui tombe se met à jour ou se désinstalle ; un service de WINDOWS qui tombe est un symptôme et pas une cause — chercher alors du côté des pilotes et des fichiers système.",
                          $"Open services.msc and look for {nomsCoupables}: a service's properties show its startup account and its recovery actions. A THIRD-PARTY service that keeps failing gets updated or uninstalled; a WINDOWS service that keeps failing is a symptom and not a cause — look at drivers and system files instead.")
                 : Lang.T("Des échecs dispersés sur plusieurs services désignent rarement ces services : vérifier d'abord les fichiers système et l'image Windows, puis les mises à jour installées à la même période.",

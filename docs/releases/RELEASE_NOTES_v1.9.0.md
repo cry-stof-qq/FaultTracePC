@@ -43,6 +43,9 @@ Un particulier veut diagnostiquer sa machine ; un administrateur veut piloter un
 - Dans le rapport français, la carte antivirus affichait le mode de Windows Defender en anglais (« mode Not running »). Il est désormais traduit (« arrêté », « passif », « normal »…) ; une valeur inconnue est rendue telle quelle.
 - Quand des échecs répétés de services viennent d'un ou deux services seulement — souvent un logiciel tiers —, la carte ne propose plus sfc /scannow et DISM, qui réparent Windows et non ce logiciel. Ils restent proposés quand les échecs se dispersent sur de nombreux services, ce qui désigne plutôt le système.
 - Un même écran bleu pouvait être compté deux fois quand le minidump et MEMORY.DMP l'enregistraient sous deux formes du même code (par exemple 0x1000007E et 0x7E) : deux conclusions critiques pour un seul plantage. Les deux formes sont désormais reconnues comme un seul arrêt.
+- Quand des services échouent de façon répétée, ceux dont le programme a disparu (restes d'une désinstallation) sont mis à part avant de conclure : ils ne font plus croire à un problème de Windows quand les autres échecs se concentrent sur un ou deux services.
+- Les plantages répétés d'un logiciel tiers ne proposent plus sfc /scannow et DISM ; ils restent proposés quand c'est un composant de Windows qui plante.
+- Sous un verdict matériel, le rapport ne dit plus « le problème principal vient d'un pilote ».
 
 ## Windows à jour
 

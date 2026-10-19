@@ -148,13 +148,23 @@ public static class HtmlReportGenerator
     /// question se pose. Il n'apparaît que s'il y a réellement quelque chose à
     /// traiter : sur une machine saine, ce serait du bruit.
     /// </summary>
+    /// <summary>
+    /// « Dans ton cas, le problème principal vient d'un pilote » : seulement si le
+    /// VERDICT le dit. Constaté le 19/10/2026 sur un poste du parc : verdict
+    /// « MATÉRIELLE » (erreurs WHEA sur un lien PCI Express), et cette phrase juste
+    /// en dessous, parce qu'une carte critique de catégorie Pilote existait — un
+    /// écran bleu ancien de quatre mois. Deux conclusions contraires à deux lignes
+    /// d'écart.
+    /// </summary>
+    internal static bool PiloteEnCause(DiagnosticReport r) =>
+        r.VerdictCategory is FaultCategory.Driver or FaultCategory.GpuDriver
+        && r.Findings.Any(f => f.Category is FaultCategory.Driver or FaultCategory.GpuDriver
+                               && f.Severity == Severity.Critical);
+
     private static void GuidedHint(StringBuilder sb, DiagnosticReport r)
     {
         bool somethingToDo = r.Findings.Any(f => f.Severity is Severity.Critical or Severity.Warning);
         if (!somethingToDo) return;
-
-        var driver = r.Findings.FirstOrDefault(f =>
-            f.Category == FaultCategory.Driver && f.Severity == Severity.Critical);
 
         sb.Append("<div class=\"guided\">");
         sb.Append(Lang.T("<div class=\"guided-t\">Tu ne sais pas par où commencer ?</div>", "<div class=\"guided-t\">Not sure where to start?</div>"));
@@ -168,7 +178,7 @@ public static class HtmlReportGenerator
             + "and of the Windows image, disk check — then it checks again and concludes in one sentence. "
             + "Anything needing a decision is offered at the end, one action at a time, with its reason.</p>"));
 
-        if (driver is not null)
+        if (PiloteEnCause(r))
             sb.Append(Lang.T(
                 "<p><strong>Dans ton cas</strong>, le problème principal vient d'un pilote. L'assistant ne le "
                 + "remplacera pas à ta place — un pilote se choisit — mais il écarte tout le reste et te laisse "
