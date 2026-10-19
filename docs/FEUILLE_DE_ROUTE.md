@@ -121,7 +121,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 100 | **Colonne « Version » de la Supervision trop étroite** | constaté le 12/10/2026 sur la console 1.8.1 : « 1.8.0 — à mettre à jou… » — défaut d'affichage, sans conséquence sur la donnée ; à corriger avec la 1.9.0 (points 93 et 94 touchent déjà cette liste) |
 | 101 | **Échecs répétés d'un service tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 sur le rapport d'un poste du parc — **défaut, corrigé le même jour** ; voir « Déploiement du 19/10/2026 » plus bas |
 | 102 | **Un même plantage compté deux fois (variante « _M » d'un code d'arrêt)** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » plus bas |
-| 103 | **Un pilote de Trend Micro en échec « fichier introuvable » n'est pas reconnu comme orphelin** | constaté le 19/10/2026 — **premier diagnostic faux, corrigé le même jour** (les pilotes SONT vérifiés) ; cause non établie, mesure demandée sur le poste concerné ; voir « Trois diagnostics du 19/10/2026 » |
+| 103 | **Un pilote de Trend Micro en échec « fichier introuvable » n'est pas reconnu comme orphelin** | constaté le 19/10/2026 — **cause établie le même jour en VM** : WMI ne liste pas un pilote dont le fichier manque ; correction proposée et mesurée sans fausse alerte, en attente d'accord ; voir « Trois diagnostics du 19/10/2026 » |
 | 104 | **Échecs dispersés : des services déjà expliqués comptent comme « le système »** | validé le 19/10/2026 — **livré le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
 | 105 | **Un plantage ancien, hors période, décide du verdict** | **validé et livré le 19/10/2026** — la carte reste, elle ne porte plus le verdict ; voir « Trois diagnostics du 19/10/2026 » |
 | 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | **validé et livré le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
@@ -2040,6 +2040,47 @@ présent, fichier absent, échec à chaque démarrage). Relevé au passage par
 l'auteur : Trend n'apparaît plus dans « Ajout/suppression de programmes » sur ces
 deux postes, alors que l'agent Endpoint Basecamp y est toujours installé comme
 service.
+
+**Comment fermer le point 103 (proposé le 19/10/2026 au soir).** Il faut un
+poste où un pilote est inscrit AVEC un chemin, en démarrage automatique, alors
+que son fichier n'existe pas — l'état de TmPreFilter. Deux voies :
+1. **Reproduire, en machine virtuelle** (préférée : déterministe, sans risque
+   avec un point de contrôle). Créer une inscription de test qui pointe vers un
+   fichier absent (`sc.exe create` d'un pilote noyau en démarrage automatique,
+   même groupe que TmPreFilter), redémarrer, puis vérifier trois choses : le
+   journal Système porte bien l'échec 7000 « fichier introuvable » ; WMI
+   (`Win32_SystemDriver`) liste ou non l'inscription ; la carte des inscriptions
+   orphelines de FaultTracePC la cite ou non. Retour au point de contrôle ensuite.
+2. **Attendre un cas réel** : un poste qui a encore l'agent Apex One complet
+   (pilotes `Tm*` présents), désinstallé sans le script de nettoyage des restes.
+Lecture du résultat : si WMI ne liste pas l'inscription, la correction (lire le
+registre en plus de WMI) est justifiée ; si WMI la liste et que FaultTracePC la
+cite, le logiciel est juste et le cas du 19/10/2026 avait une autre cause — le
+point se ferme comme non reproduit.
+
+**REPRODUIT le 19/10/2026 au soir, dans la machine virtuelle de test.** Un pilote
+noyau de test, en démarrage automatique, groupe « FSFilter Anti-Virus », pointant
+vers un fichier absent, créé par `sc.exe create`. Après redémarrage : le journal
+Système porte bien l'échec 7000 « Le fichier spécifié est introuvable », et
+`Win32_SystemDriver` filtré sur son nom ne renvoie **RIEN**. **Cause établie** :
+WMI ne liste pas un pilote dont le fichier manque ; `DriverCollector` lit WMI,
+donc `FichierPresent == false` n'arrive pratiquement jamais pour ce cas, et la
+carte des inscriptions orphelines ne peut pas le citer. Correction proposée,
+**en attente de l'accord de l'auteur** (changement de comportement) : lire aussi
+les clés `Services` du registre — pilotes (`Type` 1 ou 2) en démarrage au boot,
+système ou automatique (`Start` 0 à 2), chemin absent → inscription orpheline.
+Avant d'écrire le code : mesure du bruit possible (pilotes de Windows inscrits
+sans fichier) avec la même règle en PowerShell, sur la VM (doit trouver le pilote
+de test), sur le poste de l'auteur et sur un poste du parc.
+
+**Mesure du bruit faite le 19/10/2026 au soir** (règle : `Type` 1 ou 2,
+`Start` 0 à 2, fichier du chemin absent — chemin par défaut
+`\SystemRoot\System32\drivers\<nom>.sys` quand `ImagePath` manque) : la VM
+de test affiche le pilote de test, et **seulement lui** ; le poste de l'auteur et
+un poste du parc n'affichent **aucune ligne**. Pas de fausse alerte des pilotes de
+Windows sur ces trois machines. Il n'est donc plus utile d'allumer les portables
+qui ont encore Trend pour ce point. **Reste : l'accord de l'auteur pour écrire la
+correction.**
 
 **Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
 de compter la dispersion, les services et pilotes dont le programme est MESURÉ
