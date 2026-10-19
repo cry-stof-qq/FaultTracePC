@@ -315,7 +315,7 @@ public sealed class RulesEngine
     /// ne rien affirmer plutôt que de deviner la gravité d'un code qu'on n'a pas vérifié.
     /// </summary>
     private static readonly int[] WheaCorrige = { 17 };
-    private static readonly int[] WheaFatal = { 18 };
+    internal static readonly int[] WheaFatal = { 18 };
 
     private static void AnalyzeWhea(DiagnosticReport r)
     {

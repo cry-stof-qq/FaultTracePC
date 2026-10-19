@@ -51,6 +51,22 @@ public static class ScanHistory
         public double MemUsedPct { get; set; }
         public long VirtualizationBytes { get; set; }
         public List<string> CriticalFindings { get; set; } = new();
+
+        // POINT 99, lot 99b (validé le 19/10/2026). Champs AJOUTÉS sans changer
+        // FormatActuel : une console plus ancienne les ignore à la lecture, et le
+        // résumé d'un poste plus ancien ne les contient pas (valeurs vides). Ils
+        // permettent à la carte « erreurs matérielles sur plusieurs postes » de dire
+        // si les postes sont du même modèle, avec le même BIOS, et si c'est le même
+        // composant qui est en cause.
+
+        /// <summary>Fabricant et modèle du poste, tels que le BIOS les déclare.</summary>
+        public string Modele { get; set; } = "";
+        /// <summary>Version du BIOS.</summary>
+        public string VersionBios { get; set; } = "";
+        /// <summary>Erreurs matérielles FATALES (WHEA-Logger 18) sur la période.</summary>
+        public int WheaFatales { get; set; }
+        /// <summary>Composants désignés par les événements WHEA, avec leur adresse quand elle est connue (au plus 5).</summary>
+        public List<string> WheaComposants { get; set; } = new();
     }
 
     public sealed class BsodBrief
@@ -100,6 +116,18 @@ public static class ScanHistory
                 : Math.Round(100.0 * (os.TotalVisibleMemoryKB - os.FreePhysicalMemoryKB) / os.TotalVisibleMemoryKB, 1),
             VirtualizationBytes = Analysis.RulesEngine.VirtualizationBytes(r),
             CriticalFindings = r.Findings.Where(f => f.Severity == Severity.Critical).Select(f => f.Title).ToList(),
+            Modele = $"{r.System.Bios.SystemManufacturer} {r.System.Bios.SystemModel}".Trim(),
+            VersionBios = r.System.Bios.Version.Trim(),
+            WheaFatales = r.Events.Count(e => e.Category == EventCategory.Whea && Analysis.RulesEngine.WheaFatal.Contains(e.EventId)),
+            WheaComposants = r.Events
+                .Where(e => e.Category == EventCategory.Whea)
+                .Select(e => $"{e.Extracted.GetValueOrDefault("Composant", "")} {e.Extracted.GetValueOrDefault("Bdf", "")}".Trim())
+                .Where(x => x.Length > 0)
+                .GroupBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key)
+                .Take(5)
+                .ToList(),
         };
     }
 

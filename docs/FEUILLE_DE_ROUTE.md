@@ -1637,6 +1637,18 @@ tous les événements du fournisseur WHEA-Logger, sans distinguer corrigé et fa
 — d'où la gravité « à surveiller » ; 99b permettra de la préciser. Tests :
 `ParcMemeAlerteTests` (2).
 
+**Lot 99b — livré le 19/10/2026.** Quatre champs AJOUTÉS au résumé
+(`ScanSummary`), `FormatActuel` inchangé (2) : `Modele` (fabricant et modèle
+déclarés par le BIOS), `VersionBios`, `WheaFatales` (événements WHEA-Logger 18),
+`WheaComposants` (composant et adresse des événements WHEA, cinq au plus, du
+plus fréquent au moins fréquent). La carte « Erreurs matérielles (WHEA) » devient
+critique dès qu'une erreur est fatale, indique « dont N fatale(s) » par poste, et
+dit ce que les postes ont en commun (`PointsCommunsWhea`) : même modèle ou non,
+même version de BIOS ou combien, et le composant mis en cause sur TOUS. Elle ne
+conclut que sur les postes qui transmettent ces informations, et le dit quand une
+partie du parc ne les envoie pas encore (postes antérieurs à la 1.9.0). Tests :
+`ParcMemeAlerteTests` (4 de plus, 6 au total).
+
 **Point 99 — même alerte sur plusieurs postes : le comparateur ne la rapproche
 pas.** Le comparateur croise les pilotes et les codes d'arrêt, pas les alertes
 de la surveillance. Les trois postes en alerte WHEA appartiennent à la même

@@ -250,15 +250,20 @@ public static class ParkComparator
                                .ToList();
         if (avecWhea.Count >= 2)
         {
-            var liste = string.Join(", ", avecWhea.Select(m => $"{m.Name} ({m.Summary.WheaEvents})"));
+            var liste = string.Join(", ", avecWhea.Select(m => m.Summary.WheaFatales > 0
+                ? Lang.T($"{m.Name} ({m.Summary.WheaEvents}, dont {m.Summary.WheaFatales} fatale(s))", $"{m.Name} ({m.Summary.WheaEvents}, {m.Summary.WheaFatales} of them fatal)")
+                : $"{m.Name} ({m.Summary.WheaEvents})"));
+            int fatales = avecWhea.Sum(m => m.Summary.WheaFatales);
             a.Correlations.Add(new Correlation
             {
                 Kind = "commun",   // pas-de-traduction : clé interne, lue par ParkReportGenerator.
-                Severity = "warn",
+                // Lot 99b : critique dès qu'une erreur est FATALE, à surveiller sinon.
+                Severity = fatales > 0 ? "crit" : "warn",
                 Title = Lang.T($"Erreurs matérielles (WHEA) sur {avecWhea.Count} postes sur {machines.Count}",
                                $"Hardware errors (WHEA) on {avecWhea.Count} machines out of {machines.Count}"),
                 Details = Lang.T($"Nombre d'événements WHEA sur la période analysée de chaque poste : {liste}. ",
                                  $"Number of WHEA events over each machine's analysed period: {liste}. ")
+                        + PointsCommunsWhea(avecWhea)
                         + Lang.T("Plusieurs postes qui signalent des erreurs matérielles sur la même période font chercher d'abord une cause commune — même modèle, même version de BIOS, même pilote de chipset — avant une panne propre à chacun. Le rapport de chaque poste dit quel composant est en cause.",
                                  "Several machines reporting hardware errors over the same period call for a shared cause first — same model, same BIOS version, same chipset driver — before a fault specific to each. Each machine's report says which component is involved."),
                 Action = Lang.T("Comparer le modèle et la version du BIOS de ces postes. S'ils sont identiques, chercher chez le fabricant une mise à jour du BIOS ou du pilote de chipset, l'appliquer d'abord sur un seul poste, et comparer son nombre d'erreurs par jour avant et après.",
@@ -408,6 +413,45 @@ public static class ParkComparator
                             "Check with the vendor which version is the newest, then bring the other machines in line with it."),
             Machines = versions.SelectMany(g => g.Select(e => e.Machine)).Distinct().OrderBy(x => x).ToList(),
         };
+    }
+
+    /// <summary>
+    /// Point 99, lot 99b — ce que les postes en erreur WHEA ont en commun : modèle,
+    /// version du BIOS, composant désigné. Ne dit que ce que les résumés MESURENT ;
+    /// un poste plus ancien que la 1.9.0 n'envoie pas ces informations, et la phrase
+    /// le dit au lieu de conclure sur une partie du parc.
+    /// </summary>
+    internal static string PointsCommunsWhea(List<MachineSummary> postes)
+    {
+        var phrase = "";
+        var connus = postes.Where(m => m.Summary.Modele.Length > 0).ToList();
+        if (connus.Count >= 2)
+        {
+            var modeles = connus.Select(m => m.Summary.Modele).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var bios = connus.Select(m => m.Summary.VersionBios).Where(v => v.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            phrase += modeles.Count == 1
+                ? Lang.T($"Même modèle pour les {connus.Count} postes dont il est connu : {modeles[0]}", $"Same model for the {connus.Count} machines where it is known: {modeles[0]}")
+                  + (bios.Count == 1 ? Lang.T($", même version de BIOS ({bios[0]}). ", $", same BIOS version ({bios[0]}). ")
+                     : bios.Count > 1 ? Lang.T($", mais {bios.Count} versions de BIOS différentes ({string.Join(", ", bios)}). ", $", but {bios.Count} different BIOS versions ({string.Join(", ", bios)}). ")
+                     : ". ")
+                : Lang.T($"Modèles différents : {string.Join(", ", modeles)}. ", $"Different models: {string.Join(", ", modeles)}. ");
+        }
+
+        var avecComposants = postes.Where(m => m.Summary.WheaComposants.Count > 0).ToList();
+        if (avecComposants.Count >= 2)
+        {
+            var communs = avecComposants.Skip(1).Aggregate(
+                new HashSet<string>(avecComposants[0].Summary.WheaComposants, StringComparer.OrdinalIgnoreCase),
+                (acc, m) => { acc.IntersectWith(m.Summary.WheaComposants); return acc; });
+            if (communs.Count > 0)
+                phrase += Lang.T($"Même composant mis en cause sur ces postes : {string.Join(", ", communs.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}. ",
+                                 $"Same component involved on these machines: {string.Join(", ", communs.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}. ");
+        }
+
+        if (connus.Count < postes.Count)
+            phrase += Lang.T("Le modèle et le composant ne sont transmis que par les postes en 1.9.0 ou plus. ",
+                             "The model and component are only sent by machines running 1.9.0 or later. ");
+        return phrase;
     }
 
     internal enum FamillePilote { Constructeur, Windows, Defender }

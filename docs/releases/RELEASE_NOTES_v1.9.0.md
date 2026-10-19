@@ -46,6 +46,8 @@ Les pilotes livrés avec Windows changent tous ensemble à chaque mise à jour, 
 
 Quand plusieurs postes signalent des erreurs matérielles (WHEA) sur leur période d'analyse, le rapport du parc les rapproche désormais en une carte qui les nomme, du plus touché au moins touché, et conseille de chercher d'abord une cause commune — même modèle, même BIOS, même pilote de chipset. Cette carte fonctionne aussi avec des postes encore en 1.8.1.
 
+Une fois les postes en 1.9.0, elle dit aussi ce qu'ils ont en commun : même modèle, même version de BIOS, même composant mis en cause (par exemple le même lien PCI Express) — et elle devient critique dès qu'une erreur est fatale. Le résumé envoyé par chaque poste porte pour cela quatre informations de plus ; une console plus ancienne les ignore simplement.
+
 ## Corrigé au passage
 
 - Dans le rapport français, la carte antivirus affichait le mode de Windows Defender en anglais (« mode Not running »). Il est désormais traduit (« arrêté », « passif », « normal »…) ; une valeur inconnue est rendue telle quelle.
