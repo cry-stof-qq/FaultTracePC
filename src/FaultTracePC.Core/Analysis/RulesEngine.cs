@@ -289,7 +289,7 @@ public sealed class RulesEngine
                     ? Lang.T($"BSOD récurrent : {BugCheckCatalog.NameOf(group.Key)} ({n}×)", $"Recurring BSOD: {BugCheckCatalog.NameOf(group.Key)} ({n}×)")
                     : Lang.T($"BSOD : {BugCheckCatalog.NameOf(group.Key)}", $"BSOD: {BugCheckCatalog.NameOf(group.Key)}"),
                 Details = details,
-                Recommendation = entry?.Advice ?? Lang.T("Analyser le dump avec WinDbg (!analyze -v) pour identifier le module fautif — automatisé en Phase 2.", "Analyse the dump with WinDbg (!analyze -v) to identify the faulting module."),
+                Recommendation = entry?.Advice ?? Lang.T("Ce code d'arrêt n'est pas encore décrit par FaultTracePC. Pour nommer le module fautif, installer, s'ils manquent, les « Debugging Tools for Windows » (Windows SDK) ou WinDbg : FaultTracePC analysera alors lui-même le fichier de vidage au prochain scan.", "FaultTracePC does not describe this stop code yet. To name the faulting module, install the Debugging Tools for Windows (Windows SDK) or WinDbg if they are missing: FaultTracePC will then analyse the dump file itself at the next scan."),
                 DerniereTrace = last,
             });
         }

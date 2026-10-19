@@ -124,7 +124,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 103 | **Un pilote de Trend Micro en échec « fichier introuvable » n'est pas reconnu comme orphelin** | constaté le 19/10/2026 — **premier diagnostic faux, corrigé le même jour** (les pilotes SONT vérifiés) ; cause non établie, mesure demandée sur le poste concerné ; voir « Trois diagnostics du 19/10/2026 » |
 | 104 | **Échecs dispersés : des services déjà expliqués comptent comme « le système »** | validé le 19/10/2026 — **livré le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
 | 105 | **Un plantage ancien, hors période, décide du verdict** | **validé et livré le 19/10/2026** — la carte reste, elle ne porte plus le verdict ; voir « Trois diagnostics du 19/10/2026 » |
-| 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | **validé le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
+| 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | **validé et livré le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
 | 107 | **Plantages d'un logiciel tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
 | 108 | **« Le problème principal vient d'un pilote » sous un verdict matériel** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
 | 109 | **Un service arrêté pendant l'arrêt de Windows compté comme un échec (cas de GLPI Agent)** | relevé le 19/10/2026 — **confirmé le même jour par mesure, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
@@ -2015,6 +2015,18 @@ des processus « le futur mode surveillance (Phase 3) » : l'analyse WinDbg et l
 surveillance existent, ce sont des mots de la feuille de route, sans sens pour
 le lecteur. Par ailleurs `0x23` (FAT_FILE_SYSTEM, un plantage d'un poste du
 parc) n'est pas au catalogue.
+
+**Point 106 — livré le 19/10/2026.** Repli d'un code d'arrêt inconnu : « ce code
+n'est pas encore décrit par FaultTracePC ; pour nommer le module fautif, installer
+s'ils manquent les Debugging Tools for Windows ou WinDbg : FaultTracePC analysera
+lui-même le fichier de vidage au prochain scan » (c'est ce que fait `CdbAnalyzer`).
+Section des processus : « la boîte noire (surveillance temps réel) » au lieu du
+« futur mode surveillance (Phase 3) ». Catalogue : `0x23 FAT_FILE_SYSTEM`,
+catégorie Stockage, texte tiré de la page Microsoft (learn.microsoft.com, « Bug
+Check 0x23 FAT_FILE_SYSTEM ») ; le conseil sur la clé USB est une déduction (FAT
+est le format des clés et cartes en FAT32), écrite comme telle. Confirmation de
+l'auteur le même jour : le nettoyage des restes de Trend Micro avait bien été fait
+entre les deux mesures du point 103. Tests : `TextesPerimesTests` (2).
 
 **Point 107 — corrigé le 19/10/2026.** Sur le quatrième poste diagnostiqué ce
 jour, 10 plantages d'un logiciel tiers de prise en main de classe (module fautif :

@@ -77,6 +77,16 @@ public static class BugCheckCatalog
             "Unhandled kernel-mode exception — driver or hardware incompatibility.",
             "Identifier le module cité, mettre à jour ou désinstaller le pilote correspondant.",
             "Identify the module named, then update or uninstall the matching driver."),
+        // Point 106 (19/10/2026) : code relevé sur un poste du parc, absent du catalogue.
+        // Source : learn.microsoft.com, « Bug Check 0x23 FAT_FILE_SYSTEM » — corruption
+        // du système de fichiers ou secteurs défectueux, pilotes de disque corrompus,
+        // ou mémoire noyau non paginable épuisée ; chkdsk /f /r, journal FASTFAT,
+        // désactiver un temps les outils qui surveillent le disque en continu.
+        [0x23] = new("FAT_FILE_SYSTEM", FaultCategory.Storage,
+            "Erreur dans le pilote du système de fichiers FAT — celui des clés USB et cartes mémoire formatées en FAT32, et de la petite partition de démarrage EFI. Causes documentées : système de fichiers corrompu ou secteurs défectueux, pilote de disque corrompu, plus rarement mémoire noyau épuisée.",
+            "Error in the FAT file system driver — the one used by USB sticks and memory cards formatted FAT32, and by the small EFI boot partition. Documented causes: a corrupted file system or bad sectors, a corrupted disk driver, more rarely exhausted kernel memory.",
+            "Chercher dans l'Observateur d'événements (journal Système) des erreurs FASTFAT ou disque autour de l'heure du plantage pour savoir quel support était en cause. Lancer chkdsk /f /r sur ce support ; si c'est une clé USB ou une carte mémoire, la tester sur un autre poste et la remplacer si elle se répète. Si le plantage revient, désactiver un temps l'antivirus ou l'outil de sauvegarde qui surveille le disque en continu.",
+            "Look in Event Viewer (System log) for FASTFAT or disk errors around the time of the crash, to find which medium was involved. Run chkdsk /f /r on that medium; if it is a USB stick or a memory card, test it on another machine and replace it if it recurs. If the crash comes back, temporarily disable the antivirus or backup tool that monitors the disk continuously."),
         [0x24] = new("NTFS_FILE_SYSTEM", FaultCategory.Storage,
             "Erreur dans le pilote NTFS — disque défaillant ou système de fichiers corrompu.",
             "Error in the NTFS driver — failing disk or corrupted file system.",

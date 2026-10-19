@@ -47,6 +47,7 @@ Un particulier veut diagnostiquer sa machine ; un administrateur veut piloter un
 - Les plantages répétés d'un logiciel tiers ne proposent plus sfc /scannow et DISM ; ils restent proposés quand c'est un composant de Windows qui plante.
 - Sous un verdict matériel, le rapport ne dit plus « le problème principal vient d'un pilote ».
 - Un écran bleu plus ancien que la période analysée ne décide plus du verdict : il reste affiché, avec la mention qu'il est antérieur, et le verdict le signale. Constaté sur un parc : « PILOTE défectueux » pour un unique écran bleu vieux de dix mois, sur une machine saine.
+- L'écran bleu 0x23 (FAT_FILE_SYSTEM, système de fichiers des clés USB et cartes mémoire en FAT32) est désormais décrit, avec la marche à suivre. Deux textes qui renvoyaient à des étapes internes du projet (« Phase 2 », « Phase 3 ») ont été réécrits.
 - Un service coupé pendant l'arrêt ou le redémarrage de Windows n'est plus compté comme un échec. Constaté sur un parc : l'agent d'inventaire « s'arrêtait de manière inattendue » chaque soir, toujours dans la même seconde que l'arrêt de Windows programmé — il était coupé, pas en panne.
 
 ## Windows à jour
