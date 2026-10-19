@@ -2347,14 +2347,14 @@ public sealed class RulesEngine
             // DISM. On met donc ces services à part AVANT de compter.
             var expliques = parService.Where(g => ProgrammeDisparu(r, g.Key)).ToList();
             var aCompter = parService.Where(g => !ProgrammeDisparu(r, g.Key)).ToList();
-            int reste = aCompter.Sum(g => g.Count());
+            int aCompterTotal = aCompter.Sum(g => g.Count());
 
             int cumul = 0, noyau = 0;
             foreach (var g in aCompter)
             {
                 cumul += g.Count();
                 noyau++;
-                if (cumul * 5 >= reste * 4) break;
+                if (cumul * 5 >= aCompterTotal * 4) break;
             }
             bool concentre = noyau <= 2;
             var coupables = aCompter.Take(noyau).ToList();
@@ -2371,7 +2371,7 @@ public sealed class RulesEngine
 
             // « des 23 échecs » quand rien n'est mis à part ; « des 62 autres échecs »
             // sinon — le lecteur doit pouvoir refaire le compte.
-            var surQuoi = expliques.Count > 0 ? Lang.T($"{reste} autres", $"{reste} other") : $"{reste}";
+            var surQuoi = expliques.Count > 0 ? Lang.T($"{aCompterTotal} autres", $"{aCompterTotal} other") : $"{aCompterTotal}";
 
             details += noyau == 0
                 ? Lang.T(" Tous ces échecs ont donc une cause établie : rien ne désigne le système.",

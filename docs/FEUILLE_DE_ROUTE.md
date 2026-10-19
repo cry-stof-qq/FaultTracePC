@@ -127,6 +127,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | **validé le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
 | 107 | **Plantages d'un logiciel tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
 | 108 | **« Le problème principal vient d'un pilote » sous un verdict matériel** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
+| 109 | **Un service arrêté pendant l'arrêt de Windows compté comme un échec (cas de GLPI Agent)** | relevé le 19/10/2026 — **confirmé le même jour par mesure** ; défaut à corriger ; voir « Trois diagnostics du 19/10/2026 » |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -1948,6 +1949,15 @@ inscription sans chemin (`ImagePath` absent — Windows prend alors un chemin pa
 défaut que `Win32_SystemDriver` ne rend pas), ou pilote absent de
 `Win32_SystemDriver`. Mesure en lecture seule demandée sur le poste concerné.
 
+**Mesure du 19/10/2026** (poste non encore confirmé : l'invite ne le dit pas).
+Registre : `ImagePath = \??\C:\Program Files (x86)\Trend Micro\Security Agent\TmPreFlt.sys`,
+`Type = 1` (pilote noyau), `Start = 2` (automatique), groupe `FSFilter Anti-Virus`.
+`Win32_SystemDriver` filtré sur ce nom : **aucun résultat**. Donc l'inscription
+existe dans le registre, mais WMI ne la rend pas — et `DriverCollector`, qui lit
+WMI, ne peut pas la voir. Piste de correction, à décider après confirmation du
+poste et de l'existence du fichier : lire les clés `Services` du registre
+(`Type` 1 ou 2) en plus de WMI.
+
 **Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
 de compter la dispersion, les services et pilotes dont le programme est MESURÉ
 comme disparu (`ProgrammeDisparu` : liste des services orphelins, ou pilote avec
@@ -2006,6 +2016,36 @@ et point 99 (quatre postes d'une même série avec des erreurs WHEA corrigées s
 un lien PCI Express — 12, 3, 34 erreurs et l'alerte du quatrième —, sans carte qui
 les rapproche). Un point commun utile est en revanche bien trouvé : un même pilote
 réseau ancien sur cinq postes.
+
+**Point 109 — relevé le 19/10/2026, cause à confirmer.** Les échecs « GLPI Agent
+s'est terminé de manière inattendue » (7031) figurent sur TOUS les postes
+analysés, quelle que soit la version de l'agent (trois versions différentes sur
+le parc). Sur deux postes, ils tombent presque chaque jour à 20:31 et 21:00 ; sur
+les autres, à des heures de cours dispersées, plus 20:31 et 21:00 certains jours
+communs à tout le parc. Hypothèse : l'agent est arrêté brutalement pendant un
+redémarrage ou un arrêt de Windows (tâches planifiées du soir, extinctions par
+les utilisateurs) — ce qui ne serait pas une panne. **Non vérifiée** : mesure
+demandée (événements 7031 rapprochés des 1074/6006 d'un même poste). Si elle se
+confirme, proposition : FaultTracePC reconnaît un 7031 survenu dans la minute qui
+précède un arrêt de Windows et ne le compte plus comme un échec.
+
+**Hypothèse CONFIRMÉE le 19/10/2026** sur un poste du parc (journal Système, 7
+jours) : les 9 événements 7031 de GLPI Agent tombent tous **dans la même seconde
+qu'un 6006** (« le service d'Enregistrement d'événement a été arrêté », c'est-à-dire
+l'arrêt de Windows). Déclencheurs relevés : les deux tâches planifiées de l'auteur
+(redémarrage vers 20:30, extinction à 21:00, toutes deux par `shutdown.exe`), et un
+redémarrage de mise à jour Windows (`TrustedInstaller.exe`). L'auteur confirme que
+ces tâches sont les siennes, mises en place pour les postes que les utilisateurs
+oublient d'éteindre. Ce n'est donc pas une panne de l'agent : FaultTracePC compte à
+tort comme « échec de service » un service coupé pendant l'arrêt de Windows, et en
+fait une conclusion sur chaque poste. La signature mesurable à retenir : 7031 à
+quelques secondes d'un 6006 du même journal.
+
+**CI rouge du 19/10/2026 (commit `16479fc`), corrigé le même jour.** Le lot
+104/107/108 ne compilait pas : la variable `reste` ajoutée au point 104 existait
+déjà dans la même méthode (texte « et N autre(s) service(s) »). Renommée
+`aCompterTotal`. Erreur de livraison : le code n'avait pas été compilé avant
+d'être remis — rappel qu'un lot non compilé doit le dire, et rester petit.
 
 **Au passage, pour le retrait de Trend Micro** (non lié au code) : l'agent Trend
 (`EndpointBasecamp`) tourne sur les quatre postes analysés ce jour ; le service
