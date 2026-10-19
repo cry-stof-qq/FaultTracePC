@@ -25,6 +25,11 @@ dist/
 # retrouvent dans le dépôt.
 # ---------------------------------------------------------------------------
 Diagnostic_*.html
+# Rapport récupéré d'un poste par la console (« Ouvrir le dernier rapport »,
+# diagnostic à distance) : la console l'écrit dans %TEMP% sous le nom
+# <poste>_Diagnostic_<poste>_<date>.html. S'il est enregistré ici, le motif
+# ci-dessus ne le prend pas — il ne commence pas par « Diagnostic_ ».
+*_Diagnostic_*.html
 Diagnostic_*.pdf
 Parc_*.html
 Reparation_PC_*.ps1
@@ -44,6 +49,12 @@ langue.txt
 # Historique des scans (résumés machine) et configuration locale
 Historique/
 parc.json
+# Toute COPIE de parc.json (sauvegarde avant une manipulation, par exemple).
+# Constaté le 19/10/2026 : « parc.json.avant-inscription-auto », copie du
+# 21/09/2026, était suivie et publiée — noms de postes et adresses IP réels,
+# jetons vides. Le motif « parc.json » ne vaut que pour ce nom exact.
+parc.json.*
+parc*.json
 remote.json
 alerts.json
 *.jsonl

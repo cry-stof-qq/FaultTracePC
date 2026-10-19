@@ -1866,6 +1866,43 @@ carte Protection dit « aucun autre antivirus inscrit » — ce n'est pas forcé
 faux (un agent peut ne pas s'inscrire auprès du Centre de sécurité), à ne pas
 corriger sans preuve.
 
+Précision du même jour : le disque cité (`Harddisk1`) n'apparaît pas dans
+l'inventaire du poste au moment du scan — un seul disque, le SSD système. C'est
+compatible avec un support amovible (l'auteur signale un usage courant des clés
+USB par les enseignants), sans le prouver. L'absence de carte est voulue : la
+conclusion disque ne se déclenche qu'à partir de 3 événements, ou avec un écran
+bleu lié au stockage — ici, 2 événements et aucun écran bleu.
+
+**Rapport du parc du 19/10/2026, 08:59** (avant le diagnostic d'un poste encore
+jamais analysé). Comparaison faite sur 4 postes sur 10. Ce qu'il confirme :
+
+- **Point 96** : 113 cartes « divergence de version », presque toutes des pilotes
+  livrés avec Windows ou avec Defender (`tpm.sys`, `stornvme.sys`, `WdFilter.sys`,
+  `WdNisDrv.sys`…) — pire que les 88 du 12/10/2026.
+- **Point 99** : quatre postes ont une alerte WHEA (événement 17) dans la
+  Supervision, et le rapport ne les rapproche pas. Trois d'entre eux n'ont jamais
+  été analysés, donc ne sont pas comparés : il faut leur diagnostic pour que le
+  comparateur les voie.
+- **Relevé, puis expliqué le même jour — pas un défaut** : sur un poste, le texte
+  de la dernière alerte est en anglais (« Corrected hardware error (WHEA, event
+  17) ») dans un rapport français. L'auteur avait passé ce poste en anglais pour
+  des essais. Le texte d'une alerte est écrit par le service du poste, dans la
+  langue du poste, au moment de l'alerte ; la console le rend tel quel — le
+  retraduire serait inventer.
+
+**Fichier publié par erreur, constaté le 19/10/2026.** Une copie de sauvegarde de
+`parc.json`, nommée `parc.json.avant-inscription-auto` (21/09/2026), était suivie
+par git depuis le commit `50260ee` et donc publiée : noms de postes et adresses IP
+réels du parc. **Aucun secret** : les jetons y sont vides (vérifié sur le fichier,
+champ `Token` de longueur 0 pour chaque poste). Cause : le motif `parc.json` du
+`.gitignore` ne vaut que pour ce nom exact. Corrigé : motifs `parc.json.*` et
+`parc*.json` ajoutés, ainsi que `*_Diagnostic_*.html` (rapports récupérés par la
+console, dont le nom commence par celui du poste) ; le fichier est retiré du suivi
+par `git rm --cached` (il reste sur le disque). Vérifié le même jour : plus aucun
+fichier du dossier n'est à la fois non suivi et non ignoré. L'historique, lui,
+garde le fichier : le réécrire (`git filter-repo`, puis envoi forcé) est une
+décision de l'auteur.
+
 ## Point 90 — un relevé annoncé toutes les 10 secondes, fait toutes les 12
 
 Constaté le 10/10/2026 en ouvrant à distance la boîte noire d'un poste mis à
