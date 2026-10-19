@@ -270,6 +270,7 @@ public sealed class RulesEngine
             var details = Lang.T($"{n} occurrence(s) de l'écran bleu {BugCheckCatalog.NameOf(group.Key)} (0x{group.Key:X8}), dernière le {last:dd/MM/yyyy HH:mm}.", $"{n} occurrence(s) of the {BugCheckCatalog.NameOf(group.Key)} blue screen (0x{group.Key:X8}), last one on {last:yyyy-MM-dd HH:mm}.");
             if (entry is not null) details += " " + entry.Description;
             if (drivers.Count > 0) details += Lang.T($" Pilote suspect : {string.Join(", ", drivers)}.", $" Suspect driver: {string.Join(", ", drivers)}.");
+            if (last < DebutDePeriode(r)) details += PhraseHorsPeriode(r);
 
             // Si l'analyse symbolique a nommé un pilote pour TOUS les incidents du groupe,
             // la catégorie de la cause est « Pilote », pas celle générique du code STOP.
@@ -289,6 +290,7 @@ public sealed class RulesEngine
                     : Lang.T($"BSOD : {BugCheckCatalog.NameOf(group.Key)}", $"BSOD: {BugCheckCatalog.NameOf(group.Key)}"),
                 Details = details,
                 Recommendation = entry?.Advice ?? Lang.T("Analyser le dump avec WinDbg (!analyze -v) pour identifier le module fautif — automatisé en Phase 2.", "Analyse the dump with WinDbg (!analyze -v) to identify the faulting module."),
+                DerniereTrace = last,
             });
         }
 
@@ -1977,6 +1979,11 @@ public sealed class RulesEngine
                 : "")
             + (faits.Count > 0 ? " " + string.Join(" ", faits) : "");
 
+        // POINT 105 : la trace la plus récente de cette instabilité.
+        var tracesGpu = tdr.Select(e => e.TimeLocal).Concat(gpuBsods.Select(b => b.TimeLocal)).Concat(gels.Select(DateDump)).ToList();
+        DateTime? derniereTraceGpu = tracesGpu.Count > 0 ? tracesGpu.Max() : null;
+        if (derniereTraceGpu < DebutDePeriode(r)) details += PhraseHorsPeriode(r);
+
         r.Findings.Add(new Finding
         {
             Severity = gpuBsods.Count > 0 || materielDesigne ? Severity.Critical : Severity.Warning,
@@ -1984,7 +1991,8 @@ public sealed class RulesEngine
             Category = FaultCategory.GpuDriver,
             Title = titre,
             Details = details,
-            Recommendation = string.Join(" ", recos)
+            Recommendation = string.Join(" ", recos),
+            DerniereTrace = derniereTraceGpu,
         });
     }
 
@@ -2692,9 +2700,33 @@ public sealed class RulesEngine
         }
     }
 
+    /// <summary>Début de la période analysée : la date du rapport moins sa durée.</summary>
+    internal static DateTime DebutDePeriode(DiagnosticReport r) => r.GeneratedAt.AddDays(-r.ScanPeriodDays);
+
+    /// <summary>POINT 105 — la conclusion repose-t-elle uniquement sur des traces antérieures à la période ?</summary>
+    internal static bool HorsPeriode(DiagnosticReport r, Finding f) =>
+        f.DerniereTrace is DateTime d && d < DebutDePeriode(r);
+
+    private static string PhraseHorsPeriode(DiagnosticReport r) => Lang.T(
+        $" Antérieur à la période analysée ({r.ScanPeriodDays} jours) : rappelé ici, il ne décide pas du verdict.",
+        $" Older than the period analysed ({r.ScanPeriodDays} days): shown here, it does not decide the verdict.");
+
     internal static void ComputeVerdict(DiagnosticReport r)
     {
-        var critical = r.Findings.Where(f => f.Severity == Severity.Critical).ToList();
+        // POINT 105 (validé le 19/10/2026). Une conclusion critique dont la dernière
+        // trace précède la période reste AFFICHÉE, mais ne décide plus du verdict —
+        // et le verdict le dit, pour que le lecteur ne s'étonne pas d'une carte
+        // critique sous un verdict rassurant.
+        var anciennes = r.Findings.Where(f => f.Severity == Severity.Critical && HorsPeriode(r, f)).ToList();
+        var noteAnciennes = anciennes.Count == 0 ? "" : Lang.T(
+            $" Des plantages plus anciens que la période analysée (le dernier le {Lang.Date(anciennes.Max(f => f.DerniereTrace!.Value))}) sont rappelés plus bas : ils ne décident pas de ce verdict.",
+            $" Crashes older than the period analysed (the last on {Lang.Date(anciennes.Max(f => f.DerniereTrace!.Value))}) are listed below: they do not decide this verdict.");
+        ComputeVerdictSur(r, r.Findings.Where(f => f.Severity == Severity.Critical && !HorsPeriode(r, f)).ToList());
+        r.Verdict += noteAnciennes;
+    }
+
+    private static void ComputeVerdictSur(DiagnosticReport r, List<Finding> critical)
+    {
         if (critical.Count == 0)
         {
             var warnings = r.Findings.Where(f => f.Severity == Severity.Warning).ToList();
@@ -2702,7 +2734,8 @@ public sealed class RulesEngine
             // rapport. On compte donc d'abord les arrêts ANORMAUX — écrans bleus, et
             // arrêts inattendus qu'aucun écran bleu n'explique — avant de prononcer quoi
             // que ce soit de rassurant.
-            var arretsAnormaux = r.Bsods.Count + ArretsInexpliques(r).Count;
+            // Point 105 : seuls les écrans bleus DE LA PÉRIODE comptent — la phrase dit « sur la période ».
+            var arretsAnormaux = r.Bsods.Count(b => b.TimeLocal >= DebutDePeriode(r)) + ArretsInexpliques(r).Count;
 
             if (warnings.Count == 0)
             {

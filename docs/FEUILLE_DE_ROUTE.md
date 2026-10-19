@@ -123,7 +123,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 102 | **Un même plantage compté deux fois (variante « _M » d'un code d'arrêt)** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » plus bas |
 | 103 | **Un pilote de Trend Micro en échec « fichier introuvable » n'est pas reconnu comme orphelin** | constaté le 19/10/2026 — **premier diagnostic faux, corrigé le même jour** (les pilotes SONT vérifiés) ; cause non établie, mesure demandée sur le poste concerné ; voir « Trois diagnostics du 19/10/2026 » |
 | 104 | **Échecs dispersés : des services déjà expliqués comptent comme « le système »** | validé le 19/10/2026 — **livré le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
-| 105 | **Un plantage ancien, hors période, décide du verdict** | **validé le 19/10/2026** — garder la carte, ne plus la laisser porter le verdict ; voir « Trois diagnostics du 19/10/2026 » |
+| 105 | **Un plantage ancien, hors période, décide du verdict** | **validé et livré le 19/10/2026** — la carte reste, elle ne porte plus le verdict ; voir « Trois diagnostics du 19/10/2026 » |
 | 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | **validé le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
 | 107 | **Plantages d'un logiciel tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
 | 108 | **« Le problème principal vient d'un pilote » sous un verdict matériel** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
@@ -1958,6 +1958,16 @@ WMI, ne peut pas la voir. Piste de correction, à décider après confirmation d
 poste et de l'existence du fichier : lire les clés `Services` du registre
 (`Type` 1 ou 2) en plus de WMI.
 
+**Seconde mesure du 19/10/2026, sur les DEUX postes concernés** (nom du poste
+affiché cette fois) : fichier absent, `sc.exe qc TmPreFilter` → erreur 1060
+(« le service spécifié n'existe pas »), et plus aucune clé de registre. Le pilote
+a donc disparu entièrement entre les deux mesures — l'auteur avait prévu de
+traiter les restes de Trend Micro ce jour-là. Le cas n'est plus mesurable, et le
+poste de la première mesure reste incertain. **Point 103 laissé ouvert, sans
+correction** : la piste « lire le registre en plus de WMI » ne repose que sur une
+mesure dont le poste n'est pas sûr. À reprendre si un autre cas apparaît. Leçon
+retenue : toujours faire afficher `hostname` dans une commande de mesure.
+
 **Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
 de compter la dispersion, les services et pilotes dont le programme est MESURÉ
 comme disparu (`ProgrammeDisparu` : liste des services orphelins, ou pilote avec
@@ -1986,6 +1996,18 @@ antérieurs à la période analysée », « le diagnostic de ces crashs est
 incomplet »), mais la carte reste « Critique » et décide du verdict. À discuter :
 garder la carte, mais ne plus la laisser porter le verdict quand le dernier
 plantage est hors période.
+
+**Point 105 — livré le 19/10/2026.** Nouvelle propriété `Finding.DerniereTrace`
+(trace la plus récente d'une conclusion), renseignée par la carte d'écran bleu et
+par la carte « Instabilité graphique ». `ComputeVerdict` écarte du calcul les
+conclusions critiques dont la dernière trace précède la période
+(`HorsPeriode`), et ajoute au verdict une phrase qui les signale avec la date du
+dernier plantage. Les cartes restent affichées, en « Critique », avec la mention
+« Antérieur à la période analysée : rappelé ici, il ne décide pas du verdict ».
+Le compte des « arrêts anormaux sur la période » ne prend plus que les écrans
+bleus de la période. Effet sur le cas réel : verdict sain au lieu de « PILOTE
+défectueux », et plus de phrase « le problème principal vient d'un pilote ».
+Tests : `PlantagesAnciensTests` (4).
 
 **Point 106 — proposition (textes existants).** La recommandation de repli
 d'un code d'arrêt inconnu dit encore « automatisé en Phase 2 », et la section

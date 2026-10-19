@@ -46,6 +46,7 @@ Un particulier veut diagnostiquer sa machine ; un administrateur veut piloter un
 - Quand des services échouent de façon répétée, ceux dont le programme a disparu (restes d'une désinstallation) sont mis à part avant de conclure : ils ne font plus croire à un problème de Windows quand les autres échecs se concentrent sur un ou deux services.
 - Les plantages répétés d'un logiciel tiers ne proposent plus sfc /scannow et DISM ; ils restent proposés quand c'est un composant de Windows qui plante.
 - Sous un verdict matériel, le rapport ne dit plus « le problème principal vient d'un pilote ».
+- Un écran bleu plus ancien que la période analysée ne décide plus du verdict : il reste affiché, avec la mention qu'il est antérieur, et le verdict le signale. Constaté sur un parc : « PILOTE défectueux » pour un unique écran bleu vieux de dix mois, sur une machine saine.
 - Un service coupé pendant l'arrêt ou le redémarrage de Windows n'est plus compté comme un échec. Constaté sur un parc : l'agent d'inventaire « s'arrêtait de manière inattendue » chaque soir, toujours dans la même seconde que l'arrêt de Windows programmé — il était coupé, pas en panne.
 
 ## Windows à jour

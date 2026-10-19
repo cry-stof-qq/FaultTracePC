@@ -765,6 +765,16 @@ public sealed class Finding
     public string Title { get; set; } = "";
     public string Details { get; set; } = "";
     public string Recommendation { get; set; } = "";
+
+    /// <summary>
+    /// POINT 105 (validé le 19/10/2026) — date de la trace la plus RÉCENTE sur
+    /// laquelle repose la conclusion, quand elle en a une (écran bleu, gel
+    /// graphique…). Une conclusion dont la dernière trace précède la période
+    /// analysée reste affichée, mais ne décide plus du verdict. Constaté sur deux
+    /// postes du parc : un verdict « PILOTE défectueux » tiré d'un unique écran bleu
+    /// vieux de dix mois, sur une machine saine par ailleurs.
+    /// </summary>
+    public DateTime? DerniereTrace { get; set; }
 }
 
 public sealed class DiagnosticReport
