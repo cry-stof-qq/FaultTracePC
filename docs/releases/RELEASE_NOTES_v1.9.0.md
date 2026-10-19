@@ -38,6 +38,10 @@ Un particulier veut diagnostiquer sa machine ; un administrateur veut piloter un
 
 **Éprouvé avant publication** sur une machine virtuelle Windows 11 à jour : installation neuve (interactive et silencieuse), ajout de la case, retrait de la case, mise à jour depuis la 1.8.1 (case cochée d'office), mise à jour d'un poste sans la case (elle reste décochée), mise à jour silencieuse avec `ADDLOCAL=Main` d'un poste supervisé (toujours joignable), désinstallation (configuration du poste conservée), version portable.
 
+## Rapport du parc : moins de bruit — point 96
+
+Les pilotes livrés avec Windows changent tous ensemble à chaque mise à jour, ceux de Microsoft Defender avec sa plateforme. Le rapport du parc en faisait une carte par fichier — 175 cartes sur un parc de dix postes, dont 145 pour Windows. Ils tiennent désormais en **une carte par famille**, qui nomme les postes en retard et dit sur combien de fichiers. Les pilotes de constructeurs (réseau, son, graphique…) gardent chacun leur carte : ce sont eux qui méritent un regard.
+
 ## Corrigé au passage
 
 - Dans le rapport français, la carte antivirus affichait le mode de Windows Defender en anglais (« mode Not running »). Il est désormais traduit (« arrêté », « passif », « normal »…) ; une valeur inconnue est rendue telle quelle.

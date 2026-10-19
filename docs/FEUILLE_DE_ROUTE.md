@@ -1607,6 +1607,18 @@ erreur ou critique → « critique ») plutôt que par une table de numéros.
 **À vérifier d'abord sur un des postes concernés** : quels numéros et quels
 niveaux d'événements WHEA il porte réellement.
 
+**Point 96 — livré le 19/10/2026** (go de l'auteur le même jour), à partir du
+rapport du parc du 19/10/2026 10:15 : 175 cartes « divergence », dont 145 de
+pilotes livrés avec Windows, 4 de Defender, 3 de composants de sécurité Microsoft
+aux versions mêlées, 23 de constructeurs. `ParkComparator.Famille` classe chaque
+fichier d'après ce que ses versions disent : mention `(WinBuild.` → Windows ; nom
+en `Wd` et versions toutes en `4.18.` → Defender ; le reste → constructeur. Les
+familles Windows et Defender donnent UNE carte chacune (à partir de deux fichiers ;
+un fichier seul garde sa carte), qui nomme les postes en retard avec, pour chacun,
+le nombre de fichiers en retard, et cite cinq fichiers en exemple. Les pilotes de
+constructeurs gardent une carte par fichier. Effet attendu sur le cas réel : de
+175 cartes à environ 25. Tests : `ParcRegroupementTests` (7 cas).
+
 **Point 99 — même alerte sur plusieurs postes : le comparateur ne la rapproche
 pas.** Le comparateur croise les pilotes et les codes d'arrêt, pas les alertes
 de la surveillance. Les trois postes en alerte WHEA appartiennent à la même

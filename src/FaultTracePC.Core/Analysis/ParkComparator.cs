@@ -104,6 +104,10 @@ public static class ParkComparator
                 list.Add((m.Name, version, date));
             }
 
+        // Point 96 : divergences mises de côté pour être regroupées (voir plus bas).
+        var divergencesWindows = new List<(string Fichier, List<IGrouping<string, (string Machine, string Version, DateTime? Date)>> Versions)>();
+        var divergencesDefender = new List<(string Fichier, List<IGrouping<string, (string Machine, string Version, DateTime? Date)>> Versions)>();
+
         foreach (var (file, entries) in byDriver.OrderByDescending(e => e.Value.Count))
         {
             if (entries.Count < 2) continue;
@@ -134,8 +138,25 @@ public static class ParkComparator
                                   .GroupBy(e => e.Version)
                                   .OrderByDescending(g => g.Count()).ToList();
             if (versions.Count >= 2 && entries.Count >= 3)
-                a.Correlations.Add(Divergence(file, versions));
+            {
+                switch (Famille(file, versions.Select(g => g.Key)))
+                {
+                    case FamillePilote.Windows: divergencesWindows.Add((file, versions)); break;
+                    case FamillePilote.Defender: divergencesDefender.Add((file, versions)); break;
+                    default: a.Correlations.Add(Divergence(file, versions)); break;
+                }
+            }
         }
+
+        // POINT 96 — constaté sur les rapports du parc du 12/10/2026 (88 cartes) et du
+        // 19/10/2026 (175 cartes, dont 145 pour des pilotes de Windows). Les pilotes
+        // livrés avec Windows changent TOUS ENSEMBLE à chaque mise à jour cumulative ;
+        // ceux de Defender, avec sa plateforme. Une carte par fichier noyait les vrais
+        // écarts — ceux des pilotes de constructeurs — sous un seul fait répété cent
+        // fois. Regroupés en une carte par famille, à partir de DEUX fichiers : un seul
+        // fichier garde sa carte, qui dit déjà tout.
+        AjouterGroupe(a, divergencesWindows, FamillePilote.Windows);
+        AjouterGroupe(a, divergencesDefender, FamillePilote.Defender);
 
         // ---------------------------------------------------------------
         // 3. Même code d'arrêt sur plusieurs postes
@@ -355,6 +376,80 @@ public static class ParkComparator
                             "Check with the vendor which version is the newest, then bring the other machines in line with it."),
             Machines = versions.SelectMany(g => g.Select(e => e.Machine)).Distinct().OrderBy(x => x).ToList(),
         };
+    }
+
+    internal enum FamillePilote { Constructeur, Windows, Defender }
+
+    /// <summary>
+    /// Point 96. Famille d'un pilote, reconnue à ce que Windows en dit lui-même :
+    /// la mention « WinBuild » que portent les versions des fichiers livrés avec
+    /// Windows (« 10.0.26100.9549 (WinBuild.160101.0800) ») ; pour Defender, un nom
+    /// en « Wd » et une version de plateforme « 4.18.x » (WdFilter, WdBoot,
+    /// WdNisDrv…). Tout le reste est un pilote de constructeur et garde sa carte.
+    /// </summary>
+    internal static FamillePilote Famille(string fichier, IEnumerable<string> versions)
+    {
+        var liste = versions.ToList();
+        if (liste.Any(v => v.Contains("(WinBuild.", StringComparison.OrdinalIgnoreCase)))
+            return FamillePilote.Windows;
+        if (fichier.StartsWith("Wd", StringComparison.OrdinalIgnoreCase)
+            && liste.All(v => v.TrimStart().StartsWith("4.18.", StringComparison.Ordinal)))
+            return FamillePilote.Defender;
+        return FamillePilote.Constructeur;
+    }
+
+    /// <summary>Postes dont la version de ce fichier est plus ancienne que la plus récente observée — vide si les versions ne se comparent pas.</summary>
+    private static List<string> EnRetard(List<IGrouping<string, (string Machine, string Version, DateTime? Date)>> versions)
+    {
+        var numeros = versions.Select(g => (Groupe: g, Numero: NumeroDeVersion(g.Key))).ToList();
+        if (!numeros.All(x => x.Numero is not null)) return new();
+        var max = numeros.Max(x => x.Numero)!;
+        return numeros.Where(x => x.Numero < max).SelectMany(x => x.Groupe.Select(e => e.Machine)).Distinct().ToList();
+    }
+
+    private static void AjouterGroupe(ParkAnalysis a,
+        List<(string Fichier, List<IGrouping<string, (string Machine, string Version, DateTime? Date)>> Versions)> groupe,
+        FamillePilote famille)
+    {
+        if (groupe.Count == 0) return;
+        if (groupe.Count == 1) { a.Correlations.Add(Divergence(groupe[0].Fichier, groupe[0].Versions)); return; }
+
+        // Pour chaque poste : sur combien de ces fichiers il est en retard.
+        var retards = groupe.SelectMany(d => EnRetard(d.Versions))
+                            .GroupBy(m => m, StringComparer.OrdinalIgnoreCase)
+                            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+        var fichiers = groupe.Select(d => d.Fichier).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
+        var exemples = string.Join(", ", fichiers.Take(5)) + (fichiers.Count > 5 ? Lang.T($" et {fichiers.Count - 5} autre(s)", $" and {fichiers.Count - 5} more") : "");
+        var postes = retards.Count == 0
+            ? Lang.T(" Les numéros de version ne permettent pas de dire quel poste est en retard.", " The version numbers do not tell which machine is behind.")
+            : Lang.T(" Postes en retard sur au moins un de ces fichiers : ", " Machines behind on at least one of these files: ")
+              + string.Join(", ", retards.Select(g => Lang.T($"{g.Key} ({g.Count()} fichier(s))", $"{g.Key} ({g.Count()} file(s))"))) + ".";
+
+        bool windows = famille == FamillePilote.Windows;
+        a.Correlations.Add(new Correlation
+        {
+            Kind = "divergence",
+            Severity = "info",
+            Title = windows
+                ? Lang.T($"{fichiers.Count} pilotes de Windows en versions différentes : le niveau de mise à jour de Windows n'est pas le même partout",
+                         $"{fichiers.Count} Windows drivers in different versions: Windows is not at the same update level everywhere")
+                : Lang.T($"{fichiers.Count} pilotes de Microsoft Defender en versions différentes : la plateforme Defender n'est pas la même partout",
+                         $"{fichiers.Count} Microsoft Defender drivers in different versions: the Defender platform is not the same everywhere"),
+            Details = (windows
+                ? Lang.T("Ces pilotes sont livrés avec Windows et changent tous ensemble à chaque mise à jour cumulative : un écart sur l'un est un écart sur tous, une seule carte le dit. ",
+                         "These drivers ship with Windows and all change together with each cumulative update: a gap on one is a gap on all, so a single card says it. ")
+                : Lang.T("Ces pilotes appartiennent à l'antivirus de Windows et changent ensemble quand sa plateforme se met à jour : une seule carte le dit. ",
+                         "These drivers belong to the Windows antivirus and change together when its platform updates: a single card says it. "))
+                + Lang.T($"Fichiers concernés : {exemples}.", $"Files involved: {exemples}.")
+                + postes,
+            Action = windows
+                ? Lang.T("Installer les mises à jour de Windows sur les postes nommés : leurs pilotes suivront. Un poste en retard sur quelques fichiers seulement a souvent une mise à jour facultative non installée.",
+                         "Install the Windows updates on the machines named: their drivers will follow. A machine behind on only a few files often has an optional update not installed.")
+                : Lang.T("Vérifier que Windows Update s'applique sur les postes nommés : c'est par lui que la plateforme Defender se met à jour.",
+                         "Check that Windows Update is applied on the machines named: that is how the Defender platform gets updated."),
+            Machines = retards.Select(g => g.Key).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+        });
     }
 
     /// <summary>
