@@ -2091,6 +2091,12 @@ quand `ImagePath` manque). Ils rejoignent `ServicesOrphelins` avec
 inscriptions orphelines les cite comme « pilote », sans état ; le point 104 les
 reconnaît comme cause établie. Tests : `PilotesOrphelinsTests` (14 cas).
 
+**CI rouge sur ce lot (commit `066e185`), corrigé le même jour.** Erreur de
+compilation dans un commentaire : la séquence `\n` de « drivers\nom.sys », écrite
+par un script d'édition, avait été transformée en vrai retour à la ligne, coupant
+le commentaire en deux. Leçon : relire tout texte contenant une barre oblique
+inverse après une modification faite par script.
+
 **Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
 de compter la dispersion, les services et pilotes dont le programme est MESURÉ
 comme disparu (`ProgrammeDisparu` : liste des services orphelins, ou pilote avec

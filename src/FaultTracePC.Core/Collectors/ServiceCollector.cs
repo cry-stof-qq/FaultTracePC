@@ -56,8 +56,7 @@ public static class ServiceCollector
     /// poste de l'auteur et un poste du parc : pilote noyau ou de système de
     /// fichiers (Type 1 ou 2), démarrant avec Windows (Start 0, 1 ou 2), dont le
     /// fichier n'existe pas. Sans ImagePath, Windows prend
-    /// \SystemRoot\System32\drivers
-om.sys : on vérifie ce même chemin.
+    /// \SystemRoot\System32\drivers\nom.sys : on vérifie ce même chemin.
     /// </summary>
     public static List<ServiceOrphelin> PilotesOrphelinsDuRegistre(ICollection<string> dejaCites)
     {
