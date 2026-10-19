@@ -3158,9 +3158,12 @@ public sealed class RulesEngine
     {
         var lignes = new List<string>();
         foreach (var sv in r.System.ServicesOrphelins.OrderBy(x => x.NomAffiche, StringComparer.OrdinalIgnoreCase))
-            lignes.Add(Lang.T(
-                $"service « {sv.NomAffiche} » ({sv.Nom}), démarrage {sv.Demarrage}, {sv.Etat} — {sv.Chemin}",
-                $"service “{sv.NomAffiche}” ({sv.Nom}), start mode {sv.Demarrage}, {sv.Etat} — {sv.Chemin}"));
+            lignes.Add(sv.EstPilote
+                // Point 103 : pilote lu dans le registre — pas d'état, Windows n'a pas pu le charger.
+                ? Lang.T($"pilote « {sv.NomAffiche} » ({sv.Nom}), démarrage {sv.Demarrage} — {sv.Chemin}",
+                         $"driver “{sv.NomAffiche}” ({sv.Nom}), start mode {sv.Demarrage} — {sv.Chemin}")
+                : Lang.T($"service « {sv.NomAffiche} » ({sv.Nom}), démarrage {sv.Demarrage}, {sv.Etat} — {sv.Chemin}",
+                         $"service “{sv.NomAffiche}” ({sv.Nom}), start mode {sv.Demarrage}, {sv.Etat} — {sv.Chemin}"));
         foreach (var d in r.System.Drivers.Where(d => d.FichierPresent == false).OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase))
             lignes.Add(Lang.T(
                 $"pilote « {d.DisplayName} » ({d.Name}), démarrage {d.StartMode} — {d.Path}",

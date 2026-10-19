@@ -360,6 +360,11 @@ public sealed class ServiceOrphelin
     public string Chemin { get; set; } = "";
     public string Demarrage { get; set; } = "";
     public string Etat { get; set; } = "";
+    /// <summary>
+    /// Point 103 : inscription d'un PILOTE trouvée dans le registre (WMI ne la
+    /// montre pas, voir <see cref="Collectors.ServiceCollector.PilotesOrphelinsDuRegistre"/>).
+    /// </summary>
+    public bool EstPilote { get; set; }
 }
 
 /// <summary>

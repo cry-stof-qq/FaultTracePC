@@ -32,6 +32,14 @@ public sealed class SystemInfoCollector
         Safe(Lang.T("Filtres de disque", "File system filters"), () => FiltreCollector.Collect(s, _errors));
         if (includeDrivers)
             Safe("Pilotes", () => s.Drivers.AddRange(DriverCollector.Collect()));
+        // Point 103 : les pilotes dont le fichier manque, que WMI ne montre pas.
+        // Après les deux collectes ci-dessus, pour ne pas citer deux fois la même inscription.
+        Safe(Lang.T("Pilotes sans fichier", "Drivers with no file"), () =>
+        {
+            var deja = new HashSet<string>(s.ServicesOrphelins.Select(o => o.Nom)
+                .Concat(s.Drivers.Where(d => d.FichierPresent == false).Select(d => d.Name)), StringComparer.OrdinalIgnoreCase);
+            s.ServicesOrphelins.AddRange(ServiceCollector.PilotesOrphelinsDuRegistre(deja));
+        });
 
         return s;
     }

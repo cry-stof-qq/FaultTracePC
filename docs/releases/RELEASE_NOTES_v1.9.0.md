@@ -58,6 +58,7 @@ Une fois les postes en 1.9.0, elle dit aussi ce qu'ils ont en commun : même mod
 - Sous un verdict matériel, le rapport ne dit plus « le problème principal vient d'un pilote ».
 - Un écran bleu plus ancien que la période analysée ne décide plus du verdict : il reste affiché, avec la mention qu'il est antérieur, et le verdict le signale. Constaté sur un parc : « PILOTE défectueux » pour un unique écran bleu vieux de dix mois, sur une machine saine.
 - L'écran bleu 0x23 (FAT_FILE_SYSTEM, système de fichiers des clés USB et cartes mémoire en FAT32) est désormais décrit, avec la marche à suivre. Deux textes qui renvoyaient à des étapes internes du projet (« Phase 2 », « Phase 3 ») ont été réécrits.
+- Un pilote inscrit pour démarrer avec Windows dont le fichier a disparu (reste d'un antivirus désinstallé, par exemple) est désormais signalé. Windows échouait à le lancer à chaque démarrage, mais ne le montrait pas dans la liste des pilotes que lisait FaultTracePC : il est maintenant lu directement dans le registre.
 - Un service coupé pendant l'arrêt ou le redémarrage de Windows n'est plus compté comme un échec. Constaté sur un parc : l'agent d'inventaire « s'arrêtait de manière inattendue » chaque soir, toujours dans la même seconde que l'arrêt de Windows programmé — il était coupé, pas en panne.
 
 ## Windows à jour

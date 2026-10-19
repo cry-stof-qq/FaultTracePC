@@ -121,7 +121,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 100 | **Colonne « Version » de la Supervision trop étroite** | constaté le 12/10/2026 sur la console 1.8.1 : « 1.8.0 — à mettre à jou… » — défaut d'affichage, sans conséquence sur la donnée ; à corriger avec la 1.9.0 (points 93 et 94 touchent déjà cette liste) |
 | 101 | **Échecs répétés d'un service tiers : la boîte à outils renvoie vers sfc et DISM** | constaté le 19/10/2026 sur le rapport d'un poste du parc — **défaut, corrigé le même jour** ; voir « Déploiement du 19/10/2026 » plus bas |
 | 102 | **Un même plantage compté deux fois (variante « _M » d'un code d'arrêt)** | constaté le 19/10/2026 — **défaut, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » plus bas |
-| 103 | **Un pilote de Trend Micro en échec « fichier introuvable » n'est pas reconnu comme orphelin** | constaté le 19/10/2026 — **cause établie le même jour en VM** : WMI ne liste pas un pilote dont le fichier manque ; correction proposée et mesurée sans fausse alerte, en attente d'accord ; voir « Trois diagnostics du 19/10/2026 » |
+| 103 | **Un pilote de Trend Micro en échec « fichier introuvable » n'est pas reconnu comme orphelin** | constaté le 19/10/2026 — **cause établie le même jour en VM** : WMI ne liste pas un pilote dont le fichier manque ; **corrigé le même jour** (lecture du registre) ; voir « Trois diagnostics du 19/10/2026 » |
 | 104 | **Échecs dispersés : des services déjà expliqués comptent comme « le système »** | validé le 19/10/2026 — **livré le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
 | 105 | **Un plantage ancien, hors période, décide du verdict** | **validé et livré le 19/10/2026** — la carte reste, elle ne porte plus le verdict ; voir « Trois diagnostics du 19/10/2026 » |
 | 106 | **Textes périmés « Phase 2 » / « Phase 3 » et code 0x23 absent du catalogue** | **validé et livré le 19/10/2026** ; voir « Trois diagnostics du 19/10/2026 » |
@@ -2081,6 +2081,15 @@ un poste du parc n'affichent **aucune ligne**. Pas de fausse alerte des pilotes 
 Windows sur ces trois machines. Il n'est donc plus utile d'allumer les portables
 qui ont encore Trend pour ce point. **Reste : l'accord de l'auteur pour écrire la
 correction.**
+
+**Correction validée le 19/10/2026 (« écrire la correction validé point 103 »),
+livrée le même jour.** `ServiceCollector.PilotesOrphelinsDuRegistre` lit
+`HKLM\SYSTEM\CurrentControlSet\Services` (vue 64 bits) et retient les pilotes
+`Type` 1 ou 2, `Start` 0 à 2, dont le fichier n'existe pas (chemin par défaut
+quand `ImagePath` manque). Ils rejoignent `ServicesOrphelins` avec
+`EstPilote = true`, après les collectes WMI et sans doublon. La carte des
+inscriptions orphelines les cite comme « pilote », sans état ; le point 104 les
+reconnaît comme cause établie. Tests : `PilotesOrphelinsTests` (14 cas).
 
 **Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
 de compter la dispersion, les services et pilotes dont le programme est MESURÉ
