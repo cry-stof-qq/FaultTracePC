@@ -2010,6 +2010,15 @@ correction** : la piste « lire le registre en plus de WMI » ne repose que sur 
 mesure dont le poste n'est pas sûr. À reprendre si un autre cas apparaît. Leçon
 retenue : toujours faire afficher `hostname` dans une commande de mesure.
 
+**Pour reprendre le point 103 (proposé le 19/10/2026).** L'auteur a encore des
+postes avec Trend Micro. Le cas à mesurer n'est pas un poste où Trend est installé,
+mais l'état intermédiaire : Trend désinstallé, restes PAS encore nettoyés. Sur un
+tel poste, une commande en lecture seule liste les inscriptions de Trend (nom en
+`Tm*` ou chemin contenant « Trend Micro ») avec, pour chacune : fichier présent ou
+non, et vue ou non par WMI (`Win32_SystemDriver` / `Win32_Service`). Si une
+inscription dont le fichier manque n'est pas vue par WMI, la correction est
+établie : lire les clés `Services` du registre en plus de WMI.
+
 **Point 104 — livré le 19/10/2026.** `AnalyzeServiceFailures` met à part, avant
 de compter la dispersion, les services et pilotes dont le programme est MESURÉ
 comme disparu (`ProgrammeDisparu` : liste des services orphelins, ou pilote avec
