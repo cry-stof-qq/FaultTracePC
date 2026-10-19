@@ -92,7 +92,21 @@ public class ParcMemeAlerteTests
 
         var carte = Assert.Single(c, x => x.Title.StartsWith("Erreurs matérielles (WHEA)"));
         Assert.DoesNotContain("Même modèle", carte.Details);
-        Assert.Contains("ne sont transmis que par les postes en 1.9.0 ou plus", carte.Details);
+        Assert.Contains("Modèle et composant inconnus pour POSTE-B", carte.Details);
+        Assert.Contains("relancer un diagnostic à distance", carte.Details);
+    }
+
+    [Fact]
+    public void Une_conclusion_critique_anterieure_a_la_periode_ne_compte_pas_dans_le_resume()
+    {
+        var r = new DiagnosticReport { GeneratedAt = new DateTime(2026, 10, 19, 21, 8, 0), ScanPeriodDays = 30 };
+        r.Findings.Add(new Finding { Severity = Severity.Critical, Title = "Erreurs WHEA récentes", DerniereTrace = new DateTime(2026, 10, 15) });
+        r.Findings.Add(new Finding { Severity = Severity.Critical, Title = "Écran bleu de mars", DerniereTrace = new DateTime(2026, 3, 10) });
+        r.Findings.Add(new Finding { Severity = Severity.Critical, Title = "Sans date" });
+
+        var s = ScanHistory.Summarize(r);
+
+        Assert.Equal(new[] { "Erreurs WHEA récentes", "Sans date" }, s.CriticalFindings);
     }
 
     [Fact]

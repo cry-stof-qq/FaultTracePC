@@ -115,7 +115,12 @@ public static class ScanHistory
             MemUsedPct = os.TotalVisibleMemoryKB == 0 ? 0
                 : Math.Round(100.0 * (os.TotalVisibleMemoryKB - os.FreePhysicalMemoryKB) / os.TotalVisibleMemoryKB, 1),
             VirtualizationBytes = Analysis.RulesEngine.VirtualizationBytes(r),
-            CriticalFindings = r.Findings.Where(f => f.Severity == Severity.Critical).Select(f => f.Title).ToList(),
+            // Point 105 : une conclusion critique dont la dernière trace précède la
+            // période ne compte pas — sinon la console de parc désignait un poste
+            // « qui concentre 4 problèmes critiques » dont 3 vieux de plusieurs mois
+            // (constaté au rapport du parc du 19/10/2026 au soir), alors que le verdict
+            // du poste lui-même n'en retenait qu'un.
+            CriticalFindings = r.Findings.Where(f => f.Severity == Severity.Critical && !Analysis.RulesEngine.HorsPeriode(r, f)).Select(f => f.Title).ToList(),
             Modele = $"{r.System.Bios.SystemManufacturer} {r.System.Bios.SystemModel}".Trim(),
             VersionBios = r.System.Bios.Version.Trim(),
             WheaFatales = r.Events.Count(e => e.Category == EventCategory.Whea && Analysis.RulesEngine.WheaFatal.Contains(e.EventId)),

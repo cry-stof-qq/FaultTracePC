@@ -85,6 +85,7 @@ public class ParcRegroupementTests
     [Theory]
     [InlineData("tcpip.sys", "10.0.26100.9549 (WinBuild.160101.0800)", "Windows")]
     [InlineData("WdFilter.sys", "4.18.26090.9 (4df2f7dd)", "Defender")]
+    [InlineData("KslD.sys", "1.1.26090.64001 (43411653)", "Defender")]
     [InlineData("rt640x64.sys", "10.073.0815.2024", "Constructeur")]
     [InlineData("WdcSata.sys", "2.1.0.0", "Constructeur")]
     public void La_famille_se_reconnait_a_ce_que_Windows_dit_du_fichier(string fichier, string version, string attendu)

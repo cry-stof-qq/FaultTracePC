@@ -448,9 +448,15 @@ public static class ParkComparator
                                  $"Same component involved on these machines: {string.Join(", ", communs.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}. ");
         }
 
-        if (connus.Count < postes.Count)
-            phrase += Lang.T("Le modèle et le composant ne sont transmis que par les postes en 1.9.0 ou plus. ",
-                             "The model and component are only sent by machines running 1.9.0 or later. ");
+        // Constaté le 19/10/2026 au premier rapport du parc en 1.9.0 : un poste DÉJÀ
+        // en 1.9.0 manquait encore, parce que son dernier diagnostic datait d'avant.
+        // L'ancienne phrase (« seuls les postes en 1.9.0 les transmettent ») était donc
+        // fausse pour lui. Ce qui compte est la version qui a fait le DIAGNOSTIC : on
+        // nomme les postes concernés et on dit quoi faire.
+        var sansModele = postes.Where(m => m.Summary.Modele.Length == 0).Select(m => m.Name).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+        if (sansModele.Count > 0)
+            phrase += Lang.T($"Modèle et composant inconnus pour {string.Join(", ", sansModele)} : ils ne figurent que dans un diagnostic fait avec la 1.9.0 ou plus — relancer un diagnostic à distance sur ce(s) poste(s). ",
+                             $"Model and component unknown for {string.Join(", ", sansModele)}: they only appear in a diagnosis made with 1.9.0 or later — run a remote diagnosis again on these machine(s). ");
         return phrase;
     }
 
@@ -470,6 +476,11 @@ public static class ParkComparator
             return FamillePilote.Windows;
         if (fichier.StartsWith("Wd", StringComparison.OrdinalIgnoreCase)
             && liste.All(v => v.TrimStart().StartsWith("4.18.", StringComparison.Ordinal)))
+            return FamillePilote.Defender;
+        // KslD.sys est aussi un pilote de Defender (déjà nommé comme tel au rapport du
+        // 12/10/2026), mais son nom ne commence pas par « Wd » et sa version non plus
+        // par 4.18 : constaté seul sur sa carte au rapport du parc du 19/10/2026 au soir.
+        if (fichier.Equals("KslD.sys", StringComparison.OrdinalIgnoreCase))
             return FamillePilote.Defender;
         return FamillePilote.Constructeur;
     }
