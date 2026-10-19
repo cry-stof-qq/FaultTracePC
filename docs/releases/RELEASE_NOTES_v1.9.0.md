@@ -1,10 +1,8 @@
-<!-- BROUILLON commencé le 17/10/2026 — à compléter avec les autres points de la
-     1.9.0 (93, 94, 96, 99, 100) et à relire avant de pousser le tag v1.9.0.
-     Le travail « Publication » lit ce fichier tel quel : ce commentaire HTML ne
-     s'affiche pas dans la release, mais tout le reste, si. -->
 ## In English
 
 **This release separates the two audiences of FaultTracePC.** Someone diagnosing their own PC no longer sees the fleet console; an administrator gets it with one tick box at installation — and no machine that already had it loses it.
+
+The fleet console can now act on one machine or on a selection: right-click menu (update this machine, refresh it, black box, alert history, remote diagnosis) and "Refresh selection". The fleet report groups the drivers that ship with Windows and with Microsoft Defender into one card per family instead of one card per file, and brings together the machines that report the same hardware errors. Finally, single-machine reports were re-read card by card against real diagnostics from a school network: ten corrections came out of it, so that the advice matches what was actually measured.
 
 The notes below are in French. The full English description of the software is here: **[FaultTracePC — diagnose, monitor and repair a Windows PC](https://palisser.fr/spip.php?article31)**
 
@@ -38,6 +36,13 @@ Un particulier veut diagnostiquer sa machine ; un administrateur veut piloter un
 
 **Éprouvé avant publication** sur une machine virtuelle Windows 11 à jour : installation neuve (interactive et silencieuse), ajout de la case, retrait de la case, mise à jour depuis la 1.8.1 (case cochée d'office), mise à jour d'un poste sans la case (elle reste décochée), mise à jour silencieuse avec `ADDLOCAL=Main` d'un poste supervisé (toujours joignable), désinstallation (configuration du poste conservée), version portable.
 
+## Console de parc : agir sur un poste ou sur une sélection — points 93, 94 et 100
+
+- **Clic droit sur un poste** de la Supervision : « Mettre à jour ce poste… », « Actualiser ce poste », boîte noire, historique des alertes, diagnostic à distance. Les boutons du bas restent : le menu est un raccourci de plus.
+- **« Mettre à jour ce poste… »** ne déploie rien directement : il ouvre l'onglet Inventaire avec ce seul poste coché — en lisant l'inventaire s'il n'est pas encore affiché —, et le déploiement passe par le chemin habituel, avec sa vérification du paquet et sa confirmation.
+- **Sélection de plusieurs postes** (Ctrl+clic, Maj+clic) et bouton **« Actualiser la sélection »**, qui n'interroge que ces postes et les garde sélectionnés. Retirer plusieurs postes demande de taper leur nombre pour confirmer. Les actions qui ne visent qu'un poste le disent quand plusieurs sont sélectionnés, au lieu d'agir sur le premier.
+- **Colonne « Version »** : « ⬆ 1.8.0 → 1.9.0 » (la version du poste, et celle vers laquelle le mettre à jour) au lieu d'un texte coupé ; le sens des flèches est expliqué en survolant l'en-tête.
+
 ## Rapport du parc : moins de bruit — point 96
 
 Les pilotes livrés avec Windows changent tous ensemble à chaque mise à jour, ceux de Microsoft Defender avec sa plateforme. Le rapport du parc en faisait une carte par fichier — 175 cartes sur un parc de dix postes, dont 145 pour Windows. Ils tiennent désormais en **une carte par famille**, qui nomme les postes en retard et dit sur combien de fichiers. Les pilotes de constructeurs (réseau, son, graphique…) gardent chacun leur carte : ce sont eux qui méritent un regard.
@@ -48,7 +53,9 @@ Quand plusieurs postes signalent des erreurs matérielles (WHEA) sur leur pério
 
 Une fois les postes en 1.9.0, elle dit aussi ce qu'ils ont en commun : même modèle, même version de BIOS, même composant mis en cause (par exemple le même lien PCI Express) — et elle devient critique dès qu'une erreur est fatale. Le résumé envoyé par chaque poste porte pour cela quatre informations de plus ; une console plus ancienne les ignore simplement.
 
-## Corrigé au passage
+## Le rapport d'un poste : des conseils alignés sur ce qui est mesuré
+
+Des diagnostics réels, faits sur le parc d'un établissement et sur le poste de l'auteur, ont été relus carte par carte. Voici ce qu'ils ont corrigé.
 
 - Dans le rapport français, la carte antivirus affichait le mode de Windows Defender en anglais (« mode Not running »). Il est désormais traduit (« arrêté », « passif », « normal »…) ; une valeur inconnue est rendue telle quelle.
 - Quand des échecs répétés de services viennent d'un ou deux services seulement — souvent un logiciel tiers —, la carte ne propose plus sfc /scannow et DISM, qui réparent Windows et non ce logiciel. Ils restent proposés quand les échecs se dispersent sur de nombreux services, ce qui désigne plutôt le système.
