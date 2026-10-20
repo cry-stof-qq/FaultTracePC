@@ -77,6 +77,13 @@ public static class NetworkCollector
             {
                 if (n.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel) continue;
 
+                // POINT 111. Une couche de filtrage n'est pas une carte : on la compte.
+                if (EstCoucheDeFiltrage(n.Name, n.Description))
+                {
+                    info.FilterLayerCount++;
+                    continue;
+                }
+
                 var carte = new NetworkAdapterInfo
                 {
                     Name = n.Name,
@@ -212,6 +219,53 @@ public static class NetworkCollector
         "Hyper-V", "VirtualBox", "VMware", "Bluetooth Device (Personal Area Network)",
         "Microsoft Wi-Fi Direct", "Npcap", "WAN Miniport",
     };
+
+    /// <summary>
+    /// POINT 111. Reconnaît une couche de filtrage posée sur une carte.
+    ///
+    /// Constaté le 20/10/2026 sur le rapport du poste de l'auteur : la fiche « Cartes
+    /// réseau » listait 9 cartes, puis une trentaine de lignes comme
+    /// « Ethernet 7-QoS Packet Scheduler-0000 (UsbNcm Host Device-QoS Packet
+    /// Scheduler-0000) ». La même mesure faite dans PowerShell 5.1 (.NET Framework), sur
+    /// le même poste, ne les montre pas : c'est .NET 10 qui les expose.
+    ///
+    /// La règle tient à la forme que Windows donne à ces couches, pas à une liste de
+    /// noms de filtres : le nom ET la description finissent par le MÊME morceau
+    /// « -[nom du filtre]-0000 ». Le nom est celui de la carte, la description celle
+    /// de son pilote, suivis tous deux du nom du filtre et d'un numéro à quatre
+    /// chiffres. Une vraie carte n'a jamais cette fin commune — « Ethernet 2 » et
+    /// « VirtualBox Host-Only Ethernet Adapter » n'ont rien en commun à la fin.
+    ///
+    /// La carte de base n'a pas besoin d'être dans la liste : le rapport montrait des
+    /// couches posées sur « Connexion au réseau local* 8 » (WAN Miniport) et sur
+    /// « vSwitch (Default Switch) », deux interfaces que .NET ne liste pas elles-mêmes.
+    /// </summary>
+    internal static bool EstCoucheDeFiltrage(string nom, string description)
+    {
+        nom ??= "";
+        description ??= "";
+        if (!FinNumerotee.IsMatch(nom) || !FinNumerotee.IsMatch(description)) return false;
+
+        // Fin commune aux deux chaînes, lue depuis la droite.
+        int i = 0;
+        while (i < nom.Length && i < description.Length
+               && nom[nom.Length - 1 - i] == description[description.Length - 1 - i]) i++;
+        var finCommune = nom[(nom.Length - i)..];
+
+        // Elle peut mordre sur la fin du nom de la carte (deux noms qui finissent par la
+        // même lettre) : le nom du filtre commence au premier tiret de cette fin.
+        int tiret = finCommune.IndexOf('-');
+        if (tiret < 0) return false;
+        return CoucheDeFiltrage.IsMatch(finCommune[tiret..]);
+    }
+
+    /// <summary>Un tiret et quatre chiffres en fin de chaîne : « -0000 ».</summary>
+    private static readonly System.Text.RegularExpressions.Regex FinNumerotee =
+        new(@"-\d{4}$");
+
+    /// <summary>« -[nom du filtre]-0000 », avec un nom de filtre non vide.</summary>
+    private static readonly System.Text.RegularExpressions.Regex CoucheDeFiltrage =
+        new(@"^-[^-].*-\d{4}$");
 
     internal static bool EstVirtuelle(string description) =>
         MarqueursVirtuels.Any(m => (description ?? "").Contains(m, StringComparison.OrdinalIgnoreCase));

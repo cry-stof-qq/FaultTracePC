@@ -377,6 +377,15 @@ public sealed class NetworkInfo
     public List<NetworkAdapterInfo> Adapters { get; set; } = new();
 
     /// <summary>
+    /// POINT 111. Couches de filtrage écartées de <see cref="Adapters"/> : pare-feu de
+    /// Windows (WFP), planificateur QoS, capture réseau (Npcap), filtres de VirtualBox
+    /// ou de Fortinet… .NET 10 les rend comme des interfaces à part entière
+    /// (« Ethernet-QoS Packet Scheduler-0000 »), alors que ce ne sont pas des cartes.
+    /// Comptées plutôt que jetées : rien ne disparaît du rapport sans qu'il le dise.
+    /// </summary>
+    public int FilterLayerCount { get; set; }
+
+    /// <summary>
     /// Nombre de réseaux Wi-Fi enregistrés. <b>-1 signifie « pas pu regarder »</b>, ce
     /// qui n'est pas la même chose que zéro : l'un empêche de conclure, l'autre EST la
     /// conclusion. Les confondre ferait annoncer une panne sur une machine saine.

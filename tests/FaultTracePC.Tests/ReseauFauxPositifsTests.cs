@@ -78,6 +78,49 @@ public class ReseauFauxPositifsTests
         Assert.Equal(virtuelle, NetworkCollector.EstVirtuelle(description));
     }
 
+    // Point 111 — constaté le 20/10/2026 sur le rapport du poste de l'auteur : une
+    // trentaine de couches de filtrage listées comme des cartes. Noms relevés tels
+    // quels dans ce rapport (ce sont des noms de pilotes, pas des noms de machines).
+    [Theory]
+    [InlineData("Ethernet 7-QoS Packet Scheduler-0000", "UsbNcm Host Device-QoS Packet Scheduler-0000")]
+    [InlineData("Ethernet-WFP Native MAC Layer LightWeight Filter-0000", "Realtek PCIe GbE Family Controller-WFP Native MAC Layer LightWeight Filter-0000")]
+    [InlineData("Ethernet 2-Npcap Packet Driver (NPCAP)-0000", "VirtualBox Host-Only Ethernet Adapter-Npcap Packet Driver (NPCAP)-0000")]
+    [InlineData("Ethernet 3-VirtualBox NDIS Light-Weight Filter-0000", "Fortinet Virtual Ethernet Adapter (NDIS 6.30)-VirtualBox NDIS Light-Weight Filter-0000")]
+    [InlineData("vEthernet (Default Switch)-WFP 802.3 MAC Layer LightWeight Filter-0000", "Hyper-V Virtual Ethernet Adapter-WFP 802.3 MAC Layer LightWeight Filter-0000")]
+    [InlineData("vSwitch (Default Switch)-Hyper-V Virtual Switch Extension Filter-0000", "Hyper-V Virtual Switch Extension Adapter-Hyper-V Virtual Switch Extension Filter-0000")]
+    [InlineData("Connexion au réseau local* 8-Fortinet NDIS 6.0 LightWeight Filter-0000", "WAN Miniport (IP)-Fortinet NDIS 6.0 LightWeight Filter-0000")]
+    public void Une_couche_de_filtrage_n_est_pas_une_carte(string nom, string description)
+    {
+        Assert.True(NetworkCollector.EstCoucheDeFiltrage(nom, description));
+    }
+
+    // Les neuf vraies cartes du même rapport : aucune ne doit être écartée.
+    [Theory]
+    [InlineData("vEthernet (Default Switch)", "Hyper-V Virtual Ethernet Adapter")]
+    [InlineData("Ethernet 2", "VirtualBox Host-Only Ethernet Adapter")]
+    [InlineData("Connexion au réseau local* 1", "Microsoft Wi-Fi Direct Virtual Adapter")]
+    [InlineData("Connexion au réseau local* 2", "Microsoft Wi-Fi Direct Virtual Adapter #2")]
+    [InlineData("Ethernet 3", "Fortinet Virtual Ethernet Adapter (NDIS 6.30)")]
+    [InlineData("Wi-Fi", "MediaTek Wi-Fi 6E MT7922 (RZ616) 160MHz PCIe Adapter")]
+    [InlineData("Connexion réseau Bluetooth", "Bluetooth Device (Personal Area Network)")]
+    [InlineData("Ethernet", "Realtek PCIe GbE Family Controller")]
+    [InlineData("Ethernet 7", "UsbNcm Host Device")]
+    public void Une_vraie_carte_n_est_pas_une_couche_de_filtrage(string nom, string description)
+    {
+        Assert.False(NetworkCollector.EstCoucheDeFiltrage(nom, description));
+    }
+
+    [Theory]
+    // Fin numérotée d'un seul côté : rien ne permet de conclure.
+    [InlineData("Ethernet-0000", "Realtek PCIe GbE Family Controller")]
+    // Même fin numérotée, mais pas de nom de filtre devant : pas une couche.
+    [InlineData("Carte-0001", "Pilote-0001")]
+    [InlineData("", "")]
+    public void Une_fin_numerotee_seule_ne_suffit_pas(string nom, string description)
+    {
+        Assert.False(NetworkCollector.EstCoucheDeFiltrage(nom, description));
+    }
+
     [Fact]
     public void Un_adaptateur_wifi_direct_ne_declenche_pas_une_panne_de_wifi()
     {

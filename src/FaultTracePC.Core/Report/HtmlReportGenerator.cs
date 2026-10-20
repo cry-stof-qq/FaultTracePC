@@ -722,8 +722,13 @@ public static class HtmlReportGenerator
                 $"<strong>{H(a.Kind)}</strong> — {H(a.Name)} ({H(a.Description)}) : {H(etat)}{pilote}{mac}",
                 $"<strong>{H(a.Kind)}</strong> — {H(a.Name)} ({H(a.Description)}): {H(etat)}{pilote}{mac}"));
         }
-        Card(sb, Lang.T("Cartes réseau", "Network adapters"),
-            lignesReseau.Count == 0 ? Lang.T("aucune détectée", "none detected") : string.Join("<br>", lignesReseau));
+        var corpsCartes = lignesReseau.Count == 0 ? Lang.T("aucune détectée", "none detected") : string.Join("<br>", lignesReseau);
+        // Point 111 : les couches de filtrage ne sont pas listées, mais leur nombre est dit.
+        if (res.FilterLayerCount > 0)
+            corpsCartes += "<br><em>" + Lang.T(
+                $"et {res.FilterLayerCount} couche(s) de filtrage posée(s) sur ces cartes (pare-feu de Windows, QoS, capture réseau…) : ce ne sont pas des cartes, elles ne sont pas listées",
+                $"and {res.FilterLayerCount} filter layer(s) attached to these adapters (Windows firewall, QoS, packet capture…): they are not adapters and are not listed") + "</em>";
+        Card(sb, Lang.T("Cartes réseau", "Network adapters"), corpsCartes);
 
         var profils = res.WifiProfileCount < 0
             ? Lang.T($"non déterminé — {H(res.WifiProfileNote)}", $"undetermined — {H(res.WifiProfileNote)}")
