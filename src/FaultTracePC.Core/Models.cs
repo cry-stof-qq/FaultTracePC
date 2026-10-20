@@ -1030,6 +1030,16 @@ public sealed class ScanComparison
     public List<string> DriverUpdates { get; set; } = new();
 
     /// <summary>
+    /// POINT 110. Pilotes dont la version a BAISSÉ entre les deux analyses
+    /// (« 10.0.26100.9549 → 10.0.26100.8875 »). Ils étaient rangés jusqu'ici sous
+    /// « Pilotes mis à jour » : constaté le 19/10/2026 sur le diagnostic 1.9.0 du
+    /// poste de l'auteur. Un retour en arrière n'est pas une mise à jour — il signale
+    /// une désinstallation de mise à jour, une restauration ou un pilote remplacé par
+    /// un plus ancien, et c'est une information à part entière.
+    /// </summary>
+    public List<string> DriverDowngrades { get; set; } = new();
+
+    /// <summary>
     /// POINT 55. Nom du pilote accusé par la conclusion qui a été REMPLACÉ entre les
     /// deux analyses, alors que des plantages de même signature sont survenus après.
     ///

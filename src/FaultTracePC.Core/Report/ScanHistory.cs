@@ -365,10 +365,26 @@ public static class ScanHistory
             var apres = VersionSeule(cur);
             if (string.Equals(avant, apres, StringComparison.OrdinalIgnoreCase)) continue;
 
+            // Un retour en arrière reste un REMPLACEMENT pour le point 55 : si deux
+            // versions différentes du pilote accusé ont planté avec la même signature,
+            // la version n'est pas en cause. Seul l'affichage les sépare.
             tousLesPilotesChanges.Add(sys);
-            c.DriverUpdates.Add(Lang.T($"{sys} : {avant} → {apres}", $"{sys}: {avant} → {apres}"));
+
+            // POINT 110. Une version plus ANCIENNE n'est pas une mise à jour. Constaté le
+            // 19/10/2026 : « Pilotes mis à jour » listait 10.0.26100.9549 → 10.0.26100.8875.
+            // Les numéros sont comparés comme des versions (9549 > 8875), pas comme du
+            // texte. Quand l'un des deux ne se lit pas comme un numéro, on ne peut rien
+            // conclure sur le sens : la ligne reste parmi les mises à jour, comme avant.
+            var numAvant = FaultTracePC.Core.Analysis.ParkComparator.NumeroDeVersion(avant);
+            var numApres = FaultTracePC.Core.Analysis.ParkComparator.NumeroDeVersion(apres);
+            var ligne = Lang.T($"{sys} : {avant} → {apres}", $"{sys}: {avant} → {apres}");
+            if (numAvant is not null && numApres is not null && numApres < numAvant)
+                c.DriverDowngrades.Add(ligne);
+            else
+                c.DriverUpdates.Add(ligne);
         }
         if (c.DriverUpdates.Count > 12) c.DriverUpdates = c.DriverUpdates.Take(12).ToList();
+        if (c.DriverDowngrades.Count > 12) c.DriverDowngrades = c.DriverDowngrades.Take(12).ToList();
 
         // POINT 55. Le pilote accusé a-t-il été remplacé entre les deux analyses, et les
         // plantages ont-ils continué quand même ? Les deux données existaient déjà, à

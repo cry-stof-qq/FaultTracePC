@@ -164,6 +164,53 @@ public class PlafondEtVersionsTests
         Assert.Contains("10.0.26100.9444", ligne);
     }
 
+    // Point 110 — constaté le 19/10/2026 : « Pilotes mis à jour » listait
+    // 10.0.26100.9549 → 10.0.26100.8875, un retour en arrière.
+
+    [Fact]
+    public void Une_version_plus_ancienne_n_est_pas_une_mise_a_jour()
+    {
+        var r = AvecPilote("10.0.26100.8875", new DateTime(2026, 10, 19));
+        var c = EnFrancais(() => ScanHistory.Compare(r, Precedent("10.0.26100.9549", "2026-10-12")));
+
+        Assert.Empty(c.DriverUpdates);
+        var ligne = Assert.Single(c.DriverDowngrades);
+        Assert.Contains("10.0.26100.9549 → 10.0.26100.8875", ligne);
+    }
+
+    [Fact]
+    public void Les_numeros_se_comparent_comme_des_versions_pas_comme_du_texte()
+    {
+        // En texte, « 10.0.26100.10001 » est plus petit que « 10.0.26100.9549 » ;
+        // en version, il est plus grand : c'est une mise à jour.
+        var r = AvecPilote("10.0.26100.10001", new DateTime(2026, 10, 19));
+        var c = EnFrancais(() => ScanHistory.Compare(r, Precedent("10.0.26100.9549", "2026-10-12")));
+
+        Assert.Single(c.DriverUpdates);
+        Assert.Empty(c.DriverDowngrades);
+    }
+
+    [Fact]
+    public void Un_retour_en_arriere_se_voit_aussi_avec_un_suffixe_de_construction()
+    {
+        var r = AvecPilote("10.0.26100.8875 (WinBuild.160101.0800)", new DateTime(2026, 10, 19));
+        var c = EnFrancais(() => ScanHistory.Compare(r, Precedent("10.0.26100.9549 (WinBuild.160101.0800)", "2026-10-12")));
+
+        Assert.Empty(c.DriverUpdates);
+        Assert.Single(c.DriverDowngrades);
+    }
+
+    [Fact]
+    public void Une_version_illisible_reste_parmi_les_mises_a_jour()
+    {
+        // Sans numéro lisible, le sens du changement est inconnu : rien n'est conclu.
+        var r = AvecPilote("version inconnue", new DateTime(2026, 10, 19));
+        var c = EnFrancais(() => ScanHistory.Compare(r, Precedent("10.0.26100.9549", "2026-10-12")));
+
+        Assert.Single(c.DriverUpdates);
+        Assert.Empty(c.DriverDowngrades);
+    }
+
     [Fact]
     public void La_version_seule_se_lit_meme_sans_separateur()
     {

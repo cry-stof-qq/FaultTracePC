@@ -218,6 +218,8 @@ public static class HtmlReportGenerator
         if (c.NewWheaEvents > 0) items.Add(Lang.T($"⚠️ {c.NewWheaEvents} nouvelle(s) erreur(s) matérielle(s) WHEA", $"⚠️ {c.NewWheaEvents} new WHEA hardware error(s)"));
         if (c.NewDiskErrorEvents > 0) items.Add(Lang.T($"⚠️ {c.NewDiskErrorEvents} nouvelle(s) erreur(s) disque", $"⚠️ {c.NewDiskErrorEvents} new disk error(s)"));
         if (c.DriverUpdates.Count > 0) items.Add(Lang.T($"🔄 Pilotes mis à jour : {H(string.Join(" · ", c.DriverUpdates))}", $"🔄 Drivers updated: {H(string.Join(" · ", c.DriverUpdates))}"));
+        // Point 110 : un retour à une version plus ancienne, affiché à part.
+        if (c.DriverDowngrades.Count > 0) items.Add(Lang.T($"↩️ Pilotes revenus à une version plus ancienne : {H(string.Join(" · ", c.DriverDowngrades))}", $"↩️ Drivers back to an older version: {H(string.Join(" · ", c.DriverDowngrades))}"));
         if (c.DiskChanges.Count > 0) items.Add(Lang.T($"💽 Disques : {H(string.Join(" · ", c.DiskChanges))}", $"💽 Drives: {H(string.Join(" · ", c.DiskChanges))}"));
         if (!string.IsNullOrEmpty(c.MemoryTrend)) items.Add($"🧠 {H(c.MemoryTrend)}");
 
