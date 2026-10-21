@@ -202,6 +202,17 @@ public sealed class EventLogCollector
                 if (p.Count > 6) e.Extracted["ExceptionCode"] = p[6].Value?.ToString() ?? "";
                 break;
             }
+            case EventCategory.AppCrash when string.Equals(rec.ProviderName, ".NET Runtime", StringComparison.OrdinalIgnoreCase):
+            {
+                // POINT 113. L'événement 1026 n'a qu'une donnée : un texte dont la
+                // première ligne nomme l'application (« Application: X.exe »). Sans ce
+                // nom, chaque 1026 était rangé sous « (inconnue) » — constaté le
+                // 21/10/2026 : 33 plantages comptés une seconde fois.
+                var texte = rec.Properties.Count > 0 ? rec.Properties[0].Value?.ToString() ?? "" : "";
+                if ((NomApplicationDotNet(texte) ?? NomApplicationDotNet(message)) is { } app)
+                    e.Extracted["App"] = app;
+                break;
+            }
             case EventCategory.ServiceFailure when string.Equals(rec.ProviderName, "Service Control Manager", StringComparison.OrdinalIgnoreCase):
             {
                 // Les quatre identifiants collectés (7000, 7001, 7031, 7034) portent tous
@@ -276,6 +287,18 @@ public sealed class EventLogCollector
     /// Microsoft trouvée) : tenforums.com, tutoriel 91178 ; flamingo.run,
     /// « windows-memory-diagnostic-results » — concordants.
     /// </summary>
+    /// <summary>
+    /// POINT 113. Nom de l'application dans un événement « .NET Runtime » 1026 :
+    /// « Application: MicrosoftSearchInBing.exe » — ou « Application : … » quand le
+    /// message est rendu en français. Null si aucun nom d'exécutable n'est lisible.
+    /// </summary>
+    internal static string? NomApplicationDotNet(string? texte)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(texte ?? "",
+            @"Application\s*:\s*([^\r\n]+?\.exe)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return m.Success ? m.Groups[1].Value.Trim() : null;
+    }
+
     internal static bool? DiagnosticMemoireEnErreur(int eventId) => eventId switch
     {
         1101 or 1201 => false,

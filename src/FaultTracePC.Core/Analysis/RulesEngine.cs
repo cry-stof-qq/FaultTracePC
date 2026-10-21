@@ -2118,12 +2118,44 @@ public sealed class RulesEngine
         BinairesGraphiques.Contains(exe)
         || modules.Any(m => m is not null && ModulesGraphiques.Any(g => m.Contains(g, StringComparison.OrdinalIgnoreCase)));
 
+    /// <summary>
+    /// POINT 113. Un plantage d'application .NET laisse DEUX événements : « .NET
+    /// Runtime » 1026 (l'exception non gérée), puis « Application Error » 1000 (le
+    /// processus qui tombe), à quelques secondes d'intervalle. Constaté le 21/10/2026
+    /// sur un poste du parc : « MicrosoftSearchInBing.exe (33 crashs) » et
+    /// « (inconnue) (33 crashs) » — le même plantage, compté deux fois.
+    ///
+    /// Un 1026 est écarté quand un 1000 de la même application (ou, si son nom n'a pas
+    /// pu être lu, un 1000 quelconque) est enregistré dans les deux minutes. Un 1026
+    /// SEUL reste compté : c'est alors la seule trace du plantage.
+    /// </summary>
+    internal static List<WinEvent> SansDoublonsDotNet(List<WinEvent> crashes)
+    {
+        static bool EstDotNet(WinEvent e) => e.EventId == 1026
+            && string.Equals(e.Provider, ".NET Runtime", StringComparison.OrdinalIgnoreCase);
+
+        var erreursApplication = crashes.Where(e => e.EventId == 1000
+            && string.Equals(e.Provider, "Application Error", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        return crashes.Where(e =>
+        {
+            if (!EstDotNet(e)) return true;
+            var app = e.Extracted.GetValueOrDefault("App");
+            return !erreursApplication.Any(m =>
+                Math.Abs((m.TimeLocal - e.TimeLocal).TotalMinutes) <= 2
+                && (string.IsNullOrEmpty(app)
+                    || string.Equals(m.Extracted.GetValueOrDefault("App"), app, StringComparison.OrdinalIgnoreCase)));
+        }).ToList();
+    }
+
     private static void AnalyzeAppCrashes(DiagnosticReport r)
     {
-        var crashes = r.Events.Where(e => e.Category == EventCategory.AppCrash).ToList();
+        var crashes = SansDoublonsDotNet(r.Events.Where(e => e.Category == EventCategory.AppCrash).ToList());
         if (crashes.Count == 0) return;
 
-        var topApps = crashes.GroupBy(e => e.Extracted.GetValueOrDefault("App", "(inconnue)"))
+        // « (inconnue) » passait tel quel dans le rapport anglais.
+        var inconnue = Lang.T("(inconnue)", "(unknown)");
+        var topApps = crashes.GroupBy(e => e.Extracted.GetValueOrDefault("App", inconnue))
             .OrderByDescending(g => g.Count()).Take(5).ToList();
 
         foreach (var g in topApps.Where(g => g.Count() >= 3))

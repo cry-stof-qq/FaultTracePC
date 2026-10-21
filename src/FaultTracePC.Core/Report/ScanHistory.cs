@@ -111,7 +111,9 @@ public static class ScanHistory
             }).ToList(),
             DiskErrorEvents = r.Events.Count(e => e.Category == EventCategory.DiskError),
             WheaEvents = r.Events.Count(e => e.Category == EventCategory.Whea),
-            AppCrashEvents = r.Events.Count(e => e.Category == EventCategory.AppCrash),
+            // Point 113 : un plantage .NET laisse deux événements ; il n'en compte qu'un.
+            AppCrashEvents = FaultTracePC.Core.Analysis.RulesEngine.SansDoublonsDotNet(
+                r.Events.Where(e => e.Category == EventCategory.AppCrash).ToList()).Count,
             MemUsedPct = os.TotalVisibleMemoryKB == 0 ? 0
                 : Math.Round(100.0 * (os.TotalVisibleMemoryKB - os.FreePhysicalMemoryKB) / os.TotalVisibleMemoryKB, 1),
             VirtualizationBytes = Analysis.RulesEngine.VirtualizationBytes(r),

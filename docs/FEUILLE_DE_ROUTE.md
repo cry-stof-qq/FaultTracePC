@@ -131,7 +131,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 110 | **Un pilote revenu à une version plus ancienne rangé sous « Pilotes mis à jour »** | relevé le 19/10/2026 sur le diagnostic 1.9.0 du poste de l'auteur — **corrigé le 20/10/2026** ; voir « Point 110 » plus bas |
 | 111 | **Des couches de filtrage listées comme des cartes réseau** | relevé le 19/10/2026 dans un rapport de la VM d'essai, mesuré le 20/10/2026 sur le poste de l'auteur — **corrigé le 20/10/2026** ; voir « Point 111 » plus bas |
 | 112 | **Des erreurs WHEA toutes corrigées remontées en critique par d'anciennes alertes — verdict « MATÉRIELLE » sur cinq postes** | constaté le 21/10/2026 sur neuf diagnostics du parc — **corrigé le 21/10/2026** ; voir « Diagnostics du parc du 21/10/2026 » plus bas |
-| 113 | **Un plantage d'application .NET compté deux fois, la seconde sous « (inconnue) » et comme « anciennement instable »** | constaté le 21/10/2026 — à corriger (défaut constaté) ; même section |
+| 113 | **Un plantage d'application .NET compté deux fois, la seconde sous « (inconnue) » et comme « anciennement instable »** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — à corriger (défaut constaté) ; même section |
 
 ## 4. Repris — et une dépendance découverte
@@ -2252,7 +2252,13 @@ Neuf diagnostics faits le 21/10/2026 avec la 1.9.0 : sept postes du parc, le pos
 
 **Constat.** Sur un poste : « Application instable : MicrosoftSearchInBing.exe (33 crashs) », puis « Application anciennement instable : (inconnue) (33 crashs) », dernier plantage le jour même. Le tableau des événements montre, pour chaque plantage, deux événements à la même minute : `Application Error 1000` (qui nomme l'application) et `.NET Runtime 1026`.
 
-**Cause, lue dans le code.** `EventLogCollector` collecte les 1026 dans la catégorie « plantage d'application » mais n'en extrait pas le nom de l'application ; `AnalyzeAppCrashes` les range donc sous « (inconnue) ». Et comme aucun programme installé ne s'appelle « (inconnue) », la carte se dit « anciennement instable » pour un plantage du matin. À corriger : lire le nom dans le 1026, et ne pas recompter un 1026 qui accompagne un 1000 de la même application.
+**Cause, lue dans le code.** `EventLogCollector` collecte les 1026 dans la catégorie « plantage d'application » mais n'en extrait pas le nom de l'application ; `AnalyzeAppCrashes` les range donc sous « (inconnue) ». Et comme aucun programme installé ne s'appelle « (inconnue) », la carte se dit « anciennement instable » pour un plantage du matin. **Corrigé le 21/10/2026.**
+
+- `EventLogCollector.NomApplicationDotNet` lit le nom dans la première ligne du 1026 (« Application: X.exe », ou « Application : X.exe » quand le message est rendu en français).
+- `RulesEngine.SansDoublonsDotNet` écarte un 1026 quand un 1000 de la même application — ou, si son nom n'a pas pu être lu, un 1000 quelconque — est enregistré dans les deux minutes. Un 1026 **seul** reste compté : c'est alors la seule trace du plantage.
+- Le même tri sert au nombre de plantages d'applications gardé dans l'historique (`ScanSummary.AppCrashEvents`), pour que les deux chiffres ne divergent pas.
+- Relevé en corrigeant : « (inconnue) » était écrit en dur et passait tel quel dans le rapport anglais. Il passe par la traduction (« (unknown) »).
+- Tests : `PlantageDotNetTests` (lecture du nom, trois textes sans nom, un 1026 qui accompagne un 1000, un 1026 seul, deux applications différentes, un 1026 sans nom, et le cas réel — 33 paires, une seule carte).
 
 ### Point 114 — une même coupure dans deux cartes
 
@@ -2262,7 +2268,7 @@ Neuf diagnostics faits le 21/10/2026 avec la 1.9.0 : sept postes du parc, le pos
 
 ### Relevé, sans être un défaut
 
-- **Deux cartes batterie sur un portable** : « usée — 79 % » (25 110 sur 31 920 mWh, 105 cycles) et « en bon état — 100 % » (72 150 sur 72 150 mWh, 60 cycles). Deux batteries réelles, ou une valeur fausse rendue par le microprogramme ? Question posée à l'auteur.
+- **Deux cartes batterie sur un portable** : « usée — 79 % » (25 110 sur 31 920 mWh, 105 cycles) et « en bon état — 100 % » (72 150 sur 72 150 mWh, 60 cycles). **Réponse de l'auteur, 21/10/2026 : ce portable a bien deux batteries.** Ce n'est pas un défaut.
 - **Le service de surveillance de FaultTracePC s'est arrêté une fois de manière inattendue** sur un poste (30/09/2026, 23:48). Une seule fois ; à regarder si cela se répète.
 - **Plantages de Veyon** (`veyon-server.exe`, `veyon-worker.exe`) sur trois postes : un logiciel tiers, rien à corriger ici.
 - **Restes de Trend Micro** sur un poste : `TmPreFilter` n'a pas pu démarrer 31 fois. Cohérent avec le retrait d'Apex One en cours.
