@@ -126,7 +126,8 @@ public class DiagnosticRulesTests
 
         // Conclusion dédiée à la virtualisation (la conclusion RAM mentionne aussi le
         // mot « virtualisation » : on cible donc précisément celle-ci).
-        var vm = Assert.Single(r.Findings, f => f.Category == FaultCategory.Software &&
+        // Point 115 : la mémoire prise par la virtualisation est une affaire de ressources.
+        var vm = Assert.Single(r.Findings, f => f.Category == FaultCategory.Resources &&
                                                 f.Title.StartsWith("La virtualisation réserve", StringComparison.Ordinal));
         Assert.Contains("wslconfig", vm.Recommendation, StringComparison.OrdinalIgnoreCase);
 
@@ -155,7 +156,7 @@ public class DiagnosticRulesTests
     }
 
     [Fact]
-    public void Saturation_memoire_detectee_par_Windows_est_classee_logicielle()
+    public void Saturation_memoire_detectee_par_Windows_est_classee_ressources()
     {
         var r = NewReport();
         r.Events =
@@ -181,8 +182,11 @@ public class DiagnosticRulesTests
         new RulesEngine().Analyze(r);
 
         var finding = Assert.Single(r.Findings, f => f.Title.Contains("Mémoire saturée"));
-        Assert.Equal(FaultCategory.Software, finding.Category);
+        // Point 115 (21/10/2026) : c'était « Software », qui donnait le verdict
+        // « corruption système » et faisait proposer sfc et DISM.
+        Assert.Equal(FaultCategory.Resources, finding.Category);
         Assert.Contains("vmmem.exe", finding.Details);
+        Assert.Contains("SATURATION DE LA MÉMOIRE", r.Verdict);
     }
 
     [Fact]

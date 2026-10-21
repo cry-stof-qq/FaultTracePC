@@ -621,7 +621,8 @@ public sealed class RulesEngine
         {
             Severity = events.Count >= 2 ? Severity.Critical : Severity.Warning,
             Confidence = Confidence.High,
-            Category = FaultCategory.Software,
+            // Point 115 : une mémoire saturée n'est pas une corruption de Windows.
+            Category = FaultCategory.Resources,
             // Même identifiant de fait que la règle d'alerte « exhaustion ».
             Code = "exhaustion",
             Title = Lang.T($"Mémoire saturée : Windows a détecté l'épuisement de la mémoire virtuelle ({events.Count}×)", $"Memory exhausted: Windows detected virtual memory exhaustion ({events.Count}×)"),
@@ -662,7 +663,7 @@ public sealed class RulesEngine
         {
             Severity = Severity.Warning,
             Confidence = Confidence.High,
-            Category = FaultCategory.Software,
+            Category = FaultCategory.Resources,
             Title = Lang.T($"Pression mémoire ÉLEVÉE en ce moment ({commitUsedPct:0} % de la mémoire virtuelle utilisée)", $"Memory pressure is HIGH right now ({commitUsedPct:0}% of virtual memory in use)"),
             Details = Lang.T($"Au moment du scan : mémoire physique utilisée à {physUsedPct:0} %, mémoire virtuelle (RAM + fichier d'échange) à {commitUsedPct:0} %. ", $"At scan time: physical memory {physUsedPct:0}% used, virtual memory (RAM + page file) {commitUsedPct:0}% used. ")
                       + (top.Count > 0 ? Lang.T($"Plus gros consommateurs actuels : {string.Join(", ", top)}.", $"Largest current consumers: {string.Join(", ", top)}.") : ""),
@@ -698,7 +699,7 @@ public sealed class RulesEngine
         {
             Severity = memCrashes ? Severity.Warning : Severity.Info,
             Confidence = Confidence.High,
-            Category = FaultCategory.Software,
+            Category = FaultCategory.Resources,
             Title = Lang.T($"La virtualisation réserve {FormatBytes((ulong)vmBytes)} de RAM ({pct:0} %) — {vmNames.Split(' ')[0]}", $"Virtualisation is reserving {FormatBytes((ulong)vmBytes)} of RAM ({pct:0}%) — {vmNames.Split(' ')[0]}"),
             Details = Lang.T($"Les processus de virtualisation ({vmNames}) occupent {pct:0} % de la mémoire de la machine. ", $"The virtualisation processes ({vmNames}) are using {pct:0}% of the machine's memory. ")
                       + Lang.T(
@@ -793,7 +794,8 @@ public sealed class RulesEngine
                 Category = latest.RuleId switch
                 {
                     "cpu_temp" or "gpu_temp" or "whea" or "power41" => FaultCategory.Hardware,
-                    "commit" or "exhaustion" => FaultCategory.Software,
+                    // Point 115 : saturation de la mémoire, pas corruption de Windows.
+                    "commit" or "exhaustion" => FaultCategory.Resources,
                     _ when latest.RuleId.StartsWith("disk", StringComparison.Ordinal) => FaultCategory.Storage,
                     _ => FaultCategory.None,
                 },
@@ -923,7 +925,7 @@ public sealed class RulesEngine
                 {
                     Severity = Severity.Critical,
                     Confidence = Confidence.High,
-                    Category = FaultCategory.Software,
+                    Category = FaultCategory.Resources,
                     Title = Lang.T($"Mémoire virtuelle SATURÉE juste avant le crash du {ctx.CrashTime:dd/MM HH:mm} ({maxCommit:0} %)",
                                     $"Virtual memory EXHAUSTED just before the crash of {ctx.CrashTime:MM-dd HH:mm} ({maxCommit:0}%)"),
                     Details = Lang.T(
@@ -2951,6 +2953,8 @@ public sealed class RulesEngine
             FaultCategory.Power => Lang.T("Cause la plus probable : ALIMENTATION ou surchauffe (coupures brutales sans écran bleu).", "Most likely cause: POWER SUPPLY or overheating (abrupt losses with no blue screen)."),
             FaultCategory.Software => Lang.T("Cause la plus probable : LOGICIELLE (corruption système ou application).", "Most likely cause: SOFTWARE (system corruption or an application)."),
             FaultCategory.Network => Lang.T("Cause la plus probable : RÉSEAU (configuration, profils ou services — pas le matériel).", "Most likely cause: NETWORK (configuration, profiles or services — not the hardware)."),
+            // Point 115.
+            FaultCategory.Resources => Lang.T("Cause la plus probable : SATURATION DE LA MÉMOIRE (un programme qui consomme trop, ou un fichier d'échange trop petit — ni une panne de Windows, ni une barrette de RAM).", "Most likely cause: MEMORY EXHAUSTION (a program using too much, or a page file that is too small — neither a Windows fault nor a faulty RAM module)."),
             _ => Lang.T("Pannes détectées — voir le détail des conclusions ci-dessous.", "Failures detected — see the detail of the conclusions below."),
         } + nuance + $" ({critical.Count} conclusion(s) critique(s))";
     }

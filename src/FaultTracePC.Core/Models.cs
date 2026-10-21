@@ -750,7 +750,16 @@ public sealed class ReliabilityRecord
 
 public enum Severity { Critical, Warning, Info }
 public enum Confidence { High, Medium, Low }
-public enum FaultCategory { Hardware, Memory, Storage, GpuDriver, Driver, Software, Power, WindowsUpdate, Network, None }
+/// <summary>
+/// Famille de cause d'une conclusion. Elle décide du verdict et de la réparation proposée.
+///
+/// <see cref="Resources"/> (point 115, 21/10/2026) : la mémoire virtuelle saturée par
+/// un programme ou par un fichier d'échange trop petit. Ce n'est ni une corruption de
+/// Windows (<see cref="Software"/>, qui fait proposer sfc et DISM), ni une barrette de
+/// RAM défaillante (<see cref="Memory"/>, qui fait proposer un diagnostic mémoire avec
+/// redémarrage). Ajoutée EN FIN de liste : les valeurs des autres ne bougent pas.
+/// </summary>
+public enum FaultCategory { Hardware, Memory, Storage, GpuDriver, Driver, Software, Power, WindowsUpdate, Network, None, Resources }
 
 public sealed class Finding
 {

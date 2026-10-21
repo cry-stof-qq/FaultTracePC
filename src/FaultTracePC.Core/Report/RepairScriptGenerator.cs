@@ -182,7 +182,9 @@ public static class RepairScriptGenerator
         }
 
         // ------------------------------------------------------------ mémoire
-        if (cats.Contains(FaultCategory.Memory) || cats.Contains(FaultCategory.Software))
+        // Point 115 : la mémoire SATURÉE (Resources) relève de cette section — fichier
+        // d'échange, virtualisation —, plus la catégorie Software, qui ne la porte plus.
+        if (cats.Contains(FaultCategory.Memory) || cats.Contains(FaultCategory.Resources))
         {
             sb.AppendLine(Lang.T("Section 'Mémoire'", "Section 'Memory'"));
             sb.AppendLine(Lang.T("Write-Host 'Configuration du fichier d''échange :'", "Write-Host 'Page file configuration:'"));
@@ -191,7 +193,7 @@ public static class RepairScriptGenerator
             sb.AppendLine(Lang.T("Get-CimInstance Win32_PageFileUsage | Select-Object Name, @{n='Alloué (Mo)';e={$_.AllocatedBaseSize}}, @{n='Pic (Mo)';e={$_.PeakUsage}} | Format-Table -AutoSize", "Get-CimInstance Win32_PageFileUsage | Select-Object Name, @{n='Allocated (MB)';e={$_.AllocatedBaseSize}}, @{n='Peak (MB)';e={$_.PeakUsage}} | Format-Table -AutoSize"));
             sb.AppendLine(Lang.T("if (-not $auto) { Write-Host '  Conseil : repasser le fichier d''échange en « géré automatiquement » sauf besoin précis.' -ForegroundColor Yellow }", "if (-not $auto) { Write-Host '  Advice: set the page file back to “managed automatically” unless you have a specific need.' -ForegroundColor Yellow }"));
 
-            if (cats.Contains(FaultCategory.Software))
+            if (cats.Contains(FaultCategory.Resources))
             {
                 sb.AppendLine(Lang.T("# Cas « mémoire épuisée par un logiciel » (virtualisation WSL/Docker/Hyper-V) :", "# Case “memory exhausted by software” (WSL/Docker/Hyper-V virtualisation):"));
                 sb.AppendLine("$wslCfg = Join-Path $env:USERPROFILE '.wslconfig'");
@@ -439,6 +441,7 @@ public static class RepairScriptGenerator
         FaultCategory.Software => Lang.T("logiciel", "software"),
         FaultCategory.Power => Lang.T("alimentation", "power"),
         FaultCategory.Network => Lang.T("réseau", "network"),
+        FaultCategory.Resources => Lang.T("ressources (mémoire)", "resources (memory)"),
         FaultCategory.WindowsUpdate => "Windows Update",
         _ => Lang.T("général", "general"),
     };

@@ -134,7 +134,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 112 | **Des erreurs WHEA toutes corrigées remontées en critique par d'anciennes alertes — verdict « MATÉRIELLE » sur cinq postes** | constaté le 21/10/2026 sur neuf diagnostics du parc — **corrigé le 21/10/2026** ; voir « Diagnostics du parc du 21/10/2026 » plus bas |
 | 113 | **Un plantage d'application .NET compté deux fois, la seconde sous « (inconnue) » et comme « anciennement instable »** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
-| 115 | **Une saturation de la mémoire virtuelle donne le verdict « LOGICIELLE (corruption système) » et fait proposer sfc et DISM** | constaté le 21/10/2026 — **à décider avec l'auteur** (la correction demande une catégorie de plus) ; voir « Point 115 » dans « Diagnostics du parc du 21/10/2026 » |
+| 115 | **Une saturation de la mémoire virtuelle donne le verdict « LOGICIELLE (corruption système) » et fait proposer sfc et DISM** | constaté le 21/10/2026 — catégorie « Ressources » **validée par l'auteur le même jour, corrigé le 21/10/2026** ; voir « Point 115 » dans « Diagnostics du parc du 21/10/2026 » |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -2282,6 +2282,17 @@ Neuf diagnostics faits le 21/10/2026 avec la 1.9.0 : sept postes du parc, le pos
 
 **Pourquoi ce n'est pas corrigé d'office.** La catégorie `Memory` existe, mais elle veut dire « la RAM physique » : elle ferait conseiller un diagnostic mémoire qui redémarre la machine, tout aussi faux. `None` retirerait le conseil faux, mais le verdict deviendrait « Pannes détectées — voir le détail ». La correction propre est une **catégorie de plus**, par exemple « Ressources » : verdict « SATURATION DE LA MÉMOIRE (un programme ou le fichier d'échange) », aucune réparation de Windows proposée, et la recommandation de la carte, qui est juste (fermer ce qui consomme, nommer les processus), mise en avant. Une catégorie touche aussi les libellés du rapport, le script de réparation et les résumés envoyés à la console : c'est un changement de comportement, à décider avec l'auteur.
 
+**Décidé le 21/10/2026** (« go catégorie Ressources »). **Contexte donné par l'auteur** : le poste concerné sert à des élèves, avec des logiciels de programmation et un accès à l'invite de commandes — un programme écrit en cours qui consomme sans fin la mémoire est une cause plausible, au même titre qu'un logiciel installé. Le rapport n'a pas à trancher : il doit dire « saturation de la mémoire » et nommer les processus quand Windows les donne.
+
+**Corrigé le 21/10/2026.**
+
+- `FaultCategory.Resources`, ajoutée **en fin** d'énumération pour ne décaler aucune valeur existante. Aucun résumé envoyé à la console ne transporte la catégorie : rien à adapter côté console.
+- Passent dans cette catégorie : les alertes `commit` et `exhaustion` de la surveillance, la conclusion tirée de l'événement 2004 (« Mémoire saturée : Windows a détecté l'épuisement de la mémoire virtuelle »), « Pression mémoire ÉLEVÉE en ce moment », « La virtualisation réserve N de RAM » et « Mémoire virtuelle SATURÉE juste avant le crash ».
+- Verdict : « Cause la plus probable : SATURATION DE LA MÉMOIRE (un programme qui consomme trop, ou un fichier d'échange trop petit — ni une panne de Windows, ni une barrette de RAM) ». Libellé de carte : « Ressources ».
+- Boîte à outils : aucune indication — elle n'a pas d'outil pour ce cas, et n'en proposer aucun vaut mieux que sfc. La recommandation de la carte (fermer ce qui consomme, limiter la virtualisation) reste la marche à suivre.
+- Script de réparation : la section « Mémoire » (configuration du fichier d'échange, cas de la virtualisation WSL/Docker) est déclenchée par `Resources` au lieu de `Software` ; la section « Intégrité des fichiers système » (sfc, DISM) ne l'est plus par une saturation.
+- Tests : `RessourcesTests` (le cas réel : verdict et catégorie ; le script parle de mémoire, sans sfc ni diagnostic mémoire ; le verdict en anglais) ; deux tests existants de `DiagnosticRulesTests` réécrits — ils attendaient `Software`, c'est-à-dire l'ancien comportement.
+
 ### Relevé, sans être un défaut
 
 - **Deux cartes batterie sur un portable** : « usée — 79 % » (25 110 sur 31 920 mWh, 105 cycles) et « en bon état — 100 % » (72 150 sur 72 150 mWh, 60 cycles). **Réponse de l'auteur, 21/10/2026 : ce portable a bien deux batteries.** Ce n'est pas un défaut.
@@ -3112,6 +3123,8 @@ Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette ver
 ---
 
 ## Point 15 — le bloc winget, plan arrêté le 19/09/2026
+
+**Ce que l'auteur en attend, dit le 21/10/2026** : des logiciels restés anciens alors que Windows, lui, avance — et qui, parfois (rarement), finissent par poser problème. Mettre à jour les logiciels fait donc partie de la réparation, pas seulement du confort.
 
 Validé sur le principe depuis le début, repoussé deux fois — par les notes de la 1.3.0, puis par le périmètre de la 1.4 (*« un logiciel qui vient de découvrir qu'il ne savait pas signaler ses propres pannes n'a pas besoin de surface supplémentaire »*). Les deux reports étaient justes. Le terrain est maintenant dégagé.
 
