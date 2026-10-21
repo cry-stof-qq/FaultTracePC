@@ -7,7 +7,7 @@ namespace FaultTracePC.Tests;
 
 /// <summary>
 /// Point 115 de la feuille de route. Constaté le 21/10/2026 sur un poste du parc
-/// (64 Go de RAM, logiciels de programmation, invite de commandes ouverte aux élèves) :
+/// (64 Go de RAM, poste d'une enseignante qui y fait tourner beaucoup de logiciels) :
 /// une fois la carte WHEA ramenée à « avertissement », le verdict est devenu
 /// « LOGICIELLE (corruption système ou application) », porté par une seule carte
 /// critique — « Mémoire virtuelle presque saturée : 99 % » — et la boîte à outils
