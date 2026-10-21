@@ -78,8 +78,8 @@ public class ReseauFauxPositifsTests
         Assert.Equal(virtuelle, NetworkCollector.EstVirtuelle(description));
     }
 
-    // Point 111 — constaté le 20/10/2026 sur le rapport du poste de l'auteur : une
-    // trentaine de couches de filtrage listées comme des cartes. Noms relevés tels
+    // Point 111 — constaté le 20/10/2026 sur le rapport du poste de l'auteur : 65
+    // couches de filtrage listées comme des cartes. Noms relevés tels
     // quels dans ce rapport (ce sont des noms de pilotes, pas des noms de machines).
     [Theory]
     [InlineData("Ethernet 7-QoS Packet Scheduler-0000", "UsbNcm Host Device-QoS Packet Scheduler-0000")]
@@ -94,7 +94,7 @@ public class ReseauFauxPositifsTests
         Assert.True(NetworkCollector.EstCoucheDeFiltrage(nom, description));
     }
 
-    // Les neuf vraies cartes du même rapport : aucune ne doit être écartée.
+    // Neuf des vraies interfaces du même rapport : aucune ne doit être écartée.
     [Theory]
     [InlineData("vEthernet (Default Switch)", "Hyper-V Virtual Ethernet Adapter")]
     [InlineData("Ethernet 2", "VirtualBox Host-Only Ethernet Adapter")]

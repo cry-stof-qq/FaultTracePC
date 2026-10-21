@@ -224,7 +224,7 @@ public static class NetworkCollector
     /// POINT 111. Reconnaît une couche de filtrage posée sur une carte.
     ///
     /// Constaté le 20/10/2026 sur le rapport du poste de l'auteur : la fiche « Cartes
-    /// réseau » listait 9 cartes, puis une trentaine de lignes comme
+    /// réseau » listait 19 interfaces, puis 65 lignes comme
     /// « Ethernet 7-QoS Packet Scheduler-0000 (UsbNcm Host Device-QoS Packet
     /// Scheduler-0000) ». La même mesure faite dans PowerShell 5.1 (.NET Framework), sur
     /// le même poste, ne les montre pas : c'est .NET 10 qui les expose.
@@ -236,9 +236,8 @@ public static class NetworkCollector
     /// chiffres. Une vraie carte n'a jamais cette fin commune — « Ethernet 2 » et
     /// « VirtualBox Host-Only Ethernet Adapter » n'ont rien en commun à la fin.
     ///
-    /// La carte de base n'a pas besoin d'être dans la liste : le rapport montrait des
-    /// couches posées sur « Connexion au réseau local* 8 » (WAN Miniport) et sur
-    /// « vSwitch (Default Switch) », deux interfaces que .NET ne liste pas elles-mêmes.
+    /// La carte de base n'a pas besoin d'être dans la liste, ni d'y figurer avant la
+    /// couche : la règle ne regarde que la couche elle-même.
     /// </summary>
     internal static bool EstCoucheDeFiltrage(string nom, string description)
     {

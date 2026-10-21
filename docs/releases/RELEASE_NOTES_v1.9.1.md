@@ -41,7 +41,7 @@ Une coupure sans écran bleu apparaissait deux fois : « coupures brutales » (c
 
 ## Des couches de filtrage listées comme des cartes réseau — point 111
 
-La fiche « Cartes réseau » listait, après les vraies cartes, une trentaine de lignes comme « Ethernet-QoS Packet Scheduler-0000 » : les couches de filtrage posées sur chaque carte (pare-feu de Windows, QoS, capture réseau, filtres de VirtualBox ou de Fortinet…). Ce ne sont pas des cartes. Elles ne sont plus listées, et la fiche dit combien il y en a.
+La fiche « Cartes réseau » listait, après les vraies cartes, plus de soixante lignes comme « Ethernet-QoS Packet Scheduler-0000 » : les couches de filtrage posées sur chaque carte (pare-feu de Windows, QoS, capture réseau, filtres de VirtualBox ou de Fortinet…). Ce ne sont pas des cartes. Elles ne sont plus listées, et la fiche dit combien il y en a.
 
 ## Un pilote revenu en arrière n'est plus « mis à jour » — point 110
 
