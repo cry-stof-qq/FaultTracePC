@@ -117,6 +117,57 @@ public class PlantagesSansVidageTests
         Assert.Contains("anormalement", r.Verdict);
     }
 
+    // ------------------------------------------------------------------
+    // Point 114 — constaté le 21/10/2026 sur deux postes : les mêmes coupures
+    // dans deux cartes, « coupure(s) brutale(s) » et « arrêt(s) inattendu(s) ».
+    // ------------------------------------------------------------------
+
+    private static void Ajouter6008(DiagnosticReport r, DateTime quand) => r.Events.Add(new WinEvent
+    {
+        Category = EventCategory.UnexpectedShutdown,
+        Provider = "EventLog",
+        EventId = 6008,
+        TimeLocal = quand,
+        Message = "L'arret systeme precedent n'etait pas prevu.",
+    });
+
+    [Fact]
+    public void Une_coupure_vue_par_deux_journaux_ne_fait_qu_une_carte()
+    {
+        // Le cas réel : trois Kernel-Power 41 de code 0, et trois 6008 écrits au
+        // même démarrage — derniers cas le 12/10 à 11:20 dans les deux cartes.
+        var r = Rapport();
+        foreach (var t in new[] { new DateTime(2026, 10, 6, 11, 4, 0), new DateTime(2026, 10, 12, 10, 9, 0), new DateTime(2026, 10, 12, 11, 20, 0) })
+        {
+            AjouterKernelPower(r, "0", t);
+            Ajouter6008(r, t.AddSeconds(20));
+        }
+
+        Analyser(r);
+
+        var coupure = Assert.Single(r.Findings, f => f.Title.Contains("coupure(s) brutale(s)"));
+        Assert.DoesNotContain(r.Findings, f => f.Title.Contains("arrêt(s) inattendu"));
+        // Ce que la carte 6008 apportait n'est pas perdu.
+        Assert.Contains("événement 6008", coupure.Details);
+        Assert.Contains("maintenu le bouton", coupure.Details);
+    }
+
+    [Fact]
+    public void Un_arret_inattendu_sans_coupure_garde_sa_carte()
+    {
+        // Une coupure le 6, un arrêt inattendu le 9 : deux faits distincts.
+        var r = Rapport();
+        AjouterKernelPower(r, "0", new DateTime(2026, 10, 6, 11, 4, 0));
+        Ajouter6008(r, new DateTime(2026, 10, 9, 8, 0, 0));
+
+        Analyser(r);
+
+        Assert.Contains(r.Findings, f => f.Title.Contains("1 arrêt(s) inattendu"));
+        var coupure = Assert.Single(r.Findings, f => f.Title.Contains("coupure(s) brutale(s)"));
+        // Aucun 6008 ne l'accompagne : la phrase n'a pas à apparaître.
+        Assert.DoesNotContain("événement 6008", coupure.Details);
+    }
+
     [Fact]
     public void Une_machine_reellement_saine_reste_annoncee_saine()
     {

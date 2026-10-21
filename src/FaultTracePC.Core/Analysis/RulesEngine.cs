@@ -2053,15 +2053,41 @@ public sealed class RulesEngine
         });
     }
 
-    private static void AnalyzePowerLoss(DiagnosticReport r)
-    {
-        // Kernel-Power 41 avec BugcheckCode=0 et sans BSOD proche = coupure d'alimentation brutale.
-        var hardLosses = r.Events.Where(e =>
+    /// <summary>
+    /// Kernel-Power 41 avec BugcheckCode=0 et sans BSOD proche = coupure d'alimentation
+    /// brutale. Partagé avec <see cref="ArretsInexpliques"/> (point 114) : les deux
+    /// règles doivent s'accorder sur ce qu'est une coupure franche.
+    /// </summary>
+    private static List<WinEvent> CoupuresFranches(DiagnosticReport r) =>
+        r.Events.Where(e =>
             e.Category == EventCategory.PowerLoss &&
             e.Extracted.GetValueOrDefault("BugcheckCode", "0") == "0" &&
             !r.Bsods.Any(b => Math.Abs((b.TimeLocal - e.TimeLocal).TotalMinutes) < 5)).ToList();
 
+    /// <summary>
+    /// POINT 114. Un arrêt inattendu (6008) et une coupure franche (Kernel-Power 41)
+    /// sont la MÊME coupure quand ils sont journalisés au même démarrage. Les deux
+    /// événements sont écrits au redémarrage suivant : on les rapproche sur 15 minutes,
+    /// comme pour l'événement 41 et l'écran bleu.
+    /// </summary>
+    private static bool ExpliqueParUneCoupure(WinEvent arret, List<WinEvent> coupures) =>
+        coupures.Any(k => Math.Abs((k.TimeLocal - arret.TimeLocal).TotalMinutes) <= 15);
+
+    private static void AnalyzePowerLoss(DiagnosticReport r)
+    {
+        var hardLosses = CoupuresFranches(r);
+
         if (hardLosses.Count == 0) return;
+
+        // POINT 114. Les arrêts inattendus (6008) qui sont ces mêmes coupures ne font
+        // plus leur propre carte : ils sont dits ici, avec la piste que leur carte
+        // portait et qui ne figurait nulle part ailleurs — le bouton maintenu.
+        var memesCoupures = r.Events.Count(e => e.Category == EventCategory.UnexpectedShutdown
+            && !r.Bsods.Any(b => Math.Abs((b.TimeLocal - e.TimeLocal).TotalMinutes) <= 15)
+            && ExpliqueParUneCoupure(e, hardLosses));
+        var vuDeuxFois = memesCoupures == 0 ? "" : Lang.T(
+            $" Pour {memesCoupures} de ces coupures, Windows a aussi noté au démarrage suivant que l'arrêt précédent n'avait pas été propre (événement 6008) : c'est la même coupure vue par deux journaux, comptée une seule fois. Une coupure de ce type vient aussi, souvent, de quelqu'un qui a maintenu le bouton d'alimentation : sur un poste partagé, demander d'abord aux utilisateurs.",
+            $" For {memesCoupures} of these power losses, Windows also noted at the next start-up that the previous shutdown had not been clean (event 6008): it is the same power loss seen by two logs, counted once. A power loss of this kind also often comes from someone holding the power button down: on a shared machine, ask the people who use it first.");
 
         r.Findings.Add(new Finding
         {
@@ -2074,7 +2100,8 @@ public sealed class RulesEngine
                              + "câble/prise, ou blocage matériel complet. Ce profil n'est PAS un bug logiciel classique.",
                                "Typical causes: a failing or undersized power supply, overheating tripping the thermal protection, "
                              + "a cable or socket, or a complete hardware freeze. This profile is NOT a classic software bug.")
-                      + Lang.T($" Dernière occurrence : {hardLosses.Max(e => e.TimeLocal):dd/MM/yyyy HH:mm}.", $" Last occurrence: {hardLosses.Max(e => e.TimeLocal):yyyy-MM-dd HH:mm}."),
+                      + Lang.T($" Dernière occurrence : {hardLosses.Max(e => e.TimeLocal):dd/MM/yyyy HH:mm}.", $" Last occurrence: {hardLosses.Max(e => e.TimeLocal):yyyy-MM-dd HH:mm}.")
+                      + vuDeuxFois,
             Recommendation = Lang.T("Vérifier températures CPU/GPU en charge, dépoussiérer, contrôler les branchements. Si récurrent, tester avec une autre alimentation. ", "Check CPU/GPU temperatures under load, clear the dust, check the connections. If it recurs, test with another power supply. ")
                            + Lang.T("La surveillance temps réel (mode 2) enregistrera les températures juste avant la prochaine coupure.", "Real-time monitoring (mode 2) will record the temperatures right before the next power loss.")
         });
@@ -2294,12 +2321,21 @@ public sealed class RulesEngine
     /// de POSTE-ELEVE-01 a donc rassuré sur une machine qui plantait toutes les
     /// semaines depuis quatre mois. C'est le pire mode de défaillance de cet outil :
     /// se tromper est réparable, rassurer à tort ne l'est pas.
+    ///
+    /// POINT 114. Le code n'écartait que les arrêts proches d'un écran bleu, pas ceux
+    /// qu'une coupure franche explique déjà — ce que cette description annonçait
+    /// pourtant. Constaté le 21/10/2026 sur deux postes : « 3 coupure(s) brutale(s) »
+    /// et « 3 arrêt(s) inattendu(s) », mêmes dates, en deux cartes.
     /// </summary>
-    private static List<WinEvent> ArretsInexpliques(DiagnosticReport r) =>
-        r.Events.Where(e => e.Category == EventCategory.UnexpectedShutdown
-                            && !r.Bsods.Any(b => Math.Abs((b.TimeLocal - e.TimeLocal).TotalMinutes) <= 15))
-                .OrderBy(e => e.TimeLocal)
-                .ToList();
+    private static List<WinEvent> ArretsInexpliques(DiagnosticReport r)
+    {
+        var coupures = CoupuresFranches(r);
+        return r.Events.Where(e => e.Category == EventCategory.UnexpectedShutdown
+                                   && !r.Bsods.Any(b => Math.Abs((b.TimeLocal - e.TimeLocal).TotalMinutes) <= 15)
+                                   && !ExpliqueParUneCoupure(e, coupures))
+                       .OrderBy(e => e.TimeLocal)
+                       .ToList();
+    }
 
     private static void AnalyzeArretsInattendus(DiagnosticReport r)
     {

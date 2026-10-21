@@ -132,7 +132,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 111 | **Des couches de filtrage listées comme des cartes réseau** | relevé le 19/10/2026 dans un rapport de la VM d'essai, mesuré le 20/10/2026 sur le poste de l'auteur — **corrigé le 20/10/2026** ; voir « Point 111 » plus bas |
 | 112 | **Des erreurs WHEA toutes corrigées remontées en critique par d'anciennes alertes — verdict « MATÉRIELLE » sur cinq postes** | constaté le 21/10/2026 sur neuf diagnostics du parc — **corrigé le 21/10/2026** ; voir « Diagnostics du parc du 21/10/2026 » plus bas |
 | 113 | **Un plantage d'application .NET compté deux fois, la seconde sous « (inconnue) » et comme « anciennement instable »** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
-| 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — à corriger (défaut constaté) ; même section |
+| 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -2264,7 +2264,13 @@ Neuf diagnostics faits le 21/10/2026 avec la 1.9.0 : sept postes du parc, le pos
 
 **Constat.** Sur deux postes : « 3 coupure(s) brutale(s) sans écran bleu » (Kernel-Power 41, critique) et « 3 arrêt(s) inattendu(s) sans écran bleu associé » (événement 6008, avertissement), avec les mêmes dates (« Dernière occurrence : 12/10/2026 11:20 » dans les deux).
 
-**Cause, lue dans le code.** Le commentaire d'`ArretsInexpliques` annonce des arrêts « restés SANS explication : ni écran bleu, ni coupure franche déjà signalée », mais le code n'écarte que les arrêts proches d'un écran bleu. À corriger : écarter aussi les 6008 qu'un Kernel-Power 41 explique déjà, **sans perdre** ce que la carte 6008 apportait — notamment la piste « quelqu'un a maintenu le bouton », la plus fréquente en salle de classe.
+**Cause, lue dans le code.** Le commentaire d'`ArretsInexpliques` annonce des arrêts « restés SANS explication : ni écran bleu, ni coupure franche déjà signalée », mais le code n'écarte que les arrêts proches d'un écran bleu. **Corrigé le 21/10/2026.**
+
+- `CoupuresFranches` : la définition d'une coupure franche (Kernel-Power 41 de code 0, sans écran bleu à moins de 5 minutes) est désormais partagée par les deux règles, au lieu d'être écrite dans l'une seulement.
+- `ArretsInexpliques` écarte un 6008 journalisé à 15 minutes ou moins d'une coupure franche — la même fenêtre que pour l'événement 41 et l'écran bleu : les deux événements sont écrits au même redémarrage. Un 6008 sans coupure garde sa carte.
+- **Rien de ce que la carte 6008 disait n'est perdu.** Quand des 6008 accompagnent les coupures, la carte des coupures le dit (« c'est la même coupure vue par deux journaux, comptée une seule fois ») et reprend la piste qu'elle seule portait : quelqu'un a maintenu le bouton d'alimentation — demander d'abord aux utilisateurs d'un poste partagé.
+- Le verdict ne change pas de nature : ces arrêts restent comptés, par la carte des coupures, et un poste qui en a ne peut toujours pas être dit sain.
+- Tests : deux de plus dans `PlantagesSansVidageTests` (le cas réel — trois paires, une seule carte, la phrase sur le bouton présente — et un 6008 sans coupure, qui garde sa carte).
 
 ### Relevé, sans être un défaut
 
