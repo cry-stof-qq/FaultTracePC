@@ -93,6 +93,104 @@ public class AlerteWheaTests
         });
     }
 
+    // ------------------------------------------------------------------
+    // Point 112 — constaté le 21/10/2026 sur cinq postes du parc : des alertes
+    // écrites avant la 1.8.1 (sans numéro, « crit » par défaut) remontaient en
+    // critique une carte d'erreurs toutes corrigées, et donnaient le verdict
+    // « MATÉRIELLE (CPU/carte mère/alimentation ou surchauffe) ».
+    // ------------------------------------------------------------------
+
+    /// <summary>Alerte telle que l'écrivait une version antérieure à la 1.8.1.</summary>
+    private static PreventiveAlert WheaAncienne(DateTime quand) => new()
+    {
+        Time = quand,
+        RuleId = "whea",
+        Level = "crit",
+        Value = null,
+    };
+
+    private static WinEvent WheaJournal(int numero, DateTime quand) => new()
+    {
+        Category = EventCategory.Whea,
+        Provider = "Microsoft-Windows-WHEA-Logger",
+        EventId = numero,
+        TimeLocal = quand,
+    };
+
+    private static DiagnosticReport RapportWhea() => new()
+    {
+        ScanPeriodDays = 30,
+        System = new SystemSnapshot { MachineName = "POSTE-TEST" },
+    };
+
+    [Fact]
+    public void Une_alerte_ancienne_ne_rend_pas_critiques_des_erreurs_toutes_corrigees()
+    {
+        // Le cas réel : trois erreurs 17 dans le journal, la dernière le 28/09 à
+        // 13:08, et une alerte de la surveillance à la même minute, écrite en 1.8.0.
+        var r = RapportWhea();
+        r.Events.Add(WheaJournal(17, new DateTime(2026, 9, 25, 10, 0, 0)));
+        r.Events.Add(WheaJournal(17, new DateTime(2026, 9, 27, 10, 0, 0)));
+        r.Events.Add(WheaJournal(17, new DateTime(2026, 9, 28, 13, 8, 0)));
+        r.Flight.Alerts.Add(WheaAncienne(new DateTime(2026, 9, 28, 13, 8, 30)));
+
+        EnLangue(AppLanguage.French, () =>
+        {
+            AlertCatalog.LocalizeAll(r.Flight.Alerts);
+            new RulesEngine().Analyze(r);
+            var carte = Assert.Single(r.Findings, f => f.Code == "whea");
+            Assert.Equal(Severity.Warning, carte.Severity);
+            // Plus de texte contradictoire : ni « corrigée ou fatale », ni la liste
+            // CPU / mémoire / carte mère / alimentation.
+            Assert.DoesNotContain("corrigée ou fatale", carte.Details);
+            Assert.DoesNotContain("défaillance CPU", carte.Details);
+            Assert.DoesNotContain("MATÉRIELLE", r.Verdict);
+        });
+        // La boîte noire garde l'alerte telle qu'elle a été écrite.
+        Assert.Equal("crit", r.Flight.Alerts[0].Level);
+        Assert.Null(r.Flight.Alerts[0].Value);
+    }
+
+    [Fact]
+    public void Une_erreur_fatale_dans_le_journal_laisse_l_alerte_ancienne_critique()
+    {
+        var r = RapportWhea();
+        r.Events.Add(WheaJournal(17, new DateTime(2026, 9, 25, 10, 0, 0)));
+        r.Events.Add(WheaJournal(18, new DateTime(2026, 9, 28, 13, 8, 0)));
+        r.Flight.Alerts.Add(WheaAncienne(new DateTime(2026, 9, 28, 13, 8, 30)));
+
+        EnLangue(AppLanguage.French, () =>
+        {
+            AlertCatalog.LocalizeAll(r.Flight.Alerts);
+            new RulesEngine().Analyze(r);
+            var carte = Assert.Single(r.Findings, f => f.Code == "whea");
+            Assert.Equal(Severity.Critical, carte.Severity);
+        });
+    }
+
+    [Fact]
+    public void Une_alerte_plus_ancienne_que_le_journal_reste_critique()
+    {
+        // Le journal ne couvre plus la date de l'alerte : il ne peut pas répondre pour elle.
+        var alerte = WheaAncienne(new DateTime(2026, 9, 20, 8, 0, 0));
+        var journal = new List<WinEvent> { WheaJournal(17, new DateTime(2026, 9, 25, 10, 0, 0)) };
+
+        var relue = RulesEngine.RelireWheaAncienne(alerte, journal);
+
+        Assert.Same(alerte, relue);
+        Assert.Equal("crit", relue.Level);
+    }
+
+    [Fact]
+    public void Une_alerte_recente_garde_son_niveau_meme_critique()
+    {
+        // Depuis la 1.8.1, l'alerte porte son numéro : c'est lui qui fait foi.
+        var alerte = Whea(2, 18, new DateTime(2026, 10, 15, 8, 0, 0));
+        var journal = new List<WinEvent> { WheaJournal(17, new DateTime(2026, 10, 1, 10, 0, 0)) };
+
+        Assert.Same(alerte, RulesEngine.RelireWheaAncienne(alerte, journal));
+    }
+
     [Fact]
     public void Une_erreur_grave_parmi_des_corrigees_donne_une_carte_critique_coherente()
     {

@@ -765,7 +765,13 @@ public sealed class RulesEngine
             if (ctx.Samples.Any(s => s.CommitPct >= 95)) covered.Add("commit");
         }
 
-        foreach (var g in f.Alerts.GroupBy(a => a.RuleId))
+        // POINT 112. Une alerte WHEA écrite avant la 1.8.1 ne porte ni numéro
+        // d'événement ni niveau fiable : elle est « crit » par défaut. Le journal de
+        // Windows de la même période, lui, porte le vrai numéro. Voir RelireWheaAncienne.
+        var wheaDuJournal = r.Events.Where(e => e.Category == EventCategory.Whea).ToList();
+        var alertes = f.Alerts.Select(a => RelireWheaAncienne(a, wheaDuJournal)).ToList();
+
+        foreach (var g in alertes.GroupBy(a => a.RuleId))
         {
             if (covered.Contains(g.Key)) continue;
 
@@ -798,6 +804,57 @@ public sealed class RulesEngine
                 Recommendation = latest.Recommendation,
             });
         }
+    }
+
+    /// <summary>
+    /// POINT 112. Constaté le 21/10/2026 sur neuf diagnostics du parc : cinq verdicts
+    /// « MATÉRIELLE (CPU/carte mère/alimentation ou surchauffe) », chacun porté par une
+    /// carte critique « N erreur(s) matérielle(s) CORRIGÉE(S) — lien PCI Express ».
+    /// La règle du journal classait pourtant ces erreurs « à surveiller » (points 48 et
+    /// 49) : c'est la fusion avec les alertes de la surveillance qui les remontait en
+    /// critique. Sur chacun des cinq postes, la dernière alerte datait d'avant le
+    /// déploiement de la 1.8.1 (28/09 au 12/10) — des alertes sans numéro, donc
+    /// « crit » par défaut, et dont le texte d'origine (« corrigée ou fatale… CPU,
+    /// mémoire, carte mère ou alimentation ») contredisait la recommandation de la
+    /// même carte (« ce sont des erreurs de LIEN, pas de processeur »).
+    ///
+    /// La surveillance déclenche ces alertes sur les événements WHEA du journal
+    /// Système. Quand ce journal, sur la même période, ne contient QUE des erreurs
+    /// corrigées (identifiant 17), une alerte ancienne de cette période ne peut venir
+    /// que de l'une d'elles : elle est relue comme une erreur corrigée, événement 17.
+    /// Deux conditions, sans lesquelles rien n'est changé :
+    ///   - le journal ne contient aucune autre erreur que des 17 — une seule 18
+    ///     (fatale), ou un identifiant inconnu, et l'alerte reste critique ;
+    ///   - l'alerte est postérieure au plus ancien événement WHEA lu — avant, le
+    ///     journal ne couvre plus sa date (il peut avoir été tronqué ou vidé) et ne
+    ///     peut pas répondre pour elle.
+    /// On ne baisse pas une alarme sans savoir ; ici, on sait.
+    ///
+    /// Une COPIE est rendue : les alertes de la boîte noire restent telles qu'elles
+    /// ont été écrites, partout ailleurs dans le rapport.
+    /// </summary>
+    internal static PreventiveAlert RelireWheaAncienne(PreventiveAlert a, IReadOnlyList<WinEvent> wheaDuJournal)
+    {
+        if (a.RuleId != "whea" || a.Value is not null || a.Level != "crit") return a;
+        if (wheaDuJournal.Count == 0 || !wheaDuJournal.All(e => WheaCorrige.Contains(e.EventId))) return a;
+        if (a.Time < wheaDuJournal.Min(e => e.TimeLocal)) return a;
+
+        var relue = new PreventiveAlert
+        {
+            Time = a.Time,
+            RuleId = a.RuleId,
+            Level = "warn",
+            Value = WheaCorrige[0],
+            Extract = a.Extract,
+        };
+        // Texte d'une erreur corrigée, dans la langue du rapport.
+        if (!AlertCatalog.Localize(relue))
+        {
+            relue.Title = a.Title;
+            relue.Details = a.Details;
+            relue.Recommendation = a.Recommendation;
+        }
+        return relue;
     }
 
     /// <summary>

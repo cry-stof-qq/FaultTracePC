@@ -130,6 +130,9 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 109 | **Un service arrêté pendant l'arrêt de Windows compté comme un échec (cas de GLPI Agent)** | relevé le 19/10/2026 — **confirmé le même jour par mesure, corrigé le même jour** ; voir « Trois diagnostics du 19/10/2026 » |
 | 110 | **Un pilote revenu à une version plus ancienne rangé sous « Pilotes mis à jour »** | relevé le 19/10/2026 sur le diagnostic 1.9.0 du poste de l'auteur — **corrigé le 20/10/2026** ; voir « Point 110 » plus bas |
 | 111 | **Des couches de filtrage listées comme des cartes réseau** | relevé le 19/10/2026 dans un rapport de la VM d'essai, mesuré le 20/10/2026 sur le poste de l'auteur — **corrigé le 20/10/2026** ; voir « Point 111 » plus bas |
+| 112 | **Des erreurs WHEA toutes corrigées remontées en critique par d'anciennes alertes — verdict « MATÉRIELLE » sur cinq postes** | constaté le 21/10/2026 sur neuf diagnostics du parc — **corrigé le 21/10/2026** ; voir « Diagnostics du parc du 21/10/2026 » plus bas |
+| 113 | **Un plantage d'application .NET compté deux fois, la seconde sous « (inconnue) » et comme « anciennement instable »** | constaté le 21/10/2026 — à corriger (défaut constaté) ; même section |
+| 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — à corriger (défaut constaté) ; même section |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -2230,6 +2233,41 @@ d'être remis — rappel qu'un lot non compilé doit le dire, et rester petit.
 (`EndpointBasecamp`) tourne sur les quatre postes analysés ce jour ; le service
 de l'antivirus de remplacement, qui pèse une centaine de Mo ailleurs, n'apparaît
 dans la liste des processus que sur un seul d'entre eux.
+
+## Diagnostics du parc du 21/10/2026 — points 112 à 114
+
+Neuf diagnostics faits le 21/10/2026 avec la 1.9.0 : sept postes du parc, le poste de l'auteur et un portable. Relus carte par carte. Trois défauts en sont sortis ; les noms des postes ne sont pas écrits ici (dépôt public).
+
+### Point 112 — d'anciennes alertes rendaient critiques des erreurs toutes corrigées
+
+**Constat.** Cinq verdicts sur neuf disaient « MATÉRIELLE (CPU/carte mère/alimentation ou surchauffe) ». Chaque fois, la seule carte matérielle critique était « N erreur(s) matérielle(s) CORRIGÉE(S) — lien PCI Express » (3, 6, 15, 34 et 121 erreurs, toutes d'identifiant 17), avec deux phrases qui se contredisaient dans la même carte : « Le matériel vient de signaler une erreur corrigée ou fatale. Répétées, ces erreurs annoncent une défaillance CPU, mémoire, carte mère ou alimentation », puis « Ce sont des erreurs de LIEN, pas de processeur ».
+
+**Cause, lue dans le code.** La règle du journal (`AnalyzeWhea`) classait bien ces erreurs « à surveiller » — c'est le travail des points 48 et 49. Mais `FusionnerLesDoublons` réunit cette carte avec celle des alertes de la surveillance et garde la gravité **la plus forte des deux**. Or, sur les cinq postes, la dernière alerte WHEA de la surveillance datait d'avant le déploiement de la 1.8.1 (du 28/09 au 12/10) : des alertes sans numéro d'événement, donc « crit » par défaut — le point 98 n'a changé que les alertes écrites **après** lui. Elles restent dans la fenêtre de 30 jours jusqu'à mi-novembre : le défaut se serait éteint seul, mais en attendant le verdict, première ligne lue, était faux sur la moitié du parc.
+
+**Correction.** `RulesEngine.RelireWheaAncienne` : quand le journal Système de la période ne contient **que** des erreurs corrigées (17), une alerte WHEA ancienne de cette période ne peut venir que de l'une d'elles — la surveillance se déclenche sur ces mêmes événements. Elle est relue comme une erreur corrigée, événement 17, avec le texte d'une erreur corrigée. Rien ne change si le journal contient une seule erreur fatale (18) ou un identifiant inconnu, ni si l'alerte est plus ancienne que le plus ancien événement WHEA lu (le journal ne peut plus répondre pour elle). C'est une copie : la boîte noire garde ses alertes telles qu'elles ont été écrites. Quatre tests de plus dans `AlerteWheaTests` (le cas réel, une fatale dans le journal, une alerte plus ancienne que le journal, une alerte récente qui garde son niveau).
+
+**Ce que ces cinq postes ont réellement en commun** (une observation, pas une conclusion) : quatre d'entre eux ont la même carte mère (ASUS PRIME B760M-A WIFI) et la même carte graphique (RTX 5060 Ti), et leurs erreurs viennent du même port racine `0x0:0x1:0x0`. La carte du parc du point 99 doit les rapprocher. Le poste qui en compte le plus (121) est aussi le seul à porter un pilote graphique plus récent ; cela ne prouve rien à lui seul.
+
+### Point 113 — un plantage .NET compté deux fois
+
+**Constat.** Sur un poste : « Application instable : MicrosoftSearchInBing.exe (33 crashs) », puis « Application anciennement instable : (inconnue) (33 crashs) », dernier plantage le jour même. Le tableau des événements montre, pour chaque plantage, deux événements à la même minute : `Application Error 1000` (qui nomme l'application) et `.NET Runtime 1026`.
+
+**Cause, lue dans le code.** `EventLogCollector` collecte les 1026 dans la catégorie « plantage d'application » mais n'en extrait pas le nom de l'application ; `AnalyzeAppCrashes` les range donc sous « (inconnue) ». Et comme aucun programme installé ne s'appelle « (inconnue) », la carte se dit « anciennement instable » pour un plantage du matin. À corriger : lire le nom dans le 1026, et ne pas recompter un 1026 qui accompagne un 1000 de la même application.
+
+### Point 114 — une même coupure dans deux cartes
+
+**Constat.** Sur deux postes : « 3 coupure(s) brutale(s) sans écran bleu » (Kernel-Power 41, critique) et « 3 arrêt(s) inattendu(s) sans écran bleu associé » (événement 6008, avertissement), avec les mêmes dates (« Dernière occurrence : 12/10/2026 11:20 » dans les deux).
+
+**Cause, lue dans le code.** Le commentaire d'`ArretsInexpliques` annonce des arrêts « restés SANS explication : ni écran bleu, ni coupure franche déjà signalée », mais le code n'écarte que les arrêts proches d'un écran bleu. À corriger : écarter aussi les 6008 qu'un Kernel-Power 41 explique déjà, **sans perdre** ce que la carte 6008 apportait — notamment la piste « quelqu'un a maintenu le bouton », la plus fréquente en salle de classe.
+
+### Relevé, sans être un défaut
+
+- **Deux cartes batterie sur un portable** : « usée — 79 % » (25 110 sur 31 920 mWh, 105 cycles) et « en bon état — 100 % » (72 150 sur 72 150 mWh, 60 cycles). Deux batteries réelles, ou une valeur fausse rendue par le microprogramme ? Question posée à l'auteur.
+- **Le service de surveillance de FaultTracePC s'est arrêté une fois de manière inattendue** sur un poste (30/09/2026, 23:48). Une seule fois ; à regarder si cela se répète.
+- **Plantages de Veyon** (`veyon-server.exe`, `veyon-worker.exe`) sur trois postes : un logiciel tiers, rien à corriger ici.
+- **Restes de Trend Micro** sur un poste : `TmPreFilter` n'a pas pu démarrer 31 fois. Cohérent avec le retrait d'Apex One en cours.
+
+---
 
 ## Point 111 — des couches de filtrage listées comme des cartes réseau
 
