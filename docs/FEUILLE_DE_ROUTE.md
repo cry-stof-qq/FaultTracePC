@@ -135,6 +135,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 113 | **Un plantage d'application .NET compté deux fois, la seconde sous « (inconnue) » et comme « anciennement instable »** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 115 | **Une saturation de la mémoire virtuelle donne le verdict « LOGICIELLE (corruption système) » et fait proposer sfc et DISM** | constaté le 21/10/2026 — catégorie « Ressources » **validée par l'auteur le même jour, corrigé le 21/10/2026** ; voir « Point 115 » dans « Diagnostics du parc du 21/10/2026 » |
+| 116 | **Exporter les journaux de Windows (.evtx) pour les confier à la personne de son choix** | demandé le 23/10/2026 — principe arrêté par l'auteur le même jour (option, rien sans clic, avertissements) ; réalisation **non commencée**, choix de détail à valider — voir « Point 116 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -2464,6 +2465,36 @@ que le filtre `ROOT\` est nécessaire.
 répondu, le 24/09/2026, à la question « ai-je bien fini de désinstaller l'ancien
 antivirus ? » si une inscription de pilote était restée derrière lui. Il
 rejoint le point 85.
+
+---
+
+## Point 116 — exporter les journaux de Windows (.evtx)
+
+### D'où vient l'idée
+
+Le 23/10/2026, l'auteur a demandé la différence entre FaultTracePC et **Pulse** (Regncreative, licence MIT, sorti en octobre 2026) : un lecteur moderne du journal d'événements de Windows, en lecture seule, qui sait ouvrir un fichier `.evtx` exporté depuis un autre PC. Comparaison faite ce jour-là : Pulse répond à « qu'est-ce que Windows raconte ? », FaultTracePC à « pourquoi ce PC plante, et que faire ? » — les deux se complètent.
+
+Question suivante de l'auteur : le rapport HTML ou le `.evtx`, lequel vaut mieux ? Réponse donnée : **le rapport HTML**, sans hésiter, sur un parc — il contient l'analyse et tout ce que le journal n'a pas (écrans bleus, santé des disques, températures, boîte noire, pilotes, réseau). Le `.evtx` n'est que la matière première : complet et non tronqué, mais sans aucune conclusion. Il garde deux usages — une personne qui ne peut ou ne veut rien lancer d'autre, et un événement plus ancien que 90 jours ou un message que le rapport a coupé à 600 caractères.
+
+### Ce que l'auteur a arrêté, le 23/10/2026
+
+- **Une option.** Un bouton ; si personne ne clique, rien ne se passe.
+- **Le clic exporte** les journaux en `.evtx`, pour qu'on les analyse avec **la personne de son choix**.
+- **Des avertissements, avant l'export** :
+  - ce fichier n'est **pas un diagnostic** : il ne contient ni les écrans bleus, ni la santé des disques, ni les températures, ni la boîte noire — le rapport de FaultTracePC reste ce qu'il faut envoyer en premier ;
+  - **bien choisir la personne** : le fichier contient beaucoup d'informations sur la machine et ceux qui s'en servent.
+
+### Proposé par Claude, à valider avant d'écrire une ligne
+
+- **Où** : dans la boîte à outils (🧰 Outils), « 📤 Exporter les journaux Windows (.evtx) ». Pas dans la fenêtre principale : c'est un geste rare.
+- **Quels journaux** : **Système** et **Application**. Pas **Sécurité** : il contient les ouvertures de session de chacun — trop personnel, et inutile au diagnostic.
+- **Quelle période** : la même que l'analyse (30 jours par défaut, 90 au plus), par une requête de temps passée à `wevtutil epl` — moins de données confiées, et la même fenêtre que le rapport.
+- **Lisible sur un autre PC** : chaque fichier est ensuite archivé avec `wevtutil archive-log` (`al`), qui joint les textes des messages. Sans cela, un `.evtx` ouvert ailleurs affiche souvent « la description de l'événement est introuvable » pour les logiciels qui ne sont pas installés sur l'autre PC.
+- **Où il est écrit** : un dossier daté dans `Documents\FaultTracePC`, ouvert dans l'Explorateur à la fin. **Rien n'est envoyé** : c'est l'utilisateur qui transmet, à qui il veut.
+- **Ce que l'avertissement nomme concrètement** (et non « des informations personnelles » en général) : le nom de la machine, des noms de comptes et des chemins du type `C:\Users\prénom.nom`, les logiciels installés et désinstallés, les périphériques USB branchés, des noms de réseaux, des dates et heures d'utilisation.
+- **Confirmation** : une fenêtre qui dit tout cela, avec « Exporter » et « Annuler », Annuler par défaut.
+
+Non décidé : la version qui l'accueillera.
 
 ---
 
