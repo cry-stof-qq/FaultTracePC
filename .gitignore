@@ -121,3 +121,13 @@ _to_delete/
 # adresses IP réelles. Rien de tout cela n'a sa place dans un dépôt public, et
 # un « git add . » les prenait jusqu'ici sans rien signaler.
 Claude outputs/
+
+# Point 116 : journaux de Windows exportés par la boîte à outils (« 📤 Exporter les
+# journaux Windows »). Ils sont écrits dans Documents\FaultTracePC — qui, sur le
+# poste de l'auteur, EST ce dépôt. Constaté le 23/10/2026 au premier essai :
+# « Journaux_<poste>_<date>/ » est apparu dans « git status ». Ces fichiers
+# contiennent noms de comptes, chemins d'utilisateurs, logiciels, périphériques
+# USB, réseaux, heures d'utilisation — et, pour le journal Sécurité, les
+# ouvertures de session de chacun. Ils ne doivent JAMAIS partir dans un dépôt public.
+Journaux_*/
+*.evtx

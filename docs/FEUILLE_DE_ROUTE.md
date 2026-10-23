@@ -2539,6 +2539,8 @@ Question suivante de l'auteur : le rapport HTML ou le `.evtx`, lequel vaut mieux
 
 **Défaut constaté sur ces captures, corrigé le même jour** : grisé par le garde-fou, le bouton « Exporter » devenait presque illisible — texte blanc sur le fond clair d'un bouton désactivé. Cause : couleur de fond et texte blanc posés en valeurs **locales** sur le bouton ; une valeur locale l'emporte sur l'apparence « désactivé ». Correction : un style partagé `BoutonPrincipal` dans `App.xaml` — texte blanc posé par le style, gabarit qui passe à un fond gris-bleu (#D5DCE5) et un texte foncé (#4A5868) quand le bouton est désactivé ; le fond reste réglable bouton par bouton (le survol l'assombrit par l'opacité au lieu de le remplacer). Appliqué au bouton « Exporter » et au bouton rouge de `ConfirmationChiffreeWindow` (« taper le nombre pour confirmer »), qui commence lui aussi désactivé : même construction, donc même défaut, même s'il n'a pas été photographié. **D'autres boutons blancs sur fond de couleur existent** (console de parc, boîte noire, réparation guidée…), désactivés seulement quelques instants pendant une opération : non constaté, non touché.
 
+**Relevé par l'auteur le même jour, dans `git status`** : `Journaux_<poste>_2026-10-23_1105/` apparaissait comme fichier non suivi. Le dossier d'export est `Documents\FaultTracePC` — qui, sur le poste de l'auteur, **est** le dépôt (c'est déjà pour cela que `.gitignore` écarte les rapports et `parc.json`). Un `git add .` aurait publié des journaux pleins de noms de comptes et d'heures d'utilisation. Corrigé : `.gitignore` écarte `Journaux_*/` et `*.evtx`, avec la raison.
+
 À suivre : ouvrir un `.evtx` exporté sur un autre PC (la VM), puis notes de version de la 1.9.2.
 
 ---
