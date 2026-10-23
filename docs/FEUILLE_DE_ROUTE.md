@@ -135,7 +135,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 113 | **Un plantage d'application .NET compté deux fois, la seconde sous « (inconnue) » et comme « anciennement instable »** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 115 | **Une saturation de la mémoire virtuelle donne le verdict « LOGICIELLE (corruption système) » et fait proposer sfc et DISM** | constaté le 21/10/2026 — catégorie « Ressources » **validée par l'auteur le même jour, corrigé le 21/10/2026** ; voir « Point 115 » dans « Diagnostics du parc du 21/10/2026 » |
-| 116 | **Exporter les journaux de Windows (.evtx) pour les confier à la personne de son choix** | demandé le 23/10/2026 — principe arrêté par l'auteur le même jour (option, rien sans clic, avertissements) ; réalisation **non commencée**, choix de détail à valider — voir « Point 116 » plus bas |
+| 116 | **Exporter les journaux de Windows (.evtx) pour les confier à la personne de son choix** | demandé le 23/10/2026 — principe et détails arrêtés par l'auteur le même jour ; placé en **1.9.2** avec le point 115 ; lot 1 (cœur, sans interface) livré le 23/10/2026 — voir « Point 116 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -2494,7 +2494,27 @@ Question suivante de l'auteur : le rapport HTML ou le `.evtx`, lequel vaut mieux
 - **Ce que l'avertissement nomme concrètement** (et non « des informations personnelles » en général) : le nom de la machine, des noms de comptes et des chemins du type `C:\Users\prénom.nom`, les logiciels installés et désinstallés, les périphériques USB branchés, des noms de réseaux, des dates et heures d'utilisation.
 - **Confirmation** : une fenêtre qui dit tout cela, avec « Exporter » et « Annuler », Annuler par défaut.
 
-Non décidé : la version qui l'accueillera.
+### Validé par l'auteur, le 23/10/2026
+
+| Proposition | Décision |
+|---|---|
+| Emplacement : boîte à outils, « 📤 Exporter les journaux Windows (.evtx) » | **validé** |
+| Journaux : Système et Application, jamais Sécurité | **modifié** : deux choix proposés à l'utilisateur — ① Système et Application ; ② journal Sécurité, **avec un garde-fou** : l'utilisateur valide en connaissance de cause |
+| Période : 30 ou 90 jours | **complété** : 30 jours, 90 jours, **ou le journal complet**, avec un avertissement — fichier gros, donc compliqué à envoyer, et peut-être inutile parce que les données sont trop anciennes |
+| Lisible sur un autre PC (`wevtutil archive-log`) | **validé** |
+| Rien n'est envoyé, dossier daté ouvert dans l'Explorateur | **validé** |
+| L'avertissement nomme concrètement le contenu | **validé** |
+| Confirmation « Exporter » / « Annuler », Annuler par défaut | **validé** |
+| Version | **1.9.2**, avec le point 115 (la 1.10.0 reste entièrement à winget) |
+
+**Proposé pour le garde-fou du journal Sécurité** (à confirmer au lot 2) : une case à cocher, non cochée, dont le texte dit ce que l'utilisateur accepte — « Je sais que ce fichier contient les ouvertures de session de toutes les personnes qui utilisent ce PC, et je le confie à quelqu'un de confiance » ; tant qu'elle n'est pas cochée, « Exporter » reste grisé. Sur un poste partagé, ce journal contient les connexions d'autres personnes que celle qui exporte. Pour le journal complet : la taille actuelle de chaque journal est lue sur le disque et affichée **avant** l'export (`ExportJournaux.TailleDuJournal`), plutôt que « le fichier peut être gros ».
+
+### Lot 1 — le cœur, sans interface, livré le 23/10/2026
+
+- `src/FaultTracePC.Core/ExportJournaux.cs` : le choix des journaux (`JournauxAExporter` : `SystemeEtApplication`, `Securite`) ; la requête de période passée à `wevtutil export-log /q` (30 jours = 2 592 000 000 ms ; aucune requête pour le journal complet) ; l'archivage `wevtutil archive-log` pour la langue de la session et l'anglais ; le dossier `Documents\FaultTracePC\Journaux_<machine>_<date>` ; la taille actuelle d'un journal ; l'export lui-même, qui ne lève pas et rend chaque échec pour que la fenêtre le dise. Un échec de l'archivage garde le fichier exporté et dit qu'il sera moins lisible ailleurs.
+- `tests/FaultTracePC.Tests/ExportJournauxTests.cs` : les fonctions pures seulement — aucun test ne lance wevtutil.
+
+À suivre : lot 2, la fenêtre (choix, avertissements, garde-fou, confirmation) et le bouton de la boîte à outils.
 
 ---
 
