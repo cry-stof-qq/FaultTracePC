@@ -2529,7 +2529,17 @@ Question suivante de l'auteur : le rapport HTML ou le `.evtx`, lequel vaut mieux
 - Pendant l'export, la fenêtre est figée et le dit (« un journal complet peut demander plusieurs minutes ») ; l'export tourne hors de l'interface. À la fin, le dossier s'ouvre dans l'Explorateur. Un export partiel l'annonce avec ses réserves ; un échec complet laisse la fenêtre ouverte pour réessayer.
 - Deuxième verrou dans le code : même si le bouton était actif par erreur, le journal Sécurité ne s'exporte pas sans la case cochée.
 
-À suivre : essai sur le poste de l'auteur (les trois périodes, les deux choix, le fichier ouvert dans l'Observateur d'événements d'un autre PC), puis notes de version de la 1.9.2.
+**Essai du 23/10/2026 sur le poste de l'auteur** (version portable construite après le lot 2, CI verte) — six captures d'écran :
+
+- le bouton apparaît dans « Consoles Windows utiles », à côté de l'Observateur d'événements ;
+- par défaut : « Système et Application » et « 30 derniers jours », « Exporter » actif ;
+- « Sécurité » choisi : la case apparaît, la phrase sur les sessions des autres personnes s'ajoute à l'avertissement, « Exporter » est grisé ; case cochée : « Exporter » redevient actif ;
+- « journal complet » : l'encadré affiche la taille réelle — « Sécurité : 20 Mo » ;
+- export « Système et Application, 30 jours » : dossier `Journaux_<poste>_2026-10-23_1105` ouvert dans l'Explorateur, avec `System.evtx` (7,06 Mo), `Application.evtx` et le sous-dossier `LocaleMetaData` ; `System.evtx` ouvert dans l'Observateur d'événements (« Journaux enregistrés ») : 11 246 événements, messages lisibles. L'ouverture sur **un autre PC** reste à faire.
+
+**Défaut constaté sur ces captures, corrigé le même jour** : grisé par le garde-fou, le bouton « Exporter » devenait presque illisible — texte blanc sur le fond clair d'un bouton désactivé. Cause : couleur de fond et texte blanc posés en valeurs **locales** sur le bouton ; une valeur locale l'emporte sur l'apparence « désactivé ». Correction : un style partagé `BoutonPrincipal` dans `App.xaml` — texte blanc posé par le style, gabarit qui passe à un fond gris-bleu (#D5DCE5) et un texte foncé (#4A5868) quand le bouton est désactivé ; le fond reste réglable bouton par bouton (le survol l'assombrit par l'opacité au lieu de le remplacer). Appliqué au bouton « Exporter » et au bouton rouge de `ConfirmationChiffreeWindow` (« taper le nombre pour confirmer »), qui commence lui aussi désactivé : même construction, donc même défaut, même s'il n'a pas été photographié. **D'autres boutons blancs sur fond de couleur existent** (console de parc, boîte noire, réparation guidée…), désactivés seulement quelques instants pendant une opération : non constaté, non touché.
+
+À suivre : ouvrir un `.evtx` exporté sur un autre PC (la VM), puis notes de version de la 1.9.2.
 
 ---
 

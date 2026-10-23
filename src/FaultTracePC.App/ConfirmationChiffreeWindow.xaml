@@ -37,7 +37,7 @@
                     IsCancel="True" IsDefault="True" Padding="16,7" Margin="0,0,10,0" FontSize="12.5"/>
             <Button x:Name="BtnValider" Content="{x:Static loc:L.ConfirmGo}"
                     IsEnabled="False" Padding="16,7" FontSize="12.5" FontWeight="SemiBold"
-                    Background="#B33A3A" Foreground="White" BorderThickness="0"
+                    Style="{StaticResource BoutonPrincipal}" Background="#B33A3A"
                     Click="BtnValider_Click"/>
         </StackPanel>
     </StackPanel>

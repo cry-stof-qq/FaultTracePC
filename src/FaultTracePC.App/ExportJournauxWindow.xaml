@@ -54,8 +54,9 @@
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <!-- Annuler est le bouton PAR DÉFAUT : la touche Entrée n'exporte rien. -->
             <Button x:Name="BtnAnnuler" IsCancel="True" IsDefault="True" Padding="16,7" Margin="0,0,10,0" FontSize="12.5"/>
+            <!-- Style partagé (App.xaml) : reste lisible une fois grisé par le garde-fou. -->
             <Button x:Name="BtnExporter" Padding="16,7" FontSize="12.5" FontWeight="SemiBold"
-                    Background="#2470B3" Foreground="White" BorderThickness="0"
+                    Style="{StaticResource BoutonPrincipal}"
                     Click="BtnExporter_Click"/>
         </StackPanel>
     </StackPanel>

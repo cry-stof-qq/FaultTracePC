@@ -4,6 +4,47 @@
              xmlns:local="clr-namespace:FaultTracePC.App"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <!-- Bouton d'action coloré (texte blanc sur fond de couleur).
+             Constaté le 23/10/2026 sur la fenêtre d'export des journaux (point 116) :
+             un bouton à fond coloré et texte blanc posés EN LOCAL devenait illisible une
+             fois désactivé — texte blanc sur le fond clair du bouton désactivé. Une valeur
+             locale l'emporte sur les déclencheurs ; le texte blanc est donc posé ici, par
+             le style, et le gabarit ci-dessous le remplace quand le bouton est désactivé.
+             La couleur de fond peut rester locale (bleu, rouge…) : le survol l'assombrit
+             par l'opacité, sans la remplacer. -->
+        <Style x:Key="BoutonPrincipal" TargetType="Button">
+            <Setter Property="Background" Value="#2470B3"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fond" Background="{TemplateBinding Background}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fond" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Fond" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Fond" Property="BorderBrush" Value="#182848"/>
+                                <Setter TargetName="Fond" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Fond" Property="Background" Value="#D5DCE5"/>
+                                <Setter TargetName="Fond" Property="Opacity" Value="1"/>
+                                <Setter Property="Foreground" Value="#4A5868"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Application.Resources>
 </Application>
