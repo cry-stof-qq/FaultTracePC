@@ -135,7 +135,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 113 | **Un plantage d'application .NET compté deux fois, la seconde sous « (inconnue) » et comme « anciennement instable »** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 115 | **Une saturation de la mémoire virtuelle donne le verdict « LOGICIELLE (corruption système) » et fait proposer sfc et DISM** | constaté le 21/10/2026 — catégorie « Ressources » **validée par l'auteur le même jour, corrigé le 21/10/2026** ; voir « Point 115 » dans « Diagnostics du parc du 21/10/2026 » |
-| 116 | **Exporter les journaux de Windows (.evtx) pour les confier à la personne de son choix** | demandé le 23/10/2026 — principe et détails arrêtés par l'auteur le même jour ; placé en **1.9.2** avec le point 115 ; lot 1 (cœur, sans interface) livré le 23/10/2026 — voir « Point 116 » plus bas |
+| 116 | **Exporter les journaux de Windows (.evtx) pour les confier à la personne de son choix** | demandé le 23/10/2026 — principe et détails arrêtés par l'auteur le même jour ; placé en **1.9.2** avec le point 115 ; lot 1 (cœur, sans interface) et lot 2 (fenêtre et bouton) livrés le 23/10/2026, CI du lot 1 verte — voir « Point 116 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -2514,7 +2514,22 @@ Question suivante de l'auteur : le rapport HTML ou le `.evtx`, lequel vaut mieux
 - `src/FaultTracePC.Core/ExportJournaux.cs` : le choix des journaux (`JournauxAExporter` : `SystemeEtApplication`, `Securite`) ; la requête de période passée à `wevtutil export-log /q` (30 jours = 2 592 000 000 ms ; aucune requête pour le journal complet) ; l'archivage `wevtutil archive-log` pour la langue de la session et l'anglais ; le dossier `Documents\FaultTracePC\Journaux_<machine>_<date>` ; la taille actuelle d'un journal ; l'export lui-même, qui ne lève pas et rend chaque échec pour que la fenêtre le dise. Un échec de l'archivage garde le fichier exporté et dit qu'il sera moins lisible ailleurs.
 - `tests/FaultTracePC.Tests/ExportJournauxTests.cs` : les fonctions pures seulement — aucun test ne lance wevtutil.
 
-À suivre : lot 2, la fenêtre (choix, avertissements, garde-fou, confirmation) et le bouton de la boîte à outils.
+**Validé par l'auteur le 23/10/2026** : le garde-fou du journal Sécurité (case à cocher, « Exporter » grisé tant qu'elle ne l'est pas) et l'affichage de la taille réelle avant un export complet. L'auteur a aussi laissé Claude améliorer le texte des avertissements s'il le jugeait utile.
+
+### Lot 2 — la fenêtre et le bouton, livrés le 23/10/2026
+
+- `src/FaultTracePC.App/ExportJournauxWindow.xaml` et `.xaml.cs` (nouveaux) ; tous les textes sont posés par le code, dans les deux langues — aucun texte en dur dans le XAML.
+- Bouton « 📤 Exporter les journaux Windows (.evtx) » dans le groupe « Consoles Windows utiles » de la boîte à outils, à côté de l'Observateur d'événements, avec une bulle d'aide (`L.ToolExportLogs`, `L.ToolExportLogsTip`). Après un export, la barre d'état de la boîte à outils dit où les fichiers ont été écrits.
+- Ordre de la fenêtre : ce qu'elle fait (rien n'est envoyé) ; **« Ce n'est pas un diagnostic »**, avant tout choix ; le choix des journaux (Système et Application par défaut) ; la période (30 jours par défaut) ; pour le journal complet, la taille réelle de chaque journal lue sur le disque ; **à qui confier ces fichiers** ; la case du journal Sécurité ; « Annuler » (par défaut) et « Exporter ».
+- **Ce qui a été ajouté aux avertissements validés**, comme l'auteur l'avait permis :
+  - **ne pas les déposer sur un forum ou un site public** — c'est là qu'on demande souvent « postez vos journaux », et n'importe qui pourrait les lire ; **un fichier envoyé ne se reprend pas** ;
+  - pour le journal Sécurité : chaque ouverture et fermeture de session, avec le nom du compte et l'heure — **et, sur un PC partagé, celles des autres personnes**, pas seulement celles de qui exporte ;
+  - pour le journal complet : beaucoup de messageries refusent les pièces jointes au-delà de 20 à 25 Mo ; et « si tu n'as pas de raison précise, préfère 30 ou 90 jours » ;
+  - l'option Sécurité dit elle-même qu'elle est « rarement utile à un diagnostic ».
+- Pendant l'export, la fenêtre est figée et le dit (« un journal complet peut demander plusieurs minutes ») ; l'export tourne hors de l'interface. À la fin, le dossier s'ouvre dans l'Explorateur. Un export partiel l'annonce avec ses réserves ; un échec complet laisse la fenêtre ouverte pour réessayer.
+- Deuxième verrou dans le code : même si le bouton était actif par erreur, le journal Sécurité ne s'exporte pas sans la case cochée.
+
+À suivre : essai sur le poste de l'auteur (les trois périodes, les deux choix, le fichier ouvert dans l'Observateur d'événements d'un autre PC), puis notes de version de la 1.9.2.
 
 ---
 

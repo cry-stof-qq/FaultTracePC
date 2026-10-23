@@ -1,0 +1,62 @@
+<Window x:Class="FaultTracePC.App.ExportJournauxWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Icon="Assets/FaultTracePC.ico"
+        Width="660" SizeToContent="Height" ResizeMode="NoResize"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        Background="#F4F6F9"
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol">
+    <!-- Point 116. Tous les textes sont posés par le code, dans les deux langues :
+         aucun texte en dur ici (le garde-fou de traduction lit aussi le XAML). -->
+    <StackPanel Margin="20">
+
+        <TextBlock x:Name="TxtTitre" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock x:Name="TxtIntro" Margin="0,8,0,0" FontSize="12.5" Foreground="#44546A" TextWrapping="Wrap"/>
+
+        <!-- Ce n'est pas un diagnostic : à lire AVANT de choisir. -->
+        <Border Background="#EAF2FB" BorderBrush="#9DBCE0" BorderThickness="1"
+                Padding="12,10" Margin="0,12,0,0" CornerRadius="3">
+            <TextBlock x:Name="TxtPasUnDiagnostic" FontSize="12.5" TextWrapping="Wrap" Foreground="#1F3B5C"/>
+        </Border>
+
+        <StackPanel x:Name="PanOptions">
+            <TextBlock x:Name="TxtQuoi" Margin="0,14,0,4" FontSize="13" FontWeight="SemiBold"/>
+            <RadioButton x:Name="RadSystemeApplication" GroupName="Journaux" IsChecked="True" Margin="0,2"
+                         Checked="Option_Changed"/>
+            <RadioButton x:Name="RadSecurite" GroupName="Journaux" Margin="0,2" Checked="Option_Changed"/>
+
+            <TextBlock x:Name="TxtPeriode" Margin="0,12,0,4" FontSize="13" FontWeight="SemiBold"/>
+            <RadioButton x:Name="RadJours30" GroupName="Periode" IsChecked="True" Margin="0,2" Checked="Option_Changed"/>
+            <RadioButton x:Name="RadJours90" GroupName="Periode" Margin="0,2" Checked="Option_Changed"/>
+            <RadioButton x:Name="RadComplet" GroupName="Periode" Margin="0,2" Checked="Option_Changed"/>
+
+            <!-- Journal complet : la taille RÉELLE, lue sur le disque, avant d'exporter. -->
+            <Border x:Name="PanComplet" Visibility="Collapsed" Background="#FFF7E0" BorderBrush="#E0C97F"
+                    BorderThickness="1" Padding="12,10" Margin="0,8,0,0" CornerRadius="3">
+                <TextBlock x:Name="TxtComplet" FontSize="12.5" TextWrapping="Wrap" Foreground="#5A4A1A"/>
+            </Border>
+        </StackPanel>
+
+        <!-- À qui confier ces fichiers : ce qu'ils contiennent, concrètement. -->
+        <Border Background="#FBECEC" BorderBrush="#D9A3A3" BorderThickness="1"
+                Padding="12,10" Margin="0,14,0,0" CornerRadius="3">
+            <TextBlock x:Name="TxtConfidentialite" FontSize="12.5" TextWrapping="Wrap" Foreground="#5C1F1F"/>
+        </Border>
+
+        <!-- Garde-fou du journal Sécurité : rien ne s'exporte sans cette case. -->
+        <CheckBox x:Name="ChkSecurite" Visibility="Collapsed" Margin="0,12,0,0"
+                  Checked="Option_Changed" Unchecked="Option_Changed">
+            <TextBlock x:Name="TxtChkSecurite" TextWrapping="Wrap" FontSize="12.5" FontWeight="SemiBold" MaxWidth="590"/>
+        </CheckBox>
+
+        <TextBlock x:Name="TxtEtat" Margin="0,12,0,0" FontSize="12.5" Foreground="#44546A" TextWrapping="Wrap"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <!-- Annuler est le bouton PAR DÉFAUT : la touche Entrée n'exporte rien. -->
+            <Button x:Name="BtnAnnuler" IsCancel="True" IsDefault="True" Padding="16,7" Margin="0,0,10,0" FontSize="12.5"/>
+            <Button x:Name="BtnExporter" Padding="16,7" FontSize="12.5" FontWeight="SemiBold"
+                    Background="#2470B3" Foreground="White" BorderThickness="0"
+                    Click="BtnExporter_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

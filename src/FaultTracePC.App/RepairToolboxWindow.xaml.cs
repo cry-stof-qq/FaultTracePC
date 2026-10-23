@@ -111,6 +111,18 @@ public partial class RepairToolboxWindow : Window
     /// création (un point par 24 h par défaut) : on lève cette limite le temps
     /// de l'opération, sinon l'appel échoue silencieusement.
     /// </summary>
+    /// <summary>
+    /// Point 116 : exporter les journaux Windows en .evtx. Toute la décision se prend
+    /// dans la fenêtre dédiée (choix, avertissements, garde-fou du journal Sécurité) ;
+    /// ici, on ne fait que l'ouvrir et dire où les fichiers ont été écrits.
+    /// </summary>
+    private void BtnExportJournaux_Click(object sender, RoutedEventArgs e)
+    {
+        var fenetre = new ExportJournauxWindow(this);
+        if (fenetre.ShowDialog() == true && fenetre.DossierEcrit is { } dossier)
+            TxtStatus.Text = Lang.T($"Journaux exportés dans {dossier}", $"Logs exported to {dossier}");
+    }
+
     private void BtnRestorePoint_Click(object sender, RoutedEventArgs e)
     {
         _currentTool = "restorepoint";

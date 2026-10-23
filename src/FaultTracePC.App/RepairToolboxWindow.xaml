@@ -144,6 +144,9 @@
                         <Button Content="{x:Static loc:L.ToolWuSettings}" Padding="10,6" Margin="0,0,8,6" Tag="wusettings" Click="BtnTool_Click"/>
                         <Button Content="{x:Static loc:L.ToolDiskMgmt}" Padding="10,6" Margin="0,0,8,6" Tag="diskmgmt" Click="BtnTool_Click"/>
                         <Button Content="{x:Static loc:L.ToolSysInfo}" Padding="10,6" Margin="0,0,8,6" Tag="msinfo" Click="BtnTool_Click"/>
+                        <!-- Point 116 : rien ne se passe sans ce clic, puis une confirmation. -->
+                        <Button Content="{x:Static loc:L.ToolExportLogs}" Padding="10,6" Margin="0,0,8,6"
+                                Click="BtnExportJournaux_Click" ToolTip="{x:Static loc:L.ToolExportLogsTip}"/>
                     </WrapPanel>
                 </GroupBox>
             </StackPanel>

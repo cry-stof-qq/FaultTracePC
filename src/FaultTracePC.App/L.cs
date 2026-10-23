@@ -245,6 +245,11 @@ public static class L
     public static string ToolWuSettings => Lang.T("🔄 Paramètres Windows Update", "🔄 Windows Update settings");
     public static string ToolDiskMgmt => Lang.T("💾 Gestion des disques", "💾 Disk Management");
     public static string ToolSysInfo => Lang.T("🖥 Informations système", "🖥 System Information");
+    // Point 116 : exporter les journaux bruts, pour la personne de son choix.
+    public static string ToolExportLogs => Lang.T("📤 Exporter les journaux Windows (.evtx)", "📤 Export the Windows logs (.evtx)");
+    public static string ToolExportLogsTip => Lang.T(
+        "Écrit les journaux de Windows dans des fichiers à confier à la personne de ton choix. Rien n'est envoyé ; une fenêtre explique d'abord ce que contiennent ces fichiers.",
+        "Writes the Windows logs to files you can hand to the person of your choice. Nothing is sent; a window first explains what these files contain.");
     public static string ToolFooter => Lang.T(
         "Les actions qui modifient le système demandent confirmation. FaultTracePC étant administrateur, les fenêtres PowerShell le sont aussi.",
         "Actions that change the system ask for confirmation. Since FaultTracePC runs as administrator, the PowerShell windows do too.");
