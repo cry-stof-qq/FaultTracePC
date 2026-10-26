@@ -7,16 +7,94 @@ namespace FaultTracePC.Tests;
 /// Point 15, lot 1a de la 1.10.0 : lire le tableau de « winget upgrade ».
 ///
 /// D'OÙ VIENNENT CES SORTIES
-/// Elles sont CONSTRUITES selon la structure mesurée à l'écran le 26/10/2026 sur le
-/// poste de l'auteur (winget v1.29.380) : en-tête traduit, ligne de tirets continue,
-/// valeurs alignées à gauche, phrase de compte sous le tableau. Seule la ligne
-/// Notepad++ (8.8.5 → 8.9.8.1) reprend des valeurs réellement mesurées ; les autres
-/// logiciels sont des exemples. Les captures BRUTES (sortie redirigée vers un
-/// fichier, comme FaultTracePC la recevra) sont demandées à l'auteur et rejoindront
-/// ces tests à l'étape suivante.
+/// · <see cref="SortieMachine"/> et <see cref="SortieUtilisateur"/> sont des CAPTURES
+///   RÉELLES, recopiées octet pour octet (espaces compris) : sortie redirigée vers un
+///   fichier de « winget upgrade --scope machine » puis « --scope user », poste de
+///   l'auteur, winget v1.29.380, 26/10/2026. Aucun nom de poste ni adresse : seulement
+///   des noms de logiciels publics.
+/// · Les autres sorties sont CONSTRUITES selon la même structure, pour les cas que les
+///   captures ne montrent pas (valeurs coupées, ligne décalée, animation, anglais).
 /// </summary>
 public class LecteurWingetTests
 {
+    // ---- Captures réelles du 26/10/2026 ----------------------------------------
+
+    internal static readonly string SortieMachine = string.Join("\r\n", new[]
+    {
+        "Nom                                             ID                Version     Disponible  Source",
+        "------------------------------------------------------------------------------------------------",
+        "MicrosoftCorporationII.WindowsSubsystemForLinux Microsoft.WSL     2.7.13.0    2.7.14      winget",
+        "MobaXterm                                       Mobatek.MobaXterm 26.4.0.5512 26.6.0.5560 winget",
+        "2 mises à niveau disponibles.",
+        "1 package(s) a(ont) des numéros de version qui ne peuvent pas être déterminés. Utilisez --include-unknown pour afficher tous les résultats.",
+    }) + "\r\n";
+
+    internal static readonly string SortieUtilisateur = string.Join("\r\n", new[]
+    {
+        "Nom                             ID                        Version        Disponible    Source",
+        "---------------------------------------------------------------------------------------------",
+        "Notepad++                       Notepad++.Notepad++       8.8.5          8.9.8.1       winget",
+        "Ollama version 0.30.6           Ollama.Ollama             0.30.6         0.40.11       winget",
+        "Python 3.14.5 (64-bit)          Python.Python.3.14        3.14.5         3.14.7        winget",
+        "Sous-système Windows pour Linux Microsoft.WSL             2.7.13.0       2.7.14        winget",
+        "Terminal Windows                Microsoft.WindowsTerminal 1.24.12741.0   1.25.2733.0   winget",
+        "WinDbg                          Microsoft.WinDbg          1.2606.22001.0 1.2610.1001.0 winget",
+        "WinSCP 6.5.6                    WinSCP.WinSCP             6.5.6          6.7           winget",
+        "7 mises à niveau disponibles.",
+    }) + "\r\n";
+
+    [Fact]
+    public void Capture_reelle_etendue_machine()
+    {
+        var r = LecteurWinget.Lire(SortieMachine);
+
+        Assert.Equal(EtatLectureWinget.Lu, r.Etat);
+        Assert.Equal(2, r.MisesAJour.Count);
+        Assert.Equal(2, r.NombreAnnonce);
+        Assert.Equal(0, r.LignesIllisibles);
+
+        // Le nom remplit sa colonne : un seul espace avant l'ID (point 24, en vrai).
+        var wsl = r.MisesAJour[0];
+        Assert.Equal("MicrosoftCorporationII.WindowsSubsystemForLinux", wsl.Nom);
+        Assert.Equal("Microsoft.WSL", wsl.Identifiant);
+        Assert.Equal("2.7.13.0", wsl.VersionInstallee);
+        Assert.Equal("2.7.14", wsl.VersionDisponible);
+
+        var moba = r.MisesAJour[1];
+        Assert.Equal("Mobatek.MobaXterm", moba.Identifiant);
+        Assert.Equal("26.4.0.5512", moba.VersionInstallee);
+        Assert.Equal("26.6.0.5560", moba.VersionDisponible);
+        Assert.Equal("winget", moba.Source);
+    }
+
+    [Fact]
+    public void Capture_reelle_etendue_utilisateur()
+    {
+        var r = LecteurWinget.Lire(SortieUtilisateur);
+
+        Assert.Equal(EtatLectureWinget.Lu, r.Etat);
+        Assert.Equal(7, r.MisesAJour.Count);
+        Assert.Equal(7, r.NombreAnnonce); // lu 7 sur 7
+        Assert.Equal(0, r.LignesIllisibles);
+        Assert.All(r.MisesAJour, m => Assert.NotNull(m.Identifiant));
+        Assert.All(r.MisesAJour, m => Assert.False(m.NomCoupe || m.VersionCoupee));
+
+        var n = r.MisesAJour[0];
+        Assert.Equal(("Notepad++", "Notepad++.Notepad++", "8.8.5", "8.9.8.1"),
+            (n.Nom, n.Identifiant, n.VersionInstallee, n.VersionDisponible));
+
+        // Nom accentué : l'alignement se compte en caractères.
+        var wsl = r.MisesAJour[3];
+        Assert.Equal("Sous-système Windows pour Linux", wsl.Nom);
+        Assert.Equal("Microsoft.WSL", wsl.Identifiant);
+
+        // Nom avec espaces et parenthèses, version à 4 nombres.
+        Assert.Equal("Python 3.14.5 (64-bit)", r.MisesAJour[2].Nom);
+        Assert.Equal("1.2610.1001.0", r.MisesAJour[5].VersionDisponible);
+    }
+
+    // ---- Sorties construites ---------------------------------------------------
+
     // Positions des colonnes : Nom 0, ID 20, Version 42, Disponible 51, Source 62.
     private static readonly int[] Positions = { 0, 20, 42, 51, 62 };
 
