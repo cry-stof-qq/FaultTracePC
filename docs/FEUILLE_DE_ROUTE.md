@@ -137,6 +137,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 114 | **Une même coupure dans deux cartes : Kernel-Power 41 (critique) et événement 6008 (avertissement)** | constaté le 21/10/2026 — **corrigé le 21/10/2026** ; même section |
 | 115 | **Une saturation de la mémoire virtuelle donne le verdict « LOGICIELLE (corruption système) » et fait proposer sfc et DISM** | constaté le 21/10/2026 — catégorie « Ressources » **validée par l'auteur le même jour, corrigé le 21/10/2026** ; voir « Point 115 » dans « Diagnostics du parc du 21/10/2026 » |
 | 116 | **Exporter les journaux de Windows (.evtx) pour les confier à la personne de son choix** | demandé le 23/10/2026 — principe et détails arrêtés par l'auteur le même jour ; placé en **1.9.2** avec le point 115 ; lot 1 (cœur, sans interface) et lot 2 (fenêtre et bouton) livrés le 23/10/2026, CI du lot 1 verte — voir « Point 116 » plus bas |
+| 117 | **Mises à jour de sécurité des composants : runtime .NET embarqué, paquets NuGet** | relevé le 26/10/2026 à la demande de l'auteur — **proposé, non décidé** ; voir « Point 117 » plus bas |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -2466,6 +2467,36 @@ que le filtre `ROOT\` est nécessaire.
 répondu, le 24/09/2026, à la question « ai-je bien fini de désinstaller l'ancien
 antivirus ? » si une inscription de pilote était restée derrière lui. Il
 rejoint le point 85.
+
+---
+
+## Point 117 — mises à jour de sécurité des composants
+
+Question de l'auteur, le 26/10/2026 : parmi les failles publiées ces derniers temps, qu'est-ce qui, dans ce que FaultTracePC utilise, devrait être mis à jour ?
+
+### Inventaire, lu dans le dépôt ce jour-là
+
+| Composant | Version utilisée | Livré avec le logiciel ? |
+|---|---|---|
+| Runtime .NET 10 | celui du SDK de la CI (`10.0.x`) au moment de la construction | **oui** : publication autonome (`--self-contained`), le runtime est DANS le MSI et le ZIP |
+| `System.Management`, `System.Diagnostics.EventLog`, `System.DirectoryServices`, `Microsoft.Extensions.Hosting.WindowsServices` | 10.0.10 | oui |
+| `LibreHardwareMonitorLib` | 0.9.6 | oui |
+| WiX (outil de construction du MSI) | 6.0.2, extension UI seulement | non (outil de construction) |
+| xUnit, `Microsoft.NET.Test.Sdk` | 3.2.2 / 18.8.1 | non (tests) |
+| Actions GitHub | `checkout@v5`, `setup-dotnet@v5`, `upload-artifact@v6` | non (CI) |
+
+### Ce qui a été trouvé
+
+- **.NET : mises à jour de sécurité du 13/10/2026 (10.0.13), puis hors calendrier le 25/10/2026 (10.0.14).** Celle du 25/10 corrige CVE-2026-111497 (décompression Brotli) et re-publie deux correctifs que le 13/10 n'avait pas complètement réglés, dont CVE-2026-70197 (mémoire corrompue dans `SocketAsyncEventArgs`). Microsoft le dit explicitement : une application autonome doit être **reconstruite et republiée** — installer un runtime plus récent sur la machine ne met pas à jour celui qui est embarqué. **Windows Update ne corrige donc jamais le runtime de FaultTracePC.** La 1.9.2 a été construite le 23/10 : elle embarque au mieux la 10.0.13.
+- **Exposition réelle, lue dans le code** : FaultTracePC n'utilise aucune API Brotli et n'active nulle part la décompression automatique de `HttpClient` — la faille Brotli ne le touche pas, d'après la description de Microsoft. Pour `SocketAsyncEventArgs`, la description publiée ne permet pas de conclure : le service de surveillance écoute avec `HttpListener` (http.sys, hors des sockets gérés), mais la console de parc et la vérification des mises à jour passent par `HttpClient`, qui s'appuie sur les sockets de .NET. **Non confirmé dans un sens ni dans l'autre.**
+- **Paquets NuGet en 10.0.10** : en retard de quatre correctifs sur le runtime. Aucune faille propre à ces paquets n'a été trouvée ; les aligner sur 10.0.14 est de l'hygiène.
+- **LibreHardwareMonitorLib 0.9.6** : dernière version publiée, et elle passe par PawnIO, pas par l'ancien pilote WinRing0 (vulnérable). Rien à faire.
+- **WiX 6.0.2** : les failles connues (CVE-2024-29187, CVE-2024-29188) sont corrigées depuis 3.14.1 / 4.0.5, et la seconde ne concerne que l'extension Util, non utilisée. Rien à faire.
+
+### Proposé par Claude, à décider avec l'auteur
+
+- Une **1.9.3 de maintenance** : paquets passés à 10.0.14, reconstruction sur le runtime 10.0.14, aucune autre modification.
+- Une **règle** : reconstruire après chaque mise à jour de sécurité mensuelle de .NET (deuxième mardi du mois), puisque rien d'autre ne mettra à jour le runtime embarqué.
 
 ---
 
