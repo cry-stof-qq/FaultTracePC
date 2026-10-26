@@ -3303,6 +3303,20 @@ Ce que ce tableau apprend :
 
 - **Sur ce poste, presque tout est « utilisateur »** : 7 mises à jour sur 8. Parmi elles, trois paquets du Store (WSL, Terminal Windows, WinDbg) — enregistrés par utilisateur par nature. Sous SYSTEM, en mode parc, seul MobaXterm aurait été vu.
 - **La liste sans `--scope` n'est pas la réunion des deux** : Notepad++ n'y apparaît pas, alors que `--scope user` le donne en retard. Hypothèse, **non vérifiée** : deux installations de Notepad++ (une pour la machine, une pour l'utilisateur), et la liste par défaut n'en retient qu'une — peut-être celle « de version indéterminée ». Leçon pour la conception, quelle que soit la cause : **lister séparément `machine` et `user`, puis réunir**, plutôt que se fier à la liste par défaut. Mesure proposée pour trancher : `winget list --id Notepad++.Notepad++`.
+  **Mesuré le même jour** : `winget list --id Notepad++.Notepad++` ne donne **qu'une** installation (8.8.5, 8.9.8.1 disponible). L'hypothèse des deux installations est **fausse**. Pourquoi la liste par défaut ne le montre pas reste **inexpliqué** ; la leçon de conception, elle, tient.
+
+### Plan du lot 1 de la 1.10.0 — proposé le 26/10/2026, à valider point par point
+
+Lot 1 = **lecture seule** : dire dans le rapport quels logiciels ont une mise à jour, sans rien installer.
+
+1. **Une option, désactivée par défaut — à décider.** `winget upgrade` interroge la source winget sur Internet. Or le logiciel promet, dans ses articles et son interface, qu'il *« ne contacte jamais Internet de lui-même »* sans case cochée. La recherche des mises à jour de logiciels doit donc être une **case**, non cochée par défaut, qui dit qu'elle contacte Internet — comme la vérification des mises à jour de FaultTracePC lui-même.
+2. **Seulement en diagnostic local dans ce lot.** Le diagnostic à distance tourne sous SYSTEM, où la ligne de commande `winget` n'est pas prise en charge (Microsoft). Le rapport d'un diagnostic à distance dira « non vérifié — sous le compte système, prévu dans un lot suivant », jamais « à jour ».
+3. **Deux interrogations, réunies** : `--scope machine` puis `--scope user`, toujours avec `--disable-interactivity --accept-source-agreements`, délai d'une minute chacune. Jamais `upgrade` sans filtre (Notepad++).
+4. **Lecture du tableau aux positions des mots de l'en-tête** (ligne qui précède les tirets), quelle que soit la langue ; arrêt à la première ligne vide ou au résumé. Une cellule coupée par winget (« … ») est signalée telle quelle ; **un identifiant coupé n'est jamais deviné** — la ligne garde son nom et dit « identifiant illisible ».
+5. **Dire ce qui n'a pas pu être mesuré** : winget absent, source injoignable (filtrage, proxy), délai dépassé, tableau illisible → la raison, jamais « tout est à jour ».
+6. **Dans le rapport** : une section dans les détails techniques — nom, identifiant, version installée, version disponible, étendue (machine / utilisateur) ; une conclusion de niveau « Information » qui donne le nombre ; et, **le vrai apport**, sur la carte d'une application qui plante, la mention « une mise à jour est disponible : 8.8.5 → 8.9.8.1 » quand c'est le cas — le lien entre un logiciel resté ancien et ses plantages, qui est ce que l'auteur attend de winget.
+7. **Tests** : le lecteur de tableau sur les sorties réelles du 26/10/2026 (en-têtes français), une sortie en anglais, des lignes coupées, une sortie vide, un message d'erreur de source.
+
 - **Incident sans conséquence pendant la mesure** : le résultat a été recollé par erreur dans PowerShell ; chaque ligne a été lue comme une commande. Une seule a lancé un programme (`Ollama version …` → « unknown command »), sans effet. À retenir pour les procédures : donner les commandes une par une, et rappeler de ne coller que la commande.
 
 ---
