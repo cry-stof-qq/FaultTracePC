@@ -10,7 +10,7 @@
 
     <AssemblyName>FaultTracePC.Monitor</AssemblyName>
     <RootNamespace>FaultTracePC.Monitor</RootNamespace>
-    <Version>1.9.2</Version>
+    <Version>1.9.3</Version>
     <Product>FaultTracePC Monitor</Product>
     <Description>Service de surveillance temps réel (boîte noire) de FaultTracePC</Description>
     <ApplicationIcon>..\..\assets\FaultTracePC.ico</ApplicationIcon>
@@ -18,14 +18,14 @@
 
   <ItemGroup>
     <!-- Hébergement en service Windows (inclut Microsoft.Extensions.Hosting) -->
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.14" />
     <!-- Capteurs matériels : températures/charges CPU et GPU -->
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <!-- Abonnement temps réel au journal d'événements -->
-    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.10" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.14" />
     <!-- WMI : santé des disques pour les alertes préventives (référence explicite,
          plutôt que de dépendre du flux transitif via FaultTracePC.Core). -->
-    <PackageReference Include="System.Management" Version="10.0.10" />
+    <PackageReference Include="System.Management" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup>
