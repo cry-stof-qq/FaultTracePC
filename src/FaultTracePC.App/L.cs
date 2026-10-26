@@ -67,6 +67,12 @@ public static class L
         "Exécute !analyze -v sur les 5 derniers dumps via CDB pour nommer le pilote fautif. Nécessite WinDbg (winget install Microsoft.WinDbg) ; ignoré proprement s'il est absent.",
         "Runs !analyze -v on the last 5 dumps through CDB to name the faulting driver. Requires WinDbg (winget install Microsoft.WinDbg); skipped cleanly if absent.");
 
+    // Point 15, lot 1d : la case qui autorise winget à contacter Internet.
+    public static string MainSoftwareUpdates => Lang.T("Mises à jour des logiciels (winget)", "Software updates (winget)");
+    public static string MainSoftwareUpdatesTip => Lang.T(
+        "Demande à winget quels logiciels ont une version plus récente, et le dit dans le rapport — notamment sur la carte d'une application qui plante. Contacte Internet (la source winget) : décoché par défaut. N'installe rien. Ajoute jusqu'à deux minutes à l'analyse.",
+        "Asks winget which programs have a newer version, and says so in the report — notably on the card of an application that crashes. Contacts the Internet (the winget source): unticked by default. Installs nothing. Adds up to two minutes to the analysis.");
+
     public static string MainReady => Lang.T(
         "Prêt. Lance l'analyse pour examiner dumps, journaux d'événements, fiabilité et état matériel.",
         "Ready. Start the analysis to examine dumps, event logs, reliability and hardware state.");

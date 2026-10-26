@@ -80,6 +80,17 @@ public sealed class ScanOrchestrator
         }
         catch (Exception ex) { errors.Add(Lang.T($"Boîte noire : {ex.Message}", $"Flight recorder: {ex.Message}")); }
 
+        // POINT 15, lot 1d : seulement si la case est cochée (winget contacte Internet).
+        // Deux minutes au plus ; un échec devient un état dit dans le rapport, jamais
+        // une analyse interrompue.
+        if (options.RechercherMisesAJourLogiciels)
+        {
+            Step(progress, Lang.T("Recherche des mises à jour de logiciels (winget, Internet)…", "Searching for software updates (winget, Internet)…"), 88);
+            try { report.Winget = WingetCollector.Collecter(); }
+            catch (Exception ex) { errors.Add(Lang.T($"Mises à jour des logiciels (winget) : {ex.Message}", $"Software updates (winget): {ex.Message}")); }
+            ct.ThrowIfCancellationRequested();
+        }
+
         Step(progress, Lang.T("Corrélation et diagnostic…", "Cross-referencing and diagnosis…"), 90);
         new RulesEngine().Analyze(report);
 

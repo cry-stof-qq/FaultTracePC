@@ -98,6 +98,10 @@
                 <CheckBox x:Name="ChkDeep" Content="{x:Static loc:L.MainDeepAnalysis}" IsChecked="True"
                           VerticalAlignment="Center" Margin="12,0,0,6"
                           ToolTip="{x:Static loc:L.MainDeepAnalysisTip}"/>
+                <!-- Point 15, lot 1d : décochée par défaut — winget contacte Internet. -->
+                <CheckBox x:Name="ChkWinget" Content="{x:Static loc:L.MainSoftwareUpdates}" IsChecked="False"
+                          VerticalAlignment="Center" Margin="12,0,0,6"
+                          ToolTip="{x:Static loc:L.MainSoftwareUpdatesTip}"/>
             </WrapPanel>
         </Border>
 

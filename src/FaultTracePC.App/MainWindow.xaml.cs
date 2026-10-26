@@ -280,6 +280,7 @@ public partial class MainWindow : Window
             Days = days,
             IncludeDrivers = ChkDrivers.IsChecked == true,
             DeepDumpAnalysis = ChkDeep.IsChecked == true,
+            RechercherMisesAJourLogiciels = ChkWinget.IsChecked == true,
         };
         var progress = new Progress<ScanProgress>(p =>
         {
