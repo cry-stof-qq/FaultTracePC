@@ -77,6 +77,32 @@ public class WingetCollectorTests
         Assert.Equal("Failed when opening source(s); try the 'source reset' command if the problem persists.", i.Message);
     }
 
+    /// <summary>
+    /// Mesure réelle du 26/10/2026 (VM sans réseau, au-delà du délai de 15 minutes) :
+    /// code -2147012889, sortie relevée par Get-Content — les lignes sont exactes, les
+    /// octets (fins de ligne, animation éventuelle) n'ont pas été relevés.
+    /// </summary>
+    internal static readonly string SortieNomNonResolu = string.Join("\r\n", new[]
+    {
+        "Failed in attempting to update the source: winget",
+        "An unexpected error occurred while executing the command:",
+        "InternetOpenUrl() failed.",
+        "0x80072ee7 : unknown error",
+    }) + "\r\n";
+
+    internal const int CodeNomNonResolu = -2147012889;
+
+    [Fact]
+    public void Mesure_reelle_hors_ligne_au_dela_du_delai_est_un_echec_0x80072EE7()
+    {
+        var i = WingetCollector.Interpreter(EtendueWinget.Utilisateur, CodeNomNonResolu, SortieNomNonResolu);
+
+        Assert.Equal(EtatWinget.Echec, i.Etat);
+        Assert.Equal("0x80072EE7", i.CodeHexadecimal);
+        Assert.Equal("Failed in attempting to update the source: winget", i.Message);
+        Assert.Empty(WingetCollector.Bilan(new[] { i }).Logiciels); // jamais une vieille liste
+    }
+
     [Fact]
     public void Un_echec_ne_donne_aucune_ligne_meme_s_il_contient_un_tableau()
     {

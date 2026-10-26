@@ -100,6 +100,17 @@ public class MisesAJourLogicielsTests
     }
 
     [Fact]
+    public void Hors_ligne_au_dela_du_delai_le_code_0x80072EE7_a_la_meme_explication()
+    {
+        var i = WingetCollector.Interpreter(EtendueWinget.Utilisateur,
+            WingetCollectorTests.CodeNomNonResolu, WingetCollectorTests.SortieNomNonResolu);
+
+        Assert.Equal(
+            "winget a échoué (code 0x80072EE7) : « Failed in attempting to update the source: winget » — winget n'a pas pu joindre sa source : pas d'accès à Internet, ou accès filtré. Réessayer avec une connexion qui l'autorise",
+            EnFrancais(() => MisesAJourLogiciels.Raison(i)));
+    }
+
+    [Fact]
     public void Un_code_inconnu_n_a_pas_d_explication_inventee()
     {
         Assert.Equal("", MisesAJourLogiciels.Explication(1));

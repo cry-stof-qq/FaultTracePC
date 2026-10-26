@@ -96,10 +96,19 @@ public static class MisesAJourLogiciels
     internal const int CodeSourceInjoignable = unchecked((int)0x8A15004B);
 
     /// <summary>
+    /// 0x80072EE7 : l'erreur Windows 12007, ERROR_INTERNET_NAME_NOT_RESOLVED, « The server
+    /// name could not be resolved » (documentation Microsoft des erreurs WinINet). Mesuré
+    /// le 26/10/2026 dans une VM sans réseau, plus de 15 minutes après le dernier passage
+    /// en ligne : winget annonce « Failed in attempting to update the source: winget » et
+    /// s'arrête. Même cause que 0x8A15004B : même explication (go de l'auteur le même jour).
+    /// </summary>
+    internal const int CodeNomNonResolu = unchecked((int)0x80072EE7);
+
+    /// <summary>
     /// Ce que veut dire un code connu, pour le lecteur. Vide pour un code inconnu : on
     /// n'invente pas d'explication. Texte validé par l'auteur le 26/10/2026.
     /// </summary>
-    internal static string Explication(int? code) => code == CodeSourceInjoignable
+    internal static string Explication(int? code) => code is CodeSourceInjoignable or CodeNomNonResolu
         ? Lang.T(" — winget n'a pas pu joindre sa source : pas d'accès à Internet, ou accès filtré. Réessayer avec une connexion qui l'autorise",
                  " — winget could not reach its source: no Internet access, or filtered access. Try again with a connection that allows it")
         : "";
