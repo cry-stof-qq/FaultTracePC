@@ -3291,6 +3291,20 @@ Décidé le même jour : la 1.10.0 (winget) se prépare **sans attendre** le dé
 
 **À mesurer avant d'écrire le lot 1** : sur le poste de l'auteur, la liste avec `--scope machine` puis `--scope user` (lesquels des 7 sont « machine ») ; au retour sur le parc, le module `Microsoft.WinGet.Client` sous SYSTEM sur un poste de l'établissement.
 
+**Mesure du 26/10/2026, poste de l'auteur, suite** (PowerShell non administrateur) :
+
+| Commande | Résultat |
+|---|---|
+| `winget upgrade` (sans `--scope`) | 7 : MobaXterm, Ollama, Python 3.14, WSL, Terminal Windows, WinDbg, WinSCP — plus « 1 paquet de version indéterminée » |
+| `winget upgrade --scope machine` | **1** : MobaXterm — plus « 1 paquet de version indéterminée » |
+| `winget upgrade --scope user` | **7** : **Notepad++** (8.8.5 → 8.9.8.1), Ollama, Python 3.14, WSL, Terminal Windows, WinDbg, WinSCP |
+
+Ce que ce tableau apprend :
+
+- **Sur ce poste, presque tout est « utilisateur »** : 7 mises à jour sur 8. Parmi elles, trois paquets du Store (WSL, Terminal Windows, WinDbg) — enregistrés par utilisateur par nature. Sous SYSTEM, en mode parc, seul MobaXterm aurait été vu.
+- **La liste sans `--scope` n'est pas la réunion des deux** : Notepad++ n'y apparaît pas, alors que `--scope user` le donne en retard. Hypothèse, **non vérifiée** : deux installations de Notepad++ (une pour la machine, une pour l'utilisateur), et la liste par défaut n'en retient qu'une — peut-être celle « de version indéterminée ». Leçon pour la conception, quelle que soit la cause : **lister séparément `machine` et `user`, puis réunir**, plutôt que se fier à la liste par défaut. Mesure proposée pour trancher : `winget list --id Notepad++.Notepad++`.
+- **Incident sans conséquence pendant la mesure** : le résultat a été recollé par erreur dans PowerShell ; chaque ligne a été lue comme une commande. Une seule a lancé un programme (`Ollama version …` → « unknown command »), sans effet. À retenir pour les procédures : donner les commandes une par une, et rappeler de ne coller que la commande.
+
 ---
 
 ## Points 72 à 78 — ce que la 1.6.1 a montré à son tour
