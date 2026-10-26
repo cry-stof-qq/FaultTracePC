@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using FaultTracePC.Core.Analysis;
+using FaultTracePC.Core.Collectors;
 
 namespace FaultTracePC.Core.Report;
 
@@ -77,6 +78,7 @@ public static class HtmlReportGenerator
         SmartSection(sb, r);
         DriversSection(sb, r);
         sb.Append(SectionLogicielsInstalles(r));
+        sb.Append(SectionMisesAJourWinget(r));
         ReliabilitySection(sb, r);
         ErrorsSection(sb, r);
 
@@ -1010,6 +1012,55 @@ public static class HtmlReportGenerator
         foreach (var a in apps.OrderByDescending(a => a.InstallDate ?? DateTime.MinValue).ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase))
             sb.Append($"<tr><td>{(a.InstallDate is { } d ? Lang.Date(d) : "—")}</td><td>{H(a.Name)}</td><td class=\"small\">{H(a.Version)}</td><td class=\"small\">{H(a.Publisher)}</td></tr>");
         sb.Append("</tbody></table></details></section>");
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// POINT 15, lot 1c — la liste de winget, en détail : nom, identifiant, versions,
+    /// pour tout le poste ou pour ce compte. D'abord ce que chaque recherche a donné —
+    /// une recherche qui a échoué se lit AVANT la liste, pour qu'on ne prenne pas une
+    /// liste partielle pour une liste complète. Rien quand la recherche n'a pas été
+    /// demandée (<see cref="DiagnosticReport.Winget"/> null).
+    /// </summary>
+    internal static string SectionMisesAJourWinget(DiagnosticReport r)
+    {
+        if (r.Winget is not { } bilan) return "";
+
+        var sb = new StringBuilder();
+        sb.Append(Lang.T("<section class=\"tech\"><h2>Mises à jour des logiciels (winget)</h2>",
+                         "<section class=\"tech\"><h2>Software updates (winget)</h2>"));
+        sb.Append(Lang.T(
+            "<p class=\"explain\">Liste donnée par winget, le gestionnaire de paquets de Windows, interrogé deux fois : pour les logiciels installés pour tout le poste, puis pour ceux installés pour ce compte. Rien n'a été installé : c'est une lecture. Un logiciel que winget ne connaît pas n'apparaît pas ici, même s'il est en retard.</p>",
+            "<p class=\"explain\">List given by winget, the Windows package manager, queried twice: for programs installed for the whole computer, then for those installed for this account. Nothing was installed: this is a read-only check. A program winget does not know about does not appear here, even if it is out of date.</p>"));
+
+        sb.Append("<ul>");
+        foreach (var i in bilan.Interrogations)
+        {
+            var etat = MisesAJourLogiciels.Raison(i) ?? (i.Etat == EtatWinget.Lu
+                ? Lang.T($"{i.Lecture?.MisesAJour.Count ?? 0} mise(s) à jour lue(s)", $"{i.Lecture?.MisesAJour.Count ?? 0} update(s) read")
+                  + (MisesAJourLogiciels.EcartDeCompte(i) is { } e ? $" — {e}" : "")
+                  + (i.Lecture?.LignesIllisibles is int n && n > 0 ? Lang.T($" — {n} ligne(s) illisible(s)", $" — {n} unreadable line(s)") : "")
+                : Lang.T("aucune mise à jour signalée", "no update reported")
+                  + (string.IsNullOrWhiteSpace(i.Message) ? "" : Lang.T($" (« {i.Message} »)", $" (“{i.Message}”)")));
+            sb.Append("<li>").Append(H(Lang.T($"Recherche {MisesAJourLogiciels.NomEtendue(i.Etendue)} : {etat}",
+                                              $"Search {MisesAJourLogiciels.NomEtendue(i.Etendue)}: {etat}"))).Append("</li>");
+        }
+        sb.Append("</ul>");
+
+        if (bilan.Logiciels.Count > 0)
+        {
+            sb.Append(Lang.T("<table><thead><tr><th>Nom</th><th>Identifiant</th><th>Installée</th><th>Disponible</th><th>Installé pour</th><th>Source</th></tr></thead><tbody>",
+                             "<table><thead><tr><th>Name</th><th>Identifier</th><th>Installed</th><th>Available</th><th>Installed for</th><th>Source</th></tr></thead><tbody>"));
+            foreach (var l in bilan.Logiciels)
+            {
+                var id = l.Identifiant ?? Lang.T("illisible (coupé par winget)", "unreadable (cut by winget)");
+                sb.Append($"<tr><td>{H(l.Nom)}</td><td class=\"small\">{H(id)}</td><td class=\"small\">{H(l.VersionInstallee)}</td>")
+                  .Append($"<td class=\"small\">{H(l.VersionDisponible)}</td><td class=\"small\">{H(MisesAJourLogiciels.NomEtendues(l.Etendues))}</td>")
+                  .Append($"<td class=\"small\">{H(l.Source)}</td></tr>");
+            }
+            sb.Append("</tbody></table>");
+        }
+        sb.Append("</section>");
         return sb.ToString();
     }
 

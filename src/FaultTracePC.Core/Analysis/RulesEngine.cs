@@ -57,6 +57,11 @@ public sealed class RulesEngine
             });
         }
 
+        // POINT 15, lot 1c. APRÈS la conclusion « aucune anomalie » : une liste de
+        // logiciels à mettre à jour n'est pas une anomalie, et ne doit pas l'effacer.
+        if (r.Winget is { } bilanWinget)
+            r.Findings.Add(MisesAJourLogiciels.Conclusion(bilanWinget));
+
         // Deux chemins peuvent rapporter le même fait : le journal de Windows et la
         // surveillance temps réel. Le lecteur voyait alors deux problèmes là où il
         // n'y en a qu'un, avec deux gravités contradictoires. Constaté sur un
@@ -2239,7 +2244,13 @@ public sealed class RulesEngine
                 Details = Lang.T($"{g.Count()} plantages sur la période, dernier le {lastCrash:dd/MM/yyyy}", $"{g.Count()} crashes over the period, the last on {lastCrash:yyyy-MM-dd}")
                           + (modules.Count > 0 ? Lang.T($", module(s) fautif(s) : {string.Join(", ", modules!)}", $", faulting module(s): {string.Join(", ", modules!)}") : "")
                           + Lang.T($". État actuel : {statusText}", $". Current state: {statusText}")
-                          + complement,
+                          + complement
+                          // POINT 15, lot 1c : le lien entre un logiciel resté ancien et
+                          // ses plantages. Pas pour un composant de Windows ni graphique :
+                          // winget ne les met pas à jour.
+                          + (!graphique && !BinairesSysteme.Contains(g.Key)
+                             && MisesAJourLogiciels.MiseAJourPour(r.Winget, g.Key) is { } maj
+                                 ? MisesAJourLogiciels.PhraseSurLaCarte(maj) : ""),
                 Recommendation = reco,
             });
         }

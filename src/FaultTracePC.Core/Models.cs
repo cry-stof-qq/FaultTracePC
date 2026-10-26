@@ -863,6 +863,15 @@ public sealed class DiagnosticReport
     public ScanComparison? Comparison { get; set; }
     /// <summary>Données de la boîte noire (surveillance temps réel), si le journal existe.</summary>
     public FlightInfo Flight { get; set; } = new();
+
+    /// <summary>
+    /// POINT 15, lot 1c — ce que winget dit des mises à jour de logiciels.
+    /// <c>null</c> : la vérification n'a PAS été demandée (case non cochée, lot 1d) —
+    /// winget contacte Internet, et le logiciel promet de ne jamais le faire sans case
+    /// cochée. Le rapport n'en dit alors rien : il ne prétend ni « à jour » ni
+    /// « en retard ».
+    /// </summary>
+    public Collectors.BilanWinget? Winget { get; set; }
 }
 
 // ---------------------------------------------------------------------------
@@ -1119,6 +1128,15 @@ public sealed class ScanOptions
     public bool DeepDumpAnalysis { get; set; } = true;
     /// <summary>Nombre maximum de dumps analysés en profondeur (les plus récents d'abord).</summary>
     public int MaxDeepDumps { get; set; } = 5;
+
+    /// <summary>
+    /// POINT 15, lot 1d — demander à winget quels logiciels ont une mise à jour.
+    /// FAUX PAR DÉFAUT, et ce n'est pas un détail : winget contacte Internet, et
+    /// FaultTracePC promet de ne jamais le faire sans case cochée. Seule la case de la
+    /// fenêtre principale le met à vrai ; le service (diagnostic à distance, sous le
+    /// compte système) et la réparation guidée le laissent à faux.
+    /// </summary>
+    public bool RechercherMisesAJourLogiciels { get; set; }
 }
 
 public sealed record ScanProgress(string Step, int Percent);

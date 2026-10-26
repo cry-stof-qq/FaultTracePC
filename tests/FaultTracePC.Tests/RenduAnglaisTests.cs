@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using FaultTracePC.Core;
+using FaultTracePC.Core.Collectors;
 using FaultTracePC.Core.Analysis;
 using FaultTracePC.Core.Report;
 using Xunit;
@@ -113,6 +114,18 @@ public class RenduAnglaisTests
                 },
             ],
         };
+
+        // Point 15, lot 1c : une liste winget partielle — une étendue lue, une en
+        // échec — fait passer la conclusion ET la section par leurs textes.
+        r.Winget = WingetCollector.Bilan(new[]
+        {
+            new InterrogationWinget(EtendueWinget.Machine, EtatWinget.Lu, 0, null,
+                new LectureWinget(EtatLectureWinget.Lu,
+                    new[] { new MiseAJourWinget("7-Zip", "7zip.7zip", "24.08", "25.01", "winget", 0, false, false) },
+                    0, 1, 0)),
+            new InterrogationWinget(EtendueWinget.Utilisateur, EtatWinget.Echec, unchecked((int)0x8A15000F),
+                "Failed when searching source: winget", null),
+        });
 
         new RulesEngine().Analyze(r);
         return r;
