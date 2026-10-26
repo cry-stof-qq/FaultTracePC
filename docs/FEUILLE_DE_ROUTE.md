@@ -3317,6 +3317,8 @@ Lot 1 = **lecture seule** : dire dans le rapport quels logiciels ont une mise à
 6. **Dans le rapport** : une section dans les détails techniques — nom, identifiant, version installée, version disponible, étendue (machine / utilisateur) ; une conclusion de niveau « Information » qui donne le nombre ; et, **le vrai apport**, sur la carte d'une application qui plante, la mention « une mise à jour est disponible : 8.8.5 → 8.9.8.1 » quand c'est le cas — le lien entre un logiciel resté ancien et ses plantages, qui est ce que l'auteur attend de winget.
 7. **Tests** : le lecteur de tableau sur les sorties réelles du 26/10/2026 (en-têtes français), une sortie en anglais, des lignes coupées, une sortie vide, un message d'erreur de source.
 
+- **Décision de l'auteur, 26/10/2026** : points 1, 2, 3, 4, 6 et 7 **validés**. Le point 5 (dire ce qui n'a pas pu être mesuré) n'est pas cité dans la validation : question posée, en attente. Le codage n'a pas commencé.
+
 - **Incident sans conséquence pendant la mesure** : le résultat a été recollé par erreur dans PowerShell ; chaque ligne a été lue comme une commande. Une seule a lancé un programme (`Ollama version …` → « unknown command »), sans effet. À retenir pour les procédures : donner les commandes une par une, et rappeler de ne coller que la commande.
 
 ---
