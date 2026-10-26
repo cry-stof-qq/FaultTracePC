@@ -68,6 +68,16 @@ public class WingetCollectorTests
     }
 
     [Fact]
+    public void Capture_reelle_hors_ligne_est_un_echec_0x8A15004B_avec_la_phrase_de_winget()
+    {
+        var i = WingetCollector.Interpreter(EtendueWinget.Machine, LecteurWingetTests.CodeHorsLigne, LecteurWingetTests.SortieHorsLigne);
+
+        Assert.Equal(EtatWinget.Echec, i.Etat);
+        Assert.Equal("0x8A15004B", i.CodeHexadecimal);
+        Assert.Equal("Failed when opening source(s); try the 'source reset' command if the problem persists.", i.Message);
+    }
+
+    [Fact]
     public void Un_echec_ne_donne_aucune_ligne_meme_s_il_contient_un_tableau()
     {
         var echec = WingetCollector.Interpreter(EtendueWinget.Machine, 1, LecteurWingetTests.SortieMachine);

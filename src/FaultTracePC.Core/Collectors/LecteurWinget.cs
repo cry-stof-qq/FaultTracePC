@@ -97,10 +97,24 @@ public sealed record LectureWinget(
 /// large dans un nom, par exemple — et toutes ses valeurs sont douteuses : elle est
 /// comptée illisible, jamais devinée.
 ///
-/// CE QUI RESTE À MESURER (captures réelles demandées le 26/10/2026)
-/// La sortie REDIRIGÉE (celle que FaultTracePC recevra) n'a pas encore été capturée :
-/// présence de l'animation d'attente, largeur des colonnes sans console, encodage.
-/// Les tests de ce lot sont construits selon la structure mesurée à l'écran.
+/// LA SORTIE REDIRIGÉE, MESURÉE LE 26/10/2026 (poste de l'auteur, winget v1.29.380,
+/// « cmd /c winget upgrade --scope … > fichier ») — c'est elle que FaultTracePC recevra :
+///   · UTF-8 sans BOM, fins de ligne CRLF — le lancement (lot 1b) devra lire en UTF-8 ;
+///   · aucune animation d'attente dans le fichier ;
+///   · colonnes taillées sur la plus longue valeur, rien de coupé : le nom
+///     « MicrosoftCorporationII.WindowsSubsystemForLinux » remplit sa colonne et ne
+///     laisse qu'un espace — le cas du point 24, en vrai ;
+///   · un nom accentué (« Sous-système Windows pour Linux ») est aligné en caractères ;
+///   · sous le tableau : « 2 mises à niveau disponibles. », puis éventuellement la
+///     phrase sur les versions indéterminées ;
+///   · code de sortie 0 dans les deux cas.
+/// La règle des valeurs coupées reste : rien ne garantit qu'une autre version ou une
+/// console étroite ne les produira pas.
+///
+/// HORS LIGNE, MESURÉ LE MÊME JOUR (VM, carte réseau désactivée) : code 0x8A15004B, et
+/// l'animation d'attente EST dans le fichier — vingt images « \r   - » « \r   \ »…,
+/// un retour chariot, 120 espaces, un retour chariot, puis le message. La règle du
+/// retour chariot (voir <see cref="Lignes"/>) le ramène à sa seule phrase.
 /// </summary>
 public static class LecteurWinget
 {

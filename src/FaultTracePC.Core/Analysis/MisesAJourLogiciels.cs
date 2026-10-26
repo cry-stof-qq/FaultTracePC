@@ -74,7 +74,8 @@ public static class MisesAJourLogiciels
                 "la réponse de winget n'a pas la forme attendue ; elle n'a pas été lue plutôt que mal lue",
                 "winget's answer is not in the expected form; it was left unread rather than misread"),
             EtatWinget.Echec => Lang.T($"winget a échoué (code {i.CodeHexadecimal ?? "?"}){citation}",
-                                       $"winget failed (code {i.CodeHexadecimal ?? "?"}){citation}"),
+                                       $"winget failed (code {i.CodeHexadecimal ?? "?"}){citation}")
+                                + Explication(i.CodeDeSortie),
             EtatWinget.DelaiDepasse => Lang.T("winget n'a pas répondu en une minute ; il a été arrêté",
                                               "winget did not answer within one minute; it was stopped"),
             EtatWinget.WingetAbsent => Lang.T("winget est introuvable pour ce compte (absent, ou pas installé pour ce compte)",
@@ -85,6 +86,23 @@ public static class MisesAJourLogiciels
             _ => Lang.T("état inconnu", "unknown state"),
         };
     }
+
+    /// <summary>
+    /// 0x8A15004B, APPINSTALLER_CLI_ERROR_FAILED_TO_OPEN_ALL_SOURCES (« Failed to open one
+    /// or more sources », table des codes de winget). Mesuré le 26/10/2026 dans une VM
+    /// sans réseau. winget conseille alors « source reset » — conseil trompeur quand la
+    /// cause est l'absence d'Internet ou le filtrage, cas fréquent en établissement.
+    /// </summary>
+    internal const int CodeSourceInjoignable = unchecked((int)0x8A15004B);
+
+    /// <summary>
+    /// Ce que veut dire un code connu, pour le lecteur. Vide pour un code inconnu : on
+    /// n'invente pas d'explication. Texte validé par l'auteur le 26/10/2026.
+    /// </summary>
+    internal static string Explication(int? code) => code == CodeSourceInjoignable
+        ? Lang.T(" — winget n'a pas pu joindre sa source : pas d'accès à Internet, ou accès filtré. Réessayer avec une connexion qui l'autorise",
+                 " — winget could not reach its source: no Internet access, or filtered access. Try again with a connection that allows it")
+        : "";
 
     /// <summary>
     /// Écart entre ce que winget annonce sous son tableau et ce qui a été lu (point 28 :

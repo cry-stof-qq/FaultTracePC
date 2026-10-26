@@ -43,6 +43,37 @@ public class LecteurWingetTests
         "7 mises à niveau disponibles.",
     }) + "\r\n";
 
+    /// <summary>
+    /// Capture réelle HORS LIGNE (VM, carte réseau désactivée, 26/10/2026), reconstruite
+    /// octet pour octet d'après son vidage hexadécimal (330 octets) : vingt images de
+    /// l'animation d'attente, chacune « \r » + trois espaces + le caractère + un espace,
+    /// puis « \r » + 120 espaces, puis « \r » + le message, puis CRLF. Code de sortie
+    /// -1978335157 (0x8A15004B).
+    /// </summary>
+    internal static readonly string SortieHorsLigne =
+        string.Concat(Enumerable.Repeat("-\\|/", 5).SelectMany(s => s).Select(c => "\r   " + c + " "))
+        + "\r" + new string(' ', 120)
+        + "\rFailed when opening source(s); try the 'source reset' command if the problem persists.\r\n";
+
+    internal const int CodeHorsLigne = -1978335157;
+
+    [Fact]
+    public void La_capture_hors_ligne_fait_bien_330_octets()
+    {
+        Assert.Equal(330, System.Text.Encoding.UTF8.GetByteCount(SortieHorsLigne));
+    }
+
+    [Fact]
+    public void Capture_reelle_hors_ligne_l_animation_ne_laisse_que_la_phrase()
+    {
+        var r = LecteurWinget.Lire(SortieHorsLigne);
+
+        Assert.Equal(EtatLectureWinget.AucunTableau, r.Etat);
+        Assert.Empty(r.MisesAJour);
+        Assert.Equal("Failed when opening source(s); try the 'source reset' command if the problem persists.",
+            Assert.Single(LecteurWinget.Lignes(SortieHorsLigne), l => l.Trim().Length > 0).Trim());
+    }
+
     [Fact]
     public void Capture_reelle_etendue_machine()
     {

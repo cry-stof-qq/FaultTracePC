@@ -84,6 +84,29 @@ public class MisesAJourLogicielsTests
     }
 
     [Fact]
+    public void Hors_ligne_le_rapport_explique_le_code_0x8A15004B()
+    {
+        var bilan = WingetCollector.Bilan(new[]
+        {
+            WingetCollector.Interpreter(EtendueWinget.Machine, LecteurWingetTests.CodeHorsLigne, LecteurWingetTests.SortieHorsLigne),
+            WingetCollector.Interpreter(EtendueWinget.Utilisateur, LecteurWingetTests.CodeHorsLigne, LecteurWingetTests.SortieHorsLigne),
+        });
+
+        var f = EnFrancais(() => MisesAJourLogiciels.Conclusion(bilan));
+
+        Assert.Equal("Mises à jour des logiciels : vérification incomplète", f.Title);
+        Assert.Contains("Recherche pour tout le poste : winget a échoué (code 0x8A15004B) : « Failed when opening source(s); try the 'source reset' command if the problem persists. » — winget n'a pas pu joindre sa source : pas d'accès à Internet, ou accès filtré. Réessayer avec une connexion qui l'autorise.", f.Details);
+        Assert.Contains("ne veut PAS dire que tout est à jour", f.Details);
+    }
+
+    [Fact]
+    public void Un_code_inconnu_n_a_pas_d_explication_inventee()
+    {
+        Assert.Equal("", MisesAJourLogiciels.Explication(1));
+        Assert.Equal("", MisesAJourLogiciels.Explication(null));
+    }
+
+    [Fact]
     public void Rien_de_signale_des_deux_cotes_cite_winget_sans_dire_a_jour()
     {
         var bilan = WingetCollector.Bilan(new[]
