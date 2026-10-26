@@ -3272,6 +3272,25 @@ Validé sur le principe depuis le début, repoussé deux fois — par les notes 
 
 **La question ouverte, à trancher par l'essai avant d'écrire quoi que ce soit dans le rapport :** `winget upgrade` liste les paquets de la machine **plus ceux du profil du compte qui l'exécute**. Or le logiciel demande les droits d'administrateur. Élever son propre compte ne change rien ; ouvrir en tant qu'**autre** administrateur ferait disparaître les logiciels installés « pour l'utilisateur courant ». Le rapport dirait « rien à mettre à jour » sur un poste qui en a dix. **Non vérifié à ce jour.**
 
+### Repris le 26/10/2026 — mesures et décisions de l'auteur
+
+Décidé le même jour : la 1.10.0 (winget) se prépare **sans attendre** le déploiement de la 1.9.3 du 02/11, en lots qui laissent **chacun** le logiciel publiable (d'abord la lecture : lister les mises à jour dans le rapport ; l'installation ensuite) — pour pouvoir sortir une 1.9.4 corrective sans travail à moitié fait dans le dépôt.
+
+**Mesure du 26/10/2026, poste de l'auteur** : `winget --version` = **v1.29.380**. L'aide de `winget upgrade` ne propose **toujours aucune sortie structurée** (ni JSON, ni format) — le point 24 tient : découper aux positions de l'en-tête. L'en-tête est **traduit** (« Nom ID Version Disponible Source » en français) et la ligne de tirets est continue : les positions se prennent sur les mots de l'en-tête, pas sur les tirets. `--scope` existe pour `upgrade` : c'est un **filtre** sur l'étendue du paquet installé (`user` ou `machine`). `winget upgrade` sur ce poste : 7 mises à jour, et une ligne finale « 1 package(s) a(ont) des numéros de version qui ne peuvent pas être déterminés » (option `--include-unknown`).
+
+**Ce que l'auteur dit de son contexte et de son expérience** :
+- sur son propre poste, son compte est administrateur ;
+- sur le parc, il est administrateur des postes, mais la session ouverte est le plus souvent celle d'un utilisateur **non administrateur**, ou il n'y en a aucune ;
+- d'expérience : les logiciels installés dans le profil (`AppData`), qui ne demandent pas de droits d'administrateur, se mettent à jour ; tous les autres font demander le mot de passe d'un administrateur.
+
+**Ce que dit Microsoft, et qui change le plan** (page « Troubleshooting » de WinGet, Microsoft Learn) : *le WinGet en ligne de commande n'est pas pris en charge sous le compte système* — c'est une application empaquetée (MSIX), qui doit être enregistrée pour un utilisateur, et SYSTEM ne peut pas l'être. *Le module PowerShell `Microsoft.WinGet.Client` peut, lui, être utilisé sous le compte système, pour les applications installées pour toute la machine.* Or le diagnostic à distance de la console s'exécute sous SYSTEM, par le service. **Pour le parc, la ligne de commande `winget` est donc exclue** ; le module PowerShell est la voie documentée. Il a un second avantage : il rend des **objets**, pas du texte à découper. À vérifier : sa présence sur les postes, son installation depuis la PowerShell Gallery derrière le filtrage de l'établissement, et le proxy vu par SYSTEM (qui n'est pas celui de la session).
+
+**Proposé par l'auteur le 26/10/2026, à retenir pour la conception** :
+- **en mode parc**, n'installer qu'avec `--scope machine` — ce que la documentation impose de toute façon sous SYSTEM, et ce que l'avis d'un conseiller indépendant sur Microsoft Q&A recommande aussi (*« si vous restez sous SYSTEM, utilisez explicitement --scope machine »*) ;
+- **hors mode parc** (l'utilisateur devant son poste, FaultTracePC élevé), **laisser le choix** : avec ou sans `--scope machine`.
+
+**À mesurer avant d'écrire le lot 1** : sur le poste de l'auteur, la liste avec `--scope machine` puis `--scope user` (lesquels des 7 sont « machine ») ; au retour sur le parc, le module `Microsoft.WinGet.Client` sous SYSTEM sur un poste de l'établissement.
+
 ---
 
 ## Points 72 à 78 — ce que la 1.6.1 a montré à son tour
