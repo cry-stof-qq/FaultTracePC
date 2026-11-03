@@ -140,6 +140,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 116 | **Exporter les journaux de Windows (.evtx) pour les confier à la personne de son choix** | demandé le 23/10/2026 — principe et détails arrêtés par l'auteur le même jour ; placé en **1.9.2** avec le point 115 ; lot 1 (cœur, sans interface) et lot 2 (fenêtre et bouton) livrés le 23/10/2026, CI du lot 1 verte — voir « Point 116 » plus bas |
 | 117 | **Mises à jour de sécurité des composants : runtime .NET embarqué, paquets NuGet** | relevé le 26/10/2026 à la demande de l'auteur — **1.9.3 et règle mensuelle validées par l'auteur le même jour** ; voir « Point 117 » plus bas |
 | 118 | **La comparaison avec le scan précédent ignore les coupures brutales** (« Aucun nouveau crash… La réparation semble efficace » malgré une coupure le jour même) | constaté le 02/11/2026 sur un diagnostic à distance 1.10.0 — à corriger, voir la section du point 118 |
+| 119 | **Le script de réparation examinait tous les disques, y compris un disque externe en panne** ; « santé : Sain » affiché pour ce disque ; conseil « firmware du SSD » pour un disque dur externe | constaté le 03/11/2026 sur le poste de l'auteur — **corrigé le même jour** (script : défaut constaté ; textes : go de l'auteur), voir la section du point 119 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3253,6 +3254,20 @@ Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
 
 ---
+
+## Point 119 — le script de réparation examinait aussi un disque externe en panne — CONSTATÉ et CORRIGÉ le 03/11/2026
+
+**Constaté** sur le poste de l'auteur (03/11/2026, 20:56, FaultTracePC 1.10.0). Un disque dur externe USB, au système de fichiers illisible (RAW), a été branché pour en récupérer les données. FaultTracePC, ouvert à ce moment-là, l'a signalé en temps réel (« Erreur disque signalée par Windows », une alerte par heure), puis le diagnostic a produit la bonne carte : « Erreurs sur un support amovible (au moins 500) », disque nommé, « Tous les disques mis en cause sont des supports AMOVIBLES », et la recommandation de le recopier d'abord. L'auteur, le même jour : *« je découvre aujourd'hui que le logiciel donne des alertes sur un HDD défectueux c'est génial »*.
+
+**Le défaut** : le script de réparation produit par ce même diagnostic contenait, dans la section « Santé du stockage », une ligne exécutée **sans demande** : `Get-Volume | Where-Object DriveLetter | ForEach-Object { … Repair-Volume -DriveLetter … -Scan }` — c'est-à-dire un examen de **chaque** volume ayant une lettre, le disque externe en panne compris. Or un disque qui lâche doit être recopié avant toute autre lecture : c'est ce que dit la carte elle-même. La boîte à outils (« Vérifier le disque système ») et la réparation guidée, elles, n'examinent que C:.
+
+**Corrigé** (`Report/RepairScriptGenerator.cs`) : le script n'examine plus que le disque système (`Repair-Volume -DriveLetter $env:SystemDrive[0] -Scan`) et dit pourquoi : « Les autres disques ne sont pas examinés : un disque externe qui renvoie des erreurs doit d'abord être recopié, pas sollicité. » Test ajouté dans `ScriptReparationTests.cs`. Vérifié : 104 cas sur 104 dans l'environnement de Claude (dont `TraductionTests` et `RenduAnglaisTests`).
+
+**Relevé dans le même rapport, puis corrigé le même jour sur go de l'auteur** :
+- la fiche « Disques physiques » disait « santé : Sain » pour ce disque externe, au moment même où Windows enregistrait des centaines de « blocs défectueux ». À travers un boîtier USB, l'état de santé que Windows rapporte n'est le plus souvent pas mesuré sur le disque. Désormais (`HtmlReportGenerator.SanteLisible`) : « non mesurable à travers l'USB (Windows indique « Sain ») » pour un disque USB sain ou non lu ; un état MAUVAIS rapporté pour un disque USB reste affiché tel quel ; un disque interne ne change pas. Disque reconnu USB par son interface ou par son modèle (« … USB Device »).
+- le texte des alertes « Erreur disque signalée par Windows » conseillait à tout disque de « mettre à jour le firmware du SSD ». Désormais (`AlertCatalog.cs`) : « Sauvegarder les données importantes sans attendre, et vérifier la santé SMART du disque et ses câbles. Disque externe : le recopier avant tout, sans lancer de réparation dessus. SSD interne : vérifier aussi son firmware chez le fabricant. » Les alertes déjà archivées prennent le nouveau texte à la lecture (elles sont refabriquées depuis la règle). Même retouche dans le script de réparation : « Pour un SSD, vérifier aussi son firmware chez le fabricant. »
+- Tests : `SanteDisqueUsbTests.cs` (5). Vérifié : 109 cas sur 109 dans l'environnement de Claude ; empreintes des fichiers vérifiées sur le poste après écriture.
+- **L'auteur précise** : le disque n'est pas à réparer — les données ont déjà été récupérées, et le logiciel de récupération a trouvé trop de secteurs défectueux pour le réparer.
 
 ## Point 118 — « Aucun nouveau crash… La réparation semble efficace » malgré une coupure brutale — CONSTATÉ le 02/11/2026
 

@@ -172,12 +172,22 @@ public static class RepairScriptGenerator
             sb.AppendLine(Lang.T("Section 'Santé du stockage (lecture seule)'", "Section 'Storage health (read-only)'"));
             sb.AppendLine("Get-PhysicalDisk | Select-Object FriendlyName, MediaType, HealthStatus, OperationalStatus, @{n='Taille (Go)';e={[math]::Round($_.Size/1GB)}} | Format-Table -AutoSize");
             sb.AppendLine("Get-PhysicalDisk | Get-StorageReliabilityCounter | Select-Object DeviceId, Temperature, Wear, ReadErrorsTotal, WriteErrorsTotal, PowerOnHours | Format-Table -AutoSize");
-            sb.AppendLine(Lang.T("Write-Host 'Vérification rapide des volumes (lecture seule) :'", "Write-Host 'Quick volume check (read-only):'"));
-            sb.AppendLine("Get-Volume | Where-Object DriveLetter | ForEach-Object { Write-Host (\"  Volume {0}: \" -f $_.DriveLetter); Repair-Volume -DriveLetter $_.DriveLetter -Scan }");
+            // POINT 119 (constaté le 03/11/2026). Ce bloc examinait TOUS les volumes
+            // ayant une lettre, sans rien demander — y compris un disque externe USB
+            // qui renvoyait des centaines d'erreurs « bloc défectueux », branché pour
+            // en récupérer les données. Un disque qui lâche doit être recopié avant
+            // toute autre lecture, et la carte du rapport le dit elle-même. On
+            // n'examine donc plus que le disque système, comme la boîte à outils
+            // (« Vérifier le disque système ») et la réparation guidée.
+            sb.AppendLine(Lang.T("Write-Host 'Vérification rapide du disque système (lecture seule) :'", "Write-Host 'Quick check of the system drive (read-only):'"));
+            sb.AppendLine("Repair-Volume -DriveLetter $env:SystemDrive[0] -Scan");
+            sb.AppendLine(Lang.T(
+                "Write-Host 'Les autres disques ne sont pas examinés : un disque externe qui renvoie des erreurs doit d''abord être recopié, pas sollicité.' -ForegroundColor Gray",
+                "Write-Host 'Other drives are not checked: an external drive that returns errors must be copied first, not put under load.' -ForegroundColor Gray"));
             sb.AppendLine(Lang.T("if (Ask 'Planifier une réparation complète du disque système (chkdsk C: /f — s''exécutera au prochain redémarrage)') {", "if (Ask 'Schedule a full repair of the system drive (chkdsk C: /f — will run at the next restart)') {"));
             sb.AppendLine("    chkdsk C: /f");
             sb.AppendLine("}");
-            sb.AppendLine(Lang.T("Write-Host 'Si un disque est en état Avertissement/Défaillant : SAUVEGARDER puis remplacer. Vérifier aussi le firmware SSD chez le fabricant.' -ForegroundColor Yellow", "Write-Host 'If a drive shows Warning/Unhealthy: BACK UP then replace it. Also check the SSD firmware with the manufacturer.' -ForegroundColor Yellow"));
+            sb.AppendLine(Lang.T("Write-Host 'Si un disque est en état Avertissement/Défaillant : SAUVEGARDER puis remplacer. Pour un SSD, vérifier aussi son firmware chez le fabricant.' -ForegroundColor Yellow", "Write-Host 'If a drive shows Warning/Unhealthy: BACK UP then replace it. For an SSD, also check its firmware with the manufacturer.' -ForegroundColor Yellow"));
             sb.AppendLine();
         }
 

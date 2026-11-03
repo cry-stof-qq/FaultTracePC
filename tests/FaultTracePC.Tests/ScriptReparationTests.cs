@@ -40,6 +40,32 @@ public class ScriptReparationTests
     }
 
     [Fact]
+    public void Le_script_n_examine_que_le_disque_systeme_jamais_un_disque_externe()
+    {
+        // Point 119, constaté le 03/11/2026 : un disque USB en panne, branché pour
+        // récupérer ses données, aurait été examiné sans demande par le script.
+        var r = new DiagnosticReport
+        {
+            ScanPeriodDays = 30,
+            System = new SystemSnapshot { MachineName = "POSTE-TEST" },
+            Findings =
+            {
+                new Finding
+                {
+                    Severity = Severity.Warning, Confidence = Confidence.High, Category = FaultCategory.Storage,
+                    Title = "Erreurs sur un support amovible", Details = "Disque 1 (D:)", Recommendation = "Recopier d'abord.",
+                },
+            },
+        };
+
+        var script = RepairScriptGenerator.Generate(r);
+
+        Assert.Contains("Repair-Volume -DriveLetter $env:SystemDrive[0] -Scan", script);
+        Assert.DoesNotContain("Get-Volume | Where-Object DriveLetter", script);
+        Assert.DoesNotContain("-DriveLetter $_.DriveLetter", script);
+    }
+
+    [Fact]
     public void Un_texte_sans_apostrophe_n_est_pas_modifie()
     {
         Assert.Equal("Intel Corporation", RepairScriptGenerator.PsEscape("Intel Corporation"));

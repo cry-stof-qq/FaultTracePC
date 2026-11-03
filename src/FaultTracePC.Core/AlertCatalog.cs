@@ -117,7 +117,9 @@ public static class AlertCatalog
             case "disk_event" when a.Extract is { Length: > 0 } m:
                 a.Title = Lang.T("Erreur disque signalée par Windows", "Disk error reported by Windows");
                 a.Details = Lang.T("Windows vient d'enregistrer une erreur d'entrée/sortie sur un disque : ", "Windows has just recorded an input/output error on a drive: ") + m;
-                a.Recommendation = Lang.T("Sauvegarder les données importantes sans attendre, vérifier la santé SMART du disque et ses câbles, mettre à jour le firmware du SSD.", "Back up the important data without delay, check the drive's SMART health and its cables, update the SSD firmware.");
+                // Point 119 (03/11/2026) : « mettre à jour le firmware du SSD » était donné
+                // aussi pour un disque dur externe en panne, où il n'a aucun sens.
+                a.Recommendation = Lang.T("Sauvegarder les données importantes sans attendre, et vérifier la santé SMART du disque et ses câbles. Disque externe : le recopier avant tout, sans lancer de réparation dessus. SSD interne : vérifier aussi son firmware chez le fabricant.", "Back up the important data without delay, and check the drive's SMART health and its cables. External drive: copy it first, without running any repair on it. Internal SSD: also check its firmware with the manufacturer.");
                 return true;
 
             default:

@@ -1302,10 +1302,29 @@ public static class HtmlReportGenerator
     /// de Windows, pas du nôtre — il n'est donc pas traduit. Seul le dernier recours
     /// l'est, faute de quoi un rapport anglais afficherait « santé : inconnue ».
     /// </summary>
-    private static string SanteLisible(DiskInfo d) =>
-        d.Health == DiskHealth.NotReported
+    /// <summary>
+    /// POINT 119 (constaté le 03/11/2026, go de l'auteur le même jour). Un disque
+    /// externe USB qui renvoyait des centaines de « blocs défectueux » était affiché
+    /// « santé : Sain ». À travers un boîtier USB, l'état de santé que Windows
+    /// rapporte n'est le plus souvent pas mesuré sur le disque : « Sain » y est une
+    /// valeur par défaut, pas une mesure. On le dit. Un état MAUVAIS rapporté pour
+    /// un disque USB reste affiché tel quel : lui, il a bien été mesuré.
+    /// </summary>
+    internal static string SanteLisible(DiskInfo d)
+    {
+        var sante = d.Health == DiskHealth.NotReported
             ? FirstNonEmpty(d.WmiStatus, Lang.T("inconnue", "unknown"))
             : d.Health.Label();
+        if (EstUsb(d) && d.Health is DiskHealth.Healthy or DiskHealth.NotReported)
+            return Lang.T($"non mesurable à travers l'USB (Windows indique « {sante} »)",
+                          $"not measurable through USB (Windows reports “{sante}”)");
+        return sante;
+    }
+
+    /// <summary>Disque branché en USB : interface « USB », ou modèle « … USB Device ».</summary>
+    internal static bool EstUsb(DiskInfo d) =>
+        string.Equals(d.InterfaceType, "USB", StringComparison.OrdinalIgnoreCase)
+        || d.Model.Contains("USB", StringComparison.OrdinalIgnoreCase);
 
     private static string Shorten(string s, int max) => s.Length <= max ? s : s[..max] + "…";
 
