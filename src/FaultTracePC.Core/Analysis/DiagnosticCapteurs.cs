@@ -91,6 +91,27 @@ public static class DiagnosticCapteurs
         return Decrire(erreur, processeurs, autres);
     }
 
+    /// <summary>
+    /// Point 120 — les noms des sondes de fréquence et de consommation écrits par le
+    /// service (<see cref="EncoderComplet"/>), tous processeurs confondus. Null quand la
+    /// ligne n'en porte pas : service antérieur à la 1.11.0, ou bibliothèque non ouverte.
+    /// </summary>
+    public static (IReadOnlyList<string> Frequence, IReadOnlyList<string> Puissance)? Sondes(string? brut)
+    {
+        if (brut is null || !brut.StartsWith(Version + "|", StringComparison.Ordinal)) return null;
+        var freq = new List<string>(); var puiss = new List<string>(); bool vu = false;
+        foreach (var champ in brut.Split('|').Skip(1))
+        {
+            var i = champ.IndexOf('=');
+            if (i < 0) continue;
+            var (cle, val) = (champ[..i], champ[(i + 1)..]);
+            var liste = val.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (cle == "freq") { vu = true; freq.AddRange(liste); }
+            else if (cle == "puiss") { vu = true; puiss.AddRange(liste); }
+        }
+        return vu ? (freq, puiss) : null;
+    }
+
     /// <summary>Nom de la sonde de charge que le service lit (LibreHardwareMonitor).</summary>
     public const string SondeChargeAttendue = "Total";
 

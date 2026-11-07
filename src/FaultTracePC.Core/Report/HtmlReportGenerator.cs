@@ -494,15 +494,20 @@ public static class HtmlReportGenerator
             if (ctx.SilenceBefore is { } silence && silence.TotalSeconds >= 20)
                 sb.Append(Lang.T($"<p class=\"small\">Aucun relevé pendant les <strong>{silence.TotalSeconds:0} secondes</strong> qui précèdent l'incident : la surveillance elle-même a cessé de répondre. Ce silence fait partie du constat.</p>",
                                  $"<p class=\"small\">No readings for the <strong>{silence.TotalSeconds:0} seconds</strong> leading up to the incident: the monitoring itself stopped responding. That silence is part of the finding.</p>"));
-            sb.Append(Lang.T("<table><thead><tr><th>Heure</th><th>CPU %</th><th>Temp. CPU</th><th>Temp. GPU</th><th>RAM %</th><th>Mém. virtuelle %</th><th>Plus gros processus</th></tr></thead><tbody>", "<table><thead><tr><th>Time</th><th>CPU %</th><th>CPU temp.</th><th>GPU temp.</th><th>RAM %</th><th>Virtual mem. %</th><th>Largest processes</th></tr></thead><tbody>"));
+            // Point 120, lot B (1.11.0) : fréquence et consommation du processeur, à côté
+            // de sa température — ce qui permettra de voir un processeur qui se bride
+            // pour refroidir (sa fréquence chute pendant que sa température plafonne).
+            sb.Append(Lang.T("<table><thead><tr><th>Heure</th><th>CPU %</th><th>Temp. CPU</th><th>Fréquence CPU</th><th>Puissance CPU</th><th>Temp. GPU</th><th>RAM %</th><th>Mém. virtuelle %</th><th>Plus gros processus</th></tr></thead><tbody>", "<table><thead><tr><th>Time</th><th>CPU %</th><th>CPU temp.</th><th>CPU frequency</th><th>CPU power</th><th>GPU temp.</th><th>RAM %</th><th>Virtual mem. %</th><th>Largest processes</th></tr></thead><tbody>"));
             foreach (var s in ctx.Samples)
             {
                 sb.Append($"<tr><td>{s.Time:HH:mm:ss}</td><td>{Fmt(s.CpuLoad)}</td><td>{Fmt(s.CpuTemp, " °C")}</td>");
+                sb.Append($"<td>{FmtGHz(s.CpuClockMHz)}</td><td>{Fmt(s.CpuPowerW, " W")}</td>");
                 sb.Append($"<td>{Fmt(s.GpuTemp, " °C")}</td><td>{Fmt(s.MemPct)}</td><td>{Fmt(s.CommitPct)}</td>");
                 sb.Append($"<td class=\"small\">{H(s.TopProcesses ?? "")}</td></tr>");
             }
             sb.Append("</tbody></table>");
             sb.Append(NoteChargeAbsente(f, ctx));
+            sb.Append(NoteFrequenceAbsente(f, ctx));
         }
         if (f.Contexts.Count == 0)
             sb.Append(Lang.T("<p class=\"empty\">Aucun crash pendant la période couverte par le journal — la boîte noire veille.</p>", "<p class=\"empty\">No crash during the period covered by the log — the flight recorder is watching.</p>"));
@@ -526,6 +531,36 @@ public static class HtmlReportGenerator
 
     private static string Fmt(double? v, string suffix = "") =>
         v is null ? "—" : $"{v:0.#}{suffix}";
+
+    /// <summary>Fréquence enregistrée en MHz, affichée en GHz : « 4,21 GHz », plus parlant que « 4213 MHz ».</summary>
+    internal static string FmtGHz(double? mhz) =>
+        mhz is { } v ? (v / 1000).ToString("0.00", Lang.Culture) + " GHz" : "—";
+
+    /// <summary>
+    /// POINT 120, lot B — comme <see cref="NoteChargeAbsente"/> : quand AUCUN relevé du
+    /// contexte n'a de fréquence (ou de consommation), le dire, avec ce que le service a
+    /// trouvé comme capteurs s'il l'a écrit. Un tiret n'est pas un zéro.
+    /// </summary>
+    internal static string NoteFrequenceAbsente(FlightInfo f, FlightCrashContext ctx)
+    {
+        if (ctx.Samples.Count == 0) return "";
+        bool sansFreq = !ctx.Samples.Any(x => x.CpuClockMHz is not null);
+        bool sansPuiss = !ctx.Samples.Any(x => x.CpuPowerW is not null);
+        if (!sansFreq && !sansPuiss) return "";
+
+        var quoi = sansFreq && sansPuiss
+            ? Lang.T("Fréquence et consommation du processeur non mesurées", "Processor frequency and power not measured")
+            : sansFreq
+                ? Lang.T("Fréquence du processeur non mesurée", "Processor frequency not measured")
+                : Lang.T("Consommation du processeur non mesurée", "Processor power not measured");
+        var aucun = Lang.T("aucun", "none");
+        var trouves = Analysis.DiagnosticCapteurs.Sondes(f.DiagnosticCapteurs) is { } s
+            ? Lang.T($" Capteurs trouvés par le service à son dernier démarrage — fréquence : {(s.Frequence.Count > 0 ? string.Join(", ", s.Frequence) : aucun)} ; consommation : {(s.Puissance.Count > 0 ? string.Join(", ", s.Puissance) : aucun)}.",
+                     $" Sensors found by the service at its last start — frequency: {(s.Frequence.Count > 0 ? string.Join(", ", s.Frequence) : aucun)}; power: {(s.Puissance.Count > 0 ? string.Join(", ", s.Puissance) : aucun)}.")
+            : "";
+        return Lang.T($"<p class=\"small\"><strong>{quoi}</strong> : un tiret n'est pas un zéro. La version 1.11.0 est la première à les enregistrer, et seulement quand le processeur expose ces capteurs.{H(trouves)}</p>",
+                      $"<p class=\"small\"><strong>{quoi}</strong>: a dash is not a zero. Version 1.11.0 is the first to record them, and only when the processor exposes these sensors.{H(trouves)}</p>");
+    }
 
     private static void BsodSection(StringBuilder sb, DiagnosticReport r)
     {
