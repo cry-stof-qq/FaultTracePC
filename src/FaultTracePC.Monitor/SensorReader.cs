@@ -4,7 +4,8 @@ namespace FaultTracePC.Monitor;
 
 /// <summary>
 /// Lecture des capteurs matériels via LibreHardwareMonitor : charge CPU,
-/// température CPU (max des sondes), température et charge GPU.
+/// température CPU (max des sondes), température et charge GPU, et depuis la
+/// 1.11.0 (point 120) fréquence et consommation du processeur.
 /// Toutes les lectures sont best-effort : un capteur absent renvoie null.
 /// </summary>
 public sealed class SensorReader : IDisposable
@@ -43,7 +44,7 @@ public sealed class SensorReader : IDisposable
 
     private string Decrire(string? erreur)
     {
-        var processeurs = new List<(string, IReadOnlyList<string>)>();
+        var processeurs = new List<(string, IReadOnlyList<string>, IReadOnlyList<string>, IReadOnlyList<string>)>();
         var autres = new List<string>();
         if (_computer is not null)
         {
@@ -53,22 +54,27 @@ public sealed class SensorReader : IDisposable
                 {
                     try { hw.Update(); } catch { }
                     if (hw.HardwareType == HardwareType.Cpu)
-                        processeurs.Add((hw.Name, hw.Sensors.Where(s => s.SensorType == SensorType.Load).Select(s => s.Name).ToList()));
+                        processeurs.Add((hw.Name,
+                            hw.Sensors.Where(s => s.SensorType == SensorType.Load).Select(s => s.Name).ToList(),
+                            // Point 120 : les noms des sondes d'horloge et de puissance, pour
+                            // savoir sur de vraies machines comment la bibliothèque les nomme.
+                            hw.Sensors.Where(s => s.SensorType == SensorType.Clock).Select(s => s.Name).ToList(),
+                            hw.Sensors.Where(s => s.SensorType == SensorType.Power).Select(s => s.Name).ToList()));
                     else
                         autres.Add($"{hw.HardwareType} ({hw.Name})");
                 }
             }
             catch (Exception ex) { erreur ??= ex.Message; }
         }
-        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.Encoder(erreur, processeurs, autres); }
+        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.EncoderComplet(erreur, processeurs, autres); }
         catch { return ""; }
     }
 
-    public (double? CpuLoad, double? CpuTemp, double? GpuTemp, double? GpuLoad) Read()
+    public (double? CpuLoad, double? CpuTemp, double? GpuTemp, double? GpuLoad, double? CpuClockMHz, double? CpuPowerW) Read()
     {
-        if (_computer is null) return (null, null, null, null);
+        if (_computer is null) return (null, null, null, null, null, null);
 
-        double? cpuLoad = null, cpuTemp = null, gpuTemp = null, gpuLoad = null;
+        double? cpuLoad = null, cpuTemp = null, gpuTemp = null, gpuLoad = null, cpuClock = null, cpuPower = null;
         try
         {
             foreach (var hw in _computer.Hardware)
@@ -77,6 +83,11 @@ public sealed class SensorReader : IDisposable
                 switch (hw.HardwareType)
                 {
                     case HardwareType.Cpu:
+                        // Point 120 : le choix des sondes est fait dans Core (testé).
+                        cpuClock = FaultTracePC.Core.Analysis.CapteursProcesseur.Frequence(
+                            hw.Sensors.Where(s => s.SensorType == SensorType.Clock).Select(s => (s.Name, (double?)s.Value)));
+                        cpuPower = FaultTracePC.Core.Analysis.CapteursProcesseur.Puissance(
+                            hw.Sensors.Where(s => s.SensorType == SensorType.Power).Select(s => (s.Name, (double?)s.Value)));
                         foreach (var s in hw.Sensors)
                         {
                             if (s.Value is not { } v || float.IsNaN((float)v)) continue;
@@ -107,7 +118,7 @@ public sealed class SensorReader : IDisposable
         // Filtre de vraisemblance : certaines sondes renvoient 0 ou 255 quand elles décrochent.
         if (cpuTemp is <= 1 or >= 120) cpuTemp = null;
         if (gpuTemp is <= 1 or >= 120) gpuTemp = null;
-        return (cpuLoad, cpuTemp, gpuTemp, gpuLoad);
+        return (cpuLoad, cpuTemp, gpuTemp, gpuLoad, cpuClock, cpuPower);
     }
 
     public void Dispose()

@@ -890,6 +890,16 @@ public sealed class FlightSample
     [JsonPropertyName("ct")] public double? CpuTemp { get; set; }
     [JsonPropertyName("gt")] public double? GpuTemp { get; set; }
     [JsonPropertyName("gl")] public double? GpuLoad { get; set; }
+
+    /// <summary>
+    /// Point 120 (1.11.0) — fréquence la plus haute des cœurs du processeur, en MHz,
+    /// au moment du relevé. Absente des journaux écrits avant la 1.11.0, et sur les
+    /// machines dont la bibliothèque de capteurs ne la fournit pas : null, jamais 0.
+    /// </summary>
+    [JsonPropertyName("cf")] public double? CpuClockMHz { get; set; }
+
+    /// <summary>Point 120 (1.11.0) — consommation du processeur (sonde « Package »), en watts. Null si non mesurée.</summary>
+    [JsonPropertyName("cw")] public double? CpuPowerW { get; set; }
     [JsonPropertyName("m")] public double? MemPct { get; set; }
     [JsonPropertyName("c")] public double? CommitPct { get; set; }
     [JsonPropertyName("top")] public string? TopProcesses { get; set; }

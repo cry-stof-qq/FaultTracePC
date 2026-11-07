@@ -76,7 +76,7 @@ public sealed class FlightRecorderService : BackgroundService
             {
                 try
                 {
-                    var (cpuLoad, cpuTemp, gpuTemp, gpuLoad) = sensors.Read();
+                    var (cpuLoad, cpuTemp, gpuTemp, gpuLoad, cpuClock, cpuPower) = sensors.Read();
                     var (memPct, commitPct) = ReadMemory();
 
                     var sample = new FlightSample
@@ -87,6 +87,8 @@ public sealed class FlightRecorderService : BackgroundService
                         CpuTemp = cpuTemp,
                         GpuTemp = gpuTemp,
                         GpuLoad = gpuLoad,
+                        CpuClockMHz = cpuClock,
+                        CpuPowerW = cpuPower,
                         MemPct = memPct,
                         CommitPct = commitPct,
                         TopProcesses = (++counter % TopProcessEverySamples == 0) ? TopProcesses() : null,

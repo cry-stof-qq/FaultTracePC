@@ -40,6 +40,26 @@ public static class DiagnosticCapteurs
     }
 
     /// <summary>
+    /// Point 120 (1.11.0) — comme <see cref="Encoder"/>, avec en plus le nom des sondes
+    /// de fréquence (« freq= ») et de consommation (« puiss= ») de chaque processeur,
+    /// même vides : sur la prochaine machine sans fréquence enregistrée, on saura si la
+    /// bibliothèque n'en voyait aucune. <see cref="Lire"/> ignore ces champs : une
+    /// version antérieure qui relit ce journal n'en est pas gênée.
+    /// </summary>
+    public static string EncoderComplet(string? erreurOuverture,
+                                        IReadOnlyList<(string Nom, IReadOnlyList<string> SondesCharge, IReadOnlyList<string> SondesFrequence, IReadOnlyList<string> SondesPuissance)> processeurs,
+                                        IReadOnlyList<string> autresMateriels)
+    {
+        static string Net(string v) => v.Replace('|', ' ').Replace(',', ' ').Replace('=', ' ').Trim();
+
+        if (erreurOuverture is not null || processeurs.Count == 0)
+            return Encoder(erreurOuverture, new List<(string, IReadOnlyList<string>)>(), autresMateriels);
+        return Version + string.Concat(processeurs.Select(p =>
+            $"|cpu={Net(p.Nom)}|charge={string.Join(",", p.SondesCharge.Select(Net))}"
+            + $"|freq={string.Join(",", p.SondesFrequence.Select(Net))}|puiss={string.Join(",", p.SondesPuissance.Select(Net))}"));
+    }
+
+    /// <summary>
     /// Met la forme brute en phrase, dans la langue courante. Un texte qui n'est pas
     /// dans la forme brute (journal d'une version de développement) est rendu tel quel.
     /// </summary>

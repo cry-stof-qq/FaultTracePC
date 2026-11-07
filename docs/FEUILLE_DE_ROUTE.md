@@ -141,7 +141,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 117 | **Mises à jour de sécurité des composants : runtime .NET embarqué, paquets NuGet** | relevé le 26/10/2026 à la demande de l'auteur — **1.9.3 et règle mensuelle validées par l'auteur le même jour** ; voir « Point 117 » plus bas |
 | 118 | **La comparaison avec le scan précédent ignore les coupures brutales** (« Aucun nouveau crash… La réparation semble efficace » malgré une coupure le jour même) | constaté le 02/11/2026 sur un diagnostic à distance 1.10.0 — à corriger, voir la section du point 118 |
 | 119 | **Le script de réparation examinait tous les disques, y compris un disque externe en panne** ; « santé : Sain » affiché pour ce disque ; conseil « firmware du SSD » pour un disque dur externe | constaté le 03/11/2026 sur le poste de l'auteur — **corrigé le même jour** (script : défaut constaté ; textes : go de l'auteur), voir la section du point 119 |
-| 120 | **Fréquence et consommation du processeur dans la boîte noire**, pour pouvoir un jour nommer un processeur bridé par la chaleur | idée validée par l'auteur le 07/11/2026 (inspirée de TMOG) — plan en trois lots proposé, **lot A en attente de go**, voir la section du point 120 |
+| 120 | **Fréquence et consommation du processeur dans la boîte noire**, pour pouvoir un jour nommer un processeur bridé par la chaleur | idée validée par l'auteur le 07/11/2026 (inspirée de TMOG) — plan en trois lots ; **lot A écrit le 07/11/2026**, lot B ensuite, voir la section du point 120 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3270,6 +3270,13 @@ Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette ver
 - **Pause de mesure** : quelques jours de relevés réels (poste de l'auteur, quelques postes du parc ; rien n'est attendu dans une machine virtuelle).
 - **Lot C — conclure** : la règle « processeur bridé par la chaleur » (charge forte + température haute + fréquence nettement sous ce que CE poste atteint d'habitude), seuils fixés **sur les données mesurées**, pas devinés — pour ne pas confondre avec un portable qui baisse sa fréquence pour économiser la batterie.
 - **Version visée** : 1.11.0, avec les corrections du point 119.
+- **Go pour le lot A le 07/11/2026 ; lot A écrit le même jour** :
+  - `Models.cs` : `FlightSample.CpuClockMHz` (« cf ») et `CpuPowerW` (« cw ») — null dans les journaux antérieurs et quand le capteur manque, jamais 0 ;
+  - `Analysis/CapteursProcesseur.cs` (nouveau, testé) : `Frequence` = la plus haute des sondes d'horloge du processeur, **sauf celle du bus** (« Bus Speed », ~100 MHz) ; `Puissance` = la sonde dont le nom contient « Package » — les consommations par cœur ne sont **jamais additionnées** (leur somme oublie le reste de la puce) ; valeur nulle, négative, NaN, > 7 000 MHz ou > 500 W → absente ;
+  - `Analysis/DiagnosticCapteurs.cs` : `EncoderComplet` — la ligne de début de session porte en plus `freq=` et `puiss=` avec le nom des sondes trouvées, **même vides** (« freq=|puiss= » dira qu'il n'y en a aucune) ; `Lire` ignore ces champs, la description reste la même ;
+  - `Monitor/SensorReader.cs` et `Monitor/FlightRecorderService.cs` : lecture et enregistrement à chaque relevé ;
+  - `tests/…/CapteursProcesseurTests.cs` (nouveau, 12 tests, 17 cas).
+  - Vérifié : 136 cas sur 136 dans l'environnement de Claude (dont `TraductionTests`) ; `SensorReader.cs` compilé contre une imitation de la bibliothèque de capteurs (le paquet NuGet n'est pas joignable ici) ; empreintes vérifiées sur le poste après écriture. Rien n'est encore **montré** dans le rapport : c'est le lot B.
 
 ## Point 119 — le script de réparation examinait aussi un disque externe en panne — CONSTATÉ et CORRIGÉ le 03/11/2026
 
