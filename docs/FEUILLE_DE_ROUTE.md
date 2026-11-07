@@ -141,6 +141,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 117 | **Mises à jour de sécurité des composants : runtime .NET embarqué, paquets NuGet** | relevé le 26/10/2026 à la demande de l'auteur — **1.9.3 et règle mensuelle validées par l'auteur le même jour** ; voir « Point 117 » plus bas |
 | 118 | **La comparaison avec le scan précédent ignore les coupures brutales** (« Aucun nouveau crash… La réparation semble efficace » malgré une coupure le jour même) | constaté le 02/11/2026 sur un diagnostic à distance 1.10.0 — à corriger, voir la section du point 118 |
 | 119 | **Le script de réparation examinait tous les disques, y compris un disque externe en panne** ; « santé : Sain » affiché pour ce disque ; conseil « firmware du SSD » pour un disque dur externe | constaté le 03/11/2026 sur le poste de l'auteur — **corrigé le même jour** (script : défaut constaté ; textes : go de l'auteur), voir la section du point 119 |
+| 120 | **Fréquence et consommation du processeur dans la boîte noire**, pour pouvoir un jour nommer un processeur bridé par la chaleur | idée validée par l'auteur le 07/11/2026 (inspirée de TMOG) — plan en trois lots proposé, **lot A en attente de go**, voir la section du point 120 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -181,6 +182,8 @@ Mon avis, à discuter.
 **28 — Réconcilier les comptes, partout.** L'épisode winget a montré la valeur d'une ligne qui compare ce qu'on a analysé à ce que l'outil annonce. Le principe vaut au-delà : chaque fois que le logiciel résume une source, il devrait pouvoir dire « j'en ai lu 7 sur 7 ». C'est ce qui distingue une liste vérifiée d'une liste plausible. *Difficulté : faible, à faire au cas par cas.*
 
 **32 — Espace disque : répondre à une autre question que WinDirStat.** Les fondations existent — un bouton listant WinSxS, Windows.old, les temporaires et le cache Windows Update, plus une conclusion sous 8 % d'espace libre. Ce qui manque est ce qui distingue un diagnostic d'une cartographie : dire pour chaque poste **s'il est récupérable et comment**. WinSxS ne se supprime pas, il se nettoie par DISM ; `pagefile.sys` et `hiberfil.sys` ne se touchent jamais à la main ; les clichés instantanés pèsent plusieurs gigaoctets et **n'apparaissent dans aucun scan de fichiers**. Et un point que seul ce logiciel peut traiter : un `MEMORY.DMP` de plusieurs dizaines de gigaoctets **dont il sait s'il l'a déjà analysé**, donc s'il est devenu inutile. Enfin, un disque système saturé empêche l'écriture des dumps — le prochain plantage ne laisserait aucune trace, ce qui en fait une conclusion de diagnostic et pas une remarque de ménage. *Difficulté : moyenne.*
+
+  **Précisé le 07/11/2026, validé par l'auteur** (après examen de TMOG, nouveau gestionnaire des tâches de Dave Plummer, dont la version Pro a un onglet « Espace disque » à la manière de WinDirStat) : ne montrer ce qui remplit le disque **que si C: est presque plein**, et **seulement les gros postes connus** — pas d'explorateur complet du disque. Rien de plus à ajouter au point 32. Toujours non planifié.
 
 **33 — `actions/checkout@v5` et `actions/upload-artifact@v6`.** Calendrier GitHub vérifié le 17/08/2026 : Node 20 en fin de vie en avril 2026, runners passés à Node 24 par défaut le 16 juin 2026, retrait de Node 20 à l'automne 2026. Les actions en v4 tournent donc **déjà** sur Node 24 et les workflows sont verts : ce n'est pas une panne annoncée, c'est de l'hygiène. La raison de le faire tôt est `publication.yml`, lancé une fois par version — une casse s'y découvrirait au pire moment. Trois `checkout@v4` et deux `upload-artifact@v4` à passer en v5 et v6 (pas plus haut : v6 de checkout et v7 d'upload-artifact changent des comportements inutiles ici). `setup-dotnet@v5` est déjà en Node 24. Vérifier ensuite par un essai à blanc de la publication. *Difficulté : triviale.*
 
@@ -3254,6 +3257,19 @@ Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
 
 ---
+
+## Point 120 — fréquence et consommation du processeur dans la boîte noire — idée validée le 07/11/2026
+
+**D'où vient l'idée.** TMOG (« Task Manager OG »), gestionnaire des tâches de Dave Plummer sorti en 1.0 fin septembre 2026, affiche la consommation du processeur en watts et sa fréquence ; il dit « ne pas inventer de valeur » quand un capteur manque. Son enregistreur de vol est réservé à sa version Pro payante — celui de FaultTracePC est gratuit, argument à faire valoir. Sources : IT-Connect et Next, septembre 2026 ; MajorGeeks (TMOG 1.1.1).
+
+**Le manque, lu dans le code.** La boîte noire (`FlightSample`, `Monitor/SensorReader.cs`) enregistre charge et température du processeur et de la carte graphique, mémoire et processus — ni fréquence ni consommation. Sans elles, FaultTracePC ne peut pas distinguer un processeur **bridé par la chaleur** (cause fréquente de « mon PC rame ») d'un processeur simplement occupé.
+
+**Plan proposé le 07/11/2026** (validé sur le principe par l'auteur « avec tes remarques ») :
+- **Lot A — enregistrer** : à chaque relevé, la fréquence la plus haute des cœurs (MHz) et la consommation du processeur (W), quand la bibliothèque de capteurs les fournit ; champs vides dans les anciens journaux ; filtre de vraisemblance (fréquence nulle ou > 7 000 MHz, consommation nulle ou > 500 W → non retenue) ; **noms des capteurs trouvés** écrits dans la ligne de début de session — on ne sait pas d'avance comment la bibliothèque les nomme selon la marque du processeur.
+- **Lot B — montrer** : colonnes « Fréquence » et « Puissance » dans les dernières secondes avant un incident ; « non mesuré » quand le capteur n'existe pas.
+- **Pause de mesure** : quelques jours de relevés réels (poste de l'auteur, quelques postes du parc ; rien n'est attendu dans une machine virtuelle).
+- **Lot C — conclure** : la règle « processeur bridé par la chaleur » (charge forte + température haute + fréquence nettement sous ce que CE poste atteint d'habitude), seuils fixés **sur les données mesurées**, pas devinés — pour ne pas confondre avec un portable qui baisse sa fréquence pour économiser la batterie.
+- **Version visée** : 1.11.0, avec les corrections du point 119.
 
 ## Point 119 — le script de réparation examinait aussi un disque externe en panne — CONSTATÉ et CORRIGÉ le 03/11/2026
 
