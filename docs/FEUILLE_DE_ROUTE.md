@@ -141,7 +141,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 117 | **Mises à jour de sécurité des composants : runtime .NET embarqué, paquets NuGet** | relevé le 26/10/2026 à la demande de l'auteur — **1.9.3 et règle mensuelle validées par l'auteur le même jour** ; voir « Point 117 » plus bas |
 | 118 | **La comparaison avec le scan précédent ignore les coupures brutales** (« Aucun nouveau crash… La réparation semble efficace » malgré une coupure le jour même) | constaté le 02/11/2026 sur un diagnostic à distance 1.10.0 — à corriger, voir la section du point 118 |
 | 119 | **Le script de réparation examinait tous les disques, y compris un disque externe en panne** ; « santé : Sain » affiché pour ce disque ; conseil « firmware du SSD » pour un disque dur externe | constaté le 03/11/2026 sur le poste de l'auteur — **corrigé le même jour** (script : défaut constaté ; textes : go de l'auteur), voir la section du point 119 |
-| 120 | **Fréquence et consommation du processeur dans la boîte noire**, pour pouvoir un jour nommer un processeur bridé par la chaleur | idée validée par l'auteur le 07/11/2026 (inspirée de TMOG) — plan en trois lots ; **lots A et B écrits le 07/11/2026**, pause de mesure puis lot C, voir la section du point 120 |
+| 120 | **Fréquence et consommation du processeur dans la boîte noire**, pour pouvoir un jour nommer un processeur bridé par la chaleur | idée validée par l'auteur le 07/11/2026 (inspirée de TMOG) — plan en trois lots ; **lots A et B écrits le 07/11/2026, CI verte**, publication 1.11.0 puis pause de mesure puis lot C, voir la section du point 120 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3284,6 +3284,7 @@ Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette ver
   - Relevé, non corrigé : les colonnes existantes (températures, pourcentages) et la puissance suivent la culture de la MACHINE pour le séparateur décimal, pas la langue du rapport — un rapport anglais sur un Windows français écrit « 15,2 W ». Comportement antérieur, sans gravité ; la fréquence, elle, suit la langue du rapport.
   - Vérifié : 144 cas sur 144 dans l'environnement de Claude (dont `TraductionTests`, `RenduAnglaisTests`) ; empreintes vérifiées sur le poste après écriture.
   - **Suite** : la pause de mesure (publier la 1.11.0, laisser tourner quelques jours sur des postes réels, relever les noms des capteurs et les valeurs), puis le lot C.
+- **Lot B : CI verte le 07/11/2026.** Prochaine étape : publier la 1.11.0 (point 119 + point 120 lots A et B), sur go de l'auteur.
 
 ## Point 119 — le script de réparation examinait aussi un disque externe en panne — CONSTATÉ et CORRIGÉ le 03/11/2026
 
