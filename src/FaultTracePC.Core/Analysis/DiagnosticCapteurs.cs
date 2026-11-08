@@ -46,17 +46,50 @@ public static class DiagnosticCapteurs
     /// bibliothèque n'en voyait aucune. <see cref="Lire"/> ignore ces champs : une
     /// version antérieure qui relit ce journal n'en est pas gênée.
     /// </summary>
+    /// <param name="pilotePawnIO">
+    /// Point 120 (1.11.0, essai du 08/11/2026) — état du pilote PawnIO tel que le service
+    /// l'a relevé : <see cref="PawnIOAbsent"/>, ou l'état donné par Windows (« Running »,
+    /// « Stopped »…). Null si le relevé a échoué : le champ n'est alors pas écrit.
+    /// </param>
     public static string EncoderComplet(string? erreurOuverture,
                                         IReadOnlyList<(string Nom, IReadOnlyList<string> SondesCharge, IReadOnlyList<string> SondesFrequence, IReadOnlyList<string> SondesPuissance)> processeurs,
-                                        IReadOnlyList<string> autresMateriels)
+                                        IReadOnlyList<string> autresMateriels,
+                                        string? pilotePawnIO = null)
     {
         static string Net(string v) => v.Replace('|', ' ').Replace(',', ' ').Replace('=', ' ').Trim();
 
+        var pawnio = pilotePawnIO is null ? "" : $"|pawnio={Net(pilotePawnIO)}";
         if (erreurOuverture is not null || processeurs.Count == 0)
-            return Encoder(erreurOuverture, new List<(string, IReadOnlyList<string>)>(), autresMateriels);
+            return Encoder(erreurOuverture, new List<(string, IReadOnlyList<string>)>(), autresMateriels) + pawnio;
         return Version + string.Concat(processeurs.Select(p =>
             $"|cpu={Net(p.Nom)}|charge={string.Join(",", p.SondesCharge.Select(Net))}"
-            + $"|freq={string.Join(",", p.SondesFrequence.Select(Net))}|puiss={string.Join(",", p.SondesPuissance.Select(Net))}"));
+            + $"|freq={string.Join(",", p.SondesFrequence.Select(Net))}|puiss={string.Join(",", p.SondesPuissance.Select(Net))}"))
+            + pawnio;
+    }
+
+    /// <summary>
+    /// Point 120 — valeur écrite par le service quand aucun pilote PawnIO n'est inscrit
+    /// dans Windows. Mesuré le 08/11/2026 sur le poste de l'auteur : sans ce pilote, la
+    /// bibliothèque de capteurs (LibreHardwareMonitor 0.9.6) voit les sondes de
+    /// température, de fréquence et de consommation du processeur, mais elles restent
+    /// vides ; une fois le pilote installé et le service redémarré, elles sont lues.
+    /// </summary>
+    public const string PawnIOAbsent = "absent";
+
+    /// <summary>État relevé par Windows pour un pilote en marche.</summary>
+    public const string PawnIOActif = "Running";
+
+    /// <summary>
+    /// Point 120 — l'état du pilote PawnIO écrit par le service (<see cref="EncoderComplet"/>).
+    /// Null quand la ligne n'en porte pas : service antérieur, ou relevé impossible.
+    /// </summary>
+    public static string? EtatPawnIO(string? brut)
+    {
+        if (brut is null || !brut.StartsWith(Version + "|", StringComparison.Ordinal)) return null;
+        foreach (var champ in brut.Split('|').Skip(1))
+            if (champ.StartsWith("pawnio=", StringComparison.Ordinal))
+                return champ["pawnio=".Length..].Trim() is { Length: > 0 } v ? v : null;
+        return null;
     }
 
     /// <summary>

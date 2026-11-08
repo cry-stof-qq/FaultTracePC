@@ -473,6 +473,7 @@ public static class HtmlReportGenerator
             sb.Append(Lang.T("<p class=\"empty\">Les seuils sont modifiables dans ", "<p class=\"empty\">The thresholds can be changed in ")
                     + "<code>ProgramData\\FaultTracePC\\alerts.json</code> "
                     + "(<code>CpuTempWarn</code>, <code>CpuTempCrit</code>, <code>GpuTempWarn</code>, <code>GpuTempCrit</code>).</p>");
+            sb.Append(NoteTemperatureProcesseurAbsente(f));
         }
 
         sb.Append(Lang.T($"<p class=\"sub2\">État : <strong>{(f.Active ? "🟢 service actif" : "🔴 service arrêté")}</strong>",
@@ -538,28 +539,78 @@ public static class HtmlReportGenerator
 
     /// <summary>
     /// POINT 120, lot B — comme <see cref="NoteChargeAbsente"/> : quand AUCUN relevé du
-    /// contexte n'a de fréquence (ou de consommation), le dire, avec ce que le service a
-    /// trouvé comme capteurs s'il l'a écrit. Un tiret n'est pas un zéro.
+    /// contexte n'a de température, de fréquence ou de consommation du processeur, le
+    /// dire, avec la raison si le service l'a relevée, et les capteurs qu'il a trouvés.
+    /// Un tiret n'est pas un zéro.
+    ///
+    /// Essai réel du 08/11/2026 (poste de l'auteur) : les trois mesures manquaient alors
+    /// que le processeur avait bien ces capteurs — il manquait le pilote PawnIO. L'ancien
+    /// texte (« seulement quand le processeur expose ces capteurs ») donnait une fausse
+    /// raison ; il est remplacé par l'état du pilote (<see cref="RaisonCapteursProcesseur"/>).
     /// </summary>
     internal static string NoteFrequenceAbsente(FlightInfo f, FlightCrashContext ctx)
     {
         if (ctx.Samples.Count == 0) return "";
-        bool sansFreq = !ctx.Samples.Any(x => x.CpuClockMHz is not null);
-        bool sansPuiss = !ctx.Samples.Any(x => x.CpuPowerW is not null);
-        if (!sansFreq && !sansPuiss) return "";
+        var manque = new List<string>();
+        if (!ctx.Samples.Any(x => x.CpuTemp is not null)) manque.Add(Lang.T("température", "temperature"));
+        if (!ctx.Samples.Any(x => x.CpuClockMHz is not null)) manque.Add(Lang.T("fréquence", "frequency"));
+        if (!ctx.Samples.Any(x => x.CpuPowerW is not null)) manque.Add(Lang.T("consommation", "power"));
+        if (manque.Count == 0) return "";
 
-        var quoi = sansFreq && sansPuiss
-            ? Lang.T("Fréquence et consommation du processeur non mesurées", "Processor frequency and power not measured")
-            : sansFreq
-                ? Lang.T("Fréquence du processeur non mesurée", "Processor frequency not measured")
-                : Lang.T("Consommation du processeur non mesurée", "Processor power not measured");
+        var liste = manque.Count == 1
+            ? manque[0]
+            : string.Join(", ", manque.Take(manque.Count - 1)) + Lang.T(" et ", " and ") + manque[^1];
+        var debut = char.ToUpper(liste[0], Lang.Culture) + liste[1..];
+        var pluriel = manque.Count > 1 ? "s" : "";
+        var quoi = Lang.T($"{debut} du processeur non mesurée{pluriel}", $"Processor {liste} not measured");
         var aucun = Lang.T("aucun", "none");
         var trouves = Analysis.DiagnosticCapteurs.Sondes(f.DiagnosticCapteurs) is { } s
             ? Lang.T($" Capteurs trouvés par le service à son dernier démarrage — fréquence : {(s.Frequence.Count > 0 ? string.Join(", ", s.Frequence) : aucun)} ; consommation : {(s.Puissance.Count > 0 ? string.Join(", ", s.Puissance) : aucun)}.",
                      $" Sensors found by the service at its last start — frequency: {(s.Frequence.Count > 0 ? string.Join(", ", s.Frequence) : aucun)}; power: {(s.Puissance.Count > 0 ? string.Join(", ", s.Puissance) : aucun)}.")
             : "";
-        return Lang.T($"<p class=\"small\"><strong>{quoi}</strong> : un tiret n'est pas un zéro. La version 1.11.0 est la première à les enregistrer, et seulement quand le processeur expose ces capteurs.{H(trouves)}</p>",
-                      $"<p class=\"small\"><strong>{quoi}</strong>: a dash is not a zero. Version 1.11.0 is the first to record them, and only when the processor exposes these sensors.{H(trouves)}</p>");
+        return Lang.T($"<p class=\"small\"><strong>{quoi}</strong> : un tiret n'est pas un zéro.",
+                      $"<p class=\"small\"><strong>{quoi}</strong>: a dash is not a zero.")
+             + RaisonCapteursProcesseur(Analysis.DiagnosticCapteurs.EtatPawnIO(f.DiagnosticCapteurs))
+             + H(trouves) + "</p>";
+    }
+
+    /// <summary>
+    /// POINT 120 — pourquoi les mesures du processeur peuvent manquer, selon l'état du
+    /// pilote PawnIO relevé par le service. Texte HTML, commençant par une espace.
+    /// </summary>
+    internal static string RaisonCapteursProcesseur(string? etatPawnIO) => etatPawnIO switch
+    {
+        null => Lang.T(" La raison n'a pas été enregistrée : le service de surveillance de cette machine est antérieur à la version 1.11.0, la première à noter la fréquence, la consommation et la présence du pilote PawnIO, par lequel passent ces mesures.",
+                       " The reason was not recorded: this machine's monitoring service predates version 1.11.0, the first to record the frequency, the power and whether the PawnIO driver, which these readings go through, is present."),
+        Analysis.DiagnosticCapteurs.PawnIOAbsent => PhrasePawnIOAbsent(),
+        Analysis.DiagnosticCapteurs.PawnIOActif => Lang.T(" Le pilote PawnIO est pourtant actif : la bibliothèque de capteurs ne fournit pas ces mesures sur ce processeur.",
+                                                          " The PawnIO driver is running, though: the sensor library does not provide these readings on this processor."),
+        _ => Lang.T($" Le pilote PawnIO, par lequel passent ces mesures, est installé mais pas en marche (état relevé par Windows : {H(etatPawnIO)}).",
+                    $" The PawnIO driver, which these readings go through, is installed but not running (state reported by Windows: {H(etatPawnIO)})."),
+    };
+
+    /// <summary>
+    /// POINT 120 — le pilote PawnIO manque : le dire, et comment l'installer. FaultTracePC
+    /// ne l'installe pas lui-même (pilote du noyau : décision de l'administrateur).
+    /// Commande mesurée le 08/11/2026 sur le poste de l'auteur.
+    /// </summary>
+    internal static string PhrasePawnIOAbsent() => Lang.T(
+        " Le pilote PawnIO, par lequel la bibliothèque de capteurs lit la température, la fréquence et la consommation du processeur, n'est pas installé sur ce poste ; FaultTracePC ne l'installe pas lui-même. Pour l'installer, en administrateur : <code>winget install --id namazso.PawnIO -e</code>, puis <code>Restart-Service FaultTracePCMonitor</code> (ou redémarrer le poste).",
+        " The PawnIO driver, through which the sensor library reads the processor's temperature, frequency and power, is not installed on this computer; FaultTracePC does not install it itself. To install it, as an administrator: <code>winget install --id namazso.PawnIO -e</code>, then <code>Restart-Service FaultTracePCMonitor</code> (or restart the computer).");
+
+    /// <summary>
+    /// POINT 120 — « Températures dans la durée » sans ligne pour le processeur, quand le
+    /// service a relevé que PawnIO manque : sans cette température, les alertes
+    /// « Température du processeur élevée » ne peuvent pas se déclencher. Rien n'est dit
+    /// quand la raison n'est pas connue (service antérieur à la 1.11.0).
+    /// </summary>
+    internal static string NoteTemperatureProcesseurAbsente(FlightInfo f)
+    {
+        if (f.Thermal.Any(t => t.Sensor == Analysis.ThermalHistory.CapteurCpu)) return "";
+        if (Analysis.DiagnosticCapteurs.EtatPawnIO(f.DiagnosticCapteurs) != Analysis.DiagnosticCapteurs.PawnIOAbsent) return "";
+        return Lang.T("<p class=\"small\"><strong>Pas de ligne pour le processeur</strong> : sa température n'est pas lue, et les alertes « Température du processeur élevée » ne peuvent donc pas se déclencher.",
+                      "<p class=\"small\"><strong>No row for the processor</strong>: its temperature is not read, so the “Processor temperature high” alerts cannot fire.")
+             + PhrasePawnIOAbsent() + "</p>";
     }
 
     private static void BsodSection(StringBuilder sb, DiagnosticReport r)

@@ -66,8 +66,33 @@ public sealed class SensorReader : IDisposable
             }
             catch (Exception ex) { erreur ??= ex.Message; }
         }
-        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.EncoderComplet(erreur, processeurs, autres); }
+        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.EncoderComplet(erreur, processeurs, autres, EtatPilotePawnIO()); }
         catch { return ""; }
+    }
+
+    /// <summary>
+    /// Point 120 — essai réel du 08/11/2026 sur le poste de l'auteur : sans le pilote
+    /// PawnIO, la bibliothèque voit les sondes de température, de fréquence et de
+    /// consommation du processeur, mais elles restent vides ; une fois PawnIO installé
+    /// et le service redémarré, elles sont lues. Le service note donc l'état du pilote,
+    /// pour que le rapport donne la vraie raison d'une mesure absente.
+    /// Même requête que la vérification faite à la main le 08/11/2026
+    /// (<c>Win32_SystemDriver</c>, nom « PawnIO », état « Running »).
+    /// Null si la requête échoue : on ne prétend rien.
+    /// </summary>
+    private static string? EtatPilotePawnIO()
+    {
+        try
+        {
+            using var recherche = new System.Management.ManagementObjectSearcher(
+                "SELECT State FROM Win32_SystemDriver WHERE Name = 'PawnIO'");
+            using var resultats = recherche.Get();
+            foreach (System.Management.ManagementBaseObject pilote in resultats)
+                using (pilote)
+                    return pilote["State"] as string is { Length: > 0 } etat ? etat : null;
+            return FaultTracePC.Core.Analysis.DiagnosticCapteurs.PawnIOAbsent;
+        }
+        catch { return null; }
     }
 
     public (double? CpuLoad, double? CpuTemp, double? GpuTemp, double? GpuLoad, double? CpuClockMHz, double? CpuPowerW) Read()
