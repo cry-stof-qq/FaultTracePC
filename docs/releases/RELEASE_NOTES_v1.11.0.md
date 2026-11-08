@@ -1,6 +1,8 @@
 ## In English
 
-**The flight recorder now records two more readings: the processor's frequency and its power draw.** The background monitoring service writes them every 10 seconds, when the processor exposes those sensors, and the report shows them in "Last seconds before the incident". A dash means "not measured", never zero. This is the first step towards telling a processor slowed down by heat apart from one that is simply busy: this release measures, it does not conclude yet.
+**The flight recorder now records two more readings: the processor's frequency and its power draw.** The background monitoring service writes them every 10 seconds, and the report shows them in "Last seconds before the incident". A dash means "not measured", never zero. This is the first step towards telling a processor slowed down by heat apart from one that is simply busy: this release measures, it does not conclude yet.
+
+**These readings — and the processor temperature — need the PawnIO driver, which FaultTracePC does not install.** Measured on a real computer: without it, the sensors exist but stay empty; with it, they are read. On a computer without PawnIO, FaultTracePC has never read the processor temperature. The report now says so, and gives the command to install it on one computer.
 
 **An external drive in trouble is handled with more care.** The repair script now scans only the system drive: an external drive that returns errors must be copied first, not put under load. And for a USB drive, the health that Windows reports is shown as "not measurable through USB": through a USB enclosure, Windows usually does not read the drive's own health.
 
@@ -21,7 +23,7 @@ Fleet console at install time: `msiexec /i FaultTracePC-1.11.0.msi /qn ADDLOCAL=
 
 ---
 
-Deux changements : la boîte noire enregistre deux mesures de plus, et un disque externe en difficulté est traité avec plus de précaution. L'installation est la même qu'en 1.10.0.
+Deux changements : la boîte noire enregistre deux mesures de plus — et dit enfin pourquoi les mesures du processeur manquent sur un poste sans le pilote PawnIO —, et un disque externe en difficulté est traité avec plus de précaution. L'installation est la même qu'en 1.10.0.
 
 ## La fréquence et la consommation du processeur dans la boîte noire — point 120
 
@@ -36,7 +38,22 @@ Dans le rapport, le tableau « Dernières secondes avant l'incident » gagne deu
 
 **Pourquoi.** Un processeur trop chaud baisse lui-même sa fréquence pour se protéger : on dit qu'il est « bridé ». Le poste devient lent sans rien afficher. Jusqu'ici, FaultTracePC voyait un processeur chargé et chaud, mais ne pouvait pas distinguer un processeur bridé d'un processeur simplement occupé. **Cette version mesure, elle ne conclut pas encore.** La conclusion « processeur bridé par la chaleur » viendra dans une version suivante, avec des seuils fixés sur des mesures relevées sur de vrais postes plutôt que devinés — notamment pour ne pas confondre avec un portable qui baisse sa fréquence pour économiser sa batterie.
 
-**Un tiret n'est pas un zéro.** Quand une mesure manque, la case affiche un tiret. Quand elle manque sur tout le tableau, une note l'explique : « Fréquence et consommation du processeur non mesurées : un tiret n'est pas un zéro. » Elle ajoute, quand le service les a notés à son démarrage, le nom des capteurs qu'il a trouvés — ou « aucun ». Ces noms varient selon la marque du processeur : ils serviront à régler la future conclusion. Une valeur invraisemblable (nulle, négative, au-delà de 7 000 MHz ou de 500 W) n'est pas retenue.
+## Ces mesures demandent un pilote : PawnIO
+
+**Mesuré sur un poste réel le 08/11/2026.** La bibliothèque qui lit les capteurs (LibreHardwareMonitor) passe par un **pilote**, PawnIO, pour lire la température, la fréquence et la consommation du processeur — et elle ne l'installe pas. Sans lui, les capteurs existent mais restent vides ; une fois PawnIO installé, les trois mesures sont lues dès le premier relevé.
+
+**Cela vaut aussi pour la température du processeur, et pas seulement depuis cette version.** Sur un poste sans PawnIO, FaultTracePC ne l'a jamais lue, et les alertes « Température du processeur élevée » ne pouvaient donc pas se déclencher. La température et la charge de la carte graphique, la charge du processeur et la mémoire ne sont pas concernées : elles passent par d'autres chemins.
+
+**FaultTracePC n'installe pas PawnIO.** Un pilote tourne au cœur de Windows, avec tous les droits : l'installer est une décision d'administrateur. Pour un poste, dans PowerShell en administrateur :
+
+```
+winget install --id namazso.PawnIO -e
+Restart-Service FaultTracePCMonitor
+```
+
+La seconde commande redémarre la surveillance : elle ne voit le pilote qu'à son démarrage (redémarrer le poste fait la même chose).
+
+**Le rapport dit désormais la vraie raison.** Le service note à son démarrage si PawnIO est présent. Quand une mesure du processeur manque — température, fréquence ou consommation —, la case affiche un tiret, et une note sous le tableau dit pourquoi : pilote absent (avec la commande ci-dessus), pilote installé mais arrêté, ou pilote présent mais mesure non fournie par ce processeur. Elle ajoute le nom des capteurs que le service a trouvés ; ces noms varient selon la marque du processeur et serviront à régler la future conclusion. Sous « Températures dans la durée », quand il n'y a pas de ligne pour le processeur faute de PawnIO, le rapport le dit aussi, et rappelle que les alertes de température du processeur ne peuvent pas se déclencher. Un tiret n'est pas un zéro. Une valeur invraisemblable (nulle, négative, au-delà de 7 000 MHz ou de 500 W) n'est pas retenue.
 
 ## Un disque externe en difficulté — point 119
 
@@ -49,12 +66,14 @@ Constaté le 03/11/2026 sur un vrai disque externe devenu illisible : FaultTrace
 ## Limites, dites franchement
 
 - **Rien pour le passé.** La fréquence et la consommation ne sont enregistrées qu'à partir de l'installation de la 1.11.0. Un incident plus ancien n'en aura jamais : le rapport le dit.
-- **Tous les processeurs n'exposent pas ces capteurs.** Quand ils manquent, le rapport le dit et nomme ce que le service a trouvé.
+- **Sans PawnIO, rien de nouveau** : ni température, ni fréquence, ni consommation du processeur. Le rapport le dit, poste par poste.
+- **Sur un parc, FaultTracePC ne déploie pas PawnIO**, et la commande ci-dessus ne convient pas à un déploiement par stratégie de groupe : winget n'est pas utilisable sous le compte système de Windows (mesuré le 02/11/2026). La manière de l'installer sur un parc n'est pas encore documentée ; une fois la 1.11.0 déployée, les rapports des postes diront où il manque.
+- **Même avec PawnIO**, un processeur peut ne pas fournir l'une de ces mesures à la bibliothèque : le rapport le dit alors sous cette raison.
 - **Pas encore de conclusion** sur un processeur bridé : voir plus haut.
 
 ## Ce qu'il faut mettre à jour, et où
 
-Tous les postes où FaultTracePC est installé : c'est le service de surveillance de chaque poste qui enregistre les nouvelles mesures. Sur un parc, la console le fait par la sélection.
+Tous les postes où FaultTracePC est installé : c'est le service de surveillance de chaque poste qui enregistre les nouvelles mesures. Sur un parc, la console le fait par la sélection. Pour que les mesures du processeur soient lues, il faut **en plus** PawnIO sur le poste (voir plus haut).
 
 ## Ce qui ne change pas
 
