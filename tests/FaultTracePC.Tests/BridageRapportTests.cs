@@ -132,6 +132,31 @@ public class BridageRapportTests
     }
 
     [Fact]
+    public void Surchauffe_avant_un_crash_la_pate_thermique_seulement_si_la_surchauffe_revient()
+    {
+        // Aligné le 11/11/2026 à la demande de l'auteur : plus de conseil selon l'âge.
+        var initial = Lang.Current;
+        try
+        {
+            Lang.Apply(AppLanguage.French);
+            var r = new DiagnosticReport { ScanPeriodDays = 30, System = new SystemSnapshot { MachineName = "POSTE-TEST" } };
+            r.Flight.JournalFound = true;
+            var crash = new DateTime(2026, 11, 11, 12, 10, 0);
+            r.Flight.Contexts.Add(new FlightCrashContext
+            {
+                CrashTime = crash,
+                Samples = { new FlightSample { Time = crash.AddSeconds(-10), CpuLoad = 100, CpuTemp = 97, MemPct = 40 } },
+            });
+            new RulesEngine().Analyze(r);
+
+            var f = Assert.Single(r.Findings, x => x.Title.StartsWith("SURCHAUFFE mesurée juste avant le crash", StringComparison.Ordinal));
+            Assert.DoesNotContain("plusieurs années", f.Recommendation);
+            Assert.Contains("Si la surchauffe revient après dépoussiérage, faire renouveler la pâte thermique.", f.Recommendation);
+        }
+        finally { Lang.Apply(initial); }
+    }
+
+    [Fact]
     public void L_alerte_temps_reel_ne_conseille_plus_la_pate_thermique_selon_l_age()
     {
         var initial = Lang.Current;

@@ -919,9 +919,12 @@ public sealed class RulesEngine
                                   $"The flight recorder shows {(maxCpuTemp >= 90 ? $"the CPU at {maxCpuTemp:0} °C" : $"the GPU at {maxGpuTemp:0} °C")} "
                                   + "in the seconds before the crash — overheating that trips the hardware protection. "
                                   + $"Last readings: CPU {last.CpuLoad:0}% / {last.CpuTemp:0} °C, memory {last.MemPct:0}%."),
+                    // Point 120, lot C2 (aligné le 11/11/2026 à la demande de l'auteur) : plus de pâte
+                    // thermique selon l'âge ; elle est conseillée si la surchauffe REVIENT, c'est-à-dire
+                    // sur une mesure.
                     Recommendation = Lang.T(
-                        "Dépoussiérer radiateurs et ventilateurs, vérifier leur rotation, renouveler la pâte thermique si la machine a plusieurs années, contrôler la ventilation du boîtier.",
-                        "Clear the dust from heatsinks and fans, check that they still spin, renew the thermal paste if the machine is a few years old, and check the case airflow.")
+                        "Dépoussiérer radiateurs et ventilateurs, vérifier leur rotation, contrôler la ventilation du boîtier. Si la surchauffe revient après dépoussiérage, faire renouveler la pâte thermique.",
+                        "Clear the dust from heatsinks and fans, check that they still spin, and check the case airflow. If the overheating comes back after dusting, have the thermal paste renewed.")
                 });
             }
             else if (maxCommit >= 95)
