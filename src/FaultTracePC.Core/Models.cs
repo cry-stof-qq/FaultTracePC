@@ -900,6 +900,13 @@ public sealed class FlightSample
 
     /// <summary>Point 120 (1.11.0) — consommation du processeur (sonde « Package »), en watts. Null si non mesurée.</summary>
     [JsonPropertyName("cw")] public double? CpuPowerW { get; set; }
+
+    /// <summary>
+    /// Point 120, (a) — 11/11/2026 : nom de la sonde qui a donné <see cref="CpuTemp"/>,
+    /// écrit seulement à partir de 80 °C (<see cref="Analysis.CapteursProcesseur.NommerLaSondeDes"/>).
+    /// Null dans les journaux antérieurs et en dessous de ce seuil.
+    /// </summary>
+    [JsonPropertyName("ctn")] public string? CpuTempSensor { get; set; }
     [JsonPropertyName("m")] public double? MemPct { get; set; }
     [JsonPropertyName("c")] public double? CommitPct { get; set; }
     [JsonPropertyName("top")] public string? TopProcesses { get; set; }

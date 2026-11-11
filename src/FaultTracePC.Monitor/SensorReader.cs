@@ -45,6 +45,7 @@ public sealed class SensorReader : IDisposable
     private string Decrire(string? erreur)
     {
         var processeurs = new List<(string, IReadOnlyList<string>, IReadOnlyList<string>, IReadOnlyList<string>)>();
+        var temperatures = new List<string>();
         var autres = new List<string>();
         if (_computer is not null)
         {
@@ -54,19 +55,23 @@ public sealed class SensorReader : IDisposable
                 {
                     try { hw.Update(); } catch { }
                     if (hw.HardwareType == HardwareType.Cpu)
+                    {
+                        // Point 120, (a) : les noms des sondes de température aussi.
+                        temperatures.AddRange(hw.Sensors.Where(s => s.SensorType == SensorType.Temperature).Select(s => s.Name));
                         processeurs.Add((hw.Name,
                             hw.Sensors.Where(s => s.SensorType == SensorType.Load).Select(s => s.Name).ToList(),
                             // Point 120 : les noms des sondes d'horloge et de puissance, pour
                             // savoir sur de vraies machines comment la bibliothèque les nomme.
                             hw.Sensors.Where(s => s.SensorType == SensorType.Clock).Select(s => s.Name).ToList(),
                             hw.Sensors.Where(s => s.SensorType == SensorType.Power).Select(s => s.Name).ToList()));
+                    }
                     else
                         autres.Add($"{hw.HardwareType} ({hw.Name})");
                 }
             }
             catch (Exception ex) { erreur ??= ex.Message; }
         }
-        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.EncoderComplet(erreur, processeurs, autres, EtatPilotePawnIO()); }
+        try { return FaultTracePC.Core.Analysis.DiagnosticCapteurs.EncoderComplet(erreur, processeurs, autres, EtatPilotePawnIO(), temperatures); }
         catch { return ""; }
     }
 
@@ -95,11 +100,14 @@ public sealed class SensorReader : IDisposable
         catch { return null; }
     }
 
-    public (double? CpuLoad, double? CpuTemp, double? GpuTemp, double? GpuLoad, double? CpuClockMHz, double? CpuPowerW) Read()
+    public (double? CpuLoad, double? CpuTemp, string? CpuTempSensor, double? GpuTemp, double? GpuLoad, double? CpuClockMHz, double? CpuPowerW) Read()
     {
-        if (_computer is null) return (null, null, null, null, null, null);
+        if (_computer is null) return (null, null, null, null, null, null, null);
 
-        double? cpuLoad = null, cpuTemp = null, gpuTemp = null, gpuLoad = null, cpuClock = null, cpuPower = null;
+        double? cpuLoad = null, gpuTemp = null, gpuLoad = null, cpuClock = null, cpuPower = null;
+        // Point 120, (a) : toutes les sondes de température des processeurs, le choix
+        // (maximum, nom de la sonde) est fait dans Core (testé).
+        var temperaturesCpu = new List<(string, double?)>();
         try
         {
             foreach (var hw in _computer.Hardware)
@@ -113,13 +121,13 @@ public sealed class SensorReader : IDisposable
                             hw.Sensors.Where(s => s.SensorType == SensorType.Clock).Select(s => (s.Name, (double?)s.Value)));
                         cpuPower = FaultTracePC.Core.Analysis.CapteursProcesseur.Puissance(
                             hw.Sensors.Where(s => s.SensorType == SensorType.Power).Select(s => (s.Name, (double?)s.Value)));
+                        temperaturesCpu.AddRange(hw.Sensors.Where(s => s.SensorType == SensorType.Temperature)
+                                                           .Select(s => (s.Name, (double?)s.Value)));
                         foreach (var s in hw.Sensors)
                         {
                             if (s.Value is not { } v || float.IsNaN((float)v)) continue;
                             if (s.SensorType == SensorType.Load && s.Name.Contains("Total", StringComparison.OrdinalIgnoreCase))
                                 cpuLoad = Math.Round(v, 1);
-                            else if (s.SensorType == SensorType.Temperature)
-                                cpuTemp = Math.Max(cpuTemp ?? 0, Math.Round(v, 1));
                         }
                         break;
 
@@ -140,10 +148,11 @@ public sealed class SensorReader : IDisposable
         }
         catch { /* une lecture ratée n'arrête pas la surveillance */ }
 
-        // Filtre de vraisemblance : certaines sondes renvoient 0 ou 255 quand elles décrochent.
-        if (cpuTemp is <= 1 or >= 120) cpuTemp = null;
+        // Filtre de vraisemblance : certaines sondes renvoient 0 ou 255 quand elles décrochent
+        // (pour le processeur, il est appliqué par CapteursProcesseur.Temperature).
+        var (cpuTemp, cpuTempSensor) = FaultTracePC.Core.Analysis.CapteursProcesseur.Temperature(temperaturesCpu);
         if (gpuTemp is <= 1 or >= 120) gpuTemp = null;
-        return (cpuLoad, cpuTemp, gpuTemp, gpuLoad, cpuClock, cpuPower);
+        return (cpuLoad, cpuTemp, cpuTempSensor, gpuTemp, gpuLoad, cpuClock, cpuPower);
     }
 
     public void Dispose()

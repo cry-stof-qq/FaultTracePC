@@ -54,17 +54,34 @@ public static class DiagnosticCapteurs
     public static string EncoderComplet(string? erreurOuverture,
                                         IReadOnlyList<(string Nom, IReadOnlyList<string> SondesCharge, IReadOnlyList<string> SondesFrequence, IReadOnlyList<string> SondesPuissance)> processeurs,
                                         IReadOnlyList<string> autresMateriels,
-                                        string? pilotePawnIO = null)
+                                        string? pilotePawnIO = null,
+                                        IReadOnlyList<string>? sondesTemperature = null)
     {
         static string Net(string v) => v.Replace('|', ' ').Replace(',', ' ').Replace('=', ' ').Trim();
 
         var pawnio = pilotePawnIO is null ? "" : $"|pawnio={Net(pilotePawnIO)}";
         if (erreurOuverture is not null || processeurs.Count == 0)
             return Encoder(erreurOuverture, new List<(string, IReadOnlyList<string>)>(), autresMateriels) + pawnio;
+        // Point 120, (a) — 11/11/2026 : les noms des sondes de TEMPÉRATURE du processeur,
+        // tous processeurs confondus, même vides (« temp= » dira qu'il n'y en a aucune).
+        var temp = sondesTemperature is null ? "" : $"|temp={string.Join(",", sondesTemperature.Select(Net))}";
         return Version + string.Concat(processeurs.Select(p =>
             $"|cpu={Net(p.Nom)}|charge={string.Join(",", p.SondesCharge.Select(Net))}"
             + $"|freq={string.Join(",", p.SondesFrequence.Select(Net))}|puiss={string.Join(",", p.SondesPuissance.Select(Net))}"))
-            + pawnio;
+            + temp + pawnio;
+    }
+
+    /// <summary>
+    /// Point 120, (a) — les noms des sondes de température du processeur écrits par le
+    /// service. Null quand la ligne n'en porte pas (service antérieur à cet ajout du 11/11/2026).
+    /// </summary>
+    public static IReadOnlyList<string>? SondesTemperature(string? brut)
+    {
+        if (brut is null || !brut.StartsWith(Version + "|", StringComparison.Ordinal)) return null;
+        foreach (var champ in brut.Split('|').Skip(1))
+            if (champ.StartsWith("temp=", StringComparison.Ordinal))
+                return champ["temp=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return null;
     }
 
     /// <summary>

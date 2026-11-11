@@ -564,9 +564,13 @@ public static class HtmlReportGenerator
         var pluriel = manque.Count > 1 ? "s" : "";
         var quoi = Lang.T($"{debut} du processeur non mesurée{pluriel}", $"Processor {liste} not measured");
         var aucun = Lang.T("aucun", "none");
+        // Point 120, (a) : les sondes de température, quand le service les a notées (ajout du 11/11/2026).
+        var temp = Analysis.DiagnosticCapteurs.SondesTemperature(f.DiagnosticCapteurs) is { } t
+            ? Lang.T($" ; température : {(t.Count > 0 ? string.Join(", ", t) : aucun)}", $"; temperature: {(t.Count > 0 ? string.Join(", ", t) : aucun)}")
+            : "";
         var trouves = Analysis.DiagnosticCapteurs.Sondes(f.DiagnosticCapteurs) is { } s
-            ? Lang.T($" Capteurs trouvés par le service à son dernier démarrage — fréquence : {(s.Frequence.Count > 0 ? string.Join(", ", s.Frequence) : aucun)} ; consommation : {(s.Puissance.Count > 0 ? string.Join(", ", s.Puissance) : aucun)}.",
-                     $" Sensors found by the service at its last start — frequency: {(s.Frequence.Count > 0 ? string.Join(", ", s.Frequence) : aucun)}; power: {(s.Puissance.Count > 0 ? string.Join(", ", s.Puissance) : aucun)}.")
+            ? Lang.T($" Capteurs trouvés par le service à son dernier démarrage — fréquence : {(s.Frequence.Count > 0 ? string.Join(", ", s.Frequence) : aucun)} ; consommation : {(s.Puissance.Count > 0 ? string.Join(", ", s.Puissance) : aucun)}{temp}.",
+                     $" Sensors found by the service at its last start — frequency: {(s.Frequence.Count > 0 ? string.Join(", ", s.Frequence) : aucun)}; power: {(s.Puissance.Count > 0 ? string.Join(", ", s.Puissance) : aucun)}{temp}.")
             : "";
         return Lang.T($"<p class=\"small\"><strong>{quoi}</strong> : un tiret n'est pas un zéro.",
                       $"<p class=\"small\"><strong>{quoi}</strong>: a dash is not a zero.")
