@@ -54,7 +54,8 @@ public static class AlertCatalog
             case "cpu_temp" when a.Value is { } v:
                 a.Title = Lang.T($"Température du processeur élevée : {v:0} °C", $"Processor temperature high: {v:0} °C");
                 a.Details = Lang.T($"Le CPU dépasse {v:0} °C de façon soutenue. Au-delà de ~95 °C, le processeur se bride puis la machine peut s'éteindre brutalement pour se protéger.", $"The CPU is sustaining more than {v:0} °C. Above ~95 °C the processor throttles, then the machine may shut down abruptly to protect itself.");
-                a.Recommendation = Lang.T("Vérifier la ventilation : dépoussiérer radiateur et ventilateurs, contrôler leur rotation, renouveler la pâte thermique si la machine a plus de 3-4 ans. Fermer les applications qui chargent le CPU pour tester.", "Check the cooling: clear the dust from the heatsink and fans, check that they spin, renew the thermal paste if the machine is more than 3-4 years old. Close the applications loading the CPU to test.");
+                // Point 120, lot C2 : plus de conseil de pâte thermique selon l'âge seul (le rapport le donne quand un ralentissement est mesuré).
+                a.Recommendation = Lang.T("Vérifier la ventilation : dépoussiérer radiateur et ventilateurs, contrôler leur rotation. Fermer les applications qui chargent le CPU pour tester.", "Check the cooling: clear the dust from the heatsink and fans, check that they spin. Close the applications loading the CPU to test.");
                 return true;
 
             case "gpu_temp" when a.Value is { } v:

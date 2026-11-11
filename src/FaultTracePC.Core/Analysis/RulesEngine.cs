@@ -1094,6 +1094,88 @@ public sealed class RulesEngine
     }
 
     /// <summary>
+    /// POINT 120, LOT C2 (plan validé par l'auteur le 11/11/2026) — conclure sur la
+    /// température du PROCESSEUR à l'aide de sa fréquence (<see cref="BridageThermique"/>).
+    /// Mesuré le 11/11/2026 : un portable AMD à 100 °C gardait sa fréquence maximale (il
+    /// travaillait) ; un portable Intel à 95–99 °C la perdait de 13 % (il se bridait).
+    /// Rend true si une conclusion a été posée — la carte « Surchauffe » à l'ancienne,
+    /// fondée sur la seule température, n'est alors pas émise. Rend false quand la
+    /// fréquence ne permet pas de conclure (journal antérieur à la 1.11.0, pilote PawnIO
+    /// absent, trop peu de relevés frais) : l'ancienne règle s'applique.
+    /// </summary>
+    private static bool ConclureSurLaFrequence(DiagnosticReport r, ThermalStats t, TimeSpan crit, TimeSpan warn,
+                                               string episode, string context)
+    {
+        if (r.Flight.Bridage is not { ReferenceMHz: { } reference } b) return false;
+
+        static string GHz(double mhz) => (mhz / 1000).ToString("0.00", Lang.Culture);
+        var prudence = b.ReferenceSousCharge
+            ? ""
+            : Lang.T(" Confiance faible : la fréquence habituelle de ce processeur n'a pu être relevée qu'à faible charge, et un processeur tient souvent un peu moins sur tous ses cœurs que sur un seul.",
+                     " Low confidence: this processor's usual frequency could only be read at low load, and a processor often holds a little less on all its cores than on one.");
+
+        if (b.Episodes.Count > 0)
+        {
+            var pire = b.Episodes.MinBy(e => e.Rapport)!;
+            var plusLong = b.Episodes.MaxBy(e => e.Duree)!;
+            var cumul = TimeSpan.FromTicks(b.Episodes.Sum(e => e.Duree.Ticks));
+            var ralenti = (int)Math.Round((1 - pire.Rapport) * 100);
+            var arret = b.Episodes.Any(e => e.SuiviDArretBrutal);
+            var critique = arret || pire.Rapport < BridageThermique.RapportFort;
+            r.Findings.Add(new Finding
+            {
+                Severity = critique ? Severity.Critical : Severity.Warning,
+                Confidence = b.ReferenceSousCharge ? Confidence.High : Confidence.Low,
+                Category = FaultCategory.Hardware,
+                Title = Lang.T($"Processeur bridé par la chaleur : jusqu'à {ralenti} % plus lent sous forte charge",
+                               $"Processor throttled by heat: up to {ralenti}% slower under heavy load"),
+                Details = Lang.T(
+                              $"{b.Episodes.Count} épisode(s), {ThermalHistory.Humanize(cumul)} au total, où le processeur, chargé à plus de {BridageThermique.ChargeMin:0} % et à {pire.TemperatureMax:0.#} °C, "
+                              + $"n'a tenu que {GHz(pire.FrequenceMoyenneMHz)} GHz au lieu de {GHz(reference)} GHz, sa fréquence quand il est frais. "
+                              + $"Le plus long : {ThermalHistory.Humanize(plusLong.Duree)} le {plusLong.Debut:dd/MM à HH:mm}. "
+                              + "Le processeur se protège en ralentissant : le poste devient lent, sans panne.",
+                              $"{b.Episodes.Count} episode(s), {ThermalHistory.Humanize(cumul)} in total, where the processor, loaded above {BridageThermique.ChargeMin:0}% and at {pire.TemperatureMax.ToString("0.#", Lang.Culture)} °C, "
+                              + $"held only {GHz(pire.FrequenceMoyenneMHz)} GHz instead of {GHz(reference)} GHz, its frequency when cool. "
+                              + $"The longest: {ThermalHistory.Humanize(plusLong.Duree)} on {plusLong.Debut:MM-dd HH:mm}. "
+                              + "The processor protects itself by slowing down: the computer gets slow, without failing.")
+                          + (arret ? Lang.T(" Un arrêt brutal a suivi l'un de ces épisodes.", " An abrupt shutdown followed one of these episodes.") : "")
+                          + prudence + context,
+                Recommendation = Lang.T(
+                    "Dépoussiérer les ventilateurs et les grilles d'aération, vérifier qu'aucune sortie d'air n'est obstruée ; sur un portable, ne pas l'utiliser posé sur un lit ou un canapé. "
+                    + "Retirer tout overclocking. Si le ralentissement persiste après dépoussiérage, faire renouveler la pâte thermique : c'est ce ralentissement mesuré qui le justifie, pas l'âge de la machine.",
+                    "Clear the dust from the fans and the air vents, check that no air outlet is blocked; on a laptop, do not use it on a bed or a sofa. "
+                    + "Remove any overclocking. If the slowdown persists after dusting, have the thermal paste renewed: it is this measured slowdown that justifies it, not the machine's age."),
+            });
+            return true;
+        }
+
+        // Pas de bridage mesuré, mais assez de chaleur pour une carte : la fréquence
+        // est-elle restée haute au chaud ? Alors ce n'est ni critique ni une panne.
+        var carteMeritee = crit >= TimeSpan.FromMinutes(5) || warn >= TimeSpan.FromMinutes(30) || t.WarnPercent >= 20;
+        if (!carteMeritee || b.RapportMedianAuChaud is not { } tenue || tenue < BridageThermique.RapportBride)
+            return false;
+
+        r.Findings.Add(new Finding
+        {
+            Severity = Severity.Info,
+            Confidence = b.ReferenceSousCharge ? Confidence.High : Confidence.Medium,
+            Category = FaultCategory.Hardware,
+            Title = Lang.T($"Processeur à sa limite de température sous charge, sans ralentir — {ThermalHistory.Humanize(warn)} au-dessus de {t.WarnThreshold:0} °C",
+                           $"Processor at its temperature limit under load, without slowing down — {ThermalHistory.Humanize(warn)} above {t.WarnThreshold:0} °C"),
+            Details = Lang.T(
+                          $"Au-dessus de {t.WarnThreshold:0} °C, le processeur a gardé {Math.Round(tenue * 100):0} % de sa fréquence habituelle ({GHz(reference)} GHz) : il ne s'est pas bridé, le poste n'a pas ralenti. "
+                          + "Ce n'est pas une panne : sous forte charge, un processeur accélère tant que sa température le permet.",
+                          $"Above {t.WarnThreshold:0} °C, the processor kept {Math.Round(tenue * 100):0}% of its usual frequency ({GHz(reference)} GHz): it did not throttle, the computer did not slow down. "
+                          + "This is not a failure: under heavy load, a processor speeds up as far as its temperature allows.")
+                      + episode + prudence + context,
+            Recommendation = Lang.T(
+                "Rien à réparer. Garder les aérations dégagées. Si la chaleur gêne, le mode d'alimentation « Équilibré » ou « Économie d'énergie » de Windows limite les accélérations.",
+                "Nothing to repair. Keep the vents clear. If the heat is a nuisance, Windows' “Balanced” or “Power saver” power mode limits the boosts."),
+        });
+        return true;
+    }
+
+    /// <summary>
     /// Surchauffe dans la durée. Une pointe à 95 °C pendant dix secondes est sans
     /// conséquence ; une heure cumulée au-dessus de 90 °C use le matériel et
     /// provoque des arrêts de protection que rien, dans les journaux, ne relie
@@ -1115,6 +1197,11 @@ public sealed class RulesEngine
                 : "";
             var context = Lang.T($" Mesuré sur {ThermalHistory.Humanize(t.Observed)} de relevés", $" Measured over {ThermalHistory.Humanize(t.Observed)} of readings")
                         + (t.MaxC is { } mx ? Lang.T($", maximum {mx:0.#} °C le {t.MaxAt:dd/MM à HH:mm}", $", peak {mx.ToString("0.#", Lang.Culture)} °C on {t.MaxAt:MM-dd HH:mm}") : "") + ".";
+
+            // Point 120, lot C2 : pour le processeur, la fréquence départage un processeur
+            // BRIDÉ par la chaleur d'un processeur qui chauffe en travaillant normalement.
+            if (t.Sensor == ThermalHistory.CapteurCpu && ConclureSurLaFrequence(r, t, crit, warn, episode, context))
+                continue;
 
             if (crit >= TimeSpan.FromMinutes(5))
             {
@@ -1139,11 +1226,11 @@ public sealed class RulesEngine
                                 " At those temperatures the machine protects itself by slowing down, then shuts off abruptly — "
                                 + "shutdowns that nothing in the logs spontaneously links to heat."),
                     Recommendation = Lang.T(
-                        "Dépoussiérer les ventilateurs et les grilles d'aération, vérifier qu'aucune sortie d'air n'est obstruée, "
-                        + "et sur une machine de plus de trois ans envisager le remplacement de la pâte thermique. "
+                        // Point 120, lot C2 : plus de conseil de pâte thermique selon l'âge seul —
+                        // il est donné quand un ralentissement est mesuré (ConclureSurLaFrequence).
+                        "Dépoussiérer les ventilateurs et les grilles d'aération, vérifier qu'aucune sortie d'air n'est obstruée. "
                         + "Retirer tout overclocking. Sur un portable, éviter de l'utiliser posé sur un lit ou un canapé, qui bouchent les aérations.",
-                        "Clear the dust from the fans and the air vents, check that no air outlet is blocked, "
-                        + "and on a machine more than three years old consider renewing the thermal paste. "
+                        "Clear the dust from the fans and the air vents, check that no air outlet is blocked. "
                         + "Remove any overclocking. On a laptop, avoid using it on a bed or a sofa, which block the vents."),
                 });
             }
