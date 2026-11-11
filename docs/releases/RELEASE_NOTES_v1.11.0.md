@@ -6,6 +6,8 @@
 
 **An external drive in trouble is handled with more care.** The repair script now scans only the system drive: an external drive that returns errors must be copied first, not put under load. And for a USB drive, the health that Windows reports is shown as "not measurable through USB": through a USB enclosure, Windows usually does not read the drive's own health.
 
+**Rebuilt on .NET 10.0.15**, Microsoft's security update of 10 November 2026. FaultTracePC ships with its own copy of .NET, which Windows Update never patches: only a rebuild does.
+
 The notes below are in French. The full English description of the software is here: **[FaultTracePC — diagnose, monitor and repair a Windows PC](https://palisser.fr/spip.php?article31)**
 
 | File | For whom |
@@ -62,6 +64,12 @@ Constaté le 03/11/2026 sur un vrai disque externe devenu illisible : FaultTrace
 - **Le script de réparation n'examine plus que le disque système.** Il lançait un examen (`Repair-Volume -Scan`) sur chaque disque ayant une lettre, le disque externe en panne compris. Or un disque qui lâche doit être recopié avant toute autre lecture. Le script le dit désormais : « Les autres disques ne sont pas examinés : un disque externe qui renvoie des erreurs doit d'abord être recopié, pas sollicité. » La boîte à outils et la réparation guidée, elles, n'examinaient déjà que le disque système.
 - **« Sain » à travers l'USB n'est plus présenté comme une garantie.** La fiche « Disques physiques » affichait « santé : Sain » pour ce disque, au moment même où Windows enregistrait des centaines de blocs défectueux. À travers un boîtier USB, l'état de santé que Windows rapporte n'est le plus souvent pas lu sur le disque. Le rapport écrit maintenant : « non mesurable à travers l'USB (Windows indique « Sain ») ». Un état mauvais reste affiché tel quel ; les disques internes ne changent pas.
 - **Le conseil des alertes « Erreur disque signalée par Windows »** recommandait à tout disque de mettre à jour le firmware du SSD. Il dit maintenant : « Sauvegarder les données importantes sans attendre, et vérifier la santé SMART du disque et ses câbles. Disque externe : le recopier avant tout, sans lancer de réparation dessus. SSD interne : vérifier aussi son firmware chez le fabricant. » Les alertes déjà archivées affichent le nouveau texte.
+
+## Construite sur .NET 10.0.15 — mise à jour de sécurité du 10/11/2026
+
+FaultTracePC embarque **sa propre copie de .NET**, le moteur qui le fait tourner, et Windows Update ne la met jamais à jour : seule une reconstruction le fait (voir les notes de la 1.9.3). Microsoft a publié le 10/11/2026 la mise à jour de sécurité mensuelle de .NET 10, la **10.0.15**. Cette version est construite dessus, et ses bibliothèques Microsoft (`System.Management`, `System.Diagnostics.EventLog`, `System.DirectoryServices`, `Microsoft.Extensions.Hosting.WindowsServices`) passent de 10.0.14 à 10.0.15.
+
+Parmi les failles corrigées ce jour-là, quatre touchent .NET lui-même (deux élévations de privilèges, deux dénis de service) ; les autres concernent ASP.NET Core et Visual Studio, que FaultTracePC n'utilise pas. L'annonce de Microsoft n'en donne que le titre : elle ne permet pas de savoir si FaultTracePC y était exposé. C'est la raison de ne pas attendre.
 
 ## Limites, dites franchement
 
