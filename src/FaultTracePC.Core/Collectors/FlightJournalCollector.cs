@@ -66,6 +66,8 @@ public sealed class FlightJournalCollector
             var thresholds = AlertSettings.Load();
             var cpuThermal = new Analysis.ThermalHistory(Analysis.ThermalHistory.CapteurCpu, thresholds.CpuTempWarn, thresholds.CpuTempCrit);
             var gpuThermal = new Analysis.ThermalHistory(Analysis.ThermalHistory.CapteurGpu, thresholds.GpuTempWarn, thresholds.GpuTempCrit);
+            // Point 120, lot C1 : bridage du processeur par la chaleur, même passage.
+            var bridage = new Analysis.BridageThermique(thresholds.CpuTempWarn);
 
             var targets = Regrouper(crashTimes);
             var window = new Queue<FlightSample>(WindowSize + 1);
@@ -92,9 +94,11 @@ public sealed class FlightJournalCollector
                     {
                         case "b" when entry.PreviousEndedAbruptly == true:
                             info.AbruptSessionEnds++;
+                            bridage.ArretBrutal(info.LastSampleTime); // dernier relevé avant l'arrêt
                             break;
                         case "s":
                             info.LastSampleTime = entry.Time;
+                            bridage.Ajouter(entry.Time, entry.CpuLoad, entry.CpuTemp, entry.CpuClockMHz);
                             cpuThermal.Add(entry.Time, entry.CpuTemp);
                             gpuThermal.Add(entry.Time, entry.GpuTemp);
                             window.Enqueue(entry);
@@ -129,6 +133,7 @@ public sealed class FlightJournalCollector
             // laisserait croire que la machine reste froide alors qu'on n'a rien mesuré.
             foreach (var stats in new[] { cpuThermal.Build(), gpuThermal.Build() })
                 if (stats.HasData) info.Thermal.Add(stats);
+            info.Bridage = bridage.Bilan();
         }
         catch (Exception ex)
         {

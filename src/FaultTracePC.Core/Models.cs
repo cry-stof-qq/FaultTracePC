@@ -1016,6 +1016,12 @@ public sealed class FlightInfo
 
     /// <summary>Point 86 — dernier diagnostic des capteurs écrit par le service (null si journal antérieur à la 1.8.0).</summary>
     public string? DiagnosticCapteurs { get; set; }
+
+    /// <summary>
+    /// Point 120, lot C1 — le processeur s'est-il bridé par la chaleur sur la période
+    /// (<see cref="Analysis.BridageThermique"/>) ? Null si le journal n'a pas été lu.
+    /// </summary>
+    public Analysis.BilanBridage? Bridage { get; set; }
     public int DaysCovered { get; set; }
     public List<FlightCrashContext> Contexts { get; set; } = new();
     /// <summary>Alertes préventives émises par le service sur la période analysée.</summary>
