@@ -150,6 +150,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 124 | **Carte WHEA : un seul événement non « corrigé » fait passer des erreurs de lien PCIe en critique, avec des conseils de processeur et d'alimentation** | CONSTATÉ le 12/11/2026 sur un poste du parc ; l'événement n° 3 est une simple Information — CORRIGÉ le même jour (les événements WHEA d'information ne sont plus comptés) ; voir la section du point 124 |
 | 125 | **Dire comment le poste s'est arrêté et comment il a redémarré** (arrêt normal, veille, veille prolongée, démarrage rapide, démarrage à froid) | proposé à l'auteur le 12/11/2026 après deux postes qui ne se rallumaient plus — **go le même jour ; lot A (lecture) écrit**, lot B (rapport) à suivre ; voir la section du point 125 |
 | 126 | **Comparaison de parc : quels postes n'ont pas repris leur cycle programmé, et qu'ont-ils en commun que les autres n'ont pas ?** | proposé à l'auteur le 12/11/2026 (deux postes identiques sur 32 ne se rallumaient plus) — **validé le même jour, écrit le même jour** (après la CI verte du lot B du point 125) ; voir la section du point 126 |
+| 127 | **Campagne de vol de secrets GitHub (novembre 2026) : le dépôt a-t-il été touché ?** | question de l'auteur le 12/11/2026 — exposition lue dans les workflows, vérifications transmises à l'auteur ; durcissement proposé, go attendu ; voir la section du point 127 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3270,6 +3271,14 @@ Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
 
 ---
+
+## Point 127 — campagne de vol de secrets dans GitHub, novembre 2026 — VÉRIFICATION le 12/11/2026
+
+**Question de l'auteur** (article lu le 12/11/2026) : des milliers de comptes GitHub détournés pour voler les secrets des chaînes de construction ; comment savoir si ce dépôt a été compromis ?
+**Ce que disent les sources** (GBHackers, 12/11/2026) : identifiants volés de 4 837 comptes ; à partir du 10/11/2026 12:45 UTC, injection de workflows dans les dépôts où ces comptes avaient le droit d'écrire (61 839 demandes de fusion recensées jusqu'au 11/11 15:00 UTC) ; traces : demande de fusion « docs: dependency audit notes » depuis une branche `wfx-docs`, commits « ci: refresh build cache », « chore: add ci helper » (script `.ci-xxxxxx.sh` lancé par un `postinstall` npm), « chore: add dependency audit workflow » sur une branche temporaire `chore/xxxxxxxx`, branches `ci-check-NNNN` ; modifications annulées en une minute environ, exécutions et journaux supprimés — **un trou dans la numérotation des exécutions peut être la seule trace** ; envoi vers 194.150.166[.]244:8080 et 18.143.168[.]96:8080 (`/exfil`). Un article de DEV Community cite aussi le déclencheur `pull_request_target` comme porte d'entrée.
+**Exposition de ce dépôt, lue dans `.github/workflows` le 12/11/2026** : aucun `pull_request_target`, aucun `workflow_run` ni `issue_comment` ; aucun secret enregistré utilisé — seul le jeton temporaire de GitHub (`GITHUB_TOKEN`, `contents: write` dans « Publication ») ; ni npm, ni nuage (AWS, Azure, Google). **Il n'y a donc presque rien à voler.** Le vrai risque serait autre : un compte de l'auteur détourné pour glisser du code dans le dépôt, qui finirait dans un MSI construit par la CI. `ci.yml` et `installeur.yml` n'ont pas de bloc `permissions:` (leurs droits sont ceux fixés par défaut dans les réglages du dépôt — non vérifié).
+**Vérifications transmises à l'auteur (lecture seule)** : journal de sécurité de son compte sur la période ; activité du dépôt (branches créées ou supprimées, poussées forcées) ; numérotation continue des exécutions des 10 et 11/11 ; branches distantes (`git ls-remote --heads origin`) et commits de `main` depuis le 10/11 ; jetons, sessions, clés SSH et applications autorisées ; double authentification. Pages publiques non lisibles depuis l'environnement de Claude (accès des robots refusé par GitHub, activité réservée aux comptes connectés) : vérification par l'auteur.
+**Proposé (go attendu)** : `permissions: contents: read` en tête de `ci.yml` et `installeur.yml` (recommandation des articles), sans changer leur fonctionnement.
 
 ## Point 126 — postes restés éteints pendant que les autres démarraient — VALIDÉ et ÉCRIT le 12/11/2026
 
