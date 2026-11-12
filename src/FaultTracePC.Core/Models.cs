@@ -665,6 +665,28 @@ public sealed class WinEvent
     public Dictionary<string, string> Extracted { get; set; } = new();
 }
 
+/// <summary>
+/// POINT 125 — un événement de démarrage ou d'arrêt lu dans le journal Système :
+/// Kernel-General 12 (démarrage) et 13 (arrêt), Kernel-Boot 27 (type de démarrage),
+/// User32 1074 (arrêt ou redémarrage demandé), EventLog 6006 (arrêt propre) et 6008
+/// (arrêt inattendu), Kernel-Power 41 (redémarrage sans arrêt propre), 42 (mise en
+/// veille) et 107 (sortie de veille).
+/// </summary>
+public sealed class EvenementAlimentation
+{
+    public DateTime Heure { get; set; }
+    public string Source { get; set; } = "";
+    public int Id { get; set; }
+    /// <summary>Kernel-Boot 27 : 0 démarrage à froid, 1 « démarrage rapide », 2 sortie de veille prolongée.</summary>
+    public int? TypeDemarrage { get; set; }
+    /// <summary>User32 1074 : programme qui a demandé l'arrêt (par exemple shutdown.exe).</summary>
+    public string? Processus { get; set; }
+    /// <summary>User32 1074 : ce qui a été demandé, dans les mots de Windows (« Redémarrer », « s'arrêter »…).</summary>
+    public string? Action { get; set; }
+    /// <summary>User32 1074 : compte au nom duquel l'arrêt a été demandé.</summary>
+    public string? Compte { get; set; }
+}
+
 public enum DumpKind { KernelMinidump, FullMemoryDump, LiveKernelReport, UserModeMinidump, Unknown }
 
 /// <summary>
@@ -844,6 +866,13 @@ public sealed class DiagnosticReport
     /// qu'un 6006 — tâches planifiées de redémarrage et d'extinction, mise à jour.
     /// </summary>
     public List<DateTime> ArretsDeWindows { get; set; } = new();
+
+    /// <summary>
+    /// POINT 125 (go de l'auteur le 12/11/2026) — démarrages, arrêts, mises en veille et
+    /// arrêts inattendus de Windows sur la période, pour dire comment le poste s'est
+    /// arrêté et comment il a redémarré (voir <see cref="Analysis.ArretsEtDemarrages"/>).
+    /// </summary>
+    public List<EvenementAlimentation> ArretsEtDemarrages { get; set; } = new();
 
     /// <summary>
     /// Actions d'entretien effectuées pendant l'analyse — purge de l'historique

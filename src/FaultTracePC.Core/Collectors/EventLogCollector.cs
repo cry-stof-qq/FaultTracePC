@@ -88,6 +88,56 @@ public sealed class EventLogCollector
         return heures;
     }
 
+    /// <summary>
+    /// POINT 125 — démarrages, arrêts et mises en veille sur la période (voir
+    /// <see cref="EvenementAlimentation"/>). Lus à part des événements du rapport : ce
+    /// ne sont pas des incidents, mais la trame qui dit quand le poste a tourné. En cas
+    /// d'échec de lecture, liste vide : la section du rapport ne dira alors rien.
+    /// </summary>
+    public List<EvenementAlimentation> ArretsEtDemarrages(int days)
+    {
+        var liste = new List<EvenementAlimentation>();
+        long ms = (long)TimeSpan.FromDays(days).TotalMilliseconds;
+        var xpath = "*[System[("
+                  + "(Provider[@Name='Microsoft-Windows-Kernel-General'] and (EventID=12 or EventID=13)) or "
+                  + "(Provider[@Name='Microsoft-Windows-Kernel-Boot'] and EventID=27) or "
+                  + "(Provider[@Name='User32'] and EventID=1074) or "
+                  + "(Provider[@Name='EventLog'] and (EventID=6006 or EventID=6008)) or "
+                  + "(Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=41 or EventID=42 or EventID=107))"
+                  + $") and TimeCreated[timediff(@SystemTime) <= {ms}]]]";
+        try
+        {
+            var query = new EventLogQuery("System", PathType.LogName, xpath) { ReverseDirection = true };
+            using var reader = new EventLogReader(query);
+            for (EventRecord? rec = reader.ReadEvent(); rec is not null && liste.Count < MaxEvenementsParRequete * 4; rec = reader.ReadEvent())
+                using (rec)
+                {
+                    if (rec.TimeCreated is not DateTime t) continue;
+                    var e = new EvenementAlimentation { Heure = t.ToLocalTime(), Source = rec.ProviderName ?? "", Id = rec.Id };
+                    try
+                    {
+                        var p = rec.Properties;
+                        if (rec.Id == 27 && p.Count > 0)
+                            e.TypeDemarrage = Convert.ToInt32(p[0].Value, System.Globalization.CultureInfo.InvariantCulture);
+                        else if (rec.Id == 1074 && p.Count >= 7)
+                        {
+                            e.Processus = Convert.ToString(p[0].Value)?.Trim();
+                            e.Action = Convert.ToString(p[4].Value)?.Trim();
+                            e.Compte = Convert.ToString(p[6].Value)?.Trim();
+                        }
+                    }
+                    catch { /* détail best-effort : l'heure et le numéro suffisent */ }
+                    liste.Add(e);
+                }
+        }
+        catch (EventLogNotFoundException) { /* journal absent : ignoré */ }
+        catch (Exception ex)
+        {
+            _errors.Add(Lang.T($"Journal System (démarrages et arrêts) : {ex.Message}", $"System log (startups and shutdowns): {ex.Message}"));
+        }
+        return liste.OrderBy(e => e.Heure).ToList();
+    }
+
     private void Collect(List<WinEvent> target, string logName, string xpath, EventCategory category)
     {
         try
