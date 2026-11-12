@@ -239,7 +239,8 @@ public sealed class FlightRecorderService : BackgroundService
     private void StartEventWatchers()
     {
         Subscribe("System",
-            "*[System[Provider[@Name='Microsoft-Windows-WHEA-Logger'] or " +
+            // Point 124 : un événement WHEA de niveau Information n'est pas une erreur.
+            "*[System[(Provider[@Name='Microsoft-Windows-WHEA-Logger'] and (Level=1 or Level=2 or Level=3)) or " +
             "(Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41) or " +
             "(Provider[@Name='Microsoft-Windows-Resource-Exhaustion-Detector'] and EventID=2004) or " +
             "((Provider[@Name='disk'] or Provider[@Name='Ntfs'] or Provider[@Name='stornvme'] or Provider[@Name='storahci']) and (Level=1 or Level=2))]]",

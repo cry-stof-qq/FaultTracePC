@@ -40,7 +40,11 @@ public sealed class EventLogCollector
         Collect(events, "System", $"*[System[Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] and (EventID=1001) and TimeCreated[timediff(@SystemTime) <= {ms}]]]", EventCategory.Bsod);
         Collect(events, "System", $"*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=41) and TimeCreated[timediff(@SystemTime) <= {ms}]]]", EventCategory.PowerLoss);
         Collect(events, "System", $"*[System[Provider[@Name='EventLog'] and (EventID=6008) and TimeCreated[timediff(@SystemTime) <= {ms}]]]", EventCategory.UnexpectedShutdown);
-        Collect(events, "System", $"*[System[Provider[@Name='Microsoft-Windows-WHEA-Logger'] and TimeCreated[timediff(@SystemTime) <= {ms}]]]", EventCategory.Whea);
+        // Point 124 — constaté le 12/11/2026 sur un poste du parc : un événement WHEA-Logger
+        // n° 3 de niveau INFORMATION (« Un événement matériel s'est produit ») était compté
+        // comme une erreur matérielle, et faisait passer 18 erreurs corrigées en carte
+        // critique. Seuls les niveaux critique, erreur et avertissement sont des erreurs.
+        Collect(events, "System", $"*[System[Provider[@Name='Microsoft-Windows-WHEA-Logger'] and (Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= {ms}]]]", EventCategory.Whea);
         Collect(events, "System", $"*[System[Provider[@Name='Display'] and (EventID=4101) and TimeCreated[timediff(@SystemTime) <= {ms}]]]", EventCategory.Tdr);
         Collect(events, "System", $"*[System[(Provider[@Name='disk'] or Provider[@Name='Ntfs'] or Provider[@Name='volmgr'] or Provider[@Name='stornvme'] or Provider[@Name='storahci'] or Provider[@Name='iaStorA'] or Provider[@Name='iaStorAC']) and (Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= {ms}]]]", EventCategory.DiskError);
         Collect(events, "System", $"*[System[Provider[@Name='Service Control Manager'] and (EventID=7000 or EventID=7001 or EventID=7031 or EventID=7034) and TimeCreated[timediff(@SystemTime) <= {ms}]]]", EventCategory.ServiceFailure);

@@ -2667,8 +2667,8 @@ public sealed class RulesEngine
 
                 if (orphelins.Count > 0)
                     details += Lang.T(
-                        $" Vérifié : le programme de {string.Join(" et ", orphelins.Select(o => o.Nom))} n'existe plus ({string.Join(" ; ", orphelins.Select(o => o.Chemin))}). C'est une inscription restée derrière une désinstallation incomplète, et Windows retente de la démarrer à chaque déclenchement — voir la conclusion sur les services et pilotes sans programme.",
-                        $" Checked: the program of {string.Join(" and ", orphelins.Select(o => o.Nom))} no longer exists ({string.Join("; ", orphelins.Select(o => o.Chemin))}). It is a registration left behind by an incomplete uninstall, and Windows retries starting it at every trigger — see the conclusion on services and drivers with no program.");
+                        $" Vérifié : le programme de {string.Join(" et ", orphelins.Select(o => o.Nom))} n'existe plus ({string.Join(" ; ", orphelins.Select(o => o.Chemin))}). C'est une inscription dont le fichier manque — le plus souvent le reste d'une désinstallation incomplète —, et Windows retente de la démarrer à chaque déclenchement — voir la conclusion sur les services et pilotes sans programme.",
+                        $" Checked: the program of {string.Join(" and ", orphelins.Select(o => o.Nom))} no longer exists ({string.Join("; ", orphelins.Select(o => o.Chemin))}). It is a registration whose file is missing — most often what an incomplete uninstall left behind —, and Windows retries starting it at every trigger — see the conclusion on services and drivers with no program.");
                 else if (r.System.ServicesLus && nonDemarres.Count > 0)
                     details += Lang.T(
                         " Vérifié : le programme des services qui ne démarrent pas existe encore — ce n'est pas une inscription restée derrière une désinstallation.",
@@ -3417,14 +3417,18 @@ public sealed class RulesEngine
             Category = FaultCategory.None,
             Code = "inscriptions.orphelines",
             Title = Lang.T(
-                $"{lignes.Count} service(s) ou pilote(s) inscrit(s) dont le programme n'existe plus",
-                $"{lignes.Count} registered service(s) or driver(s) whose program no longer exists"),
+                $"{lignes.Count} service(s) ou pilote(s) inscrit(s) dont le programme est introuvable",
+                $"{lignes.Count} registered service(s) or driver(s) whose program cannot be found"),
             Details = Lang.T(
-                $"Windows garde l'inscription de ces éléments, mais le fichier qu'elle désigne a disparu : {string.Join(" ; ", lignes)}. C'est en général la trace d'une désinstallation incomplète.",
-                $"Windows keeps these entries, but the file they point to is gone: {string.Join("; ", lignes)}. This is usually the trace of an incomplete uninstall."),
+                // Point 123 — constaté le 12/11/2026 sur un poste du parc : « LibreOffice
+                // Maintenance Service » signalé alors que LibreOffice, jamais désinstallé,
+                // fonctionne. Le fichier absent est un fait mesuré ; « désinstallation
+                // incomplète » n'en est qu'une cause possible.
+                $"Windows garde l'inscription de ces éléments, mais le fichier qu'elle désigne est absent : {string.Join(" ; ", lignes)}. C'est souvent la trace d'une désinstallation incomplète. Mais un logiciel toujours installé, et qui fonctionne, peut aussi garder l'inscription d'un composant qu'il n'a pas installé ou qu'une mise à jour a retiré ; et une image de déploiement peut apporter un service qui ne sert pas sur ce modèle.",
+                $"Windows keeps these entries, but the file they point to is missing: {string.Join("; ", lignes)}. This is often the trace of an incomplete uninstall. But software that is still installed, and works, can also keep the entry of a component it did not install or that an update removed; and a deployment image can bring a service that is of no use on this model."),
             Recommendation = Lang.T(
-                "Terminer la désinstallation du logiciel concerné avec l'outil de nettoyage de son éditeur. Ne pas effacer une inscription à la main sans savoir à quoi elle sert : retirer un pilote de démarrage peut empêcher Windows de démarrer.",
-                "Finish uninstalling the software concerned with its vendor's cleanup tool. Do not delete an entry by hand without knowing what it is for: removing a boot driver can stop Windows from starting."),
+                "Si le logiciel concerné n'est plus installé, terminer sa désinstallation avec l'outil de nettoyage de son éditeur. S'il l'est encore et fonctionne, ce n'est pas une panne : rien d'urgent. Ne pas effacer une inscription à la main sans savoir à quoi elle sert : retirer un pilote de démarrage peut empêcher Windows de démarrer.",
+                "If the software concerned is no longer installed, finish uninstalling it with its vendor's cleanup tool. If it still is and works, this is not a failure: nothing urgent. Do not delete an entry by hand without knowing what it is for: removing a boot driver can stop Windows from starting."),
         });
     }
 
