@@ -32,6 +32,7 @@ public sealed class RulesEngine
         AnalyzePowerLoss(r);
         AnalyzeAppCrashes(r);
         AnalyzeArretsInattendus(r);
+        AnalyzeLonguesPeriodesEteintes(r);
         AnalyzeServiceFailures(r);
         AnalyzeUpdateCorrelation(r);
         AnalyzeReseau(r);
@@ -2438,6 +2439,58 @@ public sealed class RulesEngine
                                    && !ExpliqueParUneCoupure(e, coupures))
                        .OrderBy(e => e.TimeLocal)
                        .ToList();
+    }
+
+    /// <summary>
+    /// POINT 125, lot B (go de l'auteur le 12/11/2026) — la plus récente période d'au
+    /// moins <see cref="ArretsEtDemarrages.PeriodeLongue"/> sans démarrage : comment la
+    /// session d'avant s'était terminée, ce que Windows a enregistré dans les 24 heures
+    /// avant, comment le poste a repris. Une INFORMATION : un poste éteint pendant des
+    /// vacances n'est pas en panne — mais si celui-ci ne se rallumait plus, c'est la
+    /// dernière chose que Windows a pu en dire. Mesuré le 12/11/2026 sur un poste du parc
+    /// resté 21 jours et demi sans démarrer après un arrêt programmé propre.
+    /// </summary>
+    internal static void AnalyzeLonguesPeriodesEteintes(DiagnosticReport r)
+    {
+        var p = ArretsEtDemarrages.Periodes(r.ArretsEtDemarrages)
+            .Where(x => x.Duree >= ArretsEtDemarrages.PeriodeLongue)
+            .OrderByDescending(x => x.Fin)
+            .FirstOrDefault();
+        if (p is not { Debut: { } debut, Duree: { } duree }) return;
+
+        var avant = r.Events
+            .Where(e => e.TimeLocal <= debut && debut - e.TimeLocal <= TimeSpan.FromHours(24)
+                        && e.Category != EventCategory.ServiceFailure)
+            .GroupBy(e => e.Category)
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"{Report.HtmlReportGenerator.CategoryEventLabel(g.Key)} ({g.Count()})")
+            .ToList();
+        var veille = avant.Count == 0
+            ? Lang.T(" Dans les 24 heures avant cet arrêt, Windows n'a enregistré ni erreur matérielle, ni plantage, ni arrêt brutal, ni mise à jour.",
+                     " In the 24 hours before this stop, Windows recorded no hardware error, no crash, no abrupt stop and no update.")
+            : Lang.T($" Dans les 24 heures avant cet arrêt, Windows a enregistré : {string.Join(", ", avant)} — voir l'historique des événements.",
+                     $" In the 24 hours before this stop, Windows recorded: {string.Join(", ", avant)} — see the event history.");
+
+        r.Findings.Add(new Finding
+        {
+            Severity = Severity.Info,
+            Confidence = Confidence.High,
+            Category = FaultCategory.None,
+            Code = "arrets.longue-periode",
+            Title = Lang.T(
+                $"Poste resté éteint {ArretsEtDemarrages.Duree(duree)} (du {debut:dd/MM à HH:mm} au {p.Fin:dd/MM à HH:mm})",
+                $"Computer stayed off for {ArretsEtDemarrages.Duree(duree)} (from {debut:MM-dd HH:mm} to {p.Fin:MM-dd HH:mm})"),
+            Details = Lang.T($"La session d'avant s'est terminée par : {ArretsEtDemarrages.FinLisible(p)}.",
+                             $"The previous session ended with: {ArretsEtDemarrages.FinLisible(p)}.")
+                      + veille
+                      + Lang.T($" Redémarrage : {ArretsEtDemarrages.RepriseLisible(p)}.",
+                               $" Restart: {ArretsEtDemarrages.RepriseLisible(p)}.")
+                      + Lang.T(" Si le poste devait fonctionner pendant cette période et ne s'allumait pas, la panne s'est produite pendant qu'il était éteint : Windows n'a rien pu en écrire, et ce qui précède est la dernière chose qu'il a enregistrée.",
+                               " If the computer was meant to run during this period and would not power on, the failure happened while it was off: Windows could record nothing of it, and the above is the last thing it recorded."),
+            Recommendation = Lang.T(
+                "Si cette période correspond à des vacances ou à un poste rangé, rien à faire. Si le poste ne se rallumait pas : la cause est à chercher avant Windows — alimentation, carte mère, micrologiciel (BIOS) — et à comparer avec des postes du même modèle ; un poste encore sous garantie se signale à son fabricant avec ce rapport.",
+                "If this period matches holidays or a computer put away, nothing to do. If the computer would not power on: look for the cause before Windows — power supply, motherboard, firmware (BIOS) — and compare with computers of the same model; a computer still under warranty is reported to its maker with this report."),
+        });
     }
 
     private static void AnalyzeArretsInattendus(DiagnosticReport r)

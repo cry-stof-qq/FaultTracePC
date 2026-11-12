@@ -74,6 +74,7 @@ public static class HtmlReportGenerator
         DumpSection(sb, r);
         ProcessesSection(sb, r);
         EventsSection(sb, r);
+        ArretsEtDemarragesSection(sb, r);
         SystemSection(sb, r);
         SmartSection(sb, r);
         DriversSection(sb, r);
@@ -766,6 +767,41 @@ public static class HtmlReportGenerator
         sb.Append("</section>");
     }
 
+    /// <summary>
+    /// POINT 125, lot B (go de l'auteur le 12/11/2026) — comment le poste s'est arrêté,
+    /// combien de temps il n'a pas tourné, comment il a redémarré. Une panne survenue
+    /// poste éteint ne s'écrit nulle part ; ce tableau dit la dernière chose que Windows a
+    /// enregistrée avant. Rien n'est affiché si le journal n'a rien rendu.
+    /// </summary>
+    private static void ArretsEtDemarragesSection(StringBuilder sb, DiagnosticReport r)
+    {
+        var periodes = Analysis.ArretsEtDemarrages.Periodes(r.ArretsEtDemarrages);
+        if (periodes.Count == 0) return;
+
+        sb.Append(Lang.T("<section class=\"tech\"><h2>Derniers arrêts et démarrages</h2>", "<section class=\"tech\"><h2>Recent shutdowns and startups</h2>"));
+        sb.Append(Lang.T(
+            "<p class=\"explain\">Pour chaque démarrage de Windows : comment la session d'avant s'était terminée, combien de temps le poste est resté éteint, et comment il a repris. "
+            + "Si un poste ne se rallume plus, la panne se produit pendant qu'il est éteint et rien ne l'écrit : la dernière ligne avant le trou est la dernière chose que Windows a enregistrée.</p>",
+            "<p class=\"explain\">For each Windows startup: how the previous session had ended, how long the computer stayed off, and how it came back. "
+            + "If a computer no longer powers on, the failure happens while it is off and nothing records it: the last row before the gap is the last thing Windows recorded.</p>"));
+        sb.Append(Lang.T(
+            "<table><thead><tr><th>Arrêt</th><th>Comment la session s'est terminée</th><th>Éteint pendant</th><th>Redémarrage</th><th>Comment il a repris</th></tr></thead><tbody>",
+            "<table><thead><tr><th>Stop</th><th>How the session ended</th><th>Off for</th><th>Restart</th><th>How it came back</th></tr></thead><tbody>"));
+        foreach (var p in periodes.OrderByDescending(x => x.Fin).Take(30))
+        {
+            bool longue = p.Duree >= Analysis.ArretsEtDemarrages.PeriodeLongue;
+            sb.Append($"<tr{(longue || p.FinDeSession == Analysis.FinDeSession.Inattendue ? " class=\"oldrow\"" : "")}>");
+            sb.Append($"<td>{(p.Debut is { } d ? Lang.ShortDateMinute(d) : "—")}</td>");
+            sb.Append($"<td class=\"small\">{H(Analysis.ArretsEtDemarrages.FinLisible(p))}</td>");
+            sb.Append($"<td>{(p.Duree is { } du ? (longue ? $"<strong>{H(Analysis.ArretsEtDemarrages.Duree(du))}</strong>" : H(Analysis.ArretsEtDemarrages.Duree(du))) : "—")}</td>");
+            sb.Append($"<td>{Lang.ShortDateMinute(p.Fin)}</td><td class=\"small\">{H(Analysis.ArretsEtDemarrages.RepriseLisible(p))}</td></tr>");
+        }
+        sb.Append("</tbody></table>");
+        if (periodes.Count > 30)
+            sb.Append(Lang.T($"<p class=\"empty\">… {periodes.Count - 30} démarrage(s) plus ancien(s) non affiché(s).</p>", $"<p class=\"empty\">… {periodes.Count - 30} older startup(s) not shown.</p>"));
+        sb.Append("</section>");
+    }
+
     private static void SystemSection(StringBuilder sb, DiagnosticReport r)
     {
         var s = r.System;
@@ -1290,7 +1326,7 @@ public static class HtmlReportGenerator
         _ => Lang.T("Général", "General"),
     };
 
-    private static string CategoryEventLabel(EventCategory c) => c switch
+    internal static string CategoryEventLabel(EventCategory c) => c switch
     {
         EventCategory.Bsod => "BSOD",
         EventCategory.PowerLoss => Lang.T("Coupure (Kernel-Power 41)", "Power loss (Kernel-Power 41)"),

@@ -35,8 +35,11 @@ public class ArretsEtDemarragesTests
         E("2026-11-12 08:02:06", General, 12), E("2026-11-12 08:02:06", Boot, 27, type: 0), E("2026-11-12 08:02:27", "EventLog", 6005),
     };
 
+    /// <summary>La même séquence, pour les tests du rapport.</summary>
+    internal static IEnumerable<EvenementAlimentation> PosteAPourRapport => PosteA;
+
     [Fact]
-    public void Le_poste_qui_ne_se_rallumait_plus_22_jours_eteint_apres_un_arret_programme()
+    public void Le_poste_qui_ne_se_rallumait_plus_21_jours_eteint_apres_un_arret_programme()
     {
         var p = ArretsEtDemarrages.Periodes(PosteA);
 
@@ -100,5 +103,71 @@ public class ArretsEtDemarragesTests
         var veille = Assert.Single(p, x => x.FinDeSession == FinDeSession.Veille);
         Assert.Equal((TimeSpan?)TimeSpan.FromMinutes(90), veille.Duree);
         Assert.Equal(Reprise.SortieDeVeille, veille.Reprise);
+    }
+}
+
+/// <summary>Point 125, lot B : la conclusion et la section du rapport, sur la séquence réelle du poste A.</summary>
+[Collection("Langue")]
+public class ArretsEtDemarragesRapportTests
+{
+    private static DiagnosticReport Rapport(params WinEvent[] evenements)
+    {
+        var r = new DiagnosticReport { ScanPeriodDays = 30, System = new SystemSnapshot { MachineName = "POSTE-A" } };
+        r.ArretsEtDemarrages.AddRange(ArretsEtDemarragesTests.PosteAPourRapport);
+        r.Events.AddRange(evenements);
+        return r;
+    }
+
+    private static T EnFrancais<T>(Func<T> action)
+    {
+        var initial = Lang.Current;
+        try { Lang.Apply(AppLanguage.French); return action(); }
+        finally { Lang.Apply(initial); }
+    }
+
+    [Fact]
+    public void Vingt_et_un_jours_eteint_apres_un_arret_programme_rien_d_anormal_avant()
+    {
+        var f = EnFrancais(() => { var r = Rapport(); RulesEngine.AnalyzeLonguesPeriodesEteintes(r); return r.Findings; });
+
+        var c = Assert.Single(f);
+        Assert.Equal(Severity.Info, c.Severity);
+        Assert.Equal("Poste resté éteint 21 j 11 h (du 21/10 à 21:00 au 12/11 à 08:02)", c.Title);
+        Assert.Contains("arrêt propre, demandé par shutdown.exe, au nom de DOMAINE\\admin (« s’arrêter »)", c.Details);
+        Assert.Contains("ni erreur matérielle, ni plantage, ni arrêt brutal, ni mise à jour", c.Details);
+        Assert.Contains("Redémarrage : démarrage à froid.", c.Details);
+        Assert.Contains("pendant qu'il était éteint", c.Details);
+    }
+
+    [Fact]
+    public void Ce_que_Windows_a_enregistre_dans_les_24_heures_avant_est_cite()
+    {
+        var whea = new WinEvent { TimeLocal = new DateTime(2026, 10, 21, 16, 0, 0), Category = EventCategory.Whea, EventId = 17 };
+        var service = new WinEvent { TimeLocal = new DateTime(2026, 10, 21, 21, 0, 2), Category = EventCategory.ServiceFailure, EventId = 7031 };
+        var ancien = new WinEvent { TimeLocal = new DateTime(2026, 10, 14, 16, 0, 0), Category = EventCategory.Whea, EventId = 17 };
+
+        var c = EnFrancais(() => { var r = Rapport(whea, service, ancien); RulesEngine.AnalyzeLonguesPeriodesEteintes(r); return r.Findings.Single(); });
+
+        Assert.Contains("Windows a enregistré : Erreur matérielle (WHEA) (1)", c.Details);
+        Assert.DoesNotContain("Échec de service", c.Details); // coupé par l'arrêt : pas un indice
+    }
+
+    [Fact]
+    public void Pas_de_longue_periode_pas_de_conclusion()
+    {
+        var r = new DiagnosticReport { System = new SystemSnapshot { MachineName = "POSTE-B" } };
+        r.ArretsEtDemarrages.AddRange(ArretsEtDemarragesTests.PosteAPourRapport.Take(9)); // jusqu'au 21/10 au soir seulement
+        RulesEngine.AnalyzeLonguesPeriodesEteintes(r);
+        Assert.Empty(r.Findings);
+    }
+
+    [Fact]
+    public void La_section_du_rapport_montre_la_periode_et_l_arret_programme()
+    {
+        var html = System.Net.WebUtility.HtmlDecode(EnFrancais(() => Core.Report.HtmlReportGenerator.Generate(Rapport())));
+
+        Assert.Contains("<h2>Derniers arrêts et démarrages</h2>", html);
+        Assert.Contains("<strong>21 j 11 h</strong>", html);
+        Assert.Contains("arrêt propre, demandé par shutdown.exe", html);
     }
 }
