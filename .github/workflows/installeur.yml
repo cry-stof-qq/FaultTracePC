@@ -22,6 +22,13 @@ on:
       - 'build/**'
   workflow_dispatch:
 
+# POINT 127 (go de l'auteur le 12/11/2026) — DROITS MINIMAUX. Après la campagne de
+# vol de secrets de novembre 2026 (comptes détournés qui injectaient des workflows),
+# ce workflow ne reçoit que le droit de LIRE le dépôt : il construit le MSI, il
+# n'écrit rien. Même détourné, son jeton ne pourrait rien modifier.
+permissions:
+  contents: read
+
 concurrency:
   group: msi-${{ github.ref }}
   cancel-in-progress: true
