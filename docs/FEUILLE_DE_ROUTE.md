@@ -143,6 +143,8 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 118 | **La comparaison avec le scan précédent ignore les coupures brutales** (« Aucun nouveau crash… La réparation semble efficace » malgré une coupure le jour même) | constaté le 02/11/2026 sur un diagnostic à distance 1.10.0 — à corriger, voir la section du point 118 |
 | 119 | **Le script de réparation examinait tous les disques, y compris un disque externe en panne** ; « santé : Sain » affiché pour ce disque ; conseil « firmware du SSD » pour un disque dur externe | constaté le 03/11/2026 sur le poste de l'auteur — **corrigé le même jour** (script : défaut constaté ; textes : go de l'auteur), voir la section du point 119 |
 | 120 | **Fréquence et consommation du processeur dans la boîte noire**, pour pouvoir un jour nommer un processeur bridé par la chaleur | idée validée par l'auteur le 07/11/2026 (inspirée de TMOG) — plan en trois lots ; **lots A et B écrits le 07/11/2026, CI verte**, publication 1.11.0 puis pause de mesure puis lot C ; **essai réel du 08/11/2026 : valeurs vides sans le pilote PawnIO, lues une fois PawnIO installé** (démontré), publication suspendue en attente de décisions, voir la section du point 120 |
+| 121 | **Console de parc : trier les colonnes en cliquant sur leur en-tête** | demandé par l'auteur le 12/11/2026 (le parc grandit : 13 machines) — proposition faite, go attendu ; voir la section du point 121 |
+| 122 | **Rapport du parc : titre d'alerte en anglais dans un rapport en français** | CONSTATÉ le 12/11/2026 dans le rapport du parc, CORRIGÉ le même jour (défaut constaté : sans demande) — voir la section du point 122 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3263,6 +3265,20 @@ Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
 
 ---
+
+## Point 122 — rapport du parc : titre d'alerte en anglais — CONSTATÉ et CORRIGÉ le 12/11/2026
+
+**Constaté** dans le rapport du parc du 12/11/2026 (console en français) : colonne « Dernière alerte / erreur » du poste de l'auteur, « 12/11 00:13 — Processor temperature high: 100 °C ». **Cause, lue dans le code** : la console (`ParkWindow.xaml.cs`, construction des lignes du rapport) reprend le titre de l'alerte tel que le service distant l'a écrit ; or le service tourne sous le compte SYSTEM, dont la langue n'est pas celle de l'utilisateur (même cause qu'au point 86). La fenêtre « Historique des alertes », elle, réécrivait déjà les alertes dans la langue du moment (`AlertCatalog.LocalizeAll`). **Corrigé** : même appel avant de choisir la dernière alerte. Pas de test automatique (fenêtre WPF, hors des tests) ; à vérifier sur le prochain rapport du parc. Empreinte vérifiée sur le poste après écriture.
+
+## Point 121 — console de parc : trier les colonnes — DEMANDÉ le 12/11/2026
+
+**Demande de l'auteur** : cliquer sur l'en-tête d'une colonne (Machine, Hôte, État, Version…) pour trier par ordre croissant puis décroissant, le nombre de machines grandissant (13 ce jour-là, dont trois postes à problème ajoutés).
+
+**Lu dans le code** : la liste est une `ListView` à colonnes (`GridView`), sans tri ; elle est reconstruite à chaque actualisation (`RenderRows`) ; toutes les valeurs sont du texte (« 98,8 », « 51,6 °C », « 48 (14 ⛔) »).
+
+**Proposé à l'auteur (go attendu)** : clic = croissant, second clic = décroissant, flèche ▲/▼ dans l'en-tête ; colonnes chiffrées triées comme des nombres (sinon « 10 » passe avant « 9 »), « Dernier relevé » comme une date, « Alertes 90 j » sur le total ; noms de machines dans l'ordre naturel (POSTE-2 avant POSTE-10) ; les cases vides toujours en bas ; le tri gardé après « Actualiser » ; pour la session seulement ; l'onglet « Inventaire » en option.
+
+**Relevé au passage dans le même rapport (pour la décision 2 du point 120)** : sur les 10 postes joignables, la température du processeur n'est lue que sur le poste de l'auteur, où PawnIO a été installé — **aucun poste du parc n'a PawnIO**. Trois des postes ajoutés n'ont jamais été analysés : un diagnostic à distance de chacun donnera leur rapport, avec la note PawnIO.
 
 ## Point 120 — fréquence et consommation du processeur dans la boîte noire — idée validée le 07/11/2026
 

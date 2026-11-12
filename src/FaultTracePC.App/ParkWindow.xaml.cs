@@ -548,6 +548,12 @@ public partial class ParkWindow : Window
             {
                 _lastResults.TryGetValue(m, out var r);
                 var alerts = r?.Alerts ?? new List<PreventiveAlert>();
+                // Constaté le 12/11/2026 dans le rapport du parc : « Processor temperature
+                // high: 100 °C » dans un rapport en français. Le service tourne sous le
+                // compte SYSTEM, dont la langue n'est pas celle de l'utilisateur (point 86) :
+                // le titre reçu doit être réécrit dans la langue de la console, comme le
+                // fait déjà la fenêtre « Historique des alertes ».
+                AlertCatalog.LocalizeAll(alerts);
                 var latest = alerts.OrderByDescending(a => a.Time).FirstOrDefault();
                 return new ParkReportGenerator.MachineLine
                 {
