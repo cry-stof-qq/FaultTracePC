@@ -272,6 +272,8 @@ public static class ParkComparator
             });
         }
 
+        PostesRestesEteints(machines, a);
+
         // ---------------------------------------------------------------
         // 6. Poste isolé qui accumule — là, c'est la machine
         // ---------------------------------------------------------------
@@ -421,6 +423,122 @@ public static class ParkComparator
     /// un poste plus ancien que la 1.9.0 n'envoie pas ces informations, et la phrase
     /// le dit au lieu de conclure sur une partie du parc.
     /// </summary>
+    /// <summary>Point 126 — durée minimale d'une période éteinte pour être comparée aux autres postes.</summary>
+    internal static readonly TimeSpan EteintMin = TimeSpan.FromHours(48);
+    /// <summary>Point 126 — nombre minimal de JOURS où d'autres postes du même modèle ont démarré pendant cette période.</summary>
+    internal const int JoursAutresMin = 2;
+
+    /// <summary>
+    /// POINT 126 (validé par l'auteur le 12/11/2026) — les postes restés éteints pendant
+    /// que les autres postes du MÊME modèle démarraient, et ce qui les distingue d'eux.
+    ///
+    /// Constaté le 12/11/2026 : deux postes d'une salle de 32 postes identiques ne se
+    /// rallumaient plus, et ne sont repartis qu'après plusieurs heures ou jours sans
+    /// courant. Une panne qui survient poste éteint ne s'écrit nulle part ; mais un poste
+    /// qui ne démarre plus pendant que ses voisins démarrent chaque jour, cela se voit — et
+    /// la comparaison avec ces voisins est ce qui peut confirmer, ou écarter, un défaut
+    /// commun. Seuils : au moins 48 heures éteint, et d'autres postes du même modèle
+    /// démarrés au moins 2 jours différents pendant ce temps (un week-end ou des vacances,
+    /// où tout le monde est éteint, ne comptent donc pas). La phrase reste prudente : un
+    /// poste peut aussi, simplement, ne pas avoir été allumé.
+    /// </summary>
+    internal static void PostesRestesEteints(IReadOnlyList<MachineSummary> machines, ParkAnalysis a)
+    {
+        var touches = new List<(MachineSummary Poste, ScanHistory.PeriodeBreve Periode, int Autres)>();
+        foreach (var m in machines.Where(x => x.Summary.Modele.Length > 0))
+        {
+            var memeModele = machines.Where(o => !ReferenceEquals(o, m)
+                && o.Summary.Modele.Equals(m.Summary.Modele, StringComparison.OrdinalIgnoreCase)).ToList();
+            var pire = m.Summary.PeriodesEteintes
+                .Where(p => p.Debut is { } d && p.Fin - d >= EteintMin)
+                .Select(p => (Periode: p,
+                              Autres: memeModele.Where(o => o.Summary.PeriodesEteintes.Any(q => q.Fin > p.Debut && q.Fin < p.Fin)).ToList(),
+                              Jours: memeModele.SelectMany(o => o.Summary.PeriodesEteintes)
+                                               .Where(q => q.Fin > p.Debut && q.Fin < p.Fin)
+                                               .Select(q => q.Fin.Date).Distinct().Count()))
+                .Where(x => x.Jours >= JoursAutresMin)
+                .OrderByDescending(x => x.Periode.Fin - x.Periode.Debut!.Value)
+                .FirstOrDefault();
+            if (pire.Periode is not null) touches.Add((m, pire.Periode, pire.Autres.Count));
+        }
+        if (touches.Count == 0) return;
+
+        var lignes = touches.OrderBy(t => t.Poste.Name, StringComparer.OrdinalIgnoreCase).Select(t =>
+        {
+            var p = t.Periode;
+            var fin = ArretsEtDemarrages.FinLisible(new PeriodeEteinte { Debut = p.Debut, Fin = p.Fin, FinDeSession = p.FinDeSession });
+            return Lang.T(
+                $"{t.Poste.Name} : éteint du {p.Debut:dd/MM à HH:mm} au {p.Fin:dd/MM à HH:mm} ({ArretsEtDemarrages.Duree(p.Fin - p.Debut!.Value)}), après : {fin} ; pendant ce temps, {t.Autres} autre(s) poste(s) du même modèle ont démarré",
+                $"{t.Poste.Name}: off from {p.Debut:MM-dd HH:mm} to {p.Fin:MM-dd HH:mm} ({ArretsEtDemarrages.Duree(p.Fin - p.Debut!.Value)}), after: {fin}; meanwhile, {t.Autres} other machine(s) of the same model started");
+        });
+
+        var modele = touches[0].Poste.Summary.Modele;
+        var nomsTouches = touches.Select(t => t.Poste.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var autres = machines.Where(o => !nomsTouches.Contains(o.Name)
+                                      && o.Summary.Modele.Equals(modele, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        a.Correlations.Add(new Correlation
+        {
+            Kind = touches.Count >= 2 ? "commun" : "isolé",   // pas-de-traduction : clé interne, lue par ParkReportGenerator.
+            Severity = "warn",
+            Title = touches.Count >= 2
+                ? Lang.T($"{touches.Count} postes du même modèle sont restés éteints plusieurs jours pendant que les autres démarraient",
+                         $"{touches.Count} machines of the same model stayed off for days while the others were starting")
+                : Lang.T($"{touches[0].Poste.Name} est resté éteint plusieurs jours pendant que les autres postes du même modèle démarraient",
+                         $"{touches[0].Poste.Name} stayed off for days while the other machines of the same model were starting"),
+            Details = string.Join(Lang.T(" ; ", "; "), lignes) + ". "
+                    + Lang.T("Soit ces postes n'ont pas été allumés, soit ils ne se sont pas allumés : une panne qui survient poste éteint ne s'écrit nulle part. ",
+                             "Either these machines were not switched on, or they would not power on: a failure that happens while a machine is off is recorded nowhere. ")
+                    + CeQuiLesDistingue(touches.Select(t => t.Poste).ToList(), autres),
+            Action = Lang.T("Si ces postes ne se rallumaient pas : les signaler au fabricant (garantie) avec leurs rapports. Si un point distinctif est nommé ci-dessus, le corriger d'abord sur un seul poste et observer ; sinon, la piste va vers des exemplaires défaillants (alimentation, carte mère) plutôt que vers un réglage commun.",
+                            "If these machines would not power on: report them to the manufacturer (warranty) with their reports. If a distinguishing point is named above, fix it on one machine first and watch; otherwise, the lead goes towards faulty units (power supply, motherboard) rather than a shared setting."),
+            Machines = nomsTouches.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+        });
+    }
+
+    /// <summary>
+    /// Point 126 — ce que les postes touchés partagent et qu'aucun autre poste du même
+    /// modèle n'a : version du BIOS, carte graphique et son pilote, composants désignés
+    /// par les erreurs matérielles. Dit aussi, honnêtement, quand rien ne les distingue.
+    /// </summary>
+    internal static string CeQuiLesDistingue(List<MachineSummary> touches, List<MachineSummary> autres)
+    {
+        if (autres.Count == 0)
+            return Lang.T("Aucun autre poste du même modèle n'a de résumé : pas de comparaison possible.",
+                          "No other machine of the same model has a summary: no comparison possible.");
+
+        var criteres = new (string Nom, Func<ScanHistory.ScanSummary, string> Valeur)[]
+        {
+            (Lang.T("version du BIOS", "BIOS version"), s => s.VersionBios),
+            (Lang.T("carte graphique et pilote", "graphics card and driver"), s => s.CarteGraphique),
+            (Lang.T("erreurs matérielles par composant", "hardware errors by component"),
+             s => string.Join(", ", s.WheaComposants.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))),
+        };
+
+        var distinctifs = new List<string>();
+        var compares = new List<string>();
+        foreach (var (nom, valeur) in criteres)
+        {
+            var vt = touches.Select(m => valeur(m.Summary)).ToList();
+            var va = autres.Select(m => valeur(m.Summary)).Where(v => v.Length > 0).ToList();
+            if (vt.Any(v => v.Length == 0) || va.Count == 0) continue; // inconnu d'un côté : on ne conclut pas
+            compares.Add(nom);
+            var communs = vt.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (communs.Count == 1 && !va.Contains(communs[0], StringComparer.OrdinalIgnoreCase))
+                distinctifs.Add(Lang.T($"{nom} : {communs[0]} — les autres : {string.Join(" ; ", va.Distinct(StringComparer.OrdinalIgnoreCase))}",
+                                       $"{nom}: {communs[0]} — the others: {string.Join("; ", va.Distinct(StringComparer.OrdinalIgnoreCase))}"));
+        }
+
+        if (distinctifs.Count > 0)
+            return Lang.T($"Ce qui les distingue des {autres.Count} autre(s) poste(s) du même modèle : {string.Join(" ; ", distinctifs)}.",
+                          $"What sets them apart from the {autres.Count} other machine(s) of the same model: {string.Join("; ", distinctifs)}.");
+        return compares.Count == 0
+            ? Lang.T("Les résumés ne permettent pas encore de les comparer aux autres postes du même modèle.",
+                     "The summaries do not yet allow comparing them with the other machines of the same model.")
+            : Lang.T($"Rien ne les distingue des {autres.Count} autre(s) poste(s) du même modèle sur : {string.Join(", ", compares)}.",
+                     $"Nothing sets them apart from the {autres.Count} other machine(s) of the same model on: {string.Join(", ", compares)}.");
+    }
+
     internal static string PointsCommunsWhea(List<MachineSummary> postes)
     {
         var phrase = "";

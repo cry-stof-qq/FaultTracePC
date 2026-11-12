@@ -148,7 +148,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 123 | **« Désinstallation incomplète » affirmé pour un logiciel toujours installé** | CONSTATÉ le 12/11/2026 (LibreOffice, poste du parc), texte CORRIGÉ le même jour (défaut constaté) ; vérification du fichier demandée à l'auteur — voir la section du point 123 |
 | 124 | **Carte WHEA : un seul événement non « corrigé » fait passer des erreurs de lien PCIe en critique, avec des conseils de processeur et d'alimentation** | CONSTATÉ le 12/11/2026 sur un poste du parc ; l'événement n° 3 est une simple Information — CORRIGÉ le même jour (les événements WHEA d'information ne sont plus comptés) ; voir la section du point 124 |
 | 125 | **Dire comment le poste s'est arrêté et comment il a redémarré** (arrêt normal, veille, veille prolongée, démarrage rapide, démarrage à froid) | proposé à l'auteur le 12/11/2026 après deux postes qui ne se rallumaient plus — **go le même jour ; lot A (lecture) écrit**, lot B (rapport) à suivre ; voir la section du point 125 |
-| 126 | **Comparaison de parc : quels postes n'ont pas repris leur cycle programmé, et qu'ont-ils en commun que les autres n'ont pas ?** | proposé à l'auteur le 12/11/2026 (deux postes identiques sur 32 ne se rallumaient plus) — après le lot B du point 125 ; go attendu |
+| 126 | **Comparaison de parc : quels postes n'ont pas repris leur cycle programmé, et qu'ont-ils en commun que les autres n'ont pas ?** | proposé à l'auteur le 12/11/2026 (deux postes identiques sur 32 ne se rallumaient plus) — **validé le même jour, écrit le même jour** (après la CI verte du lot B du point 125) ; voir la section du point 126 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3269,6 +3269,16 @@ Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
 
 ---
+
+## Point 126 — postes restés éteints pendant que les autres démarraient — VALIDÉ et ÉCRIT le 12/11/2026
+
+**Pourquoi** : deux postes d'une salle de 32 postes identiques (même fournisseur, même livraison, même image) ne se rallumaient plus. L'auteur penche pour une faiblesse du modèle et attendait de FaultTracePC qu'il aide à la confirmer. Une panne qui survient poste éteint ne s'écrit nulle part ; mais un poste qui ne démarre plus pendant que ses voisins démarrent chaque jour, cela se voit dans les résumés que la console rapatrie.
+**Écrit** :
+- `Report/ScanHistory.cs` : le résumé d'un diagnostic (`ScanSummary`) gagne `PeriodesEteintes` (périodes d'au moins 6 heures sans démarrage — les nuits comprises, pas les redémarrages — au plus 200, avec la façon dont la session s'était terminée) et `CarteGraphique` (nom et version du pilote) ; champs ajoutés sans changer le format, comme au point 99 : un poste plus ancien ne les fournit pas, une console plus ancienne les ignore ;
+- `Analysis/ParkComparator.cs` : `PostesRestesEteints` — un poste est retenu s'il est resté éteint **au moins 48 heures** pendant que d'autres postes **du même modèle** démarraient **au moins 2 jours différents** (un week-end ou des vacances, où tout le monde est éteint, ne comptent donc pas) ; carte « à surveiller », « poste isolé » pour un seul poste, « point commun » à partir de deux ; la phrase reste prudente : « Soit ces postes n'ont pas été allumés, soit ils ne se sont pas allumés » ; puis `CeQuiLesDistingue` : version du BIOS, carte graphique et pilote, erreurs matérielles par composant — ce que les postes touchés partagent et qu'aucun autre poste du même modèle n'a, ou, honnêtement, « Rien ne les distingue des N autre(s) poste(s) du même modèle sur : … » (critère inconnu d'un côté : pas de conclusion) ; action : garantie, corriger d'abord sur un seul poste un point distinctif, sinon piste des exemplaires défaillants ;
+- `tests/…/ParcEteintsTests.cs` (nouveau, 4 tests : la période réelle du poste A contre un calendrier simulé de la salle ; deux postes touchés avec un BIOS que les autres n'ont pas ; vacances ; autre modèle).
+- Vérifié : 213 cas sur 213 chez Claude ; fichiers comparés avant écriture, empreintes vérifiées après.
+**Pour que la carte apparaisse sur le vrai parc** : les postes doivent avoir la version qui écrit ces champs (la prochaine), et un diagnostic récent ; la console compare alors les résumés. Les postes de la salle encore sans FaultTracePC ne peuvent pas entrer dans la comparaison — d'où l'intérêt, une fois la version jugée fiable par l'auteur, de l'installer sur les autres.
 
 ## Point 125 — comment le poste s'est arrêté, comment il a redémarré — PROPOSÉ le 12/11/2026
 

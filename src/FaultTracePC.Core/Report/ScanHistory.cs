@@ -67,7 +67,28 @@ public static class ScanHistory
         public int WheaFatales { get; set; }
         /// <summary>Composants désignés par les événements WHEA, avec leur adresse quand elle est connue (au plus 5).</summary>
         public List<string> WheaComposants { get; set; } = new();
+
+        // POINT 126 (validé par l'auteur le 12/11/2026). Champs AJOUTÉS sans changer
+        // FormatActuel, comme au point 99 : la console compare les périodes où chaque
+        // poste n'a pas tourné, pour trouver ceux qui sont restés éteints pendant que
+        // les autres postes du même modèle démarraient — et ce qui les distingue.
+
+        /// <summary>Périodes d'au moins 6 heures sans démarrage (les nuits comprises), au plus 200.</summary>
+        public List<PeriodeBreve> PeriodesEteintes { get; set; } = new();
+        /// <summary>Carte(s) graphique(s) et version de leur pilote.</summary>
+        public string CarteGraphique { get; set; } = "";
     }
+
+    /// <summary>Point 126 — une période sans démarrage, réduite à ce que la console compare.</summary>
+    public sealed class PeriodeBreve
+    {
+        public DateTime? Debut { get; set; }
+        public DateTime Fin { get; set; }
+        public Analysis.FinDeSession FinDeSession { get; set; }
+    }
+
+    /// <summary>Durée minimale d'une période gardée dans le résumé : une nuit en fait partie, un redémarrage non.</summary>
+    public static readonly TimeSpan PeriodeResumeMin = TimeSpan.FromHours(6);
 
     public sealed class BsodBrief
     {
@@ -135,6 +156,15 @@ public static class ScanHistory
                 .Select(g => g.Key)
                 .Take(5)
                 .ToList(),
+            PeriodesEteintes = Analysis.ArretsEtDemarrages.Periodes(r.ArretsEtDemarrages)
+                .Where(p => p.Duree >= PeriodeResumeMin)
+                .OrderByDescending(p => p.Fin)
+                .Take(200)
+                .Select(p => new PeriodeBreve { Debut = p.Debut, Fin = p.Fin, FinDeSession = p.FinDeSession })
+                .ToList(),
+            CarteGraphique = string.Join(" + ", r.System.Gpus
+                .Where(g => g.Name.Length > 0)
+                .Select(g => g.DriverVersion.Length > 0 ? $"{g.Name} ({g.DriverVersion})" : g.Name)),
         };
     }
 
