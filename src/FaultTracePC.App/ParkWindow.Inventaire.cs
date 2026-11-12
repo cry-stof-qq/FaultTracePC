@@ -45,6 +45,9 @@ public partial class ParkWindow
         public string Hote { get; init; } = "";
         public string Unite { get; init; } = "";
         public string DerniereSession { get; init; } = "";
+
+        /// <summary>Point 121 — la vraie date, pour trier la colonne comme une date ; null si inconnue (en bas).</summary>
+        public DateTime? DerniereSessionTri { get; init; }
         public string Compte { get; init; } = "";
         public string Mac { get; init; } = "";
 
@@ -302,6 +305,7 @@ public partial class ParkWindow
 
         var postes = ParkInventory.Fusionner(annuaire, console, macs);
         LvInventaire.ItemsSource = postes.Select(Convertir).ToList();
+        _triInventaire?.Appliquer(); // point 121
 
         // « Fichier absent » et « fichier lu, zéro adresse » ne se disent pas pareil :
         // le premier explique une colonne vide, le second signale un fichier à revoir.
@@ -967,6 +971,7 @@ public partial class ParkWindow
             Hote = p.Host,
             Unite = p.OrganizationalUnit,
             DerniereSession = vuParLAnnuaire ? DateCourte(p.LastLogon) : horsAnnuaire,
+            DerniereSessionTri = vuParLAnnuaire ? p.LastLogon : null,
             Compte = vuParLAnnuaire
                      ? (p.Disabled ? Lang.T("désactivé", "disabled") : Lang.T("actif", "enabled"))
                      : horsAnnuaire,

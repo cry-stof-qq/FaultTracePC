@@ -67,9 +67,15 @@ public partial class ParkWindow : Window
     /// </summary>
     private string? _secretMaitre;
 
+    /// <summary>Point 121 — tri par clic sur l'en-tête des colonnes (voir TriParEnTete).</summary>
+    private TriParEnTete? _triMachines;
+    private TriParEnTete? _triInventaire;
+
     public ParkWindow()
     {
         InitializeComponent();
+        _triMachines = new TriParEnTete(LvMachines);
+        _triInventaire = new TriParEnTete(LvInventaire);
         _secretMaitre = ParkSecret.Load();
         MajEtatSecret();
         LoadMachines();
@@ -813,6 +819,9 @@ public partial class ParkWindow : Window
         public string Host { get; set; } = "";
         public string Etat { get; set; } = "";
         public string DernierReleve { get; set; } = "";
+
+        /// <summary>Point 121 — la date du relevé, pour trier « Dernier relevé » comme une date et non comme le texte « 12/11 08:27 ».</summary>
+        public DateTime? DernierReleveTri { get; set; }
         public string Cpu { get; set; } = "";
         public string TempCpu { get; set; } = "";
         public string TempGpu { get; set; } = "";
@@ -865,6 +874,7 @@ public partial class ParkWindow : Window
                 // quand il n'y a pas d'explication plus longue à donner.
                 Etat = r is null ? "—" : etat,
                 DernierReleve = r?.Last?.Time is { } rt ? Lang.ShortDateSecond(rt) : "",
+                DernierReleveTri = r?.Last?.Time,
                 Cpu = r?.Last?.CpuLoad?.ToString("0.#") ?? "",
                 TempCpu = r?.Last?.CpuTemp is { } ct ? $"{ct:0.#} °C" : "",
                 TempGpu = r?.Last?.GpuTemp is { } gt ? $"{gt:0.#} °C" : "",
@@ -878,6 +888,7 @@ public partial class ParkWindow : Window
                 Aide = !string.IsNullOrEmpty(r?.Aide) ? r!.Aide : etat,
             };
         }).ToList();
+        _triMachines?.Appliquer(); // point 121 : le tri choisi tient après chaque actualisation
     }
 
     // ------------------------------------------------------------------
