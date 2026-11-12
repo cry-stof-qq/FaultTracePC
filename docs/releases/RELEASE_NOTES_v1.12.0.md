@@ -34,7 +34,7 @@ La 1.11.0 enregistrait la fréquence et la consommation du processeur ; la 1.12.
 
 **Ce que dit maintenant le rapport, pour le processeur :**
 
-- **« Processeur bridé par la chaleur : jusqu'à N % plus lent sous forte charge »** quand, pendant au moins une minute, chargé à plus de 80 % et à 90 °C ou plus, il n'a pas tenu 90 % de sa fréquence habituelle à froid. Niveau **Attention** ; **Critique** si un arrêt brutal a suivi, ou si la fréquence est tombée sous 70 %. Le poste devient lent, sans panne.
+- **« Processeur bridé par la chaleur : jusqu'à N % plus lent sous forte charge »** quand, pendant au moins une minute, chargé à plus de 80 % et à 90 °C ou plus, il n'a pas tenu 90 % de sa fréquence habituelle à froid. Niveau **Avertissement** ; **Critique** si un arrêt brutal a suivi, ou si la fréquence est tombée sous 70 %. Le poste devient lent, sans panne.
 - **« Processeur à sa limite de température sous charge, sans ralentir »** quand il chauffe mais garde sa fréquence : une simple **information** — plus de « surchauffe critique », plus de « la machine s'éteint brutalement ».
 - Sans mesure de fréquence (pilote PawnIO absent, journal ancien), l'ancienne règle s'applique.
 
@@ -65,7 +65,7 @@ La « fréquence habituelle à froid » est lue dans le journal de chaque poste.
 
 ## Limites, dites franchement
 
-- **L'alerte en temps réel « Température du processeur élevée »** se déclenche toujours sur la seule température : au moment où il alerte, le service ne connaît pas encore la fréquence habituelle du poste. Un portable qui chauffe sans se brider continue donc de la recevoir. Le rapport, lui, juge sur la fréquence.
+- **L'alerte en temps réel « Température du processeur élevée »** se déclenche toujours sur la seule température : au moment où il alerte, le service ne connaît pas encore la fréquence habituelle du poste. Un portable qui chauffe sans se brider continue donc de la recevoir, et elle peut encore faire pencher le verdict du rapport vers « MATÉRIELLE ». Les conclusions sur le processeur, elles, jugent sur la fréquence.
 - **Bridage** : seuils provisoires, tirés de deux postes ; ils seront revus avec les relevés du parc. Sans le pilote PawnIO, pas de fréquence, donc pas de conclusion sur le bridage.
 - **La carte des postes restés éteints** n'apparaît qu'entre postes équipés de la 1.12.0, du même modèle, et diagnostiqués récemment.
 
