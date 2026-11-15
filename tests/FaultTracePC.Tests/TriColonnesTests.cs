@@ -48,7 +48,9 @@ public class TriColonnesTests
     [Fact]
     public void Les_adresses_se_trient_numero_par_numero()
     {
-        Assert.Equal(new object?[] { "10.129.2.28:58620", "10.129.3.232:58620", "10.129.9.1:58620" },
-                     Trier(false, "10.129.9.1:58620", "10.129.2.28:58620", "10.129.3.232:58620"));
+        // Adresses de documentation (RFC 5737), jamais celles du parc réel. Triées comme du
+        // texte, elles donneraient 232, 28, 9 : l'ordre attendu est 9, 28, 232.
+        Assert.Equal(new object?[] { "192.0.2.9:58620", "192.0.2.28:58620", "192.0.2.232:58620" },
+                     Trier(false, "192.0.2.232:58620", "192.0.2.9:58620", "192.0.2.28:58620"));
     }
 }

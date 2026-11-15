@@ -7,7 +7,7 @@ namespace FaultTracePC.Core;
 /// POINT 121 (validé par l'auteur le 12/11/2026) — l'ordre de deux cases d'une colonne
 /// de la console de parc, quand on clique sur son en-tête.
 ///
-/// Les colonnes affichent du TEXTE (« 51,6 °C », « 48 (14 ⛔) », « S2-00-10 »). Trié
+/// Les colonnes affichent du TEXTE (« 51,6 °C », « 48 (14 ⛔) », « POSTE-10 »). Trié
 /// comme du texte, « 10 » passerait avant « 9 ». D'où trois règles :
 ///  · une case vide (« », « — ») va TOUJOURS en bas, quel que soit le sens du tri —
 ///    sinon un tri décroissant remonterait en tête les postes qui n'ont rien dit ;
