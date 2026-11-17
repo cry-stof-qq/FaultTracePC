@@ -157,6 +157,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 126 | **Comparaison de parc : quels postes n'ont pas repris leur cycle programmé, et qu'ont-ils en commun que les autres n'ont pas ?** | proposé à l'auteur le 12/11/2026 (deux postes identiques sur 32 ne se rallumaient plus) — **validé le même jour, écrit le même jour** (après la CI verte du lot B du point 125) ; **confirmé à l'essai pilote du 12/11/2026** (carte sur les postes A et B) ; voir la section du point 126 |
 | 127 | **Campagne de vol de secrets GitHub (novembre 2026) : le dépôt a-t-il été touché ?** | question de l'auteur le 12/11/2026 — exposition lue dans les workflows, vérifications transmises à l'auteur ; durcissement proposé, go attendu ; voir la section du point 127 |
 | 128 | **Protection antivirus : présence, état et mise à jour, quel que soit l'antivirus — carte « antivirus pas à jour »** | discuté le 17/11/2026, **retenu par l'auteur sur le principe** (« on tombe d'accord ») ; écriture sur go, en petit lot ; voir la section du point 128 |
+| 129 | **Ce qui démarre avec Windows : nouveautés depuis le dernier diagnostic, restes de désinstallation, points de démarrage détournés** (idées tirées de l'outil Autoruns, sans le copier ni en dépendre) | discuté le 17/11/2026, **retenu par l'auteur pour plus tard**, trois lots dans l'ordre A, B, C ; écriture sur go, en petits lots ; voir la section du point 129 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3275,6 +3276,30 @@ Les points 48 à 52 et 54 à 63 étaient des **corrections**, sur des données d
 Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict rassurant sur une machine qui s'arrête anormalement**, il nomme le composant au lieu de son rapporteur, et il écrit son script de réparation à partir de ce qu'il a mesuré.
 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
+
+---
+
+## Point 129 — ce qui démarre avec Windows — RETENU pour plus tard le 17/11/2026
+
+**Origine** (discussion du 17/11/2026) : l'auteur a entendu parler d'**Autoruns** (Sysinternals, Microsoft) en le croyant intégré à Windows, et y a vu un moyen de repérer virus et mouchards. **Autoruns n'est pas livré avec Windows** (téléchargement gratuit sur le site de Microsoft, ou lancement depuis Sysinternals Live — version 14.3 du 17/06/2026 d'après sa page) : l'auteur ne veut pas dépendre d'un outil à installer. Mais Autoruns ne fait que lire des emplacements que **Windows fournit lui-même** (registre, Planificateur de tâches, services, signatures des fichiers) : FaultTracePC peut les lire directement. Règle : **ne rien copier d'Autoruns** (ni code, ni liste d'emplacements) ; partir de la documentation de Microsoft. Retenu par l'auteur (« je prends tout ça »), à faire plus tard, dans cet ordre :
+
+**Lot A — « Nouveau au démarrage depuis le dernier diagnostic »** (priorité de l'auteur et de Claude). Dans la partie « Évolution depuis le dernier scan » du rapport, qui dit déjà « Pilotes mis à jour » (`Report/ScanHistory.cs`) : « N nouveaux programmes démarrent avec Windows depuis le … ». Intérêt : relier la date d'apparition d'un élément au démarrage à la date où les plantages ont commencé — le métier de FaultTracePC. Intérêt secondaire, sans rien prétendre de plus : un logiciel indésirable doit s'ajouter au démarrage pour survivre à un redémarrage ; il apparaîtrait là comme un **changement constaté**, jamais comme « virus détecté ». Pour comparer, le résumé d'un diagnostic devra garder la liste de ces éléments (ajout de champ sans changer le format, comme aux points 99 et 126).
+
+**Lot B — restes de désinstallation, au-delà des services et pilotes** (prolonge le point 123). `Collectors/ServiceCollector.cs` repère déjà les services et pilotes dont le programme est introuvable ; ajouter les clés « Run » du registre (machine et utilisateur) et les **tâches planifiées** dont le programme est introuvable (une tâche qui lance un programme supprimé échoue en silence ou affiche une erreur à chaque ouverture de session). Même texte nuancé qu'au point 123 : « souvent un reste de désinstallation, mais pas forcément ».
+
+**Lot C — points de démarrage détournés** : peu nombreux, presque toujours à leur valeur d'origine, et quand ils changent, cause de pannes **et** technique connue de logiciels malveillants :
+- programme lancé à l'ouverture de session (Winlogon « Shell » et « Userinit » ; normalement l'Explorateur Windows et userinit.exe) — classé technique de persistance par MITRE ATT&CK (T1547.004) ; remplacé, il donne par exemple un écran noir à la connexion ;
+- DLL injectées dans tous les programmes (« AppInit_DLLs ») — Microsoft les déconseille (« même légitimes, elles peuvent provoquer des blocages et des problèmes de performance ») et les désactive quand le démarrage sécurisé est actif (depuis Windows 8) ;
+- détournement du lancement d'un programme (« Image File Execution Options », valeur « Debugger »).
+Exception légitime connue : des outils qui remplacent volontairement le Gestionnaire des tâches. Formulation retenue : « configuration de démarrage inhabituelle », **jamais** « virus ».
+
+**Noté, non retenu à ce stade** : afficher l'éditeur qui a signé les pilotes tiers (sur Windows 64 bits, les pilotes sont presque tous signés : peu révélateur).
+
+**Exclu** : l'envoi à VirusTotal (données envoyées à un service extérieur ; une variante d'Autoruns envoie même les fichiers) ; tout bouton de suppression ou de désactivation (FaultTracePC constate, il ne casse rien — retirer la mauvaise entrée peut empêcher Windows de démarrer) ; la liste complète des centaines d'emplacements d'Autoruns (trop de bruit pour un rapport destiné à un technicien).
+
+**Avant d'écrire** : go de l'auteur, lot par lot ; pour chaque emplacement, la documentation Microsoft d'abord (et les valeurs d'origine sur un Windows 11 propre, mesurées et non supposées) ; mesure sur un poste du parc et sur un poste personnel pour compter les fausses alertes.
+
+Sources : [Autoruns — Microsoft Learn](https://learn.microsoft.com/en-us/sysinternals/downloads/autoruns) ; [AppInit DLLs and Secure Boot — Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/dlls/secure-boot-and-appinit-dlls) ; [T1547.004 Winlogon Helper DLL — MITRE ATT&CK](https://attack.mitre.org/techniques/T1547/004/).
 
 ---
 
