@@ -156,6 +156,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 125 | **Dire comment le poste s'est arrêté et comment il a redémarré** (arrêt normal, veille, veille prolongée, démarrage rapide, démarrage à froid) | proposé à l'auteur le 12/11/2026 après deux postes qui ne se rallumaient plus — **go le même jour ; lots A (lecture) et B (rapport) écrits** ; **confirmé à l'essai pilote du 12/11/2026, sur le cas réel du poste A** ; voir la section du point 125 |
 | 126 | **Comparaison de parc : quels postes n'ont pas repris leur cycle programmé, et qu'ont-ils en commun que les autres n'ont pas ?** | proposé à l'auteur le 12/11/2026 (deux postes identiques sur 32 ne se rallumaient plus) — **validé le même jour, écrit le même jour** (après la CI verte du lot B du point 125) ; **confirmé à l'essai pilote du 12/11/2026** (carte sur les postes A et B) ; voir la section du point 126 |
 | 127 | **Campagne de vol de secrets GitHub (novembre 2026) : le dépôt a-t-il été touché ?** | question de l'auteur le 12/11/2026 — exposition lue dans les workflows, vérifications transmises à l'auteur ; durcissement proposé, go attendu ; voir la section du point 127 |
+| 128 | **Protection antivirus : présence, état et mise à jour, quel que soit l'antivirus — carte « antivirus pas à jour »** | discuté le 17/11/2026, **retenu par l'auteur sur le principe** (« on tombe d'accord ») ; écriture sur go, en petit lot ; voir la section du point 128 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3274,6 +3275,33 @@ Les points 48 à 52 et 54 à 63 étaient des **corrections**, sur des données d
 Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict rassurant sur une machine qui s'arrête anormalement**, il nomme le composant au lieu de son rapporteur, et il écrit son script de réparation à partir de ce qu'il a mesuré.
 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
+
+---
+
+## Point 128 — protection antivirus : présence, état et mise à jour, quel que soit l'antivirus — RETENU sur le principe le 17/11/2026
+
+**Question de l'auteur** (17/11/2026, discussion) : peut-on détecter un comportement suspect pour repérer un virus ou un mouchard ? Puis, précisé : le logiciel doit rester utilisable **partout**, avec des antivirus différents d'un poste à l'autre, parfois aucun, ou pire, un antivirus désactivé — ne vaudrait-il pas mieux détecter si un antivirus est présent, toujours actif et surtout à jour ?
+
+**Écarté : écrire une détection « maison » de virus ou de mouchard.** Raisons retenues :
+- les antivirus et outils de détection d'entreprise (au parc : un outil de détection professionnel en plus de Defender) ont des pilotes au cœur de Windows, des bases de menaces mises à jour en continu et des analystes ; une détection maison raterait les vraies menaces et lèverait de fausses alertes sur des programmes légitimes (outils de supervision de salle, agent d'inventaire, scripts d'administration) ;
+- le pire serait une **fausse tranquillité** : une carte « rien de suspect » affirmerait ce que l'outil ne peut pas garantir — contraire à la règle du projet de ne rien affirmer sans preuve ;
+- FaultTracePC est déjà un service qui tourne sous le compte SYSTEM, joignable à distance et **non signé** : y ajouter une surveillance des processus et du réseau augmenterait le risque qu'un antivirus le bloque comme logiciel espion ;
+- chercher un mouchard revient à surveiller ce que font les utilisateurs (au parc : des élèves) — données personnelles, à voir avec le délégué à la protection des données avant toute idée de ce genre (obligations exactes non vérifiées).
+
+**Ce qui existe déjà (point 81, lu dans le code le 17/11/2026)** : `Collectors/ProtectionCollector.cs` lit le Centre de sécurité de Windows (`root\SecurityCenter2`, `AntiVirusProduct` : nom, chemin du programme, `productState`) — registre où **chaque antivirus s'inscrit lui-même**, quelle que soit sa marque — et l'état de Defender. `RulesEngine.AnalyzeProtection` en tire trois conclusions : antivirus mal désinstallé (inscrit, programme absent), deux antivirus actifs en même temps, aucune protection en temps réel (couvre aussi l'antivirus désactivé quand il n'en reste aucun d'actif). `Models.cs` calcule déjà `SignaturesAJour` (bit `0x10` de `productState`) et le rapport l'affiche dans le tableau de la protection (`HtmlReportGenerator`), **sans en tirer de conclusion** : un antivirus périmé passe inaperçu sauf à lire le tableau.
+
+**Retenu** : compléter le point 81 par une **carte « antivirus pas à jour »** :
+- pour **tout antivirus inscrit** : « à jour / pas à jour » d'après `productState`, sans date — confiance **moyenne**, comme pour « actif », parce que ce codage n'est pas documenté par Microsoft ;
+- pour **Defender** : l'âge exact des signatures (date de dernière mise à jour lue par `Get-MpComputerStatus` / `MSFT_MpComputerStatus`, déjà affichée dans la boîte à outils, pas dans le rapport) — « signatures vieilles de N jours » ; seuil à fixer.
+- vérifier que les cas déjà couverts restent justes : présence, actif, désactivé, aucun antivirus, antivirus mal désinstallé.
+
+**Précautions et limites, à écrire telles quelles dans le rapport et les notes** :
+- un antivirus qui ne s'inscrit pas au Centre de sécurité est invisible (rare pour les antivirus grand public ; possible pour certains outils d'entreprise — non vérifié pour celui du parc) ;
+- le Centre de sécurité n'existe que sur Windows 10/11 (pas Windows Server) — c'est la cible de FaultTracePC ;
+- « à jour » est ce que l'antivirus **déclare** ; une menace capable de le neutraliser pourrait fausser cette déclaration : un indicateur, jamais une preuve ;
+- les **détections** d'un antivirus (ce qu'il a trouvé) ne se lisent de façon standard que pour Defender (son journal d'événements) ; chaque autre marque garde les siennes dans son propre format. Lecture des détections de Defender : **piste optionnelle, non retenue à ce stade** ; si un jour : numéros d'événements (1116 à 1119 détections, 5001 protection en temps réel coupée) **à confirmer sur la documentation officielle de Microsoft avant toute ligne de code**, et mesure préalable sur un poste où un autre outil de détection est installé (Defender s'y met souvent en mode passif et peut écrire peu de choses).
+
+**Avant d'écrire** : go de l'auteur ; vérifier sur la documentation Microsoft le nom exact de la propriété de date des signatures de Defender ; mesurer sur un poste du parc et sur un poste personnel (autre antivirus, si disponible) ce que renvoient `productState` et `Get-MpComputerStatus` ; fixer le seuil « pas à jour » de Defender avec l'auteur.
 
 ---
 
