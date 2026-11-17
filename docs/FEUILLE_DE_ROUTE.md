@@ -3279,6 +3279,27 @@ Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette ver
 
 ---
 
+## Mode parc de la 1.12.0 en usage réel — VÉRIFIÉ les 16 et 17/11/2026
+
+**Question de l'auteur** (16/11/2026) : « la dernière version en mode parc lit-elle tout comme il le faut ? ». Matière : captures de la console (16/11), trois diagnostics à distance et un rapport du parc (17/11, 08:06–08:15), lus par Claude. Noms de postes remplacés ici par leur rôle.
+
+**Lu correctement** : 11 postes en « surveillance active », relevés à jour ; diagnostics à distance complets (sections de la 1.12.0 présentes, alertes en français, texte nuancé du point 123 — dont le cas LibreOffice) ; rapport du parc produit. Le poste injoignable en permanence depuis le travail est le PC du domicile de l'auteur (adresse de réseau domestique) : normal.
+
+**Cases vides expliquées** : température du processeur — PawnIO absent (décision 2, ouverte), et chaque rapport le dit ; température de la carte graphique vide sur deux postes — **confirmé par l'auteur** : pas de carte graphique, écran branché sur la sortie vidéo de la carte mère, donc pas de capteur à lire.
+
+**Doutes levés** :
+- le poste suivi depuis le début (installé pour un problème signalé par une collègue) affichait 37 alertes critiques sur 90 jours dans la console : **aucune dans les 30 derniers jours** — elles sont antérieures ; depuis le 02/11, seulement des avertissements (erreurs PCI Express corrigées sur le même port que les autres postes de la salle, défaut commun au modèle) ; 72 « erreurs disque » du 13/11 à 09:05 sur un support débranché depuis (clé USB probablement), « rien à réparer » dit le rapport ;
+- le poste d'une salle de cours (8 Go de RAM) : mémoire engagée jusqu'à 97 % le 13/11, plusieurs fois au-dessus de 90 % ; **cause confirmée par l'auteur** : l'enseignante ouvre beaucoup d'onglets dans Edge. Aucun plantage ;
+- le rapport du parc du 17/11 à 08:15 ne compare que 6 postes sur 12 : cinq postes de la salle étaient éteints à cette heure-là — la carte du point 126 ne peut alors pas apparaître ; un rapport du parc se génère de préférence quand la salle est en service.
+
+**Constaté, à traiter (rien d'écrit dans le code)** :
+1. **Verdict « Cause la plus probable : SATURATION DE LA MÉMOIRE » sans aucune panne** sur le poste de la salle de cours : une alerte en temps réel classée critique suffit à faire écrire une « cause » — même famille que le « MATÉRIELLE » du poste de l'auteur (point 120, A + C). Proposé à l'auteur le 17/11/2026 : élargir le lot A — sans plantage à expliquer, le verdict dit « pas de panne, mais un point de vigilance : … », l'alerte restant visible. **Décision attendue.**
+2. **Cartes « divergence de version » de pilotes non pertinentes** : le résumé d'un diagnostic (`Report/ScanHistory.cs`, `DriverVersions`) garde **tous** les pilotes inscrits dans Windows (`Win32_SystemDriver`), chargés ou non ; le comparateur (`Analysis/ParkComparator.cs`) compare donc aussi des pilotes livrés avec Windows et inutilisés. Exemple du 17/11 : des pilotes de puce AMD (`amdi2c.sys`, `amdgpio2.sys`) « à mettre à jour » sur des postes à processeur Intel, d'après la version installée par le fabricant sur le seul portable AMD du parc ; et des pilotes audio Realtek comparés entre modèles différents (une version de constructeur est propre à son modèle). État « chargé ou non » des pilotes AMD sur un poste Intel : **très probable, non vérifié** — commande de vérification transmise à l'auteur. Correction à placer avec l'auteur (défaut constaté).
+3. **Alerte en temps réel « Erreur disque signalée par Windows »** : elle conseille « Sauvegarder les données importantes sans attendre » pour un support débranché (clé USB) ; le rapport, lui, conclut « rien à réparer ». Même famille : l'alerte en temps réel en dit plus qu'elle ne sait. Noté, pas de décision.
+4. Recommandation de la carte mémoire : la phrase sur WSL/Docker (au conditionnel) ne sert à rien sur un poste bureautique. Noté.
+
+---
+
 ## Point 129 — ce qui démarre avec Windows — RETENU pour plus tard le 17/11/2026
 
 **Origine** (discussion du 17/11/2026) : l'auteur a entendu parler d'**Autoruns** (Sysinternals, Microsoft) en le croyant intégré à Windows, et y a vu un moyen de repérer virus et mouchards. **Autoruns n'est pas livré avec Windows** (téléchargement gratuit sur le site de Microsoft, ou lancement depuis Sysinternals Live — version 14.3 du 17/06/2026 d'après sa page) : l'auteur ne veut pas dépendre d'un outil à installer. Mais Autoruns ne fait que lire des emplacements que **Windows fournit lui-même** (registre, Planificateur de tâches, services, signatures des fichiers) : FaultTracePC peut les lire directement. Règle : **ne rien copier d'Autoruns** (ni code, ni liste d'emplacements) ; partir de la documentation de Microsoft. Retenu par l'auteur (« je prends tout ça »), à faire plus tard, dans cet ordre :
