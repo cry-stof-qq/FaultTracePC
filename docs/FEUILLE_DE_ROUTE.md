@@ -2675,6 +2675,14 @@ L'auteur a redemandé ce point le soir de la publication de la 1.9.0 : « révei
 
 Placement proposé le 19/10/2026, non décidé : après le bloc winget (1.10.0), qui a déjà été décalé deux fois. Raison : le réveil n'est pas bloquant aujourd'hui — l'autre outil d'administration de l'auteur réveille déjà les postes, et le script de déploiement sait le faire seul (`-ReveilSeulement`).
 
+### Redemandé le 17/11/2026 — une raison concrète
+
+En lisant le rapport du parc du 17/11/2026 (08:15), qui ne comparait que 6 postes sur 12 parce que la salle était éteinte, l'auteur rappelle que c'est pour cela qu'il voulait le réveil dans FaultTracePC : **générer le rapport du parc quand la salle est allumée**, condition pour que la carte du point 126 puisse apparaître.
+
+**Le moteur est éprouvé de nouveau sur le parc réel** (journal de déploiement du 16/11/2026, 08:37, lancé par la console) : six postes de la salle, éteints, réveillés par le script — adresse MAC obtenue du serveur DHCP, paquet envoyé depuis le portable de l'auteur **en Wi-Fi** (même plage d'adresses que la salle, paquet diffusé à toute la plage), « Le poste a répondu après le réveil » pour les six. Ce qui manque est toujours le bouton de la console, et la correction préalable de `Update-LigneCsv` (ci-dessous).
+
+**En attendant le bouton** : le script peut être lancé seul en mode réveil (`-ReveilSeulement`, avec le fichier des postes et le serveur DHCP réglés dans la console). Placement du point 88 : proposé à l'auteur le 17/11/2026, décision attendue.
+
 ### Ce que la lecture de l'autre outil a appris
 
 Son code de réveil a été lu le 05/10/2026 pour le comparer à celui-ci. Les deux
