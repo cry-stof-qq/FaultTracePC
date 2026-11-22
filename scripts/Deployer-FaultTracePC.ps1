@@ -364,14 +364,51 @@ if (-not [string]::IsNullOrWhiteSpace($FichierMac)) {
     autres. Le fichier reste donc utilisable pour tout le parc, y compris les
     téléphones que le DHCP y a mis : on n'y touche jamais globalement.
 #>
+<#
+    POINT 88, lot 1 (22/11/2026) — GARDER LES COLONNES QU'ON NE CONNAÎT PAS.
+
+    Le fichier d'adresses MAC peut être celui d'un autre outil d'administration,
+    qui a plus de colonnes (Nom;MAC;IP;Date). Or PowerShell 5.1 écrit un CSV avec
+    les colonnes de la PREMIÈRE ligne qu'il reçoit : la ligne neuve n'ayant que Nom
+    et MAC, quand elle arrivait en tête après le tri, TOUTES les autres lignes
+    perdaient leurs colonnes IP et Date. Une fois sur plusieurs, selon l'ordre
+    alphabétique — le pire des défauts à retrouver après coup.
+
+    Désormais : les colonnes sont lues dans l'en-tête du fichier, chaque ligne est
+    réécrite avec toutes, et la ligne du poste garde ses autres valeurs (rien n'est
+    inventé : une colonne inconnue reste telle qu'elle était, ou vide pour un poste
+    nouveau). Corrigé AVANT le bouton « Réveiller » de la console, qui réveillera
+    plusieurs postes et réécrira donc ce fichier plusieurs fois de suite.
+#>
 function Update-LigneCsv([string]$nom, [string]$mac) {
     try {
-        $lignes = if (Test-Path $script:cheminCsv) {
-            @(Import-Csv $script:cheminCsv -Delimiter ';' | Where-Object { $_.Nom -ne $nom })
-        } else { @() }
-        $lignes += [pscustomobject]@{ Nom = $nom; MAC = $mac }
+        $colonnes = @('Nom', 'MAC')
+        $existantes = @()
+        if (Test-Path -LiteralPath $script:cheminCsv) {
+            $entete = Get-Content -LiteralPath $script:cheminCsv -TotalCount 1 -Encoding UTF8
+            if ($entete) {
+                $lues = @($entete -split ';' | ForEach-Object { $_.Trim().Trim('"') } | Where-Object { $_ })
+                if ($lues.Count -gt 0) { $colonnes = $lues }
+            }
+            foreach ($c in 'Nom', 'MAC') { if ($colonnes -notcontains $c) { $colonnes += $c } }
+            $existantes = @(Import-Csv -LiteralPath $script:cheminCsv -Delimiter ';')
+        }
+
+        $ancienne = $existantes | Where-Object { $_.Nom -eq $nom } | Select-Object -First 1
+        $neuve = [ordered]@{}
+        foreach ($c in $colonnes) {
+            if ($c -eq 'Nom') { $neuve[$c] = $nom }
+            elseif ($c -eq 'MAC') { $neuve[$c] = $mac }
+            elseif ($ancienne -and $ancienne.PSObject.Properties[$c]) { $neuve[$c] = $ancienne.$c }
+            else { $neuve[$c] = '' }
+        }
+
+        # Toutes les lignes avec TOUTES les colonnes, la neuve comprise : quelle que
+        # soit celle qui arrive en tête après le tri, l'en-tête écrit est complet.
+        $lignes = @($existantes | Where-Object { $_.Nom -ne $nom } | Select-Object -Property $colonnes)
+        $lignes += [pscustomobject]$neuve
         $lignes | Sort-Object Nom |
-            Export-Csv $script:cheminCsv -Delimiter ';' -NoTypeInformation -Encoding UTF8
+            Export-Csv -LiteralPath $script:cheminCsv -Delimiter ';' -NoTypeInformation -Encoding UTF8
     }
     catch { Alerte "postes.csv non mis à jour : $($_.Exception.Message)" }
 }
