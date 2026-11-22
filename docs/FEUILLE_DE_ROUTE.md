@@ -159,6 +159,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 128 | **Protection antivirus : présence, état et mise à jour, quel que soit l'antivirus — carte « antivirus pas à jour »** | discuté le 17/11/2026, **retenu par l'auteur sur le principe** (« on tombe d'accord ») ; écriture sur go, en petit lot ; voir la section du point 128 |
 | 129 | **Ce qui démarre avec Windows : nouveautés depuis le dernier diagnostic, restes de désinstallation, points de démarrage détournés** (idées tirées de l'outil Autoruns, sans le copier ni en dépendre) | discuté le 17/11/2026, **retenu par l'auteur pour plus tard**, trois lots dans l'ordre A, B, C ; écriture sur go, en petits lots ; voir la section du point 129 |
 | 130 | **Rapport du parc : ne comparer que les pilotes réellement chargés** (des pilotes inscrits par Windows pour du matériel absent étaient dits « à mettre à jour ») | constaté au rapport du parc du 17/11/2026, confirmé le même jour sur un poste ; **écrit le 17/11/2026** (défaut constaté) — voir la section du point 130 |
+| 131 | **Surveiller les composants de FaultTracePC : une faille connue arrête la construction, alertes GitHub, contrôle mensuel élargi** | proposé le 22/11/2026 après le contrôle des composants, **go de l'auteur le même jour** ; écrit le même jour — voir la section du point 131 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3285,6 +3286,16 @@ Les points 48 à 52 et 54 à 63 étaient des **corrections**, sur des données d
 Ce que la version change, en une phrase : **le logiciel ne rend plus de verdict rassurant sur une machine qui s'arrête anormalement**, il nomme le composant au lieu de son rapporteur, et il écrit son script de réparation à partir de ce qu'il a mesuré.
 
 Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette version. Ils vivent sur la console, pas sur le rapport d'une machine — les greffer ici aurait brouillé un thème qui tient tout seul. Ils passent en 1.7.0, dont c'est précisément le sujet.
+
+---
+
+## Point 131 — surveiller les composants de FaultTracePC — ÉCRIT le 22/11/2026
+
+**Go de l'auteur le 22/11/2026** pour les propositions 1 et 3 du contrôle des composants (section suivante) ; la proposition 2 est un réglage GitHub, fait par l'auteur.
+
+1. **Une faille connue « élevée » ou « critique » arrête la construction** — `Directory.Build.props` (nouveau, à la racine du dépôt, donc valable pour tous les projets : application, ligne de commande, service, tests) : `<WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>`, réglage recommandé par Microsoft. Les failles faibles et moyennes (NU1901, NU1902) restent des avertissements. Conséquences voulues : la CI peut passer au rouge **sans changement de code**, le jour où une faille est publiée pour un composant déjà utilisé ; la construction du MSI s'arrête aussi. Si une faille n'a pas de correctif : `NuGetAuditSuppress`, faille par faille, en dernier recours, avec la raison écrite ici. Vérifié chez Claude : le fichier est lu par la construction (`WarningsAsErrors` contient bien NU1903 et NU1904) ; la CI dira si un composant actuel est déjà touché.
+2. **Alertes Dependabot** — constaté sur la capture de l'auteur du 22/11/2026 : **déjà activées** (« Dependabot alerts : On »), sans qu'il y ait touché ; « Dependabot security updates » (propositions de modification automatiques) désactivé, comme conseillé ; « Malware alerts » désactivé ; une règle de tri automatique active (réglage par défaut de GitHub, non examinée).
+3. **Tâche planifiée mensuelle du 15 élargie** (le 22/11/2026, même identifiant, même horaire : le 15 à 8 h 50, heure de Paris) — renommée « FaultTracePC : contrôle mensuel des composants (.NET, capteurs, WiX, tests, CI) » ; en plus de .NET et des quatre bibliothèques Microsoft : LibreHardwareMonitorLib, les trois paquets de test, l'outil WiX (avec le rappel de lire la licence avant un passage en version 7) et les actions GitHub ; conclusion en tableau, en séparant « mise à jour de sécurité » de « simple nouvelle version » ; elle ne modifie toujours rien. Le piège du tableau `releases.md` en retard (15/11/2026) y est rappelé. Prochaine exécution : 15/12/2026.
 
 ---
 

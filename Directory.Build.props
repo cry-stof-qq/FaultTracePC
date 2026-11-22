@@ -1,0 +1,26 @@
+<Project>
+
+  <!--
+    POINT 131 (go de l'auteur le 22/11/2026) — UNE FAILLE CONNUE ARRÊTE LA CONSTRUCTION.
+
+    À chaque restauration des paquets (dotnet restore, donc à chaque CI et à chaque
+    construction du MSI), NuGet compare les paquets du projet — y compris ceux qu'ils
+    utilisent eux-mêmes, par défaut pour un projet en .NET 10 — à la base des failles
+    connues. Il ne fait qu'AVERTIR : NU1901 (faible), NU1902 (moyenne), NU1903 (élevée),
+    NU1904 (critique). Une CI restait donc verte avec une faille connue.
+
+    Ici, seules les failles ÉLEVÉES et CRITIQUES deviennent des erreurs, comme le
+    recommande Microsoft ; les faibles et moyennes restent des avertissements, à lire
+    dans le journal de la CI.
+
+    Si une faille n'a pas encore de correctif, la mettre de côté se fait en DERNIER
+    RECOURS, faille par faille, avec un élément NuGetAuditSuppress et l'adresse de
+    l'avis — et la raison écrite dans docs/FEUILLE_DE_ROUTE.md.
+
+    Source : https://learn.microsoft.com/nuget/concepts/auditing-packages
+  -->
+  <PropertyGroup>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
