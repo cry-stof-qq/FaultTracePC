@@ -40,6 +40,12 @@ public static class ParkDeployment
     public const string EtapeGestionADistance = "winrm";
     /// <summary>Réveil réseau tenté.</summary>
     public const string EtapeReveil = "reveil";
+    /// <summary>
+    /// POINT 88 (22/11/2026) — d'où vient l'adresse MAC d'un poste éteint : « ok » avec
+    /// la source (dhcp, fichier, arp), ou « info » avec les sources consultées sans
+    /// résultat. Jamais « echec » : c'est l'étape du réveil qui échoue, pas celle-ci.
+    /// </summary>
+    public const string EtapeAdresseMac = "mac";
     /// <summary>Copie du paquet sur le poste.</summary>
     public const string EtapeCopie = "copie";
     /// <summary>Installation du paquet.</summary>
@@ -125,6 +131,92 @@ public static class ParkDeployment
         }
         catch { return ""; }
     }
+
+    // ------------------------------------------------------------------
+    // Réveiller des postes depuis la console — point 88
+    // ------------------------------------------------------------------
+
+    public const string PrefixeReveil = "reveil_";
+
+    /// <summary>
+    /// POINT 88 — ce que le journal d'un RÉVEIL dit d'un poste : un code invariant
+    /// (absent, inconnu, deja, reveille, echec, partiel) et la phrase à afficher.
+    /// Décidé le 19/10/2026 : le compte rendu dit, poste par poste, d'où vient
+    /// l'adresse MAC, ou quelles sources ont manqué.
+    /// </summary>
+    public static (string Code, string Phrase) VerdictDuReveil(LectureDuJournal lecture, string nom)
+    {
+        var lignes = lecture.Lignes
+            .Where(l => string.Equals(l.Poste, nom, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (lignes.Count == 0)
+            return ("absent", Lang.T("aucune trace", "no trace"));
+
+        LigneDeDeploiement? Derniere(string etape) => lignes.LastOrDefault(l =>
+            string.Equals(l.Etape, etape, StringComparison.OrdinalIgnoreCase));
+        static bool Est(LigneDeDeploiement? l, string etat) =>
+            l is not null && string.Equals(l.Etat, etat, StringComparison.OrdinalIgnoreCase);
+
+        if (Est(Derniere(EtapeCompte), EtatEchec))
+            return ("inconnu", Lang.T("inconnu de l'annuaire", "unknown to the directory"));
+
+        var reveil = Derniere(EtapeReveil);
+        var mac = Derniere(EtapeAdresseMac);
+
+        if (Est(reveil, EtatOk))
+        {
+            var source = Est(mac, EtatOk) ? SourceDeLAdresse(mac!.Detail) : "";
+            return ("reveille", source.Length > 0
+                ? Lang.T($"réveillé (adresse MAC : {source})", $"woken (MAC address: {source})")
+                : Lang.T("réveillé", "woken"));
+        }
+
+        if (Est(reveil, EtatEchec))
+        {
+            // Le script écrit « adresse MAC inconnue » quand aucune source n'a donné
+            // l'adresse, et « pas de réponse après N s » quand le signal est parti.
+            // Reconnu sans dépendre de la phrase française : par la ligne « mac » en
+            // « info », ou, pour un script plus ancien, par le sigle dans le détail.
+            if (Est(mac, EtatInfo) || reveil!.Detail.Contains("MAC", StringComparison.Ordinal))
+            {
+                var manques = Est(mac, EtatInfo) ? SourcesSansResultat(mac!.Detail) : "";
+                return ("echec", manques.Length > 0
+                    ? Lang.T($"pas réveillé : adresse MAC introuvable ({manques})", $"not woken: MAC address not found ({manques})")
+                    : Lang.T("pas réveillé : adresse MAC introuvable", "not woken: MAC address not found"));
+            }
+            return ("echec", Lang.T(
+                "pas réveillé : signal envoyé, pas de réponse — réveil réseau désactivé dans le BIOS, ou poste sur un autre réseau (le signal ne traverse pas les routeurs)",
+                "not woken: signal sent, no answer — wake-on-LAN disabled in the BIOS, or the computer is on another network (the signal does not cross routers)"));
+        }
+
+        if (Est(Derniere(EtapeReponse), EtatOk))
+            return ("deja", Lang.T("déjà allumé", "already on"));
+
+        return ("partiel", Lang.T("réveil non tenté", "wake not attempted"));
+    }
+
+    /// <summary>Source de l'adresse MAC écrite par le script (dhcp, fichier, arp), en clair.</summary>
+    internal static string SourceDeLAdresse(string jeton) => (jeton ?? "").Trim().ToLowerInvariant() switch
+    {
+        "dhcp" => Lang.T("serveur DHCP", "DHCP server"),
+        "fichier" => Lang.T("fichier d'adresses, peut-être périmé", "address file, possibly outdated"),
+        "arp" => Lang.T("cache ARP", "ARP cache"),
+        _ => "",
+    };
+
+    /// <summary>Sources consultées sans résultat, écrites par le script (« dhcp:sans-bail,fichier:sans-ligne,arp:rien »), en clair.</summary>
+    internal static string SourcesSansResultat(string jetons) => string.Join(Lang.T(" ; ", "; "),
+        (jetons ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(j => j.ToLowerInvariant() switch
+            {
+                "dhcp:non-renseigne" => Lang.T("serveur DHCP non renseigné", "no DHCP server set"),
+                "dhcp:sans-bail" => Lang.T("aucun bail DHCP pour ce poste", "no DHCP lease for this computer"),
+                "dhcp:injoignable" => Lang.T("serveur DHCP injoignable", "DHCP server unreachable"),
+                "fichier:absent" => Lang.T("fichier d'adresses absent", "address file missing"),
+                "fichier:sans-ligne" => Lang.T("poste absent du fichier d'adresses", "computer not in the address file"),
+                "arp:rien" => Lang.T("rien dans le cache ARP", "nothing in the ARP cache"),
+                _ => "",
+            })
+            .Where(x => x.Length > 0));
 
     // ------------------------------------------------------------------
     // Retrouver le dernier journal — point 64, lot D

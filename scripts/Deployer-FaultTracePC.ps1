@@ -422,8 +422,16 @@ function Update-LigneCsv([string]$nom, [string]$mac) {
 
     Le DHCP n'est interrogé que pour LE poste demandé, et seulement quand on a
     besoin de sa MAC — c'est-à-dire quand il ne répond pas. Aucun balayage.
+
+    POINT 88 (22/11/2026) — le journal JSON dit d'où vient l'adresse : étape « mac »,
+    état « ok » et détail « dhcp », « fichier » ou « arp » ; ou, si aucune source ne
+    l'a donnée, état « info » et la liste des sources consultées sans résultat
+    (« dhcp:sans-bail,fichier:sans-ligne,arp:rien »). Des jetons invariants : c'est
+    la console qui les met en phrases, dans sa langue. Jamais « echec » : c'est
+    l'étape du réveil qui échoue, juste après.
 #>
 function Get-MacDuPoste([string]$nom) {
+    $manques = New-Object System.Collections.Generic.List[string]
     if ($ServeurDhcp) {
         try {
             $mac = Invoke-Command -ComputerName $ServeurDhcp -ArgumentList $nom -ErrorAction Stop -ScriptBlock {
@@ -444,11 +452,16 @@ function Get-MacDuPoste([string]$nom) {
                     Bien "Adresse attendue du poste : $script:ipAttendue"
                 }
                 Update-LigneCsv $nom $mac.ClientId
+                Write-Json $nom 'mac' 'ok' 'dhcp'
                 return $mac.ClientId
             }
             Alerte "$ServeurDhcp ne connaît pas de bail pour $nom."
+            $manques.Add('dhcp:sans-bail')
         }
-        catch { Alerte "DHCP $ServeurDhcp injoignable : $($_.Exception.Message)" }
+        catch {
+            Alerte "DHCP $ServeurDhcp injoignable : $($_.Exception.Message)"
+            $manques.Add('dhcp:injoignable')
+        }
     }
     else {
         # UNE SOURCE NON CONSULTÉE DOIT LE DIRE. Sans cette ligne, l'absence du
@@ -456,24 +469,31 @@ function Get-MacDuPoste([string]$nom) {
         # la recherche n'avait pas eu lieu. Constaté le 21/09/2026 : quatre
         # postes déclarés « MAC inconnue » sans qu'aucune trace ne dise pourquoi.
         Alerte 'Aucun serveur DHCP renseigné : la source la plus fiable n''est pas consultée.'
+        $manques.Add('dhcp:non-renseigne')
     }
 
     if (Test-Path $script:cheminCsv) {
         $ligne = Import-Csv $script:cheminCsv -Delimiter ';' | Where-Object { $_.Nom -eq $nom }
         if ($ligne -and @($ligne)[0].MAC) {
             Alerte 'Adresse MAC lue dans postes.csv (elle peut être périmée).'
+            Write-Json $nom 'mac' 'ok' 'fichier'
             return @($ligne)[0].MAC
         }
+        $manques.Add('fichier:sans-ligne')
     }
+    else { $manques.Add('fichier:absent') }
 
     try {
         $ip = (Resolve-DnsName $nom -Type A -ErrorAction Stop | Select-Object -First 1).IPAddress
         $arp = arp -a | Select-String ([regex]::Escape($ip))
         if ($arp -match '([0-9a-fA-F]{2}[-:]){5}[0-9a-fA-F]{2}') {
             Alerte 'Adresse MAC lue dans le cache ARP.'
+            Write-Json $nom 'mac' 'ok' 'arp'
             return $Matches[0]
         }
     } catch { }
+    $manques.Add('arp:rien')
+    Write-Json $nom 'mac' 'info' ($manques -join ',')
     return $null
 }
 
