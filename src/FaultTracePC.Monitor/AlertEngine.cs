@@ -31,7 +31,16 @@ public sealed class AlertEngine
         var alerts = new List<PreventiveAlert>();
         if (!_settings.Enabled) return alerts;
 
-        Check(alerts, "cpu_temp", s.CpuTemp, _settings.CpuTempWarn, _settings.CpuTempCrit);
+        // POINT 120, LOT C (variante « niveau », décidée par l'auteur le 11/11/2026).
+        // Une alerte fondée sur la SEULE température du processeur n'est plus jamais
+        // « critique » : le service ne peut pas savoir si le processeur ralentit — un
+        // portable AMD mesuré à 100 °C gardait toute sa fréquence, un Intel à 95–99 °C
+        // perdait 13 %. C'est le rapport qui juge, avec la fréquence. Elle reste émise
+        // dès le seuil d'alerte (CpuTempWarn). Relever les seuils aurait été la mauvaise
+        // variante : 95 °C est la limite des uns, 100 °C celle des autres. Les cas
+        // graves restent critiques par d'autres chemins : arrêt brutal, surchauffe
+        // juste avant un plantage, bridage fort mesuré par le rapport.
+        Check(alerts, "cpu_temp", s.CpuTemp, _settings.CpuTempWarn, double.PositiveInfinity);
 
         Check(alerts, "gpu_temp", s.GpuTemp, _settings.GpuTempWarn, _settings.GpuTempCrit);
 
