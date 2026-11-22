@@ -158,6 +158,7 @@ Trouvés en testant la 1.2.3 aujourd'hui.
 | 127 | **Campagne de vol de secrets GitHub (novembre 2026) : le dépôt a-t-il été touché ?** | question de l'auteur le 12/11/2026 — exposition lue dans les workflows, vérifications transmises à l'auteur ; durcissement proposé, go attendu ; voir la section du point 127 |
 | 128 | **Protection antivirus : présence, état et mise à jour, quel que soit l'antivirus — carte « antivirus pas à jour »** | discuté le 17/11/2026, **retenu par l'auteur sur le principe** (« on tombe d'accord ») ; écriture sur go, en petit lot ; voir la section du point 128 |
 | 129 | **Ce qui démarre avec Windows : nouveautés depuis le dernier diagnostic, restes de désinstallation, points de démarrage détournés** (idées tirées de l'outil Autoruns, sans le copier ni en dépendre) | discuté le 17/11/2026, **retenu par l'auteur pour plus tard**, trois lots dans l'ordre A, B, C ; écriture sur go, en petits lots ; voir la section du point 129 |
+| 130 | **Rapport du parc : ne comparer que les pilotes réellement chargés** (des pilotes inscrits par Windows pour du matériel absent étaient dits « à mettre à jour ») | constaté au rapport du parc du 17/11/2026, confirmé le même jour sur un poste ; **écrit le 17/11/2026** (défaut constaté) — voir la section du point 130 |
 
 ## 4. Repris — et une dépendance découverte
 
@@ -3287,6 +3288,42 @@ Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette ver
 
 ---
 
+## Contrôle des composants de FaultTracePC — 22/11/2026
+
+**Question de l'auteur** : « est-ce qu'il est possible de contrôler si ce qu'on utilise pour FaultTracePC est à jour […] parce qu'il y a beaucoup de failles en ce moment ». Contrôle fait par Claude le 22/11/2026 (fichiers du projet lus sur le poste de l'auteur ; versions publiées lues sur les pages officielles) — aucun fichier du projet modifié.
+
+| Composant | Rôle | Version du projet | Constat du 22/11/2026 |
+|---|---|---|---|
+| .NET (embarqué) et 4 bibliothèques Microsoft (`System.Management`, `System.Diagnostics.EventLog`, `System.DirectoryServices`, `Microsoft.Extensions.Hosting.WindowsServices`) | livrés avec le logiciel | 10.0.15 | à jour : mise à jour de sécurité du 10/11/2026 ; suivante le 08/12/2026 (contrôle automatique du 15 de chaque mois) |
+| `LibreHardwareMonitorLib` | livré (capteurs ; passe par le pilote PawnIO) | 0.9.6 | dernière version **stable** d'après sa page NuGet (seule une préversion 0.9.7 existe) ; aucune alerte de faille affichée |
+| Outil WiX (construction du MSI) | sert à construire, pas livré tel quel | 6.0.2 (28/08/2025) | aucune version 6 plus récente ; une **7.0.1** existe (26/10/2026). Contenu sécurité des versions 7 : **non vérifié** (notes réduites à des liens). Les pages de version mentionnent une licence « Open Source Maintenance Fee » : à lire avant tout passage en 7 |
+| Paquets de test (`xunit.v3` 3.2.2, `xunit.runner.visualstudio` 3.1.5, `Microsoft.NET.Test.Sdk` 18.8.1) | tests seulement, jamais livrés | — | versions récentes non vérifiées ce jour |
+| Actions GitHub (`actions/checkout@v5`, `actions/setup-dotnet@v5`, `actions/upload-artifact@v6`) | CI | — | versions récentes non vérifiées ce jour |
+
+**Ce qui surveille déjà, sans rien faire** : à chaque `dotnet restore` (donc à chaque CI), l'audit NuGet vérifie les paquets contre la base des failles connues ; pour un projet en .NET 10, il vérifie **aussi les paquets indirects** (`NuGetAuditMode` = `all` par défaut, documentation Microsoft). Mais il n'émet que des **avertissements** (NU1901 à NU1904) : une CI reste verte même avec une faille connue — à lire dans le journal de la CI.
+
+**Proposé à l'auteur le 22/11/2026, décision attendue** : 1) faire échouer la CI sur une faille connue de gravité élevée ou critique (NU1903, NU1904) ; 2) activer, dans les réglages GitHub du dépôt, les alertes Dependabot (l'auteur clique, rien à écrire dans le dépôt) ; 3) élargir la tâche planifiée mensuelle du 15 (aujourd'hui : .NET seulement) à LibreHardwareMonitor, WiX, les paquets de test et les actions GitHub.
+
+Sources : [NuGetAudit et paquets indirects (.NET 10) — Microsoft Learn](https://learn.microsoft.com/en-us/dotnet/core/compatibility/sdk/10.0/nugetaudit-transitive-packages) ; [LibreHardwareMonitorLib — NuGet](https://www.nuget.org/packages/LibreHardwareMonitorLib/) ; [Versions de WiX — GitHub](https://github.com/wixtoolset/wix/releases).
+
+---
+
+## Point 130 — rapport du parc : ne comparer que les pilotes réellement chargés — ÉCRIT le 17/11/2026
+
+**Constaté** au rapport du parc du 17/11/2026 et **confirmé le même jour** par l'auteur sur un poste à processeur Intel (voir « Mode parc de la 1.12.0 en usage réel », constat 2) : des pilotes de puce AMD « à mettre à jour », alors qu'ils y sont « Stopped », jamais chargés. Cause, lue dans le code : le résumé d'un diagnostic gardait tous les pilotes inscrits dans Windows (`Win32_SystemDriver`), et le comparateur les comparait tous.
+
+**Ordre de travail décidé le 17/11/2026** — l'auteur : « on continue avec ton avis d'expert par rapport à ce qui a été dit ce jour et constaté » : 1) ce point 130 ; 2) le lot A du point 120, **élargi** (sans plantage à expliquer, une alerte en temps réel ne fait plus écrire de « cause » au verdict) — compris comme accepté par cette phrase, à confirmer par l'auteur au moment d'écrire ; 3) le point 88 (correction de `Update-LigneCsv`, puis le bouton « Réveiller ») ; 4) le lot C du point 120. Le tout dans une seule version **1.13.0**, publiée après la mise à jour de sécurité de .NET du 08/12/2026.
+
+**Écrit** (défaut constaté, sans demande) :
+- `Report/ScanHistory.cs` : `ScanSummary.PilotesCharges` — noms de fichier des pilotes à l'état « Running » (valeur non traduite de WMI, relevée telle quelle sur un Windows en français), **champ ajouté sans changer le format** comme aux points 99 et 126 ; `null` si aucun état n'a été lu (mieux vaut tout comparer que rien) ; méthode `PilotesCharges` ;
+- `Analysis/ParkComparator.cs` : quand un poste a transmis cette liste, seuls ses pilotes chargés entrent dans les cartes « pilote ancien partagé » et « divergence de version » ; un poste plus ancien, sans la liste, garde l'ancien comportement ;
+- `tests/…/PilotesChargesTests.cs` (nouveau, 4 tests, versions du rapport réel) : un pilote inscrit mais jamais chargé n'est plus comparé, un pilote chargé partout garde sa carte ; résumé ancien sans la liste : comportement d'avant ; le résumé ne garde que les pilotes « Running » ; sans aucun état lu, pas de liste.
+- Vérifié chez Claude : 49 cas sur 49 (les 4 nouveaux et les tests existants du comparateur de parc et du format des résumés). Environnement de test de Claude recréé ce jour (le précédent avait disparu) ; un test a dû y être lancé avec des chemins à barres obliques (`/`), Linux ne découpant pas les chemins Windows — sur Windows (CI), le test tel qu'écrit s'applique. Fichiers du poste comparés avant écriture, empreintes vérifiées après.
+
+**Effet sur le vrai parc** : seulement quand les postes auront la version qui écrit ce champ, et un diagnostic récent. **Non traité ici** : la comparaison entre modèles différents (pilotes audio Realtek d'un fabricant à l'autre) — question à part, à décider.
+
+---
+
 ## Mode parc de la 1.12.0 en usage réel — VÉRIFIÉ les 16 et 17/11/2026
 
 **Question de l'auteur** (16/11/2026) : « la dernière version en mode parc lit-elle tout comme il le faut ? ». Matière : captures de la console (16/11), trois diagnostics à distance et un rapport du parc (17/11, 08:06–08:15), lus par Claude. Noms de postes remplacés ici par leur rôle.
@@ -3302,7 +3339,7 @@ Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette ver
 
 **Constaté, à traiter (rien d'écrit dans le code)** :
 1. **Verdict « Cause la plus probable : SATURATION DE LA MÉMOIRE » sans aucune panne** sur le poste de la salle de cours : une alerte en temps réel classée critique suffit à faire écrire une « cause » — même famille que le « MATÉRIELLE » du poste de l'auteur (point 120, A + C). Proposé à l'auteur le 17/11/2026 : élargir le lot A — sans plantage à expliquer, le verdict dit « pas de panne, mais un point de vigilance : … », l'alerte restant visible. **Décision attendue.**
-2. **Cartes « divergence de version » de pilotes non pertinentes** : le résumé d'un diagnostic (`Report/ScanHistory.cs`, `DriverVersions`) garde **tous** les pilotes inscrits dans Windows (`Win32_SystemDriver`), chargés ou non ; le comparateur (`Analysis/ParkComparator.cs`) compare donc aussi des pilotes livrés avec Windows et inutilisés. Exemple du 17/11 : des pilotes de puce AMD (`amdi2c.sys`, `amdgpio2.sys`) « à mettre à jour » sur des postes à processeur Intel, d'après la version installée par le fabricant sur le seul portable AMD du parc ; et des pilotes audio Realtek comparés entre modèles différents (une version de constructeur est propre à son modèle). **Vérifié par l'auteur le 17/11/2026** sur un poste à processeur Intel : `amdi2c` et `amdgpio2` sont « Stopped », démarrage « Manual » — inscrits dans Windows, jamais chargés. **Défaut confirmé**, correction à placer avec l'auteur. Piste : garder dans le résumé, en plus, la liste des pilotes réellement chargés (champ ajouté sans changer le format, comme aux points 99 et 126) et ne comparer que ceux-là ; un poste plus ancien, sans ce champ, garde l'ancien comportement. La comparaison entre modèles différents (pilotes audio Realtek) est une question à part, à décider.
+2. **Cartes « divergence de version » de pilotes non pertinentes** : le résumé d'un diagnostic (`Report/ScanHistory.cs`, `DriverVersions`) garde **tous** les pilotes inscrits dans Windows (`Win32_SystemDriver`), chargés ou non ; le comparateur (`Analysis/ParkComparator.cs`) compare donc aussi des pilotes livrés avec Windows et inutilisés. Exemple du 17/11 : des pilotes de puce AMD (`amdi2c.sys`, `amdgpio2.sys`) « à mettre à jour » sur des postes à processeur Intel, d'après la version installée par le fabricant sur le seul portable AMD du parc ; et des pilotes audio Realtek comparés entre modèles différents (une version de constructeur est propre à son modèle). **Vérifié par l'auteur le 17/11/2026** sur un poste à processeur Intel : `amdi2c` et `amdgpio2` sont « Stopped », démarrage « Manual » — inscrits dans Windows, jamais chargés. **Défaut confirmé** — corrigé au point 130 (17/11/2026). Piste : garder dans le résumé, en plus, la liste des pilotes réellement chargés (champ ajouté sans changer le format, comme aux points 99 et 126) et ne comparer que ceux-là ; un poste plus ancien, sans ce champ, garde l'ancien comportement. La comparaison entre modèles différents (pilotes audio Realtek) est une question à part, à décider.
 3. **Alerte en temps réel « Erreur disque signalée par Windows »** : elle conseille « Sauvegarder les données importantes sans attendre » pour un support débranché (clé USB) ; le rapport, lui, conclut « rien à réparer ». Même famille : l'alerte en temps réel en dit plus qu'elle ne sait. Noté, pas de décision.
 4. Recommandation de la carte mémoire : la phrase sur WSL/Docker (au conditionnel) ne sert à rien sur un poste bureautique. Noté.
 

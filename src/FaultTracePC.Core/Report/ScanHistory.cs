@@ -77,6 +77,21 @@ public static class ScanHistory
         public List<PeriodeBreve> PeriodesEteintes { get; set; } = new();
         /// <summary>Carte(s) graphique(s) et version de leur pilote.</summary>
         public string CarteGraphique { get; set; } = "";
+
+        // POINT 130 (défaut constaté au rapport du parc du 17/11/2026, confirmé le même
+        // jour sur un poste). Champ AJOUTÉ sans changer FormatActuel, comme aux points 99
+        // et 126. DriverVersions garde TOUS les pilotes inscrits dans Windows, chargés ou
+        // non — dont ceux que Windows installe d'office pour du matériel absent : le
+        // rapport du parc conseillait de « mettre à jour » des pilotes de puce AMD sur
+        // des postes à processeur Intel, où ils sont « Stopped », jamais chargés. Le
+        // comparateur ne compare plus que les pilotes chargés quand cette liste existe.
+
+        /// <summary>
+        /// Noms de fichier des pilotes CHARGÉS au moment du diagnostic (état « Running »).
+        /// Null quand l'état n'a pu être lu, et sur le résumé d'un poste plus ancien :
+        /// le comparateur garde alors tous ses pilotes, comme avant.
+        /// </summary>
+        public List<string>? PilotesCharges { get; set; }
     }
 
     /// <summary>Point 126 — une période sans démarrage, réduite à ce que la console compare.</summary>
@@ -85,6 +100,22 @@ public static class ScanHistory
         public DateTime? Debut { get; set; }
         public DateTime Fin { get; set; }
         public Analysis.FinDeSession FinDeSession { get; set; }
+    }
+
+    /// <summary>
+    /// Point 130 — fichiers des pilotes chargés (état « Running », valeur non traduite de
+    /// WMI : relevée telle quelle sur un Windows en français le 17/11/2026). Null si
+    /// aucun pilote n'a d'état lu : mieux vaut tout comparer que ne rien comparer.
+    /// </summary>
+    internal static List<string>? PilotesCharges(IEnumerable<DriverInfo> pilotes)
+    {
+        var liste = pilotes.Where(d => !string.IsNullOrEmpty(d.Path)).ToList();
+        if (!liste.Any(d => !string.IsNullOrWhiteSpace(d.State))) return null;
+        return liste.Where(d => string.Equals(d.State.Trim(), "Running", StringComparison.OrdinalIgnoreCase))
+                    .Select(d => Path.GetFileName(d.Path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
     }
 
     /// <summary>Durée minimale d'une période gardée dans le résumé : une nuit en fait partie, un redémarrage non.</summary>
@@ -124,6 +155,7 @@ public static class ScanHistory
                 .Where(d => !string.IsNullOrEmpty(d.Path) && !string.IsNullOrEmpty(d.FileVersion))
                 .GroupBy(d => Path.GetFileName(d.Path), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => $"{g.First().FileVersion}|{g.First().FileDate:yyyy-MM-dd}", StringComparer.OrdinalIgnoreCase),
+            PilotesCharges = PilotesCharges(r.System.Drivers),
             Disks = r.System.Disks.Select(d => new DiskBrief
             {
                 Model = d.Model, Health = d.Health,

@@ -97,12 +97,20 @@ public static class ParkComparator
         // ---------------------------------------------------------------
         var byDriver = new Dictionary<string, List<(string Machine, string Version, DateTime? Date)>>(StringComparer.OrdinalIgnoreCase);
         foreach (var m in machines)
+        {
+            // POINT 130 — seulement les pilotes CHARGÉS, quand le poste a transmis la
+            // liste : un pilote inscrit mais jamais chargé (matériel absent) n'est ni
+            // « ancien partagé », ni « en retard ». Résumé plus ancien : tout, comme avant.
+            HashSet<string>? charges = m.Summary.PilotesCharges is { } l
+                ? new HashSet<string>(l, StringComparer.OrdinalIgnoreCase) : null;
             foreach (var (file, packed) in m.Summary.DriverVersions)
             {
+                if (charges is not null && !charges.Contains(file)) continue;
                 var (version, date) = Unpack(packed);
                 if (!byDriver.TryGetValue(file, out var list)) byDriver[file] = list = new();
                 list.Add((m.Name, version, date));
             }
+        }
 
         // Point 96 : divergences mises de côté pour être regroupées (voir plus bas).
         var divergencesWindows = new List<(string Fichier, List<IGrouping<string, (string Machine, string Version, DateTime? Date)>> Versions)>();
