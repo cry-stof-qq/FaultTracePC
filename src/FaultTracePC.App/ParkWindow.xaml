@@ -87,6 +87,7 @@
                         <ContextMenu>
                             <MenuItem Header="{x:Static loc:L.ParkMenuUpdateOne}" Click="MnuMettreAJourPoste_Click"/>
                             <MenuItem Header="{x:Static loc:L.ParkMenuRefreshOne}" Click="MnuActualiserPoste_Click"/>
+                            <MenuItem Header="{x:Static loc:L.ParkMenuWake}" Click="MnuReveiller_Click"/>
                             <Separator/>
                             <MenuItem Header="{x:Static loc:L.FlightOpen}" Click="BtnBoiteNoire_Click"/>
                             <MenuItem Header="{x:Static loc:L.ParkHistoAlertes}" Click="BtnHistoriqueAlertes_Click"/>
@@ -315,6 +316,11 @@
                                     Background="#2470B3" Foreground="White" BorderThickness="0"
                                     Click="BtnInvVerifier_Click"
                                     ToolTip="{x:Static loc:L.ParkInvVerifyTip}"/>
+                            <!-- Point 88, lot 3 : réveiller les postes cochés, sans rien déployer. -->
+                            <Button x:Name="BtnInvReveiller" Content="{x:Static loc:L.ParkInvWake}"
+                                    Padding="12,6" FontSize="12" Margin="6,0,0,0"
+                                    Click="BtnInvReveiller_Click"
+                                    ToolTip="{x:Static loc:L.ParkInvWakeTip}"/>
                             <CheckBox x:Name="ChkModeParc" Content="{x:Static loc:L.ParkInvParkMode}"
                                       IsChecked="True" VerticalAlignment="Center" Margin="14,0,8,0"
                                       FontSize="12" ToolTip="{x:Static loc:L.ParkInvParkModeTip}"/>

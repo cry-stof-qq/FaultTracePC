@@ -369,6 +369,8 @@ public static class L
         "Queries only the selected machines. Ctrl+click to add a machine to the selection, Shift+click for a range.");
     public static string ParkMenuRefreshOne => Lang.T("🔄 Actualiser ce poste", "🔄 Refresh this machine");
     public static string ParkMenuUpdateOne => Lang.T("⬆ Mettre à jour ce poste…", "⬆ Update this machine…");
+    // Point 88, lot 3 : agit sur TOUS les postes sélectionnés (Ctrl+clic, Maj+clic).
+    public static string ParkMenuWake => Lang.T("⏰ Réveiller le(s) poste(s) sélectionné(s)", "⏰ Wake the selected machine(s)");
     public static string ParkColMachine => Lang.T("Machine", "Machine");
     public static string ParkColHost => Lang.T("Hôte", "Host");
     public static string ParkColState => Lang.T("État", "State");
@@ -497,6 +499,10 @@ public static class L
     public static string ParkInvVerifyTip => Lang.T(
         "Contrôle, pour chaque poste coché, qu'il est prêt à recevoir le paquet : compte d'ordinateur, réponse réseau, partage administratif et gestion à distance. AUCUNE MACHINE N'EST MODIFIÉE — ni copie, ni installation, ni réveil réseau.",
         "Checks, for each ticked computer, that it is ready to receive the package: computer account, network answer, administrative share and remote management. NO MACHINE IS MODIFIED — no copy, no install, no wake-on-LAN.");
+    public static string ParkInvWake => Lang.T("⏰ Réveiller la sélection", "⏰ Wake the selection");
+    public static string ParkInvWakeTip => Lang.T(
+        "Allume par le réseau (Wake-on-LAN) les postes cochés qui sont éteints. RIEN N'EST INSTALLÉ NI MODIFIÉ : un poste déjà allumé est seulement constaté allumé. L'adresse MAC vient du serveur DHCP, du fichier d'adresses ou du cache ARP, et le compte rendu dit laquelle. Le signal ne traverse pas les routeurs.",
+        "Turns on over the network (Wake-on-LAN) the ticked computers that are off. NOTHING IS INSTALLED OR CHANGED: a computer that is already on is only noted as on. The MAC address comes from the DHCP server, the address file or the ARP cache, and the report says which. The signal does not cross routers.");
     public static string ParkInvParkMode => Lang.T("Mettre aussi en mode parc", "Also switch to fleet mode");
     public static string ParkInvParkModeTip => Lang.T(
         "Rend le poste visible depuis cette console après l'installation. Sans cela, le logiciel est installé mais le poste reste INVISIBLE ici. Le secret maître sera demandé une fois, dans la fenêtre PowerShell : il n'est jamais écrit sur le disque.",

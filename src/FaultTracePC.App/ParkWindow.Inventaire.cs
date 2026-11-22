@@ -1021,6 +1021,7 @@ public partial class ParkWindow
         BtnInvActualiser.IsEnabled = !occupe;
         BtnInvVerifier.IsEnabled = !occupe;
         BtnInvDeployer.IsEnabled = !occupe;
+        BtnInvReveiller.IsEnabled = !occupe;
         BtnInvReprendre.IsEnabled = !occupe;
         Cursor = occupe ? System.Windows.Input.Cursors.Wait : null;
         if (message is not null) Statut(message);
