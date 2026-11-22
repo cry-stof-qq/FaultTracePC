@@ -3339,6 +3339,7 @@ Tranché le 18/09/2026 : les points **43** et **46** ne rejoignent PAS cette ver
 - Tests : `AlerteTemperatureNiveauTests.cs` (nouveau, 2 tests, cas réel du poste de l'auteur) ; `DiagnosticRulesTests.Les_alertes_preventives_deviennent_des_conclusions` **mis à jour** — il prenait une alerte critique de température du processeur comme exemple d'alerte critique ; il prend désormais celle de la carte graphique, qui le reste (même but : une alerte critique devient une conclusion critique, catégorie matériel).
 - Vérifié chez Claude : 976 cas réussis, mêmes 21 échecs d'environnement ; le service (`Monitor`) ne se compile pas chez Claude (bibliothèque Windows) — un seul argument changé, la CI le compile.
 - **Non touché, proposé à l'auteur** : le texte de l'alerte dit « Au-delà de ~95 °C, le processeur se bride puis la machine peut s'éteindre brutalement pour se protéger » — contredit par la mesure sur le portable AMD (100 °C sans ralentir). Proposition de nuance à valider (texte français existant).
+- **CI verte le 22/11/2026** (commit `43a0146`, relevé par l'auteur).
 - **Point 120 terminé** côté alerte en temps réel (A + C) ; B (un service qui reconnaît lui-même le bridage) reste « un autre jour ». Notes de version 1.13.0 : la limite « l'alerte en temps réel peut encore faire pencher le verdict vers MATÉRIELLE » écrite dans les notes de la 1.12.0 ne vaudra plus.
 
 ---
