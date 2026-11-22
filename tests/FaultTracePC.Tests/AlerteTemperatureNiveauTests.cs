@@ -53,8 +53,19 @@ public class AlerteTemperatureNiveauTests
     public void Les_autres_alertes_critiques_ne_sont_pas_touchees()
     {
         var a = new PreventiveAlert { RuleId = "commit", Level = "crit", Value = 97 };
-        Assert.Same(a, RulesEngine.RelireTemperatureProcesseur(a));
+        Assert.Same(a, RulesEngine.RelireTemperature(a));
+        var p = new PreventiveAlert { RuleId = "power41", Level = "crit" };
+        Assert.Same(p, RulesEngine.RelireTemperature(p));
+    }
+
+    [Fact]
+    public void La_temperature_de_la_carte_graphique_suit_la_meme_regle()
+    {
+        // Décision de l'auteur du 22/11/2026.
         var g = new PreventiveAlert { RuleId = "gpu_temp", Level = "crit", Value = 96 };
-        Assert.Same(g, RulesEngine.RelireTemperatureProcesseur(g));
+        var relue = RulesEngine.RelireTemperature(g);
+        Assert.Equal("warn", relue.Level);
+        Assert.Equal(96, relue.Value);
+        Assert.Equal("crit", g.Level);
     }
 }

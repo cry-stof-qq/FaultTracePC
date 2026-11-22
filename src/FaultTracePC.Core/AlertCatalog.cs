@@ -53,7 +53,10 @@ public static class AlertCatalog
         {
             case "cpu_temp" when a.Value is { } v:
                 a.Title = Lang.T($"Température du processeur élevée : {v:0} °C", $"Processor temperature high: {v:0} °C");
-                a.Details = Lang.T($"Le CPU dépasse {v:0} °C de façon soutenue. Au-delà de ~95 °C, le processeur se bride puis la machine peut s'éteindre brutalement pour se protéger.", $"The CPU is sustaining more than {v:0} °C. Above ~95 °C the processor throttles, then the machine may shut down abruptly to protect itself.");
+                // Point 120, lot C (texte validé par l'auteur le 22/11/2026) : « au-delà de ~95 °C,
+                // le processeur se bride » était faux pour un portable AMD mesuré à 100 °C sans
+                // ralentir. C'est la fréquence, lue par le rapport, qui le dit.
+                a.Details = Lang.T($"Le processeur dépasse {v:0} °C de façon soutenue. Selon les modèles, il peut alors ralentir pour se protéger : le rapport de diagnostic dit, en mesurant sa fréquence, s'il a réellement ralenti.", $"The processor is sustaining more than {v:0} °C. Depending on the model, it may then slow down to protect itself: the diagnostic report says, by measuring its frequency, whether it actually slowed down.");
                 // Point 120, lot C2 : plus de conseil de pâte thermique selon l'âge seul (le rapport le donne quand un ralentissement est mesuré).
                 a.Recommendation = Lang.T("Vérifier la ventilation : dépoussiérer radiateur et ventilateurs, contrôler leur rotation. Fermer les applications qui chargent le CPU pour tester.", "Check the cooling: clear the dust from the heatsink and fans, check that they spin. Close the applications loading the CPU to test.");
                 return true;

@@ -249,14 +249,15 @@ public class DiagnosticRulesTests
             JournalFound = true,
             Alerts =
             [
-                // Point 120, lot C (22/11/2026) : la température du PROCESSEUR seule n'est
-                // plus jamais critique (voir AlerteTemperatureNiveauTests) ; une alerte
-                // critique d'une autre règle matérielle le reste.
+                // Point 120, lot C (22/11/2026) : la température seule — processeur ou
+                // carte graphique — n'est plus jamais critique (voir
+                // AlerteTemperatureNiveauTests) ; une alerte critique d'une autre règle
+                // matérielle, ici un arrêt brutal, le reste.
                 new PreventiveAlert
                 {
-                    Time = DateTime.Now.AddHours(-2), RuleId = "gpu_temp", Level = "crit",
-                    Title = "Température de la carte graphique élevée : 96 °C",
-                    Details = "…", Recommendation = "Dépoussiérer", Value = 96,
+                    Time = DateTime.Now.AddHours(-2), RuleId = "power41", Level = "crit",
+                    Title = "Arrêt brutal du poste",
+                    Details = "…", Recommendation = "Vérifier l'alimentation",
                 },
             ],
         };

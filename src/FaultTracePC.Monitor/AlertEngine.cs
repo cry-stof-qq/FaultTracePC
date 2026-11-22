@@ -42,7 +42,10 @@ public sealed class AlertEngine
         // juste avant un plantage, bridage fort mesuré par le rapport.
         Check(alerts, "cpu_temp", s.CpuTemp, _settings.CpuTempWarn, double.PositiveInfinity);
 
-        Check(alerts, "gpu_temp", s.GpuTemp, _settings.GpuTempWarn, _settings.GpuTempCrit);
+        // Même règle pour la carte graphique, sur décision de l'auteur (22/11/2026) :
+        // la seule température ne dit pas si elle ralentit ou s'arrête. Les cas graves
+        // restent critiques ailleurs (arrêt brutal, réinitialisation du pilote, écran bleu).
+        Check(alerts, "gpu_temp", s.GpuTemp, _settings.GpuTempWarn, double.PositiveInfinity);
 
         Check(alerts, "commit", s.CommitPct, _settings.CommitWarn, _settings.CommitCrit, s.TopProcesses);
 

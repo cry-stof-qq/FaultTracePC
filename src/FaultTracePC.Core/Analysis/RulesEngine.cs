@@ -812,7 +812,7 @@ public sealed class RulesEngine
         // Windows de la même période, lui, porte le vrai numéro. Voir RelireWheaAncienne.
         var wheaDuJournal = r.Events.Where(e => e.Category == EventCategory.Whea).ToList();
         var alertes = f.Alerts.Select(a => RelireWheaAncienne(a, wheaDuJournal))
-                              .Select(RelireTemperatureProcesseur).ToList();
+                              .Select(RelireTemperature).ToList();
 
         foreach (var g in alertes.GroupBy(a => a.RuleId))
         {
@@ -880,15 +880,16 @@ public sealed class RulesEngine
     /// </summary>
     /// <summary>
     /// POINT 120, LOT C — côté lecteur. Le service n'écrit plus d'alerte « critique »
-    /// sur la seule température du processeur ; celles écrites AVANT (jusqu'à la 1.12.0)
+    /// sur la seule température du processeur, ni de la carte graphique (22/11/2026) ; celles écrites AVANT (jusqu'à la 1.12.0)
     /// le restaient dans les rapports pendant toute leur durée de conservation. Elles
     /// sont relues au niveau « à surveiller », pour que la règle soit la même pour tout
     /// l'historique. Une COPIE est rendue : la boîte noire garde ce qui a été écrit, et
     /// son tableau des alertes le montre tel quel.
     /// </summary>
-    internal static PreventiveAlert RelireTemperatureProcesseur(PreventiveAlert a)
+    internal static PreventiveAlert RelireTemperature(PreventiveAlert a)
     {
-        if (a.RuleId != "cpu_temp" || a.Level != "crit") return a;
+        // Carte graphique ajoutée sur décision de l'auteur le 22/11/2026.
+        if (a.RuleId is not ("cpu_temp" or "gpu_temp") || a.Level != "crit") return a;
         return new PreventiveAlert
         {
             Time = a.Time,
