@@ -72,6 +72,7 @@ public sealed class RulesEngine
         // occurrence. Fait ICI, après toutes les règles : l'ordre dans lequel elles
         // s'exécutent ne doit pas décider de ce qui survit.
         FusionnerLesDoublons(r.Findings);
+        NePasDoublerLAlerteDeTemperature(r);
 
         // Tri : critiques d'abord, puis avertissements, puis infos.
         r.Findings = r.Findings
@@ -96,6 +97,37 @@ public sealed class RulesEngine
     /// plus sûre (Critical = 0, High = 0). Écrire « &gt; » ici dégraderait
     /// silencieusement une conclusion critique en avertissement.
     /// </summary>
+    /// <summary>Code de la carte « Processeur bridé par la chaleur » (point 120, C2).</summary>
+    internal const string CodeProcesseurBride = "cpu.bride";
+    /// <summary>Code de la carte « Processeur à sa limite de température sous charge, sans ralentir » (point 120, C2).</summary>
+    internal const string CodeProcesseurSansRalentir = "cpu.sans_ralentir";
+
+    /// <summary>
+    /// POINT 120, LOT A (décidé par l'auteur le 11/11/2026, placé le 17/11/2026).
+    /// Quand la fréquence du processeur a permis de conclure — bridé, ou chaud sans
+    /// ralentir —, la carte de l'alerte en temps réel « Température du processeur
+    /// élevée », fondée sur la seule température, n'est plus montrée EN PLUS : elle
+    /// disait « critique » là où la mesure dit « ralenti » ou « pas de ralentissement ».
+    /// C'est ce que l'on faisait déjà quand un plantage explique l'alerte. Les alertes
+    /// restent toutes listées dans la boîte noire, et la carte de fréquence le dit.
+    /// Constaté sur le poste de l'auteur (12/11/2026) : carte « Alerte préventive
+    /// répétée (17×) : Température du processeur élevée : 100 °C » à côté de « … sans
+    /// ralentir », et un verdict « MATÉRIELLE » sans aucune panne.
+    /// </summary>
+    internal static void NePasDoublerLAlerteDeTemperature(DiagnosticReport r)
+    {
+        var frequence = r.Findings.FirstOrDefault(f => f.Code is CodeProcesseurBride or CodeProcesseurSansRalentir);
+        if (frequence is null) return;
+        var alerte = r.Findings.FirstOrDefault(f => f.Code == "cpu_temp" && f.AlerteTempsReel);
+        if (alerte is null) return;
+
+        var nombre = r.Flight.Alerts.Count(a => a.RuleId == "cpu_temp");
+        r.Findings.Remove(alerte);
+        frequence.Details = frequence.Details.TrimEnd() + Lang.T(
+            $" Les alertes en temps réel « Température du processeur élevée » ({nombre}) restent listées dans la boîte noire : elles reposent sur la seule température, cette conclusion sur la fréquence mesurée.",
+            $" The real-time “Processor temperature high” alerts ({nombre}) remain listed in the black box: they rest on temperature alone, this conclusion on the measured frequency.");
+    }
+
     internal static void FusionnerLesDoublons(List<Finding> findings)
     {
         var groupes = findings.Where(f => f.Code.Length > 0)
@@ -108,6 +140,9 @@ public sealed class RulesEngine
             var gardee = groupe.OrderBy(f => string.IsNullOrEmpty(f.Recommendation) ? 1 : 0)
                                .ThenByDescending(f => f.Details.Length)
                                .First();
+            // Point 120, lot A élargi : un fait confirmé par un AUTRE chemin n'est plus
+            // une simple alerte de seuil.
+            gardee.AlerteTempsReel = groupe.All(f => f.AlerteTempsReel);
 
             foreach (var autre in groupe.Where(f => !ReferenceEquals(f, gardee)))
             {
@@ -810,6 +845,7 @@ public sealed class RulesEngine
                     : Lang.T($"⚠ Alerte préventive : {latest.Title}", $"⚠ Preventive alert: {latest.Title}"),
                 Details = latest.Details + Lang.T($" Détecté en temps réel par la surveillance, dernière fois le {latest.Time:dd/MM/yyyy à HH:mm}.", $" Detected live by the monitoring service, most recently on {latest.Time:yyyy-MM-dd HH:mm}."),
                 Recommendation = latest.Recommendation,
+                AlerteTempsReel = true,
             });
         }
     }
@@ -1131,6 +1167,7 @@ public sealed class RulesEngine
                 Severity = critique ? Severity.Critical : Severity.Warning,
                 Confidence = b.ReferenceSousCharge ? Confidence.High : Confidence.Low,
                 Category = FaultCategory.Hardware,
+                Code = CodeProcesseurBride,
                 Title = Lang.T($"Processeur bridé par la chaleur : jusqu'à {ralenti} % plus lent sous forte charge",
                                $"Processor throttled by heat: up to {ralenti}% slower under heavy load"),
                 Details = Lang.T(
@@ -1164,6 +1201,7 @@ public sealed class RulesEngine
             Severity = Severity.Info,
             Confidence = b.ReferenceSousCharge ? Confidence.High : Confidence.Medium,
             Category = FaultCategory.Hardware,
+            Code = CodeProcesseurSansRalentir,
             Title = Lang.T($"Processeur à sa limite de température sous charge, sans ralentir — {ThermalHistory.Humanize(warn)} au-dessus de {t.WarnThreshold:0} °C",
                            $"Processor at its temperature limit under load, without slowing down — {ThermalHistory.Humanize(warn)} above {t.WarnThreshold:0} °C"),
             Details = Lang.T(
@@ -3026,7 +3064,7 @@ public sealed class RulesEngine
             // arrêts inattendus qu'aucun écran bleu n'explique — avant de prononcer quoi
             // que ce soit de rassurant.
             // Point 105 : seuls les écrans bleus DE LA PÉRIODE comptent — la phrase dit « sur la période ».
-            var arretsAnormaux = r.Bsods.Count(b => b.TimeLocal >= DebutDePeriode(r)) + ArretsInexpliques(r).Count;
+            var arretsAnormaux = ArretsAnormaux(r);
 
             if (warnings.Count == 0)
             {
@@ -3053,6 +3091,23 @@ public sealed class RulesEngine
                 return;
             }
             r.Verdict = Lang.T($"Pas de panne critique, mais des points de vigilance — le plus notable : {w.Title}.", $"No critical failure, but some points to watch — the most notable: {w.Title}.");
+            return;
+        }
+
+        // POINT 120, LOT A ÉLARGI (ordre de travail décidé par l'auteur le 17/11/2026).
+        // Toutes les conclusions critiques ne sont que des alertes de seuil émises en
+        // temps réel, et rien ne s'est arrêté anormalement : il n'y a pas de panne à
+        // expliquer, donc pas de « cause » à nommer. Constaté le 17/11/2026 : « Cause la
+        // plus probable : SATURATION DE LA MÉMOIRE » sur un poste sans aucun plantage,
+        // dont la mémoire montait à 97 % avec de nombreux onglets ouverts. Les cartes,
+        // elles, restent critiques et en tête du rapport.
+        if (critical.All(f => f.AlerteTempsReel) && ArretsAnormaux(r) == 0)
+        {
+            var premiere = critical[0];
+            r.VerdictCategory = critical.GroupBy(f => f.Category).OrderByDescending(g => g.Count()).First().Key;
+            r.Verdict = Lang.T(
+                $"Pas de panne sur la période : aucun plantage, aucun arrêt anormal. Mais la surveillance en temps réel a relevé un point à surveiller — {premiere.Title}. ({critical.Count} alerte(s) critique(s))",
+                $"No failure over the period: no crash, no abnormal shutdown. But real-time monitoring raised a point to watch — {premiere.Title}. ({critical.Count} critical alert(s))");
             return;
         }
 
@@ -3112,6 +3167,10 @@ public sealed class RulesEngine
             _ => Lang.T("Pannes détectées — voir le détail des conclusions ci-dessous.", "Failures detected — see the detail of the conclusions below."),
         } + nuance + $" ({critical.Count} conclusion(s) critique(s))";
     }
+
+    /// <summary>Écrans bleus DE LA PÉRIODE et arrêts inattendus qu'aucun écran bleu n'explique (points 52 et 105).</summary>
+    private static int ArretsAnormaux(DiagnosticReport r) =>
+        r.Bsods.Count(b => b.TimeLocal >= DebutDePeriode(r)) + ArretsInexpliques(r).Count;
 
     /// <summary>Préfixe du <see cref="Finding.Code"/> des conclusions tirées des seuls codes d'arrêt.</summary>
     internal const string PrefixeCodeArret = "bsod.0x";

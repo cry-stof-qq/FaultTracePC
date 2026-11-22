@@ -50,7 +50,12 @@ public class RessourcesTests
         var carte = Assert.Single(r.Findings, f => f.Code == "commit");
         Assert.Equal(FaultCategory.Resources, carte.Category);
         Assert.Equal(FaultCategory.Resources, r.VerdictCategory);
-        Assert.Contains("SATURATION DE LA MÉMOIRE", r.Verdict);
+        // Point 120, lot A élargi (22/11/2026) : ce poste n'a eu ni plantage ni arrêt
+        // anormal — le verdict ne nomme plus de « cause », il signale l'alerte. Avant,
+        // il disait « Cause la plus probable : SATURATION DE LA MÉMOIRE ».
+        Assert.StartsWith("Pas de panne sur la période", r.Verdict);
+        Assert.Contains("Mémoire virtuelle presque saturée", r.Verdict);
+        Assert.DoesNotContain("Cause la plus probable", r.Verdict);
         Assert.DoesNotContain("LOGICIELLE", r.Verdict);
         Assert.DoesNotContain("corruption", r.Verdict);
     }
@@ -88,7 +93,11 @@ public class RessourcesTests
         }
         finally { Lang.Apply(initial); }
 
-        Assert.Contains("MEMORY EXHAUSTION", r.Verdict);
+        // Point 120, lot A élargi (22/11/2026) : sans panne, le verdict signale
+        // l'alerte au lieu de nommer une cause — en anglais aussi, sans mot français.
+        Assert.StartsWith("No failure over the period", r.Verdict);
+        Assert.Contains("Virtual memory", r.Verdict);
         Assert.DoesNotContain("SATURATION", r.Verdict);
+        Assert.DoesNotContain("Pas de panne", r.Verdict);
     }
 }

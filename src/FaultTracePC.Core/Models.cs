@@ -820,6 +820,17 @@ public sealed class Finding
     /// vieux de dix mois, sur une machine saine par ailleurs.
     /// </summary>
     public DateTime? DerniereTrace { get; set; }
+
+    /// <summary>
+    /// POINT 120, lot A élargi (ordre de travail décidé par l'auteur le 17/11/2026) —
+    /// la conclusion vient UNIQUEMENT d'une alerte émise en temps réel par le service
+    /// (seuil franchi), sans qu'aucun autre chemin — journal de Windows, écran bleu,
+    /// arrêt — ne rapporte le même fait. Constaté le 12 puis le 17/11/2026 : une telle
+    /// alerte, classée critique, suffisait à faire écrire au verdict « Cause la plus
+    /// probable : … » sur un poste qui n'avait eu aucune panne (température d'un
+    /// processeur qui ne ralentissait pas ; mémoire presque saturée par des onglets).
+    /// </summary>
+    public bool AlerteTempsReel { get; set; }
 }
 
 public sealed class DiagnosticReport
